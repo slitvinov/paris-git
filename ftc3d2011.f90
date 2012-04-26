@@ -11,6 +11,7 @@
 ! Version 2.0   2/25/2011   Parallel implementation.
 !=================================================================================================
 !=================================================================================================
+!=================================================================================================
 ! module_grid: Contains definition of variables for the grid.
 !-------------------------------------------------------------------------------------------------
 module module_grid
@@ -31,6 +32,19 @@ module module_grid
   logical :: hypre
 end module module_grid
 !=================================================================================================
+!=================================================================================================
+! module_hello: Contains definition of variables to say hello
+!-------------------------------------------------------------------------------------------------
+module module_hello
+  implicit none
+  integer :: hello_count = 1
+  contains
+subroutine hello_coucou
+  use module_grid
+  if(rank==0) write(6,*) 'coucou ',hello_count
+  hello_count = hello_count + 1
+end subroutine hello_coucou
+end module module_hello
 !=================================================================================================
 ! module_flow: Contains definition of variables for the flow solver.
 !-------------------------------------------------------------------------------------------------
@@ -401,6 +415,7 @@ module module_poisson
   use module_grid
   use module_BC
   use module_tmpvar
+  use module_hello
   implicit none
   integer :: nstencil
   integer*8 :: grid_obj, stencil, Amat, Bvec, Xvec, solver, precond
@@ -412,7 +427,6 @@ module module_poisson
     include 'mpif.h'
     integer :: ierr, periodic_array(3), i
     integer, dimension(:,:), allocatable :: offsets
-
     nstencil = 2 * ndim + 1 !7
     allocate(ilower(ndim), iupper(ndim), stencil_indices(nstencil) )
     ilower = (/is, js, ks/);  iupper = (/ie, je, ke/)
@@ -430,6 +444,7 @@ module module_poisson
     offsets(:,6) = (/ 0, 0,-1/)
     offsets(:,7) = (/ 0, 0, 1/)
 
+    
     call HYPRE_StructGridCreate(mpi_comm_world, ndim, grid_obj, ierr)  ! create a 3d grid object
     call HYPRE_StructGridSetExtents(grid_obj, ilower, iupper, ierr)    ! add a box to the grid
     call HYPRE_StructGridSetPeriodic(grid_obj, periodic_array, ierr)   ! set periodic
@@ -599,7 +614,7 @@ Program ftc3d2011
   call initialize
   call InitCondition
   if(rank==0) write(out,*)'initialized'
-
+  if(rank==0) write(6,*)'initialized'
   if(HYPRE) call poi_initialize
   if(HYPRE .and. rank==0) write(out,*)'hypre initialized'
 
@@ -1052,15 +1067,16 @@ subroutine initialize
   use module_BC
   use module_IO
   use module_tmpvar
+  use module_hello
   implicit none
   include 'mpif.h'
   integer :: ierr, i,j,k
 
   allocate(dims(ndim),periodic(ndim),reorder(ndim),coords(ndim),STAT=ierr)
   dims(1) = nPx; dims(2) = nPy; dims(3) = nPz
-  periodic = (bdry_cond=='periodic')
-  reorder = .true.
 
+  periodic = 0; do i=1,3; if (bdry_cond(i) =='periodic') periodic(i) = 1; enddo
+  reorder = 1
   call MPI_Cart_Create(MPI_Comm_World,ndim,dims,periodic,reorder,MPI_Comm_Cart,ierr)
   if (ierr /= 0) STOP '*** Grid: unsuccessful Cartesian MPI-initialization'
 

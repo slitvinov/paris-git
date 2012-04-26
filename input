@@ -33,9 +33,9 @@ BETA    = 1.2
 NOUT    = 60       ! flush the solution every nout time steps
 output_format = 1  ! 1:tecplot 2:vtk
 
-out_path = out     ! name of the output directory
+out_path = 'out'     ! name of the output directory
 
-ICOut   = F        ! output initila condition
+ICOut   = F        ! output initial condition
 !=================================================================================================
 !Grid parameters
 npx     = 4
@@ -73,7 +73,7 @@ GY      = 0.0
 GZ      = 0.0
                    ! Components of the gravity in x,y,z direction
 
-BDRY_COND = periodic    wall    periodic
+BDRY_COND = 'periodic'    'wall'    'periodic'
                    ! Type of boundary condition in x,y,z direction: 'wall', 'periodic'
 
 dPdX      = -0.0018
@@ -92,30 +92,13 @@ RHO2    = 0.1
 MU2     = 0.00003333
                    ! rho2, mu2 : properties of the drop
 
-NumBubble = 21
+NumBubble =  1
                    !number of bubbles
 
-xyzrad(1, 1)  = 0.413  0.387  0.838  0.15
-xyzrad(1, 2)  = 0.634  1.095  0.587  0.15
-xyzrad(1, 3)  = 0.426  0.956  0.909  0.15
-xyzrad(1, 4)  = 0.808  1.443  0.425  0.15
-xyzrad(1, 5)  = 0.758  1.418  0.867  0.15
-xyzrad(1, 6)  = 1.186  0.639  0.478  0.15
-xyzrad(1, 7)  = 1.243  0.655  0.942  0.15
-xyzrad(1, 8)  = 1.498  1.108  0.594  0.15
-xyzrad(1, 9)  = 1.168  1.078  1.084  0.15
-xyzrad(1,10)  = 1.192  1.619  0.580  0.15
-xyzrad(1,11)  = 1.976  0.669  0.495  0.15
-xyzrad(1,12)  = 1.633  0.529  1.077  0.15
-xyzrad(1,13)  = 1.755  1.022  0.388  0.15
-xyzrad(1,14)  = 1.950  0.880  1.021  0.15
-xyzrad(1,15)  = 2.077  1.482  0.500  0.15
-xyzrad(1,16)  = 1.906  1.499  1.017  0.15
-xyzrad(1,17)  = 2.343  0.662  0.647  0.15
-xyzrad(1,18)  = 2.627  0.695  1.070  0.15
-xyzrad(1,19)  = 2.638  1.135  0.610  0.15
-xyzrad(1,20)  = 2.323  1.341  0.731  0.15
-xyzrad(1,21)  = 2.620  1.584  0.911  0.15
+xyzrad(1, 1)  = 0.413 
+xyzrad(2, 1)  = 0.387 
+xyzrad(3, 1)  = 0.838 
+xyzrad(4, 1)  = 0.15  
                    ! Initial bubble size and location
 
 BUOYANCYCASE = 3
