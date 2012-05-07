@@ -1,0 +1,4 @@
+test1	one processor, 128x128x128 grid x30 time steps, hypre
+test2	four processors, 128x128x128 grid x30 time steps, hypre
+test3	four processors, 128x128x128 grid x30 time steps, SOR	
+test4	eight processors, 128x128x128 grid x30 time steps, hypre

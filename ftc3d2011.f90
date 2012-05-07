@@ -31,9 +31,10 @@ module module_grid
   integer :: imin, imax, jmin, jmax, kmin, kmax
   logical :: hypre
 end module module_grid
+
 !=================================================================================================
-!=================================================================================================
-! module_hello: Contains definition of variables to say hello
+! module_hello: Contains definition of variables and subroutines to say hello
+! This is useful for debugging. 
 !-------------------------------------------------------------------------------------------------
 module module_hello
   implicit none
@@ -84,7 +85,6 @@ module module_IO
   character(len=20) :: out_path, x_file, y_file, z_file
   logical :: read_x, read_y, read_z, restart, ICOut
   contains
-!=================================================================================================
 !=================================================================================================
 ! function int2text
 !   Returns 'number' as a string with length of 'length'
@@ -177,7 +177,7 @@ subroutine output2(nf,i1,i2,j1,j2,k1,k2)
   use module_grid
   !use IO_mod
   implicit none
-  integer ::nf,i1,i2,j1,j2,k1,k2,i,j,k, itype=1
+  integer ::nf,i1,i2,j1,j2,k1,k2,i,j,k, itype=5
 !  logical, save :: first_time=.true.
   
     OPEN(UNIT=8,FILE=trim(out_path)//'/plot'//int2text(nf,3)//'_'//int2text(rank,3)//'.vtk')
@@ -224,6 +224,44 @@ end subroutine output2
 !-------------------------------------------------------------------------------------------------
 end module module_IO
 !=================================================================================================
+!=================================================================================================
+!=================================================================================================
+! module output_location: Contains definitions to output variables
+!-------------------------------------------------------------------------------------------------
+module output_location
+  implicit none
+  real(8), dimension(:), allocatable :: xloc,yloc,zloc
+  integer :: nbr_locations
+  character varname
+  integer il,ih,jl,jh,kl,kh
+  contains
+!     function variable_from_name(varname)
+!       use module_flow
+!       use module_grid
+!       character(len=20)  varname   ! @SZ check character length len
+!       real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(out) :: variable_from_name
+!       variable_from_name=u
+!     end function variable_from_name
+!
+    subroutine output_at_location(varname)
+      use module_grid
+      use module_IO
+      use module_flow
+      character(len=20)  varname   ! @SZ check character length len
+      real(8), dimension(imin:imax,jmin:jmax,kmin:kmax) :: var
+      integer j
+      if(numProcess.ne.1) stop 'works only in scalar for now'
+      var = u
+      OPEN(UNIT=11,FILE=trim(out_path)//'/output_location',status='unknown',action='write')
+      jl=jmin
+      jh=jmax
+      do j=jl,jh
+         write(11,1100) y(j),u(imax/2 - imin/2,j,kmax/2 - kmin/2)
+      enddo
+      close(11)
+1100  FORMAT(es25.16e3,es25.16e3)
+    end subroutine output_at_location
+end module output_location
 !=================================================================================================
 ! module module_BC: Sets the boundary conditions of the problem.
 !-------------------------------------------------------------------------------------------------
@@ -591,6 +629,7 @@ Program ftc3d2011
   use module_tmpvar
   use module_poisson
   use module_IO
+  use output_location
   implicit none
   include 'mpif.h'
   integer :: ierr, i,j,k
@@ -733,6 +772,7 @@ Program ftc3d2011
       close(121)
     endif
   enddo
+  call output_at_location("u")
   if(HYPRE) call poi_finalize
   call MPI_FINALIZE(ierr)
   stop
