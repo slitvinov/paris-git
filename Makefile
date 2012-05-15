@@ -3,9 +3,9 @@
 #------------------------------------------------
 
 FOPTS   = -O3 
-FCOMP   = openmpif90
+FCOMP   = mpif90
 
-HYPRE_DIR = /opt/hypre
+HYPRE_DIR = /home/zaleski/hypre-2.8.0b/src
 HYPRE_LIBS =  -L$(HYPRE_DIR)/lib -lHYPRE 
 
 
@@ -28,7 +28,7 @@ ftc3d2011.o:  ftc3d2011.f90
 # @SZ	ctags ftc3d2011.f90 
 
 clean:
-	rm -fR *.o *.mod run.exe *.gz stats *~ track out *.dat
+	rm -fR *.o *.mod run.exe *.gz stats *~ track out
 	cd Speed_Measurement; make clean; cd ..
 	cd Poiseuille_Test; make clean; cd ..
 

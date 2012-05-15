@@ -9,9 +9,9 @@
                    ! name of the namelist
 hypre    = T       ! use of hypre, if false, SOR solver is used
 restart  = F       ! T: start from backup of a previous simulation
-nBackup  = 45      ! number of time steps between backup writing. Only last two backups are kept.
+nBackup  = 450      ! number of time steps between backup writing. Only last two backups are kept.
 
-NSTEP   = 30       ! maximum number of time steps
+NSTEP   = 11      ! maximum number of time steps
 EndTime = 1000.0     ! When to stop simulation
 
 MaxDt   = 1e-2     ! maximum size of time step
@@ -38,14 +38,14 @@ out_path = 'out1'     ! name of the output directory
 ICOut   = F        ! output initial condition
 !=================================================================================================
 !Grid parameters
-npx     = 2
-npy     = 2
+npx     = 4
+npy     = 4
 npz     = 2
                    ! number of processors in x,y,z direction
 
-Nx      = 64
-Ny      = 64
-Nz      = 64
+Nx      = 256
+Ny      = 256
+Nz      = 256
 Ng      = 2
                    ! grid size in x,y,z direction and number of ghost cells
 
