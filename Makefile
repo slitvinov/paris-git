@@ -28,7 +28,7 @@ ftc3d2011.o:  ftc3d2011.f90
 # @SZ	ctags ftc3d2011.f90 
 
 clean:
-	rm -fR *.o *.mod run.exe *.gz stats *~ track out
+	rm -fR *.o *.mod run.exe *.gz stats *~ track out *.dat
 	cd Speed_Measurement; make clean; cd ..
 	cd Poiseuille_Test; make clean; cd ..
 
