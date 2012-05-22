@@ -8,16 +8,19 @@
 # fi
 
 gnuplot <<EOF
+set size square
 set grid
-# set xrange[-0.1:1.1]
+set log xy
+set xrange[1:128]
 # set yrange[-0.05:0.15]
 set xtics 4
 set xlabel "number of cores/processes"
 set ylabel "cell updates per second"
-plot "speed.txt" using 1:2 w lp title "AMD 6136 16-core 'celsius'" , "speed.txt" u 1:3 w lp title "AMD 8378 32-core 'cooley'"
+set key top left
+plot "speed.txt" using 1:2 w lp t col , "speed.txt" u 1:3 w lp t col , "speed.txt" u 1:4 w lp t col, x*1e6 t "linear" 
 set term pdf
 set out 'tmp.pdf'
-plot "speed.txt" using 1:2 w lp title "AMD 6136" , "speed.txt" u 1:3 w lp title "AMD 8378"
+plot "speed.txt" using 1:2 w lp t col , "speed.txt" u 1:3 w lp t col , "speed.txt" u 1:4 w lp t col, x*1e6 t "linear" 
 exit
 EOF
 
