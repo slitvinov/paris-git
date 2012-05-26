@@ -11,42 +11,6 @@
 ! Version 2.0   2/25/2011   Parallel implementation.
 !=================================================================================================
 !=================================================================================================
-!=================================================================================================
-! module_grid: Contains definition of variables for the grid.
-!-------------------------------------------------------------------------------------------------
-module module_grid
-  implicit none
-  integer :: Nx, Ny, Nz, Ng ! Ng isnumber of ghost cells
-  integer :: Nxt, Nyt, Nzt ! total number of cells
-  integer :: is, ie, js, je, ks, ke
-  integer :: ieu, jev, kew
-  real(8), dimension(:), allocatable :: x, xh, dx, dxh
-  real(8), dimension(:), allocatable :: y, yh, dy, dyh
-  real(8), dimension(:), allocatable :: z, zh, dz, dzh
-  real(8) :: xLength, yLength, zLength, xform, yform, zform
-
-  integer :: nPx, nPy, nPz, Mx, My, Mz, rank, ndim=3, numProcess
-  integer, dimension(:), allocatable :: dims, coords, periodic, reorder
-  integer :: MPI_Comm_Cart
-  integer :: imin, imax, jmin, jmax, kmin, kmax
-  logical :: hypre
-end module module_grid
-
-!=================================================================================================
-! module_hello: Contains definition of variables and subroutines to say hello
-! This is useful for debugging. 
-!-------------------------------------------------------------------------------------------------
-module module_hello
-  implicit none
-  integer :: hello_count = 1
-  contains
-subroutine hello_coucou
-  use module_grid
-  if(rank==0) write(6,*) 'coucou ',hello_count
-  hello_count = hello_count + 1
-end subroutine hello_coucou
-end module module_hello
-!=================================================================================================
 ! module_flow: Contains definition of variables for the flow solver.
 !-------------------------------------------------------------------------------------------------
 module module_flow
@@ -630,6 +594,7 @@ Program ftc3d2011
   use module_poisson
   use module_IO
   use output_location
+  use module_solids
   implicit none
   include 'mpif.h'
   integer :: ierr, i,j,k
@@ -674,6 +639,9 @@ Program ftc3d2011
       rhoo = rho
       muold  = mu
     endif
+!    u = u*(1.d0 -solids) 
+!    v = v*(1.d0 -solids) 
+!    w = w*(1.d0 -solids) 
 !------------------------------------ADVECTION & DIFFUSION----------------------------------------
     do ii=1, itime_scheme
       call momentumDiffusion(u,v,w,rho,mu,du,dv,dw)
@@ -1108,9 +1076,12 @@ subroutine initialize
   use module_IO
   use module_tmpvar
   use module_hello
+  use module_solids
   implicit none
   include 'mpif.h'
   integer :: ierr, i,j,k
+
+  call initsolids()
 
   allocate(dims(ndim),periodic(ndim),reorder(ndim),coords(ndim),STAT=ierr)
   dims(1) = nPx; dims(2) = nPy; dims(3) = nPz

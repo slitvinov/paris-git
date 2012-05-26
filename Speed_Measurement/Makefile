@@ -11,6 +11,12 @@ test2:
 	mpirun -np 8 ftc3d2011
 
 
+test-np4:
+	make clean
+	ln -s input-np4 input
+	mpirun -np 4 ftc3d2011
+
+
 test3:
 	make clean
 	ln -s input3 input
