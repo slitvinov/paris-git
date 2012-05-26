@@ -1,4 +1,9 @@
-#------------------------------------------------
+##------------------------------------------------
+test64:
+	make clean
+	ln -s input64 input
+	$(OPENMPIV)/bin/mpirun -np 64 $(HOME)/bin/ftc3d2011 > outftc 2>errftc
+
 
 test1:
 	make clean
@@ -22,10 +27,11 @@ test3:
 	ln -s input3 input
 	mpirun -np 32 ftc3d2011
 
-test4:
+#test4:
+test32:
 	make clean
 	ln -s input4 input
-	mpirun -np 32 ftc3d2011
+	$(OPENMPIV)/bin/mpirun -np 32 $(HOME)/bin/ftc3d2011 > outftc 2>errftc
 
 test5:
 	make clean
