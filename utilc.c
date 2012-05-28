@@ -3,10 +3,10 @@
 #include <math.h>
 #include "ftcinc.h"
 
-extern void outfarray_(int *carray);
 extern void __module_solids_MOD_outfarray(int *carray);
+
 /* check fortran indexes. 
-   call comparef2c() in calling fortran program to check */
+   call comparef2c() in calling fortran90 program to check */
 
 void comparef2c_()
 {
@@ -33,7 +33,6 @@ double sphere_func(double x, double y, double z, double x0, double y0, double z0
 
 double solid_func_one_sphere(double x, double y, double z,double boxL)
 {
-
   double x0=0.,y0=0.,z0=0.;
   double radius = 0.25*boxL;
   return sphere_func(x,y,z,x0,y0,z0,radius);
@@ -53,12 +52,13 @@ double solid_func_CFC_scaled(double x, double y, double z)
 
 /* One basic cube with CFC array and all vertices and faces */
 
-double solid_func_CFC(double x, double y, double z, double boxL)
+double solid_func_CFC_(double x, double y, double z, double boxL)
 {
-  /* rescale by boxL */
+  /* rescale by boxL: no need */
   x /= boxL;   y /= boxL;   z /= boxL;
-  /* shift to lower left corner */
-  x += 0.5; y += 0.5; z += 0.5;
+  //  printf("HAHAHAHA %g %g %g  %g \n",x,y,z,boxL);
+  /* shift to lower left corner: no need ? (add shift variable later ? ) 
+  x += 0.5; y += 0.5; z += 0.5; */
   /* cells at root vertex and three first neighbors */
   double a = MAX(solid_func_CFC_scaled(x,y,z),solid_func_CFC_scaled(x-1.,y,z));
   double b = MAX(solid_func_CFC_scaled(x,y-1.,z),solid_func_CFC_scaled(x,y,z-1.));
@@ -69,23 +69,4 @@ double solid_func_CFC(double x, double y, double z, double boxL)
   a = MAX(c,a);
   return MAX(b,a);
 }
-
-/* initialize one solid */
-
-void inisolids_(double *solids,int *nx, int *ny, int *nz,double boxL)
-{
-#define SOLIDS(i,j,k) (*(solids + (i) - 1 + ((j)-1) * *nx + ((k)-1) * *nx * *ny))
-
-  /* dx uses boxL but h elsewhere in the code is 1/(nx-2) */
-
-  double dx = boxL/((double) *nx-2.0);  
-
-  int i,j,k;
-  for(i=1;i<=*nx;i++) 
-    for(j=1;j<=*ny;j++) 
-      for(k=1;k<=*nz;k++) 
-	if(solid_func_CFC (COORD(i,*nx,dx),COORD(j,*ny,dx),COORD(k,*nz,dx),boxL)>0.)
-	    SOLIDS(i,j,k)=1.;
-}
-
   

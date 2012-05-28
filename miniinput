@@ -20,8 +20,7 @@ dt      = 1e-2     ! dt in case of dtFlag=1
 CFL     = 0.9
 MAXERROR= 1d-4     ! Residual for Poisson solver
 
-ITIME_SCHEME = 2
-                   ! time scheme: 1:first order Euler, 2: second order TVD Runge-Kutta
+ITIME_SCHEME = 2   ! time scheme: 1:first order Euler, 2: second order TVD Runge-Kutta
 
 MAXIT   = 20
 BETA    = 1.2
@@ -30,8 +29,8 @@ BETA    = 1.2
 !=================================================================================================
 ! Output parameters
 
-NOUT    = 60       ! flush the solution every nout time steps
-output_format = 1  ! 1:tecplot 2:vtk
+NOUT    = 10       ! flush the solution every nout time steps
+output_format = 2  ! 1:tecplot 2:vtk
 
 out_path = 'out'     ! name of the output directory
 
@@ -43,9 +42,9 @@ npy     = 3
 npz     = 2
                    ! number of processors in x,y,z direction
 
-Nx      = 256
-Ny      = 192
-Nz      = 128
+Nx      = 64
+Ny      = 48
+Nz      = 32
 Ng      = 2
                    ! grid size in x,y,z direction and number of ghost cells
 
