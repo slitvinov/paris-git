@@ -7,7 +7,7 @@ FC   = mpif90
 CFLAGS = -O -I/opt/local/include/openmpi/
 
 # default hypre installation without root privileges:
-# HYPRE_DIR = /home/zaleski/hypre-2.8.0b/src
+# HYPRE_DIR = $(HOME)/hypre-2.8.0b/src
 # installation in /opt with root
 HYPRE_DIR = /opt/hypre
 HYPRE_LIBS =  -L$(HYPRE_DIR)/lib -lHYPRE 
@@ -29,7 +29,7 @@ install: $(OBJ)
 all: tags install
 
 clean:
-	rm -fR *.o *.mod run.exe *.gz stats *~ track out* stats errftc outftc tmp
+	rm -fR *.o *.mod run.exe *.gz stats *~ track out* stats errftc outftc tmp parallel.visit
 	cd Speed_Measurement; make clean; cd ..
 	cd Poiseuille_Test; make clean; cd ..
 

@@ -17,10 +17,10 @@ set xtics 4
 set xlabel "number of cores/processes"
 set ylabel "cell updates per second"
 set key top left
-plot "speed.txt" using 1:2 w lp t col , "speed.txt" u 1:3 w lp t col , "speed.txt" u 1:4 w lp t col, "speed.txt" u 1:5 w lp t col,  "speed.txt" u 1:6 w lp t col, x*1e6 t "linear" 
+plot "speed.txt" using 1:2 w lp t col , "speed.txt" u 1:3 w lp t col , "speed.txt" u 1:4 w lp t col, "speed.txt" u 1:5 w lp t col,  "speed.txt" u 1:6 w lp t col, "speed.txt" u 1:7 w lp t col, x*1e6 t "linear" 
 set term pdf
 set out 'tmp.pdf'
-plot "speed.txt" using 1:2 w lp t col , "speed.txt" u 1:3 w lp t col , "speed.txt" u 1:4 w lp t col, "speed.txt" u 1:5 w lp t col, "speed.txt" u 1:6 w lp t col, x*1e6 t "linear" 
+plot "speed.txt" using 1:2 w lp t col , "speed.txt" u 1:3 w lp t col , "speed.txt" u 1:4 w lp t col, "speed.txt" u 1:5 w lp t col, "speed.txt" u 1:6 w lp t col, "speed.txt" u 1:7 w lp t col, x*1e6 t "linear" 
 exit
 EOF
 

@@ -1,5 +1,5 @@
-- "AMD 8378 32-core 'cooley' UPMC"  "AMD 6136 16-core 'celsius' UPMC"  "matous cluster Univ Notre Dame" "babbage2 cluster UPMC" "Intel i7 on Mac"
-1 328965 358488 - 409200 633581
+- "AMD 8378 32-core 'cooley' UPMC"  "AMD 6136 16-core 'celsius' UPMC"  "matous cluster Univ Notre Dame" "babbage2 cluster UPMC" "Intel i7 on Mac" "Intel bi-Xeon 12-core 'renoir' X5650  @ 2.67GHz"
+1 328965 358488 - 409200 633581 843415
 4 1218389 1462704 - - 1332371 
 8  1516927 2530500 873813 1790525 -
 16 2178859 3842697 1271001 3375697 -

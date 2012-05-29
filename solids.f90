@@ -46,39 +46,32 @@ contains
 end module module_solids
 
 module module_output_solids
-  use module_grid
-  use module_solids
+    use module_IO
+    use module_flow
+    use module_grid
+    use module_solids
   implicit none
   integer il,ih,jl,jh,kl,kh
-  contains
-    subroutine output_at_location()
-      use module_grid
-      use module_IO
-      use module_flow
-      integer j
-      OPEN(UNIT=11,FILE=trim(out_path)//'/output_location',status='unknown',action='write')
-      jl=jmin
-      jh=jmax
-      do j=jl,jh
-         write(11,1100) y(j),u(imax/2 - imin/2,j,kmax/2 - kmin/2)
-      enddo
-      close(11)
-1100  FORMAT(es25.16e3,es25.16e3)
-    end subroutine output_at_location
+contains
+  subroutine output_at_location()
+    integer j
+    OPEN(UNIT=11,FILE=trim(out_path)//'/output_location',status='unknown',action='write')
+    jl=jmin
+    jh=jmax
+    do j=jl,jh
+       write(11,1100) y(j),u(imax/2 - imin/2,j,kmax/2 - kmin/2)
+    enddo
+    close(11)
+1100 FORMAT(es25.16e3,es25.16e3)
+  end subroutine output_at_location
 !=================================================================================================
 !-------------------------------------------------------------------------------------------------
-subroutine output_solids(nf,i1,i2,j1,j2,k1,k2)
-  use module_flow
-  use module_grid
-  use module_IO
-  !use IO_mod
-  implicit none
-  integer ::nf,i1,i2,j1,j2,k1,k2,i,j,k
-! logical, save :: first_time=.true.
-  character(len=30) :: rootname
-  integer :: padding=3
-  rootname=trim(out_path)//'/solid'//TRIM(int2text(nf,padding))//'-'
-  call append_visit_file(TRIM(rootname),padding)
+  subroutine output_solids(nf,i1,i2,j1,j2,k1,k2)
+    integer ::nf,i1,i2,j1,j2,k1,k2,i,j,k
+    character(len=30) :: rootname
+    integer :: padding=3
+    rootname=trim(out_path)//'/solid'//TRIM(int2text(nf,padding))//'-'
+    call append_visit_file(TRIM(rootname),padding)
 
     OPEN(UNIT=8,FILE=TRIM(rootname)//TRIM(int2text(rank,padding))//'.vtk')
     write(8,10)

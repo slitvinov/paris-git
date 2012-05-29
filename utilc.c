@@ -90,9 +90,9 @@ void make_visit_file_()
 
 void append_visit_file_(char * rootname, int * padding)
 {
+#define STOPCHAR '-'
+
   int pprank, err;
-  int len = strlen(rootname);
-  //  if(*(rootname + len - 1)=='^G') printf("found ^G\n");
 
   if((err =  MPI_Comm_rank(MPI_COMM_WORLD,&pprank) ) != MPI_SUCCESS ) 
     {
@@ -100,6 +100,11 @@ void append_visit_file_(char * rootname, int * padding)
       exit(1);
     }
   if( fd == NULL)  make_visit_file_();
+
+  /* Dirty trick to terminate fortran-generated string */
+  char * prootname = rootname;
+  while( *(prootname++) != STOPCHAR );
+  *prootname = '\0';
 
   for(pprank=0;pprank<np;pprank++)
     fprintf(fd,"%s%0*d.vtk\n",rootname,*padding,pprank);  // 3 is the padding in ftc

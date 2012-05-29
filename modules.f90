@@ -85,6 +85,13 @@ module module_IO
   integer :: nout, out, output_format, nbackup
   character(len=20) :: out_path, x_file, y_file, z_file
   logical :: read_x, read_y, read_z, restart, ICOut
+  interface
+     SUBROUTINE append_visit_file(rootname,padding) bind(C,name="append_visit_file_")
+       use iso_c_binding, only: c_char, c_int
+       character(kind=c_char) :: rootname(*)
+       integer(kind=c_int) :: padding
+     END SUBROUTINE append_visit_file
+  end interface
   contains
 !=================================================================================================
 ! function int2text
@@ -93,13 +100,12 @@ module module_IO
 !-------------------------------------------------------------------------------------------------
 function int2text(number,length)
   integer :: number, length, i
-  character(len=(length+1)) :: int2text
+  character(len=length) :: int2text
   character, dimension(0:9) :: num = (/'0', '1', '2', '3', '4', '5', '6', '7', '8', '9'/)
-  if(number>=10**length)stop 'int2text error: not enough large string'
+  if(number>=10**length)print*, 'Warning: int2text: large input number. Increase "length".'
   do i=1,length
     int2text(length+1-i:length+1-i) = num(mod(number/(10**(i-1)),10))
   enddo
-  int2text(length+1:length+1) = ""
 end function
 !=================================================================================================
 !=================================================================================================
@@ -183,7 +189,8 @@ subroutine output2(nf,i1,i2,j1,j2,k1,k2)
 !  logical, save :: first_time=.true.
   character(len=30) :: rootname
   integer :: padding=3
-  rootname=trim(out_path)//'/plot'//TRIM(int2text(nf,padding))//'-'
+  rootname=TRIM(out_path)//'/plot'//TRIM(int2text(nf,padding))//'-'
+
   call append_visit_file(TRIM(rootname),padding)
 
   OPEN(UNIT=8,FILE=TRIM(rootname)//TRIM(int2text(rank,padding))//'.vtk')
