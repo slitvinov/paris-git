@@ -4,7 +4,7 @@
 
 FFLAGS   = -O3 
 FC   = mpif90
-CFLAGS = -O
+CFLAGS = -O -I/opt/local/include/openmpi/
 
 # default hypre installation without root privileges:
 # HYPRE_DIR = /home/zaleski/hypre-2.8.0b/src
@@ -29,15 +29,14 @@ install: $(OBJ)
 all: tags install
 
 clean:
-	rm -fR *.o *.mod run.exe *.gz stats *~ track out stats errftc outftc
+	rm -fR *.o *.mod run.exe *.gz stats *~ track out* stats errftc outftc tmp
 	cd Speed_Measurement; make clean; cd ..
 	cd Poiseuille_Test; make clean; cd ..
 
 test:	install
-	make clean
-	rm -f input
+	rm -fR out input
 	ln -s miniinput input
-	mpirun -np 24 ftc3d2011
+	mpirun -np 8 ftc3d2011
 
 tags:	$(SRC)
 # @SZ Create a tags file named TAGS for use by emacs

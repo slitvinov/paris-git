@@ -1,7 +1,9 @@
+#include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-#include "ftcinc.h"
+#include <mpi.h>
+#include "inc.h"
 
 extern void __module_solids_MOD_outfarray(int *carray);
 
@@ -57,6 +59,7 @@ double solid_func_CFC_(double x, double y, double z, double boxL)
   /* rescale by boxL: no need */
   x /= boxL;   y /= boxL;   z /= boxL;
   //  printf("HAHAHAHA %g %g %g  %g \n",x,y,z,boxL);
+  // exit(1);
   /* shift to lower left corner: no need ? (add shift variable later ? ) 
   x += 0.5; y += 0.5; z += 0.5; */
   /* cells at root vertex and three first neighbors */
@@ -69,4 +72,45 @@ double solid_func_CFC_(double x, double y, double z, double boxL)
   a = MAX(c,a);
   return MAX(b,a);
 }
-  
+
+FILE * fd = NULL;
+int np;
+
+void make_visit_file_()
+{
+  int err;
+  if((err =  MPI_Comm_size(MPI_COMM_WORLD,&np) ) != MPI_SUCCESS ) 
+    {
+      fprintf(stderr,"MPI error %d, aborting\n",err);
+      exit(1);
+    }
+  fd = fopen("parallel.visit","w");
+  fprintf(fd,"!NBLOCKS %d\n",np);
+}
+
+void append_visit_file_(char * rootname, int * padding)
+{
+  int pprank, err;
+  int len = strlen(rootname);
+  //  if(*(rootname + len - 1)=='^G') printf("found ^G\n");
+
+  if((err =  MPI_Comm_rank(MPI_COMM_WORLD,&pprank) ) != MPI_SUCCESS ) 
+    {
+      fprintf(stderr,"MPI error %d, aborting\n",err);
+      exit(1);
+    }
+  if( fd == NULL)  make_visit_file_();
+
+  for(pprank=0;pprank<np;pprank++)
+    fprintf(fd,"%s%0*d.vtk\n",rootname,*padding,pprank);  // 3 is the padding in ftc
+  fflush(fd);
+}
+ 
+void close_visit_file_()
+{
+  fclose(fd);
+}
+
+
+
+	   

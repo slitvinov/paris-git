@@ -44,6 +44,8 @@ Program ftc3d2011
   If (numProcess .NE. nPx*nPy*nPz) STOP '*** Main: Problem with nPx!'
 
   call initialize
+  call initsolids
+  call output_solids(0,imin,imax,jmin,jmax,kmin,kmax)
   call InitCondition
   if(rank==0) write(out,*)'initialized'
   if(rank==0) write(6,*)'initialized'
@@ -155,7 +157,6 @@ Program ftc3d2011
     if(mod(itimestep,nbackup)==0)call backup_write
     if(mod(itimestep,nout)==0) then
        call output(ITIMESTEP/nout,is,ie,js,je,ks,ke)
-       call output_solids(ITIMESTEP/nout,is,ie,js,je,ks,ke)
     endif
     if(rank==0)then
       end_time =  MPI_WTIME()
@@ -507,12 +508,9 @@ subroutine initialize
   use module_IO
   use module_tmpvar
   use module_hello
-  use module_solids
   implicit none
   include 'mpif.h'
   integer :: ierr, i,j,k
-
-  call initsolids()
 
   allocate(dims(ndim),periodic(ndim),reorder(ndim),coords(ndim),STAT=ierr)
   dims(1) = nPx; dims(2) = nPy; dims(3) = nPz
@@ -618,7 +616,6 @@ subroutine InitCondition
   use module_BC
   use module_IO
   use module_tmpvar
-  use module_solids
 
   implicit none
   include 'mpif.h'

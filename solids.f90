@@ -28,9 +28,6 @@ contains
 !     end test section
 !***
       allocate(solids(imin:imax,jmin:jmax,kmin:kmax))
-      xx = 1.d0; xy = 2.d0; xz = 12.d0; xl = 44.d0
-      ttt = solid_func_CFC(xx,xy,xz,xl)
-
       do i=imin,imax; do j=jmin,jmax; do k=kmin,kmax; 
          solids(i,j,k) = solid_func_CFC(x(i),y(j),z(k),xlength)
       enddo; enddo; enddo
@@ -77,9 +74,13 @@ subroutine output_solids(nf,i1,i2,j1,j2,k1,k2)
   !use IO_mod
   implicit none
   integer ::nf,i1,i2,j1,j2,k1,k2,i,j,k
-!  logical, save :: first_time=.true.
-  
-    OPEN(UNIT=8,FILE=trim(out_path)//'/solid'//int2text(nf,3)//'_'//int2text(rank,3)//'.vtk')
+! logical, save :: first_time=.true.
+  character(len=30) :: rootname
+  integer :: padding=3
+  rootname=trim(out_path)//'/solid'//TRIM(int2text(nf,padding))//'-'
+  call append_visit_file(TRIM(rootname),padding)
+
+    OPEN(UNIT=8,FILE=TRIM(rootname)//TRIM(int2text(rank,padding))//'.vtk')
     write(8,10)
     write(8,11)time
     write(8,12)

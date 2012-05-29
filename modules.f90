@@ -93,12 +93,13 @@ module module_IO
 !-------------------------------------------------------------------------------------------------
 function int2text(number,length)
   integer :: number, length, i
-  character(len=length) :: int2text
+  character(len=(length+1)) :: int2text
   character, dimension(0:9) :: num = (/'0', '1', '2', '3', '4', '5', '6', '7', '8', '9'/)
   if(number>=10**length)stop 'int2text error: not enough large string'
   do i=1,length
     int2text(length+1-i:length+1-i) = num(mod(number/(10**(i-1)),10))
   enddo
+  int2text(length+1:length+1) = ""
 end function
 !=================================================================================================
 !=================================================================================================
@@ -180,8 +181,12 @@ subroutine output2(nf,i1,i2,j1,j2,k1,k2)
   implicit none
   integer ::nf,i1,i2,j1,j2,k1,k2,i,j,k, itype=5
 !  logical, save :: first_time=.true.
-  
-    OPEN(UNIT=8,FILE=trim(out_path)//'/plot'//int2text(nf,3)//'_'//int2text(rank,3)//'.vtk')
+  character(len=30) :: rootname
+  integer :: padding=3
+  rootname=trim(out_path)//'/plot'//TRIM(int2text(nf,padding))//'-'
+  call append_visit_file(TRIM(rootname),padding)
+
+  OPEN(UNIT=8,FILE=TRIM(rootname)//TRIM(int2text(rank,padding))//'.vtk')
     write(8,10)
     write(8,11)time
     write(8,12)

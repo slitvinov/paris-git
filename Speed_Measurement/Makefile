@@ -10,6 +10,11 @@ test1:
 	ln -s input1 input
 	mpirun -np 1 ftc3d2011
 
+minitest1:
+	make clean
+	ln -s miniinput1 input
+	ftc3d2011
+
 test2:
 	make clean
 	ln -s input2 input
