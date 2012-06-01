@@ -92,9 +92,15 @@ void append_visit_file_(char * rootname, int * padding)
 {
 #define STOPCHAR '-'
 
-  int pprank, err;
-
+  int pprank, np, err;
+  
   if((err =  MPI_Comm_rank(MPI_COMM_WORLD,&pprank) ) != MPI_SUCCESS ) 
+    {
+      fprintf(stderr,"MPI error %d, aborting\n",err);
+      exit(1);
+    }
+  if(pprank != 0) return;
+  if((err =  MPI_Comm_size(MPI_COMM_WORLD,&np) ) != MPI_SUCCESS ) 
     {
       fprintf(stderr,"MPI error %d, aborting\n",err);
       exit(1);

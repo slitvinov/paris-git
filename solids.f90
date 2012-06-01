@@ -6,6 +6,7 @@ module module_solids
   use module_hello
   implicit none
   real(8), dimension(:,:,:), allocatable :: solids
+  logical :: dosolids = .false.
 !***********************************************************************
   interface
     real(c_double) FUNCTION solid_func_CFC(xdd,ydd,zdd,ldd) bind(C, name="solid_func_CFC_")
@@ -43,6 +44,20 @@ contains
       STOP 'OUTFARRAY'
     END SUBROUTINE OUTFARRAY
 !***********************************************************************
+subroutine ReadSolidParameters
+  use module_flow
+  use module_BC
+  use module_IO
+  implicit none
+  integer ierr,in
+  namelist /solidparameters/ dosolids
+  in=1
+  open(unit=in, file='input', status='old', action='read', iostat=ierr)
+  if (ierr .ne. 0) stop 'ReadSolidParameters: error opening input file'
+  read(UNIT=in,NML=solidparameters)
+  close(in)
+  print  * , "dosolids =",dosolids
+end subroutine ReadSolidParameters
 end module module_solids
 
 module module_output_solids
@@ -52,16 +67,34 @@ module module_output_solids
     use module_solids
   implicit none
   integer il,ih,jl,jh,kl,kh
+  integer :: padding=3
 contains
+!=================================================================================================
+!
+! Output the velocity profile
+!
+  function test_point_in(i,j,k)
+    integer, intent(in) :: i,j,k
+     logical :: test_point_in
+    test_point_in = (imin < i).and.(i < imax).and.(jmin < j).and.(j < jmax).and.(kmin < k).and.(k < kmax)
+  end function test_point_in
+!
   subroutine output_at_location()
-    integer j
-    OPEN(UNIT=11,FILE=trim(out_path)//'/output_location',status='unknown',action='write')
+    integer :: j,jproc
+    integer :: imidline,jmidline,kmidline
     jl=jmin
     jh=jmax
-    do j=jl,jh
-       write(11,1100) y(j),u(imax/2 - imin/2,j,kmax/2 - kmin/2)
-    enddo
-    close(11)
+    imidline = Nxt/2
+    jmidline = Nyt/2
+    kmidline = Nzt/2
+    if(test_point_in(imidline,jmidline,kmidline)) then
+       jproc = (jmin+jmax)*npy/(2*Nyt)
+       OPEN(UNIT=11,FILE=trim(out_path)//'/output_location'//TRIM(int2text(jproc,padding)),status='unknown',action='write')
+       do j=jl,jh
+          write(11,1100) y(j),u(imidline,j,kmidline)
+       enddo
+       close(11)
+    endif
 1100 FORMAT(es25.16e3,es25.16e3)
   end subroutine output_at_location
 !=================================================================================================
@@ -69,9 +102,8 @@ contains
   subroutine output_solids(nf,i1,i2,j1,j2,k1,k2)
     integer ::nf,i1,i2,j1,j2,k1,k2,i,j,k
     character(len=30) :: rootname
-    integer :: padding=3
     rootname=trim(out_path)//'/solid'//TRIM(int2text(nf,padding))//'-'
-    call append_visit_file(TRIM(rootname),padding)
+    if(rank==0) call append_visit_file(TRIM(rootname),padding)
 
     OPEN(UNIT=8,FILE=TRIM(rootname)//TRIM(int2text(rank,padding))//'.vtk')
     write(8,10)

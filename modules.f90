@@ -191,7 +191,7 @@ subroutine output2(nf,i1,i2,j1,j2,k1,k2)
   integer :: padding=3
   rootname=TRIM(out_path)//'/plot'//TRIM(int2text(nf,padding))//'-'
 
-  call append_visit_file(TRIM(rootname),padding)
+  if(rank==0) call append_visit_file(TRIM(rootname),padding)
 
   OPEN(UNIT=8,FILE=TRIM(rootname)//TRIM(int2text(rank,padding))//'.vtk')
     write(8,10)

@@ -69,9 +69,11 @@ Program ftc3d2011
       rhoo = rho
       muold  = mu
     endif
-!    u = u*(1.d0 -solids) 
-!    v = v*(1.d0 -solids) 
-!    w = w*(1.d0 -solids) 
+    if(dosolids) then
+       u = u*(1.d0 -solids) 
+       v = v*(1.d0 -solids) 
+       w = w*(1.d0 -solids) 
+    endif
 !------------------------------------ADVECTION & DIFFUSION----------------------------------------
     do ii=1, itime_scheme
       call momentumDiffusion(u,v,w,rho,mu,du,dv,dw)
@@ -172,7 +174,7 @@ Program ftc3d2011
       close(121)
     endif
   enddo
-  if(numProcess == 1)   call output_at_location()
+  call output_at_location()
   if(HYPRE) call poi_finalize
   call MPI_FINALIZE(ierr)
   stop
@@ -748,7 +750,7 @@ subroutine ReadParameters
   out=2
 
   open(unit=in, file='input', status='old', action='read', iostat=ierr)
-  if (ierr .ne. 0) stop 'ReadParameters: error openning input file'
+  if (ierr .ne. 0) stop 'ReadParameters: error opening input file'
   read(UNIT=in,NML=parameters)
   close(in)
 
@@ -764,7 +766,7 @@ subroutine ReadParameters
     call system('cp input         '//trim(out_path))
     !call system('cp ftc3d2011.f90 '//trim(out_path))
     open(unit=out, file=trim(out_path)//'/output', action='write', iostat=ierr)
-    if (ierr .ne. 0) stop 'ReadParameters: error openning output file'
+    if (ierr .ne. 0) stop 'ReadParameters: error opening output file'
     write(UNIT=out,NML=parameters)
   endif
 
