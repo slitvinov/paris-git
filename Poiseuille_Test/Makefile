@@ -5,5 +5,5 @@ test:
 	sh ./plot.sh
 
 clean:
-	rm -fR out* *~  track stats tmp.* *.visit #*
+	rm -fR out* input *~  track stats tmp.* *.visit core.* \#*
 

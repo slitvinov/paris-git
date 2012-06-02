@@ -4,6 +4,21 @@ test64:
 	ln -s input64 input
 	$(OPENMPIV)/bin/mpirun -np 64 $(HOME)/bin/ftc3d2011 > outftc 2>errftc
 
+test128:
+	make clean
+	ln -s input128 input
+	$(OPENMPIV)/bin/mpirun -np 128 $(HOME)/bin/ftc3d2011 > outftc 2>errftc
+
+test256:
+	make clean
+	ln -s input256 input
+	$(OPENMPIV)/bin/mpirun -np 256 $(HOME)/bin/ftc3d2011 > outftc 2>errftc
+
+test512:
+	make clean
+	ln -s input512 input
+	$(OPENMPIV)/bin/mpirun -np 512 $(HOME)/bin/ftc3d2011 > outftc 2>errftc
+
 
 test1:
 	make clean
@@ -50,5 +65,5 @@ test6:
 	mpirun -np 4 ftc3d2011
 
 clean:
-	rm -fR out*  input *~ */*~  tmp.* track stats errftc outftc
+	rm -fR out*  input *~ */*~  tmp.* track stats errftc outftc core.*
 

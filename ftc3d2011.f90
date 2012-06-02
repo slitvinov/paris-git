@@ -39,13 +39,18 @@ Program ftc3d2011
   start_time = MPI_Wtime(ierr)
 
   call ReadParameters
+  call ReadSolidParameters
   if(rank==0) write(out,*)'Parameters read successfully'
   ! check number of processors
   If (numProcess .NE. nPx*nPy*nPz) STOP '*** Main: Problem with nPx!'
 
   call initialize
-  call initsolids
-  call output_solids(0,imin,imax,jmin,jmax,kmin,kmax)
+  if(dosolids) then
+     call initsolids
+     call output_solids(0,imin,imax,jmin,jmax,kmin,kmax)
+     if(rank==0) write(out,*)'solids initialized'
+     if(rank==0) write(6,*)'solids initialized'
+  endif
   call InitCondition
   if(rank==0) write(out,*)'initialized'
   if(rank==0) write(6,*)'initialized'

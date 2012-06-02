@@ -7,6 +7,7 @@ module module_solids
   implicit none
   real(8), dimension(:,:,:), allocatable :: solids
   logical :: dosolids = .false.
+
 !***********************************************************************
   interface
     real(c_double) FUNCTION solid_func_CFC(xdd,ydd,zdd,ldd) bind(C, name="solid_func_CFC_")
@@ -44,21 +45,36 @@ contains
       STOP 'OUTFARRAY'
     END SUBROUTINE OUTFARRAY
 !***********************************************************************
-subroutine ReadSolidParameters
-  use module_flow
-  use module_BC
-  use module_IO
-  implicit none
-  integer ierr,in
-  namelist /solidparameters/ dosolids
-  in=1
-  open(unit=in, file='input', status='old', action='read', iostat=ierr)
-  if (ierr .ne. 0) stop 'ReadSolidParameters: error opening input file'
-  read(UNIT=in,NML=solidparameters)
-  close(in)
-  print  * , "dosolids =",dosolids
-end subroutine ReadSolidParameters
-end module module_solids
+    subroutine ReadSolidParameters
+      use module_flow
+      use module_BC
+      use module_IO
+      implicit none
+      include 'mpif.h'
+      integer ierr,in
+      logical file_is_there
+      namelist /solidparameters/ dosolids
+      in=1
+      call MPI_COMM_RANK(MPI_COMM_WORLD, rank, ierr)
+      inquire(file='inputsolids',exist=file_is_there)
+      open(unit=in, file='inputsolids', status='old', action='read', iostat=ierr)
+      if (file_is_there) then
+         if(ierr == 0) then
+            read(UNIT=in,NML=solidparameters)
+            if(rank==0) write(out,*)'Solid parameters read successfully'
+         else
+            print *, 'rank=',rank,' has error ',ierr,' opening file inputsolids'
+         endif
+      else
+         if (rank == 0) then 
+            print *, "ReadSolidParameters: no 'inputsolids' file."
+            print *, 'solids will not be activated.'
+         endif
+      endif
+      close(in)
+!      if(rank==0) print  * , "dosolids =",dosolids
+    end subroutine ReadSolidParameters
+  end module module_solids
 
 module module_output_solids
     use module_IO

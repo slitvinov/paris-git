@@ -29,7 +29,7 @@ install: $(OBJ)
 all: tags install
 
 clean:
-	rm -fR *.o *.mod run.exe *.gz stats *~ track out* stats errftc outftc tmp *.visit TAGS tags
+	rm -fR *.o *.mod run.exe *.gz stats *~ track out* stats errftc outftc tmp *.visit TAGS tags core.*
 	cd Speed_Measurement; make clean; cd ..
 	cd Poiseuille_Test; make clean; cd ..
 
