@@ -86,10 +86,9 @@ module module_IO
   character(len=20) :: out_path, x_file, y_file, z_file
   logical :: read_x, read_y, read_z, restart, ICOut
   interface
-     SUBROUTINE append_visit_file(rootname,padding) bind(C,name="append_visit_file_")
-       use iso_c_binding, only: c_char, c_int
-       character(kind=c_char) :: rootname(*)
-       integer(kind=c_int) :: padding
+     SUBROUTINE append_visit_file(rootname,padding)
+       character :: rootname(*)
+       integer :: padding
      END SUBROUTINE append_visit_file
   end interface
   contains

@@ -65,5 +65,5 @@ test6:
 	mpirun -np 4 ftc3d2011
 
 clean:
-	rm -fR out*  input *~ */*~  tmp.* track stats errftc outftc core.*
+	rm -fR out*  input *~ */*~  tmp.* track stats errftc outftc core.* *.visit
 

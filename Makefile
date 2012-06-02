@@ -1,59 +1,62 @@
-#------------------------------------------------
-#-------------- Uses openmpi library --------------
-#------------------------------------------------
+#--------- ftc3d2011-ParisSimulator main Makefile --------------------------
 
-FFLAGS   = -O3 
-FC   = mpif90
-CFLAGS = -O -I/opt/local/include/openmpi/
+FC = mpif90
+CC = mpicc
 
+# remove funny cflags from gerris in my environment
+CFLAGS = 
+
+# select option for hypre
 # default hypre installation without root privileges:
 # HYPRE_DIR = $(HOME)/hypre-2.8.0b/src
-# installation in /opt with root
+# Macport installation in /opt 
 HYPRE_DIR = /opt/hypre
-HYPRE_LIBS =  -L$(HYPRE_DIR)/lib -lHYPRE 
 # babbage
 # HYPRE_DIR = /share/apps/hypre
 
-#-----------------------------------------------------------------------------------------------
+HYPRE_LIBS =  -L$(HYPRE_DIR)/lib -lHYPRE 
 
 
-OBJ     = ftc3d2011.o utilc.o solids.o modules.o
+#------------------------No changes needed beyond this line-----------------------------------------------------------------
+
+
+OBJ = ftc3d2011.o utilc.o solids.o modules.o
 SRC = $(wildcard *.h *.c *.f90) 
 INC = $(wildcard *.h) 
 
 install: $(OBJ)
+	@echo compiler is FC = $(FC), mpi override is OMPI_FC = $(OMPI_FC)
 	$(FC) -o run.exe $(FOPTS) $(OBJ) $(HYPRE_LIBS) 
-#	put it in a sound location @SZ
 	mv run.exe ~/bin/ftc3d2011
 
 all: tags install
 
 clean:
-	rm -fR *.o *.mod run.exe *.gz stats *~ track out* stats errftc outftc tmp *.visit TAGS tags core.*
-	cd Speed_Measurement; make clean; cd ..
-	cd Poiseuille_Test; make clean; cd ..
+	@rm -fR *.o *.mod run.exe *.gz stats *~ track out* stats errftc tmp* *.tmp fort.* *.visit TAGS tags core.*
+	@cd Speed_Measurement; make clean; cd ..
+	@cd Poiseuille_Test; make clean; cd ..
 
 test:	install
-	rm -fR out input
-	ln -s miniinput input
+	@rm -fR out input
+	@ln -s miniinput input
 	mpirun -np 8 ftc3d2011
 
 tags:	$(SRC)
 # @SZ Create a tags file named TAGS for use by emacs
-	etags $(SRC)
+	@etags $(SRC)
 # @SZ Create a tags file named tags for use by vi or textwrangler
 # @SZ On MacOS tags and TAGS are identical ! 
 # @SZ	ctags ftc3d2011.f90 
 
 ftc3d2011.o:  ftc3d2011.f90 solids.o modules.o
-	$(FC) -c $(FFLAGS) ftc3d2011.f90 
+	$(FC) -c  $<
 
 solids.o:  solids.f90 modules.o
-	$(FC) -c $(FFLAGS) $<
-
+	$(FC) -c  $<
 
 %.o : %.f90
-	$(FC) -c $(FFLAGS) $<
+	$(FC) -c $<
+
 
 .c.o:   $< $(INC)
 	$(CC) -c $(CFLAGS)   $< 
