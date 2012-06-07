@@ -1,5 +1,8 @@
 #--------- ftc3d2011-ParisSimulator main Makefile --------------------------
 
+# babbage
+OMPI_FC=gfortran44
+
 FC = mpif90
 CC = mpicc
 
@@ -10,9 +13,9 @@ CFLAGS =
 # default hypre installation without root privileges:
 # HYPRE_DIR = $(HOME)/hypre-2.8.0b/src
 # Macport installation in /opt 
-HYPRE_DIR = /opt/hypre
+# HYPRE_DIR = /opt/hypre
 # babbage
-# HYPRE_DIR = /share/apps/hypre
+HYPRE_DIR = /share/apps/hypre
 
 HYPRE_LIBS =  -L$(HYPRE_DIR)/lib -lHYPRE 
 
