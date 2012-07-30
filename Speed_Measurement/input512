@@ -1,4 +1,4 @@
-! input.dat
+! input512
 
 ! The input file for running the code FTC3D2011
 ! Parameters are read using a namelist statement.

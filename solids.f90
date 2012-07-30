@@ -3,7 +3,7 @@
 !-------------------------------------------------------------------------------------------------
 module module_solids
   use module_grid
-  use module_hello
+  use module_IO
   implicit none
   real(8), dimension(:,:,:), allocatable :: solids
   logical :: dosolids = .false.
