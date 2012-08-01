@@ -89,7 +89,7 @@ module module_output_solids
     use module_solids
   implicit none
   integer il,ih,jl,jh,kl,kh
-  integer :: padding=3
+  integer :: padding=5
 contains
 !=================================================================================================
 !

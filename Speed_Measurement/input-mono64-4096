@@ -14,7 +14,7 @@ hypre    = T       ! use of hypre, if false, SOR solver is used
 restart  = F       ! T: start from backup of a previous simulation
 nBackup  = 450      ! number of time steps between backup writing. Only last two backups are kept.
 
-NSTEP   = 56      ! maximum number of time steps
+NSTEP   = 11     ! maximum number of time steps
 EndTime = 1000.0     ! When to stop simulation
 
 MaxDt   = 1e-2     ! maximum size of time step

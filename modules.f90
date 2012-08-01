@@ -118,7 +118,8 @@ subroutine backup_write
   use module_grid
   implicit none
   integer ::i,j,k
-  OPEN(UNIT=7,FILE=trim(out_path)//'/backup_'//int2text(rank,3),status='unknown',action='write')
+  integer :: padding=5
+  OPEN(UNIT=7,FILE=trim(out_path)//'/backup_'//int2text(rank,padding),status='unknown',action='write')
   write(7,1100)time,itimestep,is,ie,js,je,ks,ke
   do k=ks,ke; do j=js,je; do i=is,ie
     write(7,1200) u(i,j,k), v(i,j,k), w(i,j,k), p(i,j,k), rho(i,j,k)
@@ -135,7 +136,8 @@ subroutine backup_read
   use module_grid
   implicit none
   integer ::i,j,k,i1,i2,j1,j2,k1,k2
-  OPEN(UNIT=7,FILE=trim(out_path)//'/backup_'//int2text(rank,3),status='old',action='read')
+  integer :: padding=5
+  OPEN(UNIT=7,FILE=trim(out_path)//'/backup_'//int2text(rank,padding),status='old',action='read')
   read(7,1100)time,itimestep,i1,i2,j1,j2,k1,k2
   if(i1/=is .or. i2/=ie .or. j1/=js .or. j2/=je .or. k1/=ks .or. k2/=ke) &
     stop 'Error: backup_read'
@@ -165,9 +167,10 @@ subroutine output1(nf,i1,i2,j1,j2,k1,k2)
   !use IO_mod
   implicit none
   integer ::nf,i1,i2,j1,j2,k1,k2,i,j,k
+  integer :: padding=5
 !  logical, save :: first_time=.true.
 
-  OPEN(UNIT=7,FILE=trim(out_path)//'/plot'//int2text(nf,3)//'_'//int2text(rank,3)//'.dat')
+  OPEN(UNIT=7,FILE=trim(out_path)//'/plot'//int2text(nf,padding)//'_'//int2text(rank,3)//'.dat')
   write(7,1000)
   write(7,1100) time, i2-i1+1, j2-j1+1, k2-k1+1
   do k=k1,k2; do j=j1,j2; do i=i1,i2;
@@ -191,7 +194,7 @@ subroutine output2(nf,i1,i2,j1,j2,k1,k2)
   integer ::nf,i1,i2,j1,j2,k1,k2,i,j,k, itype=5
 !  logical, save :: first_time=.true.
   character(len=30) :: rootname
-  integer :: padding=3
+  integer :: padding=5
   rootname=TRIM(out_path)//'/plot'//TRIM(int2text(nf,padding))//'-'
 
   if(rank==0) call append_visit_file(TRIM(rootname),padding)

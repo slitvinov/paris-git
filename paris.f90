@@ -84,33 +84,15 @@ Program paris
     endif
 !------------------------------------ADVECTION & DIFFUSION----------------------------------------
     do ii=1, itime_scheme
-       call momentumDiffusion(u,v,w,rho,mu,du,dv,dw)
-       call momentumConvection(u,v,w,du,dv,dw)
-       call volumeForce(rho,rho1,rho2,dpdx,dpdy,dpdz,BuoyancyCase,fx,fy,fz,gx,gy,gz,du,dv,dw)
-       if(TwoPhase) call density(rho,u,v,w,drho)
-       u = u + dt * du
-       v = v + dt * dv
-       w = w + dt * dw
-!------------------------------------VOF STUFF----------------------------------------------------
-       if(TwoPhase) then 
-          rho = rhofunc(VOF)
-          tswap = tswap + 1
-          if (tswap .gt. 3) tswap = 1
-          if (MOD(tswap,3) .eq. 0) then
-             call swp(w,VOF,tmp1,tmp2,tmp3,3)
-             call swp(u,VOF,tmp1,tmp2,tmp3,1)
-             call swp(v,VOF,tmp1,tmp2,tmp3,2)
-          elseif (MOD(tswap,2) .eq. 0) then
-             call swp(v,VOF,tmp1,tmp2,tmp3,2)
-             call swp(w,VOF,tmp1,tmp2,tmp3,3)
-             call swp(u,VOF,tmp1,tmp2,tmp3,1)
-          else 
-             call swp(u,VOF,tmp1,tmp2,tmp3,1)
-             call swp(v,VOF,tmp1,tmp2,tmp3,2)
-             call swp(w,VOF,tmp1,tmp2,tmp3,3)
-          endif
-       endif
-!------------------------------------END VOF STUFF------------------------------------------------
+      call momentumDiffusion(u,v,w,rho,mu,du,dv,dw)
+      call momentumConvection(u,v,w,du,dv,dw)
+      call volumeForce(rho,rho1,rho2,dpdx,dpdy,dpdz,BuoyancyCase,fx,fy,fz,gx,gy,gz,du,dv,dw)
+      if(TwoPhase) call density(rho,u,v,w,drho)
+      u = u + dt * du
+      v = v + dt * dv
+      w = w + dt * dw
+      if(TwoPhase) rho = rho + dt * drho
+
       call SetVelocityBC(u,v,w)
       
       call ghost_x(u  ,2,req( 1: 4));  call ghost_x(v,2,req( 5: 8)); call ghost_x(w,2,req( 9:12)); 
