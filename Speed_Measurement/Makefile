@@ -1,69 +1,47 @@
-##------------------------------------------------
-test64:
+
+mono64-1:
 	make clean
-	ln -s input64 input
-	$(OPENMPIV)/bin/mpirun -np 64 $(HOME)/bin/ftc3d2011 > outftc 2>errftc
+	ln -s input-mono64-1 input
+#	$(OPENMPIV)/bin/mpirun -np 1 $(HOME)/bin/paris > out-mono64-1 2>err-mono64-1
+	mpirun -np 1 $(HOME)/bin/paris > out-mono64-1 2>err-mono64-1
 
-test128:
+
+mono64-8:
 	make clean
-	ln -s input128 input
-	$(OPENMPIV)/bin/mpirun -np 128 $(HOME)/bin/ftc3d2011 > outftc 2>errftc
+	ln -s input-mono64-8 input
+#	$(OPENMPIV)/bin/mpirun -np 8 $(HOME)/bin/paris > out-mono64-8 2>err-mono64-8
+	mpirun -np 8 $(HOME)/bin/paris > out-mono64-8 2>err-mono64-8
 
-test256:
+
+mono64-64:
 	make clean
-	ln -s input256 input
-	$(OPENMPIV)/bin/mpirun -np 256 $(HOME)/bin/ftc3d2011 > outftc 2>errftc
+	ln -s input-mono64-64 input
+#	$(OPENMPIV)/bin/mpirun -np 64 $(HOME)/bin/paris > out-mono64-64 2>err-mono64-64
+	mpirun -np 64 $(HOME)/bin/paris > out-mono64-64 2>err-mono64-64
 
-test512:
+
+mono64-512:
 	make clean
-	ln -s input512 input
-	$(OPENMPIV)/bin/mpirun -np 512 $(HOME)/bin/ftc3d2011 > outftc 2>errftc
+	ln -s input-mono64-512 input
+#	$(OPENMPIV)/bin/mpirun -np 512 $(HOME)/bin/paris > out-mono64-512 2>err-mono64-512
+	mpirun -np 512 $(HOME)/bin/paris > out-mono64-512 2>err-mono64-512
 
 
-test1:
+mono64-4096:
 	make clean
-	ln -s input1 input
-	mpirun -np 1 ftc3d2011
+	ln -s input-mono64-4096 input
+#	$(OPENMPIV)/bin/mpirun -np 4096 $(HOME)/bin/paris > out-mono64-4096 2>err-mono64-4096
+	mpirun -np 4096 $(HOME)/bin/paris > out-mono64-4096 2>err-mono64-4096
 
-minitest1:
+
+mono64-32768:
 	make clean
-	ln -s miniinput1 input
-	ftc3d2011
+	ln -s input-mono64-32768 input
+#	$(OPENMPIV)/bin/mpirun -np 32768 $(HOME)/bin/paris > out-mono64-32768 2>err-mono64-32768
+	mpirun -np 32768 $(HOME)/bin/paris > out-mono64-32768 2>err-mono64-32768
 
-test2:
-	make clean
-	ln -s input2 input
-	mpirun -np 8 ftc3d2011
-
-
-test-np4:
-	make clean
-	ln -s input-np4 input
-	mpirun -np 4 ftc3d2011
-
-
-test3:
-	make clean
-	ln -s input3 input
-	mpirun -np 32 ftc3d2011
-
-#test4:
-test32:
-	make clean
-	ln -s input4 input
-	$(OPENMPIV)/bin/mpirun -np 32 $(HOME)/bin/ftc3d2011 > outftc 2>errftc
-
-test5:
-	make clean
-	ln -s input5 input
-	mpirun -np 16 ftc3d2011
-
-
-test6:
-	make clean
-	ln -s input6 input
-	mpirun -np 4 ftc3d2011
+#------------------
 
 clean:
-	rm -fR out*  input *~ */*~  tmp.* track stats errftc outftc core.* *.visit
+	rm -fr out* err* stats track input *~ #*
 

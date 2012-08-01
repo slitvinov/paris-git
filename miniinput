@@ -1,6 +1,6 @@
 ! input.dat
 
-! The input file for running the code FTC3D2011
+! The input file for running the PARIS code
 ! Parameters are read using a namelist statement.
 ! Blank lines and commented lines are ignored.
 ! Location of the parameters in the list is not important.

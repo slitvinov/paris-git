@@ -15,6 +15,12 @@ module module_solids
       real(c_double) , VALUE :: xdd,ydd,zdd,ldd
     END FUNCTION solid_func_CFC
  end interface
+  interface
+     SUBROUTINE append_solid_visit_file(rootname,padding)
+       character :: rootname(*)
+       integer :: padding
+     END SUBROUTINE append_solid_visit_file
+  end interface
 contains
 !***********************************************************************
     SUBROUTINE initsolids()
@@ -119,7 +125,7 @@ contains
     integer ::nf,i1,i2,j1,j2,k1,k2,i,j,k
     character(len=30) :: rootname
     rootname=trim(out_path)//'/solid'//TRIM(int2text(nf,padding))//'-'
-    if(rank==0) call append_visit_file(TRIM(rootname),padding)
+    if(rank==0) call append_solid_visit_file(TRIM(rootname),padding)
 
     OPEN(UNIT=8,FILE=TRIM(rootname)//TRIM(int2text(rank,padding))//'.vtk')
     write(8,10)
@@ -155,6 +161,7 @@ contains
 310 format(e14.5,e14.5,e14.5)
 
     close(8)
+    if(rank==0) call close_solid_visit_file()
 end subroutine output_solids
 !***********************************************************************
 end module module_output_solids

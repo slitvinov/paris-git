@@ -1,13 +1,17 @@
 !=================================================================================================
 !=================================================================================================
-! Code: FTC3D2011 (Front Tracking Code for 3D simulations)
+!=================================================================================================
+! Paris-0.1
+! Extended from Code: FTC3D2011 (Front Tracking Code for 3D simulations)
+! 
 ! Authors: Sadegh Dabiri, Gretar Tryggvason
+! author for minor extenstions Stephane Zaleski(zaleski@dalembert.upmc.fr) 
 ! Contact: sdabiri@gmail.com
-! A three dimensional Navier-Stokes flow solver for modeling of multiphase 
+! A three-dimensional Navier-Stokes flow solver for modeling of multiphase 
 ! flows. Flow can be driven by wall motion, density difference or pressure gradient.
 ! Boundary conditions supported: wall and periodic
 ! Version 1.0   1/21/2011   The 3D flow solver for variable density/viscosity is written. 
-!                           The desity is advected by ENO scheme.
+!                           The density is advected by an ENO scheme.
 ! Version 2.0   2/25/2011   Parallel implementation.
 !=================================================================================================
 !=================================================================================================

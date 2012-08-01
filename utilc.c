@@ -113,8 +113,52 @@ void append_visit_file_(char * rootname, int * padding)
   *prootname = '\0';
 
   for(pprank=0;pprank<np;pprank++)
-    fprintf(fd,"%s%0*d.vtk\n",rootname,*padding,pprank);  // 3 is the padding in ftc
+    fprintf(fd,"%s%0*d.vtk\n",rootname,*padding,pprank);  
   fflush(fd);
+}
+
+
+FILE * fds = NULL;
+
+void make_solid_visit_file_()
+{
+  int err;
+  if((err =  MPI_Comm_size(MPI_COMM_WORLD,&np) ) != MPI_SUCCESS ) 
+    {
+      fprintf(stderr,"MPI error %d, aborting\n",err);
+      exit(1);
+    }
+  fds = fopen("solid.visit","w");
+  fprintf(fds,"!NBLOCKS %d\n",np);
+}
+
+void append_solid_visit_file_(char * rootname, int * padding)
+{
+#define STOPCHAR '-'
+
+  int pprank, np, err;
+  
+  if((err =  MPI_Comm_rank(MPI_COMM_WORLD,&pprank) ) != MPI_SUCCESS ) 
+    {
+      fprintf(stderr,"MPI error %d, aborting\n",err);
+      exit(1);
+    }
+  if(pprank != 0) return;
+  if((err =  MPI_Comm_size(MPI_COMM_WORLD,&np) ) != MPI_SUCCESS ) 
+    {
+      fprintf(stderr,"MPI error %d, aborting\n",err);
+      exit(1);
+    }
+  make_solid_visit_file_();
+
+  /* Dirty trick to terminate fortran-generated string */
+  char * prootname = rootname;
+  while( *(prootname++) != STOPCHAR );
+  *prootname = '\0';
+
+  for(pprank=0;pprank<np;pprank++)
+    fprintf(fds,"%s%0*d.vtk\n",rootname,*padding,pprank); // set padding to 4 for more than 999 procs
+  fflush(fds);
 }
  
 void close_visit_file_()
@@ -122,6 +166,11 @@ void close_visit_file_()
   fclose(fd);
 }
 
+
+void close_solid_visit_file_()
+{
+  fclose(fds);
+}
 
 
 	   
