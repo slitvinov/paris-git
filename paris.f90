@@ -183,7 +183,9 @@ Program paris
     endif
   enddo
 !--------------- END OF MAIN TIME LOOP ----------------------------------------------------------
-  if(rank==0) call close_visit_file()
+  if(rank==0) then 
+     if(output_format==2) call close_visit_file()
+  endif
   call output_at_location()
   if(HYPRE) call poi_finalize
   call MPI_FINALIZE(ierr)

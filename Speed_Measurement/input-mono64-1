@@ -34,7 +34,7 @@ BETA    = 1.2
 ! Output parameters
 
 NOUT    = 60       ! flush the solution every nout time steps
-output_format = 1  	  ! 1:tecplot 2:vtk
+output_format = 2  	  ! 1:tecplot 2:vtk
 
 out_path = 'out1'     ! name of the output directory
 

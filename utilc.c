@@ -163,13 +163,13 @@ void append_solid_visit_file_(char * rootname, int * padding)
  
 void close_visit_file_()
 {
-  fclose(fd);
+  if(fd) fclose(fd);
 }
 
 
 void close_solid_visit_file_()
 {
-  fclose(fds);
+  if(fds) fclose(fds);
 }
 
 
