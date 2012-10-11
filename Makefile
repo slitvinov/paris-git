@@ -1,6 +1,6 @@
 #--------- paris-ParisSimulator main Makefile --------------------------
 
-# babbage
+# babbage has several fortran compilers
 OMPI_FC=gfortran44
 
 FC = mpif90
@@ -17,11 +17,9 @@ HYPRE_DIR = /opt/hypre
 # babbage
 # HYPRE_DIR = /share/apps/hypre
 
+#------------------------ No changes needed beyond this line --------------------------------
+
 HYPRE_LIBS =  -L$(HYPRE_DIR)/lib -lHYPRE 
-
-
-#------------------------No changes needed beyond this line-----------------------------------------------------------------
-
 
 OBJ = paris.o utilc.o solids.o modules.o
 SRC = $(wildcard *.h *.c *.f90) 
