@@ -1,0 +1,114 @@
+! mono64-8
+! 
+! 64  grid points per dimension per domain
+! 8  mpi processes
+
+! The input file for running the PARIS code
+! Parameters are read using a namelist statement.
+! Blank lines and commented lines are ignored.
+! Location of the parameters in the list is not important.
+
+&PARAMETERS
+                   ! name of the namelist
+hypre    = T       ! use of hypre, if false, SOR solver is used
+restart  = F       ! T: start from backup of a previous simulation
+nBackup  = 450      ! number of time steps between backup writing. Only last two backups are kept.
+
+NSTEP   = 11     ! maximum number of time steps
+EndTime = 1000.0     ! When to stop simulation
+
+MaxDt   = 1e-2     ! maximum size of time step
+dtFlag  = 2        ! 1: fixed dt;  2: fixed CFL
+dt      = 1e-2     ! dt in case of dtFlag=1
+CFL     = 0.9
+MAXERROR= 1d-4     ! Residual for Poisson solver
+
+ITIME_SCHEME = 2
+                   ! time scheme: 1:first order Euler, 2: second order TVD Runge-Kutta
+
+MAXIT   = 20
+BETA    = 1.2
+                    ! parameters for linear solver
+
+!=================================================================================================
+! Output parameters
+
+NOUT    = 60       ! flush the solution every nout time steps
+output_format = 2  	  ! 1:tecplot 2:vtk
+
+out_path = 'out1'     ! name of the output directory
+
+ICOut   = F        ! output initial condition
+!=================================================================================================
+!Grid parameters
+npx     = 4
+npy     = 4
+npz     = 2
+                   ! number of processors in x,y,z direction
+
+Nx      = 256
+Ny      = 256
+Nz      = 128
+Ng      = 2
+                   ! grid size in x,y,z direction and number of ghost cells
+
+XLENGTH = 3.141593
+YLENGTH = 3.141593
+ZLENGTH = 3.141593
+                   ! domain size in x,y,z direction
+
+xform   = 0.0
+yform   = 0.0
+zform   = 0.0    ! non-uniformity of grid: 0:uniform; +:clustered at center; -:clustered near ends
+
+read_x   = F       ! read the grid file for x-grid; If true xLength and xform are neglected
+read_y   = F
+read_z   = F
+x_file   = 'xh.dat' !input file for xh (Nx+1 points)
+y_file   = 'yh.dat'
+z_file   = 'zh.dat'
+
+!=================================================================================================
+! Flow parameters
+
+GX      = 1.0
+GY      = 0.0
+GZ      = 0.0
+                   ! Components of the gravity in x,y,z direction
+
+BDRY_COND = 'periodic'    'wall'    'periodic'
+                   ! Type of boundary condition in x,y,z direction: 'wall', 'periodic'
+
+dPdX      = 0.0
+dPdY      = 0.0
+dPdZ      = 0.0
+                   ! Px, Py, Pz: pressure gradients in case of pressure driven channel flow
+                   ! Px = (P(xLength)-P(0))/xLength
+TWOPHASE= T
+                   ! TwoPhase: It only supports variable density front tracking
+
+RHO1    = 1.0
+MU1     = 1.0
+                   ! rho1, mu1 : density and viscosity of the matrix phase
+
+RHO2    = 2.0
+MU2     = 1.0
+                   ! rho2, mu2 : properties of the drop
+
+NumBubble =  1
+                   !number of bubbles
+
+xyzrad(1, 1)  = 0.413 
+xyzrad(2, 1)  = 0.387 
+xyzrad(3, 1)  = 0.838 
+xyzrad(4, 1)  = 0.15  
+                   ! Initial bubble size and location
+
+BUOYANCYCASE = 0
+                   ! BuoyancyCase : determines what density will be subtracted from the gravity 
+                   ! body force.
+                   ! 0: rro=0,  1: rro=rho1,  2: rro=rho2,  3: rro=average(rho)
+!=================================================================================================
+
+/
+! end of the namelist

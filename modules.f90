@@ -27,7 +27,7 @@ module module_grid
   real(8), dimension(:), allocatable :: x, xh, dx, dxh
   real(8), dimension(:), allocatable :: y, yh, dy, dyh
   real(8), dimension(:), allocatable :: z, zh, dz, dzh
-  real(8) :: xLength, yLength, zLength, xform, yform, zform
+  real(8) :: xLength, yLength, zLength, xform, yform, zform !non-uniformity of grid
 
   integer :: nPx, nPy, nPz, Mx, My, Mz, rank, ndim=3, numProcess
   integer, dimension(:), allocatable :: dims, coords, periodic, reorder
@@ -125,8 +125,9 @@ subroutine backup_write
     write(7,1200) u(i,j,k), v(i,j,k), w(i,j,k), p(i,j,k), rho(i,j,k)
   enddo; enddo; enddo
   close(7)
-  1100 FORMAT(es25.16e3,7I5)
-  1200 FORMAT(5es25.16e3)
+  if(rank==0)print*,'Backup written at t=',time
+  1100 FORMAT(es17.8e3,7I10)
+  1200 FORMAT(5es17.8e3)
 end subroutine backup_write
 !=================================================================================================
 !=================================================================================================
@@ -152,6 +153,7 @@ end subroutine backup_read
 !=================================================================================================
 ! subroutine output
 !   Writes the solution in the 'out_path' directory in the tecplot or vtk format
+!   called in:    program main
 !-------------------------------------------------------------------------------------------------
 subroutine output(nf,i1,i2,j1,j2,k1,k2)
   implicit none
@@ -183,7 +185,8 @@ subroutine output1(nf,i1,i2,j1,j2,k1,k2)
   close(7)
   1000 FORMAT('variables = "x","y","z","u","v","w","p"') !,"rho"')
   1100 FORMAT('ZONE solutiontime=', 1PG15.7e2, ', I=',I4, 2X, ', J=',I4, 2X, ', K=',I4, 2X)
-  1200 FORMAT(20es14.6e2)
+  1110 FORMAT('ZONE solutiontime=', 1PG15.7e2)
+  1200 FORMAT(21es14.6e2)
 end subroutine output1
 !-------------------------------------------------------------------------------------------------
 subroutine output2(nf,i1,i2,j1,j2,k1,k2)
@@ -242,6 +245,7 @@ subroutine output2(nf,i1,i2,j1,j2,k1,k2)
 end subroutine output2
 !-------------------------------------------------------------------------------------------------
 end module module_IO
+!=================================================================================================
 !=================================================================================================
 ! module module_BC: Sets the boundary conditions of the problem.
 !-------------------------------------------------------------------------------------------------
@@ -584,7 +588,8 @@ module module_poisson
     enddo;  enddo;  enddo
     deallocate(values, stat=ierr)
   end subroutine poi_solve
-!-------------------------------------------------------------------------------------------------
+!=================================================================================================
+!=================================================================================================
   subroutine poi_finalize
     implicit none
     include 'mpif.h'
