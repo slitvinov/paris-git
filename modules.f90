@@ -341,7 +341,7 @@ module module_BC
     integer, save :: srcL, srcR, destL, destR, face(2)
     logical, save :: first_time=.true.
 
-    if(ngh>Ng) stop 'ghost error: not enought ghost layers to fill'
+    if(ngh>Ng) stop 'ghost error: not enough ghost layers to fill'
     if(first_time)then
       first_time=.false.
       jlen=jmax-jmin+1; klen=kmax-kmin+1; !ilen=ngh
@@ -369,7 +369,7 @@ module module_BC
     integer, save :: srcL, srcR, destL, destR, face(2)
     logical, save :: first_time=.true.
 
-    if(ngh>Ng) stop 'ghost error: not enought ghost layers to fill'
+    if(ngh>Ng) stop 'ghost error: not enough ghost layers to fill'
     if(first_time)then
       first_time=.false.
       klen=kmax-kmin+1; ilen=imax-imin+1; !jlen=ngh
@@ -397,7 +397,7 @@ module module_BC
     integer, save :: srcL, srcR, destL, destR, face(2)
     logical, save :: first_time=.true.
 
-    if(ngh>Ng) stop 'ghost error: not enought ghost layers to fill'
+    if(ngh>Ng) stop 'ghost error: not enough ghost layers to fill'
     if(first_time)then
       first_time=.false.
       ilen=imax-imin+1; jlen=jmax-jmin+1; !klen=ngh

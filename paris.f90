@@ -115,7 +115,7 @@ Program paris
       endif
     endif
 !--------------------------------------PROJECTION STEP--------------------------------------------
-    ! Compute source term and the coefficient do p(i,j,k)
+!    Compute source term and the coefficient do p(i,j,k)
 !    tmp(is:ie,js:je,ks:ke)=rho(is:ie,js:je,ks:ke)
 !    tmp = rho
 !    call SetPressureBC(density=tmp,pressure=p)
