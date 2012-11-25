@@ -13,6 +13,21 @@
 ! Version 1.0   1/21/2011   The 3D flow solver for variable density/viscosity is written. 
 !                           The density is advected by an ENO scheme.
 ! Version 2.0   2/25/2011   Parallel implementation.
+!
+! This program is free software; you can redistribute it and/or
+! modify it under the terms of the GNU General Public License as
+! published by the Free Software Foundation; either version 2 of the
+! License, or (at your option) any later version.
+!
+! This program is distributed in the hope that it will be useful,
+! but WITHOUT ANY WARRANTY; without even the implied warranty of
+! MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	See the GNU
+! General Public License for more details.
+!
+! You should have received a copy of the GNU General Public License
+! along with this program; if not, write to the Free Software
+! Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
+! 02111-1307, USA.  
 !=================================================================================================
 !=================================================================================================
 !=================================================================================================
@@ -89,6 +104,7 @@ module module_IO
   integer :: nout, out, output_format, nbackup
   character(len=20) :: out_path, x_file, y_file, z_file
   logical :: read_x, read_y, read_z, restart, ICOut
+  integer outmin2term
   interface
      SUBROUTINE append_visit_file(rootname,padding)
        character :: rootname(*)
@@ -198,7 +214,7 @@ subroutine output2(nf,i1,i2,j1,j2,k1,k2)
 !  logical, save :: first_time=.true.
   character(len=30) :: rootname
   integer :: padding=5
-  rootname=TRIM(out_path)//'/plot'//TRIM(int2text(nf,padding))//'-'
+  rootname=TRIM(out_path)//'/VTK/plot'//TRIM(int2text(nf,padding))//'-'
 
   if(rank==0) call append_visit_file(TRIM(rootname),padding)
 
@@ -243,6 +259,49 @@ subroutine output2(nf,i1,i2,j1,j2,k1,k2)
 
     close(8)
 end subroutine output2
+!=================================================================================================
+!=================================================================================================
+! subroutine cminmax
+!   computes the min and max of some fields
+!   called in:    program main
+!-------------------------------------------------------------------------------------------------
+subroutine cminmax(var,umin_glob,umax_glob)
+  use module_grid
+  use module_flow
+  include 'mpif.h'
+  real(8) var(imin:imax,jmin:jmax,kmin:kmax)
+  real(8) umin, umax, umin_glob, umax_glob
+  integer i,j,k,ierr
+    ! calculate the min/max of u velocity
+    umin = -1d300 ; umax = 1.d300
+    do k=ks,ke;  do j=js,je;  do i=is,ie
+     if (var(i,j,k) < umax) umax = var(i,j,k)
+     if (var(i,j,k) > umin) umin = var(i,j,k)
+    enddo;  enddo;  enddo
+    call MPI_ALLREDUCE(umax, umax_glob, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_WORLD, ierr)
+    call MPI_ALLREDUCE(umin, umin_glob, 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_WORLD, ierr)
+end subroutine cminmax
+!=================================================================================================
+!=================================================================================================
+! subroutine minmax
+!   writes the min and max of some fields
+!   called in:    program main
+!-------------------------------------------------------------------------------------------------
+subroutine minmax()
+  use module_grid
+  use module_flow
+  real(8) umin_glob,umax_glob,vmin_glob, vmax_glob
+  call cminmax(u,umin_glob,umax_glob)
+  call cminmax(v,vmin_glob,vmax_glob)
+  if(rank==0) then
+     open(unit=121,file=TRIM(out_path)//'/umax',access='append')
+     write(121,'("Step:",I6," bounds:",4es16.5e2)') itimestep,umin_glob,umax_glob,vmin_glob,vmax_glob
+     if(outmin2term==1) then
+        write(6,'("            Bounds:",4es16.5e2)')          umin_glob,umax_glob,vmin_glob,vmax_glob
+     endif
+     close(121)
+  endif
+end subroutine minmax
 !-------------------------------------------------------------------------------------------------
 end module module_IO
 !=================================================================================================

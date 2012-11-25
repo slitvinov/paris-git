@@ -1,0 +1,137 @@
+%
+%
+%2345678901234567890123456789012345678901234567890123456789012345678901234567890
+
+
+% (Jie Li?:) Ici, on definit trois macros
+
+% la premiere est une macro avec deux parametres: le premier specifie
+%       la largeur, le second le nom du fichier en EncasulatedPostscript ou se
+%       trouve ton dessin.
+
+\def\epsfx#1#2{\leavevmode\epsfxsize=#1 \epsfbox{#2}}
+
+% la seconde est une macro avec deux parameters: mais le premier specifie
+%       la hauteur, le second le nom en EncasulatedPostscript ou se
+%       trouve ton dessin.
+
+\def\epsfy#1#2{\leavevmode\epsfysize=#1 \epsfbox{#2}}
+
+% la troisieme est une macro avec trois parameters: le premier specifie
+%       la larheur, le second la hauteur, le troisieme le nom de fichier
+%       en EncasulatedPostscript ou se trouve ton dessin
+
+\def\epsfxy#1#2#3{\leavevmode\epsfxsize=#1 \epsfysize=#2 \epsfbox{#3}}
+
+
+\newcommand\lgawebsite{{\tt ftp://ftp.jussieu.fr/jussieu/labos/lmm}}
+% For Notes sections
+\newcommand\subn{\paragraph{}}
+
+\newcommand{\refeq}[1]{(\ref{#1})}
+\newcommand{\reff}[1]{(\ref{#1})}
+
+\newcommand{\trema}{\"}
+%boldface letters
+
+\newcommand\A{{\bf a}}
+\newcommand\B{{\bf b}}
+\newcommand\C{{\bf c}}
+\newcommand\D{{\bf d}}
+\newcommand\E{{\bf e}}
+\newcommand\I{{\bf i}}
+\newcommand\J{{\bf j}}
+\newcommand\K{{\bf k}}
+\newcommand\G{{\bf g}}
+\newcommand\M{{\bf m}}
+\newcommand\N{{\bf n}}
+\renewcommand\P{{\bf p}}
+\newcommand\Q{{\bf q}}
+\newcommand\R{{\bf r}}
+\newcommand\F{{\bf f}}
+\newcommand\T{{\bf t}}
+\newcommand\U{{\bf u}}
+\newcommand\ut{{\tilde u}}
+\newcommand\vt{{\tilde v}}
+\newcommand\wt{{\tilde w}}
+\newcommand\V{{\bf v}}
+\newcommand\W{{\bf w}}
+\newcommand\X{{\bf x}}
+\newcommand\Y{{\bf y}}
+\newcommand\Z{{\bf z}}
+
+\renewcommand\AA{{\bf A}}
+\newcommand\BB{{\bf B}}
+\newcommand\CC{{\bf C}}
+\newcommand\DD{{\bf D}}
+\newcommand\EE{{\bf E}}
+\newcommand\FF{{\bf F}}
+\newcommand\MM{{\bf M}}
+%\newcommand\NN{{\bf N}}
+%\renewcommand\NN{{\typeout{Warning ! } \bf WARNING NN NOT AVAIL}}
+\newcommand\II{{\bf I}}
+\newcommand\JJ{{\bf J}}
+\newcommand\KK{{\bf K}}
+\newcommand\GG{{\bf G}}
+\newcommand\PP{{\bf P}}
+\newcommand\RR{{\bf R}}
+\renewcommand\SS{{\bf S}}
+\newcommand\TT{{\bf T}}
+\newcommand\UU{{\bf U}}
+\newcommand\UT{{\bf \tilde u}}
+\newcommand\XX{{\bf X}}
+\newcommand\YY{{\bf Y}}
+\newcommand\ZZ{{\bf Z}}
+
+\newcommand\MMM{{\cal M}}
+\newcommand\NNN{{\cal N}}
+
+\newcommand\derta{\partial_{t_1}}
+\newcommand\dertb{\partial_{t_2}}
+\newcommand\dert{\partial_t}
+\newcommand\derx{\partial_x}
+\newcommand\dery{\partial_y}
+\newcommand\derz{\partial_z}
+\newcommand\derr{\partial_r}
+\newcommand\derth[1]{\frac{\partial #1}{\partial \theta}}
+\newcommand\dera{\partial_\alpha}
+\newcommand\derb{\partial_\beta}
+\newcommand\deri[1]{ \frac{\partial{ #1}}{\partial{x_i}} }
+\newcommand\derj[1]{ \frac{\partial{ #1}}{\partial{x_j}} }
+\newcommand\derxj{ \frac{\partial}{\partial{x_j}} }
+\newcommand\derxi{ \frac{\partial}{\partial{x_i}} }
+\newcommand\dertt[1]{ \frac{\partial{ #1}}{\partial t} }
+\newcommand\derft{ \frac{\partial}{\partial t} }
+\newcommand\dertj[1]{\frac{\partial^2 #1}{\partial x_j^2}}
+\newcommand\jac[2]{\frac{\partial(#1,#2)}{\partial(x,z)}}
+
+\newcommand\derd[1]{\frac{D #1}{Dt}}
+\newcommand\romandt[1]{\frac{{\rm d} #1}{{\rm d}t}}
+
+\newcommand\der[2]{\frac{\partial #1}{\partial #2}}
+\newcommand\pori[2]{\frac{\partial #2}{\partial #1}}
+\newcommand\derbrack[2]{\frac{\partial}{\partial #2}\left[ #1 \right]}
+
+\newcommand\romander[2]{\frac{{\rm d} #1}{{\rm d}#2}}
+
+\newcommand\grad{\nabla}
+
+% Greek
+
+\newcommand\eps{\epsilon}
+\newcommand\ii{{\rm i}}
+\newcommand\om{{\omega}}
+
+\newcommand\porh[1]{\frac{\partial H ( {\cal S} )}{\partial #1}}
+
+\newcommand\be{\begin{equation}}
+\newcommand\nd{\end{equation}}
+\newcommand\bed{\begin{displaymath}}
+\newcommand\ndd{\end{displaymath}}
+\newcommand\hb[1]{\hbox{\hskip 10 pt #1 \hskip 10pt} }
+\newcommand\ba{\begin{array}}
+\newcommand\ea{\end{array}}
+
+% Miscellaneous
+
+\newcommand\Order{{\cal O}}

@@ -1,0 +1,63 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8x]{inputenc}
+%\usepackage{isolatin1}
+\usepackage{ctable}
+\usepackage[french]{babel}
+
+%\usepackage[T1]{inputenc}
+%\usepackage{float}
+%\usepackage{vmargin}
+\usepackage{epsfig}
+\usepackage{graphicx}
+\usepackage{graphics}
+
+\setlength{\parindent}{10pt}
+\setlength{\parskip}{10pt}
+%\renewcommand{\baselinestretch}{2.0}
+%\renewcommand\baselinestretch{1.5}
+\newcommand\numero{{n$^{\rm o}\,\,$}}
+\input{macros}
+%\input{nondim}
+
+\begin{document}
+\titlepage
+\mbox{}
+\begin{center}
+\vskip 1cm
+{\Large \bf Time scheme
+}\\\vskip 1cm
+Stéphane Zaleski\\
+\vskip 0.5cm
+\today
+\end{center}
+
+\be
+u^* = u^{n} + \tau L(u^{n})
+\nd
+\be
+u^{**} = u^* + \tau L(u^{*})
+\nd
+\be
+u^{n+1,*} = \frac 12 (u^{**} + u^n )
+\nd
+approximation:
+\be
+u^{n+1} = u^n + \tau L(u^{n}) + \Order(\tau^2) = u^{*} + \Order(\tau^2)
+\nd
+substituting:
+\be
+u^{n+1,*} = \frac 12 ( u^* + \tau L(u^{*}) + u^n) =
+\frac 12 ( u^n + \tau L(u^n) + \tau L( u^{n+1} + \Order(\tau^2)) + u^n) 
+\nd
+\be
+u^{n+1,*} = 
+u^n + \frac 12 (  \tau L(u^n) + \tau L( u^{n+1} + \Order(\tau^2)) ) 
+\nd
+Hence
+\be
+u^{n+1,*} = 
+u^n + \frac 12 (  \tau L(u^n) + \tau L( u^{n+1}) )   + \Order(\tau^3)
+\nd
+which is the the trapezoidal rule.
+
+\end{document}

@@ -1,13 +1,39 @@
 !=================================================================================================
+! Paris-0.1
+! Extended from Code: FTC3D2011 (Front Tracking Code for 3D simulations)
+! and Surfer. 
+! 
+! Authors: Sadegh Dabiri, Gretar Tryggvason
+! author for VOF extenstions Stephane Zaleski (zaleski@dalembert.upmc.fr) 
+! Contact: sdabiri@gmail.com
+!
+! This program is free software; you can redistribute it and/or
+! modify it under the terms of the GNU General Public License as
+! published by the Free Software Foundation; either version 2 of the
+! License, or (at your option) any later version.
+!
+! This program is distributed in the hope that it will be useful,
+! but WITHOUT ANY WARRANTY; without even the implied warranty of
+! MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	See the GNU
+! General Public License for more details.
+!
+! You should have received a copy of the GNU General Public License
+! along with this program; if not, write to the Free Software
+! Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
+! 02111-1307, USA.  
+!=================================================================================================
 ! module_solids: Contains definition of variables for the solids.
 !-------------------------------------------------------------------------------------------------
 module module_solids
   use module_grid
+  use module_flow
   use module_IO
+  use module_BC
   implicit none
   real(8), dimension(:,:,:), allocatable :: solids
   logical :: dosolids = .false.
-
+  integer :: padding=5
+  integer il,ih,jl,jh,kl,kh
 !***********************************************************************
   interface
     real(c_double) FUNCTION solid_func_CFC(xdd,ydd,zdd,ldd) bind(C, name="solid_func_CFC_")
@@ -23,23 +49,30 @@ module module_solids
   end interface
 contains
 !***********************************************************************
-    SUBROUTINE initsolids()
+!=================================================================================================
+  SUBROUTINE initialize_solids()
+    implicit none
+    include 'mpif.h'
       integer :: i,j,k
       real(8) :: ttt
       real(8) :: xx,xy,xz,xl
-!***
-!   test the C and Fortran array indexing- for development only
-!***
-!      call comparef2c()
-!     STOP
-!*** 
-!     end test section
-!***
-      allocate(solids(imin:imax,jmin:jmax,kmin:kmax))
-      do i=imin,imax; do j=jmin,jmax; do k=kmin,kmax; 
-         solids(i,j,k) = solid_func_CFC(x(i),y(j),z(k),xlength)
-      enddo; enddo; enddo
-    END SUBROUTINE initsolids
+      integer :: ierr
+      integer :: req(48),sta(MPI_STATUS_SIZE,48)
+
+      call ReadSolidParameters
+      if(dosolids) then
+         allocate(solids(imin:imax,jmin:jmax,kmin:kmax))
+         do i=imin,imax; do j=jmin,jmax; do k=kmin,kmax; 
+            solids(i,j,k) = solid_func_CFC(x(i),y(j),z(k),xlength)
+         enddo; enddo; enddo
+         call output_solids(0,imin,imax,jmin,jmax,kmin,kmax)
+         if(rank==0) write(out,*)'solids initialized'
+         if(rank==0) write(6,*)'solids initialized'
+         call ghost_x(solids,2,req(1:4));  call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+         call ghost_y(solids,2,req(1:4));  call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+         call ghost_z(solids,2,req(1:4));  call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+      endif
+    END SUBROUTINE initialize_solids
 !***********************************************************************
     SUBROUTINE outfarray(carray) 
       INTEGER CARRAY(2,2) 
@@ -80,18 +113,6 @@ contains
       close(in)
 !      if(rank==0) print  * , "dosolids =",dosolids
     end subroutine ReadSolidParameters
-  end module module_solids
-
-module module_output_solids
-    use module_IO
-    use module_flow
-    use module_grid
-    use module_solids
-  implicit none
-  integer il,ih,jl,jh,kl,kh
-  integer :: padding=5
-contains
-!=================================================================================================
 !
 ! Output the velocity profile
 !
@@ -124,7 +145,7 @@ contains
   subroutine output_solids(nf,i1,i2,j1,j2,k1,k2)
     integer ::nf,i1,i2,j1,j2,k1,k2,i,j,k
     character(len=30) :: rootname
-    rootname=trim(out_path)//'/solid'//TRIM(int2text(nf,padding))//'-'
+    rootname=trim(out_path)//'/VTK/solid'//TRIM(int2text(nf,padding))//'-'
     if(rank==0) call append_solid_visit_file(TRIM(rootname),padding)
 
     OPEN(UNIT=8,FILE=TRIM(rootname)//TRIM(int2text(rank,padding))//'.vtk')
@@ -164,4 +185,4 @@ contains
     if(rank==0) call close_solid_visit_file()
 end subroutine output_solids
 !***********************************************************************
-end module module_output_solids
+end module module_solids

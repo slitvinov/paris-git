@@ -2,16 +2,33 @@
 !=================================================================================================
 ! Paris-0.1
 ! Extended from Code: FTC3D2011 (Front Tracking Code for 3D simulations)
+! and Surfer. 
 ! 
 ! Authors: Sadegh Dabiri, Gretar Tryggvason
-! author for minor extenstions Stephane Zaleski(zaleski@dalembert.upmc.fr) 
+! author for VOF extenstions Stephane Zaleski (zaleski@dalembert.upmc.fr) 
 ! Contact: sdabiri@gmail.com
+!
 ! A three dimensional Navier-Stokes flow solver for modeling of multiphase 
 ! flows. Flow can be driven by wall motion, density difference or pressure gradient.
 ! Boundary conditions supported: wall and periodic
 ! Version 1.0   1/21/2011   The 3D flow solver for variable density/viscosity is written. 
 !                           The density is advected by ENO scheme.
 ! Version 2.0   2/25/2011   Parallel implementation.
+!
+! This program is free software; you can redistribute it and/or
+! modify it under the terms of the GNU General Public License as
+! published by the Free Software Foundation; either version 2 of the
+! License, or (at your option) any later version.
+!
+! This program is distributed in the hope that it will be useful,
+! but WITHOUT ANY WARRANTY; without even the implied warranty of
+! MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	See the GNU
+! General Public License for more details.
+!
+! You should have received a copy of the GNU General Public License
+! along with this program; if not, write to the Free Software
+! Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
+! 02111-1307, USA.  
 !=================================================================================================
 !=================================================================================================
 !=================================================================================================
@@ -63,6 +80,9 @@ Program paris
   allocate(mask(imin:imax,jmin:jmax,kmin:kmax))
   ! output initial condition
   if(ICOut)call output(0,is,ie,js,je,ks,ke)
+  ! output initial statistics
+  outmin2term=1
+  call minmax()
   if(rank==0)start_time = MPI_WTIME()
 !---------------------------------------MAIN TIME LOOP--------------------------------------------
   do while(time<EndTime .and. itimestep<nstep)
@@ -168,7 +188,7 @@ Program paris
     if(mod(itimestep,nout)==0) then
        call output(ITIMESTEP/nout,is,ie,js,je,ks,ke)
     endif
-    if(rank==0)then
+    if(rank==0) then
       end_time =  MPI_WTIME()
       write(out,'("Step:",I6," Iterations:",I5," cpu(s):",f10.2)')itimestep,it,end_time-start_time
       open(unit=121,file='track')
@@ -181,6 +201,11 @@ Program paris
       write(121,'(5es16.5e2)')time,flowrate,end_time-start_time
       close(121)
     endif
+!
+!    if(mod(itimestep,nout)==0) then
+       call minmax()
+!    endif
+!
   enddo
 !--------------- END OF MAIN TIME LOOP ----------------------------------------------------------
   if(rank==0) then 
@@ -653,6 +678,8 @@ subroutine InitCondition
     time = 0d0
     itimestep = 0
     rho=rho1; mu=mu1
+  ! set the velocity
+    u = 1.; 
   ! Set density and viscosity in the domain and the drop
     if(TwoPhase)then
       do ib=1,numBubble
@@ -749,7 +776,7 @@ subroutine ReadParameters
   implicit none
   include 'mpif.h'
   integer :: in, ierr
-  integer, parameter :: MaxFront=1000
+  integer, parameter :: MaxFront=1
   real(8) :: xyzrad(4,MaxFront)
   namelist /parameters/ out_path , Nx, Ny, Nz, Ng, xLength, yLength, zLength, gx, gy, gz, hypre, &
                         bdry_cond, dpdx, dpdy, dpdz, itime_scheme, nstep, maxit, maxError,  &
@@ -774,12 +801,13 @@ subroutine ReadParameters
   rad(1:NumBubble) = xyzrad(4,1:NumBubble)
 
   if(rank==0)then
-    call system('mkdir            '//trim(out_path))
-    call system('cp input         '//trim(out_path))
-    !call system('cp paris.f90 '//trim(out_path))
-    open(unit=out, file=trim(out_path)//'/output', action='write', iostat=ierr)
-    if (ierr .ne. 0) stop 'ReadParameters: error opening output file'
-    write(UNIT=out,NML=parameters)
+     call system('mkdir            '//trim(out_path))
+     call system('mkdir            '//trim(out_path)//'/VTK')
+     call system('cp input         '//trim(out_path))
+     !call system('cp paris.f90 '//trim(out_path))
+     open(unit=out, file=trim(out_path)//'/output', action='write', iostat=ierr)
+     if (ierr .ne. 0) stop 'ReadParameters: error opening output file'
+     write(UNIT=out,NML=parameters)
   endif
 
   ! Number of grid points in streamwise and transverse directions must
@@ -789,9 +817,9 @@ subroutine ReadParameters
   if(mod(Nz,nPz) /= 0) Stop 'ReadParameters: Nz not divisible by nPz!'
   Mx = Nx/nPx; My = Ny/nPy; Mz = Nz/nPz
   if(numProcess /= nPx*nPy*nPz)then
-    if(rank==0) write(out,*) 'Error: incorrect number of processors.'
-    call MPI_Finalize(ierr)
-    stop
+     if(rank==0) write(out,*) 'Error: incorrect number of processors.'
+     call MPI_Finalize(ierr)
+     stop
   endif
   call MPI_BARRIER(MPI_COMM_WORLD, ierr)
 end subroutine ReadParameters

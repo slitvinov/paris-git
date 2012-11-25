@@ -1,7 +1,7 @@
 test:
 	make clean
 	ln -s testinput input
-	mpirun -np 4 ftc3D2011
+	mpirun -np 4 paris
 	sh ./plot.sh
 
 clean:

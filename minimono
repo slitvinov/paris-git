@@ -20,7 +20,7 @@ dt      = 1e-2     ! dt in case of dtFlag=1
 CFL     = 0.25
 MAXERROR= 1d-6     ! Residual for Poisson solver
 
-ITIME_SCHEME = 1   ! time scheme: 1:first order Euler, 2: second order TVD Runge-Kutta
+ITIME_SCHEME = 2   ! time scheme: 1:first order Euler, 2: second order TVD Runge-Kutta
 
 MAXIT   = 20
 BETA    = 1.2
@@ -37,9 +37,9 @@ out_path = 'out'     ! name of the output directory
 ICOut   = F        ! output initial condition
 !=================================================================================================
 !Grid parameters
-npx     = 2
-npy     = 2
-npz     = 2
+npx     = 1
+npy     = 1
+npz     = 1
                    ! number of processors in x,y,z direction
 
 Nx      = 32
