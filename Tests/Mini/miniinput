@@ -20,7 +20,7 @@ dt      = 1e-2     ! dt in case of dtFlag=1
 CFL     = 0.25
 MAXERROR= 1d-6     ! Residual for Poisson solver
 
-ITIME_SCHEME = 1   ! time scheme: 1:first order Euler, 2: second order TVD Runge-Kutta
+ITIME_SCHEME = 2   ! time scheme: 1:first order Euler, 2: second order TVD Runge-Kutta
 
 MAXIT   = 20
 BETA    = 1.2
@@ -84,11 +84,11 @@ TWOPHASE= T
                    ! TwoPhase: used for nu_max,min computation.
 
 RHO1    = 1.0
-MU1     = 1.0
+MU1     = 0.0
                    ! rho1, mu1 : density and viscosity of the matrix phase
 
 RHO2    = 1.0
-MU2     = 1.0
+MU2     = 0.0
                    ! rho2, mu2 : properties of the drop
 
 NumBubble =  1

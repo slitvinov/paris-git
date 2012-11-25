@@ -99,8 +99,6 @@ contains
     integer :: req(48),sta(MPI_STATUS_SIZE,48)
     integer :: ngh=2, ierr
 
-    du=1.;
-
     if (MOD(tswap,3) .eq. 0) then
        call swp(w,cvof,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3),3)
        call ghost_x(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)

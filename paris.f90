@@ -42,7 +42,9 @@ Program paris
   use module_poisson
   use module_IO
   use module_solids
-  use module_output_solids
+  use module_vof
+  use module_output_vof
+
   implicit none
   include 'mpif.h'
   integer :: ierr, i,j,k
@@ -58,19 +60,10 @@ Program paris
   call MPI_COMM_SIZE(MPI_COMM_WORLD, numProcess, ierr)
   start_time = MPI_Wtime(ierr)
 
-  call ReadParameters
-  call ReadSolidParameters
-  if(rank==0) write(out,*)'Parameters read successfully'
-  ! check number of processors
-  If (numProcess .NE. nPx*nPy*nPz) STOP '*** Main: Problem with nPx!'
-
   call initialize
-  if(dosolids) then
-     call initsolids
-     call output_solids(0,imin,imax,jmin,jmax,kmin,kmax)
-     if(rank==0) write(out,*)'solids initialized'
-     if(rank==0) write(6,*)'solids initialized'
-  endif
+  call initialize_VOF
+  call initialize_solids
+
   call InitCondition
   if(rank==0) write(out,*)'initialized'
   if(rank==0) write(6,*)'initialized'
@@ -81,7 +74,7 @@ Program paris
   ! output initial condition
   if(ICOut)call output(0,is,ie,js,je,ks,ke)
   ! output initial statistics
-  outmin2term=1
+  outmin2term=0
   call minmax()
   if(rank==0)start_time = MPI_WTIME()
 !---------------------------------------MAIN TIME LOOP--------------------------------------------
@@ -104,35 +97,32 @@ Program paris
     endif
 !------------------------------------ADVECTION & DIFFUSION----------------------------------------
     do ii=1, itime_scheme
-      call momentumDiffusion(u,v,w,rho,mu,du,dv,dw)
-      call momentumConvection(u,v,w,du,dv,dw)
-      call volumeForce(rho,rho1,rho2,dpdx,dpdy,dpdz,BuoyancyCase,fx,fy,fz,gx,gy,gz,du,dv,dw)
-      if(TwoPhase) call density(rho,u,v,w,drho)
-      u = u + dt * du
-      v = v + dt * dv
-      w = w + dt * dw
-      if(TwoPhase) rho = rho + dt * drho
+!------------------------------------VOF STUFF ---------------------------------------------------
+       call vofsweeps(itimestep)
+!------------------------------------deduce rho, mu from cvof-------------------------------------
+       call linfunc(rho,rho1,rho2)
+       call linfunc(mu,mu1,mu2)
+!------------------------------------END VOF STUFF------------------------------------------------
+       call momentumDiffusion(u,v,w,rho,mu,du,dv,dw)
+       call momentumConvection(u,v,w,du,dv,dw)
+       call volumeForce(rho,rho1,rho2,dpdx,dpdy,dpdz,BuoyancyCase,fx,fy,fz,gx,gy,gz,du,dv,dw)
+       u = u + dt * du
+       v = v + dt * dv
+       w = w + dt * dw
+       call SetVelocityBC(u,v,w)
 
-      call SetVelocityBC(u,v,w)
-      
-      call ghost_x(u  ,2,req( 1: 4));  call ghost_x(v,2,req( 5: 8)); call ghost_x(w,2,req( 9:12)); 
-      call ghost_x(rho,2,req(13:16));  call MPI_WAITALL(16,req(1:16),sta(:,1:16),ierr)
-      call ghost_y(u  ,2,req( 1: 4));  call ghost_y(v,2,req( 5: 8)); call ghost_y(w,2,req( 9:12)); 
-      call ghost_y(rho,2,req(13:16));  call MPI_WAITALL(16,req(1:16),sta(:,1:16),ierr)
-      call ghost_z(u  ,2,req( 1: 4));  call ghost_z(v,2,req( 5: 8)); call ghost_z(w,2,req( 9:12)); 
-      call ghost_z(rho,2,req(13:16));  call MPI_WAITALL(16,req(1:16),sta(:,1:16),ierr)
-
-      if(TwoPhase) mu  = (rho-rho1)/(rho2-rho1)*(mu2-mu1)+mu1
+       call ghost_x(u  ,2,req( 1: 4));  call ghost_x(v,2,req( 5: 8)); call ghost_x(w,2,req( 9:12)); 
+       call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
+       call ghost_y(u  ,2,req( 1: 4));  call ghost_y(v,2,req( 5: 8)); call ghost_y(w,2,req( 9:12)); 
+       call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
+       call ghost_z(u  ,2,req( 1: 4));  call ghost_z(v,2,req( 5: 8)); call ghost_z(w,2,req( 9:12)); 
+       call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
     enddo
-
+    call linfunc(rho,rho1,rho2)
     if(itime_scheme==2) then
       u = 0.5*(u+uold)
       v = 0.5*(v+vold)
       w = 0.5*(w+wold)
-      if(TwoPhase) then
-        rho = 0.5*(rho+rhoo)
-        mu  = 0.5*(mu +muold )
-      endif
     endif
 !--------------------------------------PROJECTION STEP--------------------------------------------
 !    Compute source term and the coefficient do p(i,j,k)
@@ -187,6 +177,7 @@ Program paris
     if(mod(itimestep,nbackup)==0)call backup_write
     if(mod(itimestep,nout)==0) then
        call output(ITIMESTEP/nout,is,ie,js,je,ks,ke)
+       call output_VOF(ITIMESTEP/nout,imin,imax,jmin,jmax,kmin,kmax)
     endif
     if(rank==0) then
       end_time =  MPI_WTIME()
@@ -210,6 +201,7 @@ Program paris
 !--------------- END OF MAIN TIME LOOP ----------------------------------------------------------
   if(rank==0) then 
      if(output_format==2) call close_visit_file()
+     call close_VOF_visit_file()
   endif
   call output_at_location()
   if(HYPRE) call poi_finalize
@@ -551,6 +543,11 @@ subroutine initialize
   include 'mpif.h'
   integer :: ierr, i,j,k
 
+  call ReadParameters
+  if(rank==0) write(out,*)'Parameters read successfully'
+  ! check number of processors
+  If (numProcess .NE. nPx*nPy*nPz) STOP '*** Main: Problem with nPx!'
+
   allocate(dims(ndim),periodic(ndim),reorder(ndim),coords(ndim),STAT=ierr)
   dims(1) = nPx; dims(2) = nPy; dims(3) = nPz
 
@@ -655,7 +652,7 @@ subroutine InitCondition
   use module_BC
   use module_IO
   use module_tmpvar
-
+  use module_vof
   implicit none
   include 'mpif.h'
   integer :: ierr, i,j,k, ib
@@ -665,102 +662,63 @@ subroutine InitCondition
   WallVel=0.0
 
   if(restart)then
-    call backup_read
-    call ghost_x(u  ,2,req( 1: 4));  call ghost_x(v,2,req( 5: 8)); call ghost_x(w,2,req( 9:12)); 
-    call ghost_x(rho,2,req(13:16));  call MPI_WAITALL(16,req(1:16),sta(:,1:16),ierr)
-    call ghost_y(u  ,2,req( 1: 4));  call ghost_y(v,2,req( 5: 8)); call ghost_y(w,2,req( 9:12)); 
-    call ghost_y(rho,2,req(13:16));  call MPI_WAITALL(16,req(1:16),sta(:,1:16),ierr)
-    call ghost_z(u  ,2,req( 1: 4));  call ghost_z(v,2,req( 5: 8)); call ghost_z(w,2,req( 9:12)); 
-    call ghost_z(rho,2,req(13:16));  call MPI_WAITALL(16,req(1:16),sta(:,1:16),ierr)
-    mu = mu1
-    if(TwoPhase) mu  = (rho-rho1)/(rho2-rho1)*(mu2-mu1)+mu1
+     call backup_read
+     call ghost_x(u  ,2,req( 1: 4));  call ghost_x(v,2,req( 5: 8)); call ghost_x(w,2,req( 9:12)); 
+     call ghost_x(cvof,2,req(13:16));  call MPI_WAITALL(16,req(1:16),sta(:,1:16),ierr)
+     call ghost_y(u  ,2,req( 1: 4));  call ghost_y(v,2,req( 5: 8)); call ghost_y(w,2,req( 9:12)); 
+     call ghost_y(cvof,2,req(13:16));  call MPI_WAITALL(16,req(1:16),sta(:,1:16),ierr)
+     call ghost_z(u  ,2,req( 1: 4));  call ghost_z(v,2,req( 5: 8)); call ghost_z(w,2,req( 9:12)); 
+     call ghost_z(cvof,2,req(13:16));  call MPI_WAITALL(16,req(1:16),sta(:,1:16),ierr)
   else
-    time = 0d0
-    itimestep = 0
-    rho=rho1; mu=mu1
-  ! set the velocity
-    u = 1.; 
-  ! Set density and viscosity in the domain and the drop
-    if(TwoPhase)then
-      do ib=1,numBubble
-        do i=imin,imax; do j=jmin,jmax; do k=kmin,kmax; 
-          if ( (x(i)-xc(ib))**2+(y(j)-yc(ib))**2+(z(k)-zc(ib))**2 < rad(ib)**2) then 
-             rho(i,j,k)=rho2; mu(i,j,k)=mu2; 
-          endif 
-        enddo; enddo; enddo
-      enddo
-    endif
+     time = 0d0
+     itimestep = 0
+     cvof = 0.; u = 0;  v = 0;  w = 0.
+     if(test_type=='uniform_advection') then
+        u=1.
+     else
+        stop 'unknown initialization'
+     endif
+     do ib=1,numBubble
+        do i=imin,imax
+           do j=jmin,jmax
+              do k=kmin,kmax 
+                 du(i,j,k) =  rad(ib)**2 - ((x(i)-xc(ib))**2+(y(j)-yc(ib))**2+(z(k)-zc(ib))**2) 
+                 !  if ( (x(i)-xc(ib))**2+(y(j)-yc(ib))**2+(z(k)-zc(ib))**2 < rad(ib)**2) then 
+                 !                      cvof(i,j,k) = 1.
+                 !  endif
+              enddo
+           enddo
+        enddo
+     enddo
+     i = imax-imin+1
+     j = jmax-jmin+1
+     k = kmax-kmin+1
+     call levelset2vof(du,cvof,i,j,k)
+     call ghost_x(cvof,2,req(1:4));  call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+     call ghost_y(cvof,2,req(1:4));  call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+     call ghost_z(cvof,2,req(1:4));  call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+     call setVOFbc(cvof)
   endif
 
+  call linfunc(rho,rho1,rho2)
+  call linfunc(mu,mu1,mu2)
+
 end subroutine InitCondition
-!=================================================================================================
-!=================================================================================================
-! subroutine density
-!   calculates drho/dt
-!   called in:    program paris
-!-------------------------------------------------------------------------------------------------
-subroutine density(rho,u,v,w,drho)
-  use module_grid
-  use module_tmpvar
-  implicit none
-  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: u, v, w,rho !,D
-  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(out) :: drho
-  real(8), external :: minabs
-  integer :: i,j,k
-
-  do k=ks,ke; do j=js,je; do i=is-1,ie
-    if (u(i,j,k)>0.0) then
-      work(i,j,k,1)=rho(i  ,j,k)+0.5*minabs((rho(i+1,j,k)-rho(i  ,j,k)),(rho(i  ,j,k)-rho(i-1,j,k)))
-    else
-      work(i,j,k,1)=rho(i+1,j,k)-0.5*minabs((rho(i+2,j,k)-rho(i+1,j,k)),(rho(i+1,j,k)-rho(i  ,j,k)))
-    endif
-  enddo; enddo; enddo
-  do k=ks,ke; do j=js-1,je; do i=is,ie
-    if(v(i,j,k)>0.0) then
-      work(i,j,k,2)=rho(i,j  ,k)+0.5*minabs((rho(i,j+1,k)-rho(i,j  ,k)),(rho(i,j  ,k)-rho(i,j-1,k)))
-    else
-      work(i,j,k,2)=rho(i,j+1,k)-0.5*minabs((rho(i,j+2,k)-rho(i,j+1,k)),(rho(i,j+1,k)-rho(i,j  ,k)))
-    endif
-  enddo; enddo; enddo
-  do k=ks-1,ke; do j=js,je; do i=is,ie
-    if(w(i,j,k)>0.0) then
-      work(i,j,k,3)=rho(i,j,k  )+0.5*minabs((rho(i,j,k+1)-rho(i,j,k  )),(rho(i,j,k  )-rho(i,j,k-1)))
-    else
-      work(i,j,k,3)=rho(i,j,k+1)-0.5*minabs((rho(i,j,k+2)-rho(i,j,k+1)),(rho(i,j,k+1)-rho(i,j,k  )))
-    endif
-  enddo; enddo; enddo
-  do k=ks,ke;  do j=js,je; do i=is,ie
-    drho(i,j,k) = -( u(i  ,j  ,k  )*work(i  ,j  ,k  ,1)          &
-                    -u(i-1,j  ,k  )*work(i-1,j  ,k  ,1) )/dx(i)  &
-                  -( v(i  ,j  ,k  )*work(i  ,j  ,k  ,2)          &
-                    -v(i  ,j-1,k  )*work(i  ,j-1,k  ,2) )/dy(j)  &
-                  -( w(i  ,j  ,k  )*work(i  ,j  ,k  ,3)          &
-                    -w(i  ,j  ,k-1)*work(i  ,j  ,k-1,3) )/dz(k)  !&
-!          + 0.5*( ( (D(i,j,k)+D(i+1,j,k))*(rho(i+1,j,k)-rho(i,j,k))/dxh(i  )         &
-!                  - (D(i,j,k)+D(i-1,j,k))*(rho(i,j,k)-rho(i-1,j,k))/dxh(i-1) )/dx(i) &
-!                 +( (D(i,j,k)+D(i,j+1,k))*(rho(i,j+1,k)-rho(i,j,k))/dyh(j  )         &
-!                  - (D(i,j,k)+D(i,j-1,k))*(rho(i,j,k)-rho(i,j-1,k))/dyh(j-1) )/dy(j) &
-!                 +( (D(i,j,k)+D(i,j,k+1))*(rho(i,j,k+1)-rho(i,j,k))/dzh(k  )         &
-!                  - (D(i,j,k)+D(i,j,k-1))*(rho(i,j,k)-rho(i,j,k-1))/dzh(k-1) )/dz(k) )
-  enddo; enddo; enddo
-
-end subroutine density
 !=================================================================================================
 !=================================================================================================
 ! function minabs
 !   used for ENO interpolations
 !   called in:    subroutine momentumConvection
-!                 subroutine density
 !-------------------------------------------------------------------------------------------------
 function minabs(a,b)
-implicit none
-real(8) :: minabs, a, b
+  implicit none
+  real(8) :: minabs, a, b
   if(abs(a)<abs(b)) then
-    minabs=a
+     minabs=a
   else
-    minabs=b
+     minabs=b
   endif
-!  minabs = 0.5*(sign(1.0,abs(b)-abs(a))*(a-b)+a+b)
+  !  minabs = 0.5*(sign(1.0,abs(b)-abs(a))*(a-b)+a+b)
 end function minabs
 !=================================================================================================
 !=================================================================================================

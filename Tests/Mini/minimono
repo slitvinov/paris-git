@@ -84,11 +84,11 @@ TWOPHASE= T
                    ! TwoPhase: used for nu_max,min computation.
 
 RHO1    = 1.0
-MU1     = 1.0
+MU1     = 0.0
                    ! rho1, mu1 : density and viscosity of the matrix phase
 
 RHO2    = 1.0
-MU2     = 1.0
+MU2     = 0.0
                    ! rho2, mu2 : properties of the drop
 
 NumBubble =  1

@@ -38,24 +38,22 @@ all: tags install
 
 clean:
 	@rm -fR *.o *.mod paris stats *~ track out* errftc tmp* *.tmp fort.* *.visit core.*
-
-distclean:
-	@rm -fR *.o *.mod paris *.gz stats *~ track out* errftc tmp* *.tmp fort.* *.visit TAGS tags core.* input
-	@cd Speed_Measurement; make clean; cd ..
-	@cd Poiseuille_Test; make clean; cd ..
-	@cd Test_VOF; make clean; cd ..
+	@cd Tests; sh ./clean.sh; cd ..
 	@cd Documentation; make clean; cd ..
 
-test:	install
-	@rm -fR out input
-	@ln -s miniinput input
-	mpirun -np 8 paris
+distclean: clean
+	@rm -fR  session* *.xml TAGS tags input
+
+test:  install
+	@cd ./Tests/Mini; echo `pwd`; rm -fR out input; ln -s miniinput input; mpirun -np 8 paris
 
 # single processor test
-minitest:	install
+minitest: 
+	@cd Tests/Mini
 	@rm -fR out input
 	@ln -s minimono input
 	paris
+
 
 tags:	$(SRC)
 # @SZ Create a tags file named TAGS for use by emacs
