@@ -669,6 +669,8 @@ end subroutine levelset2vof
 !Ruben
 !
 !
+! Translated into f90 by Stephane Z.
+!
 function mycs(c,mxyz)
   !***
   implicit none
