@@ -1,3 +1,3 @@
 
 clean:
-	rm -fR  *~ tmp* *.aux *.log *.pdf *.bbl *.blg
+	rm -fR  *~ tmp* *.aux *.log *.bbl *.blg
