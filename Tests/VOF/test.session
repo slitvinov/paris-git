@@ -1228,9 +1228,9 @@
                 <Field name="windowValid" type="bool">false</Field>
             </Object>
             <Object name="View3DAttributes">
-                <Field name="viewNormal" type="doubleArray" length="3">0.138812 -0.974921 0.173956 </Field>
+                <Field name="viewNormal" type="doubleArray" length="3">0 0 1 </Field>
                 <Field name="focus" type="doubleArray" length="3">0.500013 0.500013 0.500013 </Field>
-                <Field name="viewUp" type="doubleArray" length="3">-0.0116229 0.174041 0.98467 </Field>
+                <Field name="viewUp" type="doubleArray" length="3">0 1 0 </Field>
                 <Field name="viewAngle" type="double">30</Field>
                 <Field name="parallelScale" type="double">0.947237</Field>
                 <Field name="nearPlane" type="double">-1.89447</Field>
@@ -4224,10 +4224,11 @@
         </Object>
         <Object name="ViewerSubject">
             <Object name="SourceMap">
-                <Field name="SOURCE00" type="string">localhost:/Users/stephanezaleski/darcs/paris-devel/Tests/Test_VOF/vof.visit</Field>
+                <Field name="SOURCE00" type="string">localhost:/Users/stephanezaleski/darcs/paris-devel/Tests/VOF/vof.visit</Field>
             </Object>
             <Object name="SourcePlugins">
-                <Field name="localhost:/Users/stephanezaleski/darcs/paris-devel/Tests/Test_VOF/vof.visit" type="string">VTK_1.0</Field>
+                <Field name="localhost:/Users/stephanezaleski/darcs/paris-devel/Tests/Test_VOF/parallel.visit" type="string">VTK_1.0</Field>
+                <Field name="localhost:/Users/stephanezaleski/darcs/paris-devel/Tests/VOF/vof.visit" type="string">VTK_1.0</Field>
             </Object>
             <Object name="DatabaseCorrelationList">
                 <Field name="needPermission" type="bool">true</Field>
@@ -4851,9 +4852,9 @@
                             <Field name="windowValid" type="bool">false</Field>
                         </Object>
                         <Object name="View3DAttributes">
-                            <Field name="viewNormal" type="doubleArray" length="3">0.138812 -0.974921 0.173956 </Field>
+                            <Field name="viewNormal" type="doubleArray" length="3">0 0 1 </Field>
                             <Field name="focus" type="doubleArray" length="3">0.500013 0.500013 0.500013 </Field>
-                            <Field name="viewUp" type="doubleArray" length="3">-0.0116229 0.174041 0.98467 </Field>
+                            <Field name="viewUp" type="doubleArray" length="3">0 1 0 </Field>
                             <Field name="viewAngle" type="double">30</Field>
                             <Field name="parallelScale" type="double">0.947237</Field>
                             <Field name="nearPlane" type="double">-1.89447</Field>
@@ -4875,7 +4876,7 @@
                         </Object>
                         <Object name="AnnotationObjectList">
                             <Object name="AnnotationObject">
-                                <Field name="objectName" type="string">Plot0000</Field>
+                                <Field name="objectName" type="string">Plot0001</Field>
                                 <Field name="objectType" type="string">LegendAttributes</Field>
                                 <Field name="visible" type="bool">true</Field>
                                 <Field name="active" type="bool">true</Field>
@@ -4921,11 +4922,11 @@
                         </Object>
                         <Object name="ViewerPlotList">
                             <Object name="timeSliders">
-                                <Field name="SOURCE00" type="int">5</Field>
+                                <Field name="SOURCE00" type="int">40</Field>
                             </Object>
                             <Field name="activeTimeSlider" type="string">SOURCE00</Field>
                             <Object name="plot00">
-                                <Field name="plotName" type="string">Plot0000</Field>
+                                <Field name="plotName" type="string">Plot0001</Field>
                                 <Field name="pluginID" type="string">Contour_1.0</Field>
                                 <Field name="sourceID" type="string">SOURCE00</Field>
                                 <Field name="variableName" type="string">VOF</Field>
@@ -4934,11 +4935,11 @@
                                 <Field name="realized" type="bool">true</Field>
                                 <Object name="ViewerPlot">
                                     <Field name="plotDescription" type="string"></Field>
-                                    <Field name="cacheIndex" type="int">5</Field>
+                                    <Field name="cacheIndex" type="int">40</Field>
                                     <Field name="spatialExtentsType" type="string">AVT_ORIGINAL_EXTENTS</Field>
                                     <Field name="bgColor" type="doubleArray" length="3">1 1 1 </Field>
                                     <Field name="fgColor" type="doubleArray" length="3">0 0 0 </Field>
-                                    <Field name="expandedFlag" type="bool">false</Field>
+                                    <Field name="expandedFlag" type="bool">true</Field>
                                     <Field name="followsTime" type="bool">true</Field>
                                     <Object name="ContourAttributes">
                                         <Object name="defaultPalette">
@@ -4951,7 +4952,7 @@
                                                 <Field name="externalFlag" type="bool">false</Field>
                                             </Object>
                                         </Object>
-                                        <Field name="colorType" type="string">ColorBySingleColor</Field>
+                                        <Field name="colorType" type="string">ColorByMultipleColors</Field>
                                         <Field name="colorTableName" type="string">Default</Field>
                                         <Field name="legendFlag" type="bool">true</Field>
                                         <Field name="lineStyle" type="int">0</Field>
@@ -4987,7 +4988,7 @@
                                                             <Field name="externalFlag" type="bool">false</Field>
                                                         </Object>
                                                     </Object>
-                                                    <Field name="colorType" type="string">ColorBySingleColor</Field>
+                                                    <Field name="colorType" type="string">ColorByMultipleColors</Field>
                                                     <Field name="colorTableName" type="string">Default</Field>
                                                     <Field name="legendFlag" type="bool">true</Field>
                                                     <Field name="lineStyle" type="int">0</Field>

@@ -10,7 +10,7 @@
             <Field name="externalFlag" type="bool">false</Field>
         </Object>
     </Object>
-    <Field name="colorType" type="string">ColorBySingleColor</Field>
+    <Field name="colorType" type="string">ColorByMultipleColors</Field>
     <Field name="colorTableName" type="string">Default</Field>
     <Field name="legendFlag" type="bool">true</Field>
     <Field name="lineStyle" type="int">0</Field>

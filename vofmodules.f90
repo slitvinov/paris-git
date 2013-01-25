@@ -291,6 +291,8 @@ subroutine swp(us,c,vof1,vof2,vof3,d)
   real (8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: c,vof1,vof2,vof3
   real(8) dmx,dmy,dmz,mm1,mm2
   real(8) a1,a2,alpha,al3d,fl3d
+  real(8) mxyz(3),stencil3x3(-1:1,-1:1,-1:1)
+  integer i0,j0,k0
   intrinsic dmax1,dmin1
   !***
   if(ng.lt.2) stop "wrong ng"
@@ -323,33 +325,19 @@ subroutine swp(us,c,vof1,vof2,vof3,d)
 
            else if (c(i,j,k) .gt. 0.d0) then
               !***
-              !     (1) normal vector: dmx,dmy,dmz; (2) dmx,dmy,dmz>0. and dmx+dmy+dmz = 1.;
+              !     (1) normal vector: dmx,dmy,dmz, and |dmx|+|dmy|+|dmz| = 1.
+              !     (2) dmx,dmy,dmz>0.
               !     (3) get alpha;               (4) back to original plane;
               !     (5) lagrangian advection;    (6) get fluxes
               !*(1)*
-              mm1 = c(i-1,j-1,k-1)+c(i-1,j-1,k+1)+c(i-1,j+1,k-1) &
-                   +c(i-1,j+1,k+1)+2.0d0*(c(i-1,j-1,k)+c(i-1,j+1,k) &
-                   +c(i-1,j,k-1)+c(i-1,j,k+1))+4.0d0*c(i-1,j,k)
-              mm2 = c(i+1,j-1,k-1)+c(i+1,j-1,k+1)+c(i+1,j+1,k-1) &
-                   +c(i+1,j+1,k+1)+2.0d0*(c(i+1,j-1,k)+c(i+1,j+1,k) &
-                   +c(i+1,j,k-1)+c(i+1,j,k+1))+4.0d0*c(i+1,j,k)
-              dmx = mm1 - mm2
 
-              mm1 = c(i-1,j-1,k-1)+c(i-1,j-1,k+1)+c(i+1,j-1,k-1) &
-                   +c(i+1,j-1,k+1)+2.0d0*(c(i-1,j-1,k)+c(i+1,j-1,k) &
-                   +c(i,j-1,k-1)+c(i,j-1,k+1))+4.0d0*c(i,j-1,k)
-              mm2 = c(i-1,j+1,k-1)+c(i-1,j+1,k+1)+c(i+1,j+1,k-1) &
-                   +c(i+1,j+1,k+1)+2.0d0*(c(i-1,j+1,k)+c(i+1,j+1,k) &
-                   +c(i,j+1,k-1)+c(i,j+1,k+1))+4.0d0*c(i,j+1,k)
-              dmy = mm1 - mm2
-
-              mm1 = c(i-1,j-1,k-1)+c(i-1,j+1,k-1)+c(i+1,j-1,k-1) &
-                   +c(i+1,j+1,k-1)+2.0d0*(c(i-1,j,k-1)+c(i+1,j,k-1) &
-                   +c(i,j-1,k-1)+c(i,j+1,k-1))+4.0d0*c(i,j,k-1)
-              mm2 = c(i-1,j-1,k+1)+c(i-1,j+1,k+1)+c(i+1,j-1,k+1) &
-                   +c(i+1,j+1,k+1)+2.0d0*(c(i-1,j,k+1)+c(i+1,j,k+1) &
-                   +c(i,j-1,k+1)+c(i,j+1,k+1))+4.0d0*c(i,j,k+1)
-              dmz = mm1 - mm2
+              do i0=-1,1; do j0=-1,1; do k0=-1,1
+                 stencil3x3(i0,j0,k0) = c(i+i0,j+j0,k+k0)
+              enddo;enddo;enddo
+              call mycs(stencil3x3,mxyz)
+              dmx = mxyz(1)
+              dmy = mxyz(2)
+              dmz = mxyz(3)
               !*(2)*  
               invx = 1
               invy = 1
@@ -366,10 +354,6 @@ subroutine swp(us,c,vof1,vof2,vof3,d)
                  dmz = -dmz
                  invz = -1
               endif
-              mm2 = dmx+dmy+dmz
-              dmx = dmx/mm2
-              dmy = dmy/mm2
-              dmz = dmz/mm2
               !*(3)*  
               alpha = al3d(dmx,dmy,dmz,c(i,j,k))
               !*(4)*  
@@ -671,10 +655,9 @@ end subroutine levelset2vof
 !
 ! Translated into f90 by Stephane Z.
 !
-function mycs(c,mxyz)
+subroutine mycs(c,mxyz)
   !***
   implicit none
-  real(8) mycs
   real(8) c(0:2,0:2,0:2)
   real(8) mxyz(0:2)
   real(8) m1,m2,m(0:3,0:2),t0,t1,t2
@@ -826,4 +809,4 @@ function mycs(c,mxyz)
   mxyz(2) = m(cn,2)
 
   return 
-  end function mycs
+  end subroutine mycs
