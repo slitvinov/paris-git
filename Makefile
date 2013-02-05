@@ -45,15 +45,11 @@ distclean: clean
 	@rm -fR  session* *.xml TAGS tags input
 
 test:  install
-	@cd ./Tests/Mini; echo `pwd`; rm -fR out input; ln -s miniinput input; mpirun -np 8 paris
+	@cd Tests; sh ./runtests.sh
 
 # single processor test
-minitest: 
-	@cd Tests/Mini
-	@rm -fR out input
-	@ln -s minimono input
-	paris
-
+minitest: install
+	cd Tests/Mini; rm -fR out input; ln -s minimono input; paris
 
 tags:	$(SRC)
 # @SZ Create a tags file named TAGS for use by emacs
