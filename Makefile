@@ -4,10 +4,9 @@
 OMPI_FC=gfortran44
 
 FC = mpif90
-CC = mpicc
 
 # remove funny cflags from my environment
-CFLAGS = -O
+
 FFLAGS = -O3
 
 # select option for hypre
@@ -24,10 +23,8 @@ HYPRE_LIBS =  -L$(HYPRE_DIR)/lib -lHYPRE
 #------------------------No changes needed beyond this line----------------------------------------------
 
 
-OBJ = paris.o utilc.o solids.o modules.o vofmodules.o
-FOBJ = # flux3d.o alpha3d.o
-SRC = $(wildcard *.h *.c *.f90) 
-INC = $(wildcard *.h) 
+OBJ = paris.o solids.o modules.o vofmodules.o
+SRC = $(wildcard  *.f90) 
 
 install: $(OBJ)
 	@echo compiler is FC = $(FC), mpi override is OMPI_FC = $(OMPI_FC)
@@ -69,9 +66,5 @@ solids.o:  solids.f90 modules.o
 
 %.o : %.f90
 	$(FC) -c  $(FFLAGS) $<
-
-
-.c.o:   $< $(INC)
-	$(CC) -c $(CFLAGS)   $< 
 
 

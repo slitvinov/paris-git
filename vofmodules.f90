@@ -207,7 +207,7 @@ module module_output_vof
   use module_solids
   use module_vof
   implicit none
-  integer :: opened=0;
+  integer :: vof_opened=0;
 contains
   SUBROUTINE append_VOF_visit_file(rootname)
     implicit none
@@ -215,11 +215,11 @@ contains
     integer prank
     if(rank.ne.0) stop 'rank.ne.0 in append_VOF'
 
-    if(opened==0) then
+    if(vof_opened==0) then
        OPEN(UNIT=88,FILE='vof.visit')
        write(88,10) numProcess
 10     format('!NBLOCKS ',I4)
-       opened=1
+       vof_opened=1
     endif
 
     do prank=0,numProcess-1

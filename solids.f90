@@ -32,47 +32,123 @@ module module_solids
   implicit none
   real(8), dimension(:,:,:), allocatable :: solids
   logical :: dosolids = .false.
-  integer :: padding=5
   integer il,ih,jl,jh,kl,kh
+  integer :: solid_opened=0 
 !***********************************************************************
-  interface
-    real(c_double) FUNCTION solid_func_CFC(xdd,ydd,zdd,ldd) bind(C, name="solid_func_CFC_")
-      use iso_c_binding, only: c_double
-      real(c_double) , VALUE :: xdd,ydd,zdd,ldd
-    END FUNCTION solid_func_CFC
- end interface
-  interface
-     SUBROUTINE append_solid_visit_file(rootname,padding)
-       character :: rootname(*)
-       integer :: padding
-     END SUBROUTINE append_solid_visit_file
-  end interface
 contains
+!***********************************************************************
+!=================================================================================================
+  SUBROUTINE append_solid_visit_file(rootname)
+    implicit none
+    character(*) :: rootname
+    integer prank
+    if(rank.ne.0) stop 'rank.ne.0 in append_solid'
+
+    if(solid_opened==0) then
+       OPEN(UNIT=89,FILE='solid.visit')
+       write(89,10) numProcess
+10     format('!NBLOCKS ',I4)
+       solid_opened=1
+    endif
+
+    do prank=0,numProcess-1
+       write(89,11) rootname//TRIM(int2text(prank,padding))//'.vtk'
+ 11 format(A)
+    enddo
+  end subroutine  append_solid_visit_file
+
+  subroutine close_solid_visit_file()
+    close(89)
+  end subroutine close_solid_visit_file
 !***********************************************************************
 !=================================================================================================
   SUBROUTINE initialize_solids()
     implicit none
     include 'mpif.h'
-      integer :: i,j,k
-      real(8) :: ttt
-      real(8) :: xx,xy,xz,xl
-      integer :: ierr
-      integer :: req(48),sta(MPI_STATUS_SIZE,48)
+    integer :: i,j,k
+    real(8) :: ttt
+    real(8) :: xx,xy,xz,xl
+    integer :: ierr
+    integer :: req(48),sta(MPI_STATUS_SIZE,48)
+    
+    call ReadSolidParameters
+    if(dosolids) then
+       allocate(solids(imin:imax,jmin:jmax,kmin:kmax))
+       do i=imin,imax; do j=jmin,jmax; do k=kmin,kmax; 
+          solids(i,j,k) = solid_func_CFC(x(i),y(j),z(k),xlength)
+       enddo; enddo; enddo
+       call output_solids(0,imin,imax,jmin,jmax,kmin,kmax)
+       if(rank==0) write(out,*)'solids initialized'
+       if(rank==0) write(6,*)  'solids initialized'
+       call ghost_x(solids,2,req(1:4));  call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+       call ghost_y(solids,2,req(1:4));  call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+       call ghost_z(solids,2,req(1:4));  call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+    endif
+  END SUBROUTINE initialize_solids
+  ! sphere definition function 
+  FUNCTION sphere_func(x,y,z,x0,y0,z0,radius)
+    !***
+    implicit none
+    real(8) sphere_func
+    real(8) x,y,z,x0,y0,z0,radius
+    sphere_func = -((x - x0)*(x - x0) + (y - y0)*(y - y0) + (z - z0)*(z - z0)) + radius*radius
+    return
+  end function sphere_func
 
-      call ReadSolidParameters
-      if(dosolids) then
-         allocate(solids(imin:imax,jmin:jmax,kmin:kmax))
-         do i=imin,imax; do j=jmin,jmax; do k=kmin,kmax; 
-            solids(i,j,k) = solid_func_CFC(x(i),y(j),z(k),xlength)
-         enddo; enddo; enddo
-         call output_solids(0,imin,imax,jmin,jmax,kmin,kmax)
-         if(rank==0) write(out,*)'solids initialized'
-         if(rank==0) write(6,*)'solids initialized'
-         call ghost_x(solids,2,req(1:4));  call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
-         call ghost_y(solids,2,req(1:4));  call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
-         call ghost_z(solids,2,req(1:4));  call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
-      endif
-    END SUBROUTINE initialize_solids
+  ! example implicit solid definition function 
+  FUNCTION solid_func_one_sphere(x, y, z,boxL)
+    implicit none
+    real(8) solid_func_one_sphere
+    real(8) x,y,z,boxL
+    real(8) x0,y0,z0
+    real(8) radius
+    x0=0.;y0=0.;z0=0.
+    radius = 0.25*boxL
+    solid_func_one_sphere = sphere_func(x,y,z,x0,y0,z0,radius)
+    return 
+  end function  solid_func_one_sphere
+
+  ! One basic CFC cell: one vertex + three faces
+  FUNCTION solid_func_CFC_scaled( x,  y,  z)
+    implicit none
+    !  intrinsic dmax1
+    real(8) solid_func_CFC_scaled
+    REAL(8)  x,y,z,a,b
+    real(8) radius 
+    radius = 0.25*sqrt(2.d0)
+    ! 1 lower vertex and x=0 face 
+    a = MAX(sphere_func(x,y,z,0.d0,0.d0,0.d0,radius),sphere_func(x,y,z,0.d0,0.5d0,0.5d0,radius))
+    b = MAX(sphere_func(x,y,z,0.5d0,0.d0,0.5d0,radius),sphere_func(x,y,z,0.5d0,0.5d0,0.d0,radius))
+    solid_func_CFC_scaled = MAX(a,b)
+    return 
+  end function solid_func_CFC_scaled
+
+  ! One basic cube with CFC array and all vertices and faces 
+  FUNCTION solid_func_CFC( x,  y,  z,  boxL)
+    implicit none
+    real(8) solid_func_CFC
+    real(8)  x,  y,  z,  boxL, a , b, c
+    !  rescale by boxL: no need 
+    x = x/boxL
+    y = y/boxL
+    z = z/boxL
+    !  printf("HAHAHAHA %g %g %g  %g \n",x,y,z,boxL)
+    !  stop
+    !  shift to lower left corner: no need ? (add shift variable later ? ) 
+    x = x+0.5 
+    y = y+0.5 
+    z = z+0.5 
+    ! cells at root vertex and three first neighbors */
+    a = MAX(solid_func_CFC_scaled(x,y,z),solid_func_CFC_scaled(x-1.d0,y,z))
+    b = MAX(solid_func_CFC_scaled(x,y-1.d0,z),solid_func_CFC_scaled(x,y,z-1.d0))
+    a = MAX(a,b)
+! three next lower vertices 
+    c = MAX(solid_func_CFC_scaled(x-1.d0,y-1.d0,z-1.d0),solid_func_CFC_scaled(x-1.d0,y-1.d0,z))
+    b = MAX(solid_func_CFC_scaled(x,y-1.d0,z-1.d0),solid_func_CFC_scaled(x-1.d0,y,z-1.d0))
+    a = MAX(c,a)
+    solid_func_CFC = MAX(b,a)
+    return 
+  end function solid_func_CFC
 !***********************************************************************
     SUBROUTINE outfarray(carray) 
       INTEGER CARRAY(2,2) 
@@ -146,7 +222,7 @@ contains
     integer ::nf,i1,i2,j1,j2,k1,k2,i,j,k
     character(len=30) :: rootname
     rootname=trim(out_path)//'/VTK/solid'//TRIM(int2text(nf,padding))//'-'
-    if(rank==0) call append_solid_visit_file(TRIM(rootname),padding)
+    if(rank==0) call append_solid_visit_file(TRIM(rootname))
 
     OPEN(UNIT=8,FILE=TRIM(rootname)//TRIM(int2text(rank,padding))//'.vtk')
     write(8,10)
