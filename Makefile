@@ -8,6 +8,7 @@ FC = mpif90
 # remove funny cflags from my environment
 
 FFLAGS = -O3
+CFLAGS = -g -gstabs
 
 # select option for hypre
 # default hypre installation without root privileges:
@@ -24,14 +25,17 @@ HYPRE_LIBS =  -L$(HYPRE_DIR)/lib -lHYPRE
 
 
 OBJ = paris.o solids.o modules.o vofmodules.o
+OBJC = compare.o
 SRC = $(wildcard  *.f90) 
 
 install: $(OBJ)
 	@echo compiler is FC = $(FC), mpi override is OMPI_FC = $(OMPI_FC)
-	$(FC) -g -o paris $(FOPTS) $(OBJ) $(FOBJ) $(HYPRE_LIBS) 
+	$(FC) -o paris $(FOPTS) $(OBJ) $(FOBJ) $(HYPRE_LIBS) 
 	mv paris ~/bin/paris
 
-all: tags install
+all: tags install compare
+
+
 
 clean:
 	@rm -fR *.o *.mod paris stats *~ track out* errftc tmp* *.tmp fort.* *.visit core.*
@@ -67,4 +71,9 @@ solids.o:  solids.f90 modules.o
 %.o : %.f90
 	$(FC) -c  $(FFLAGS) $<
 
+compare: $(OBJC)
+	$(CC) -o compare  $(OBJC) 
+	mv compare ~/bin
 
+.c.o:   $< 
+	cc -c $(CFLAGS)   $< 

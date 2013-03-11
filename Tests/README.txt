@@ -1,22 +1,23 @@
 Mini
 ====
 A very fast, small test, both single processor and parallel. 
+Mainly of use to check that the code does not segfault.
 
 Poiseuille
 ==========
-Tests the same. 
+Tests a simple parabolic flow parallel to the axis with 8 grid points. 
 
 Solid
 =====
-A flow with a CFC array of spheres. 
+Tests the placement of solid objects in a CFC array of spheres. 
 
 Speed
 =====
-Tests how fast the code runs on parallel machines. 
+Tests how fast the code runs on parallel machines. Not automated. 
 
 U1
 ==
-An elementary test with uniform velocity. 
+An trivial, elementary test with uniform velocity. Not automated. 
 
 VOF
 ===

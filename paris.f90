@@ -7,8 +7,7 @@
 ! Authors: Sadegh Dabiri, Gretar Tryggvason
 ! author for VOF extenstions Stephane Zaleski (zaleski@dalembert.upmc.fr) 
 ! Contact: sdabiri@gmail.com
-!
-! A three dimensional Navier-Stokes flow solver for modeling of multiphase 
+! A three dimensional Navier-Stokes flow solver with front tracking for modeling of multiphase 
 ! flows. Flow can be driven by wall motion, density difference or pressure gradient.
 ! Boundary conditions supported: wall and periodic
 ! Version 1.0   1/21/2011   The 3D flow solver for variable density/viscosity is written. 
@@ -77,7 +76,7 @@ Program paris
   outmin2term=0
   call minmax()
   if(rank==0)start_time = MPI_WTIME()
-!---------------------------------------MAIN TIME LOOP--------------------------------------------
+!-----------------------------------------MAIN TIME LOOP------------------------------------------
   do while(time<EndTime .and. itimestep<nstep)
     if(dtFlag==2)call TimeStepSize(dt)
     time=time+dt
@@ -428,7 +427,7 @@ subroutine volumeForce(rho,rho1,rho2,dpdx,dpdy,dpdz,BuoyancyCase,fx,fy,fz,gx,gy,
   else
     stop 'volumeForce: invalid buoyancy option'
   endif
-   
+ !@@@ what is rro ?   
   do k=ks,ke;  do j=js,je; do i=is,ieu
     du(i,j,k)=du(i,j,k)+(fx(i,j,k)-dpdx)/(0.5*(rho(i+1,j,k)+rho(i,j,k))) + &
         (1.0 -rro/(0.5*(rho(i+1,j,k)+rho(i,j,k))) )*gx

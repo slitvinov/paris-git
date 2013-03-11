@@ -194,25 +194,34 @@ contains
 !
   function test_point_in(i,j,k)
     integer, intent(in) :: i,j,k
-     logical :: test_point_in
+    logical :: test_point_in
     test_point_in = (imin < i).and.(i < imax).and.(jmin < j).and.(j < jmax).and.(kmin < k).and.(k < kmax)
   end function test_point_in
 !
   subroutine output_at_location()
     integer :: j,jproc
     integer :: imidline,jmidline,kmidline
+    jproc = (jmin+jmax)*npy/(2*Nyt)
     jl=jmin
+    if(jproc.eq.0) jl=ng
     jh=jmax
+    if(jproc.eq.(Npy-1)) jh=Nyt-ng+1
     imidline = Nxt/2
-    jmidline = Nyt/2
+    jmidline = Nyt/2   ! possible bug: why test j, Nyt need not be in processor's subdomain. 
     kmidline = Nzt/2
     if(test_point_in(imidline,jmidline,kmidline)) then
-       jproc = (jmin+jmax)*npy/(2*Nyt)
        OPEN(UNIT=11,FILE=trim(out_path)//'/output_location'//TRIM(int2text(jproc,padding)),status='unknown',action='write')
        do j=jl,jh
           write(11,1100) y(j),u(imidline,j,kmidline)
        enddo
        close(11)
+    endif
+    if(rank==0) then
+       OPEN(UNIT=111,FILE=trim(out_path)//'/Poiseuille_theory',status='unknown',action='write')
+       do j=ng,Nyt-ng+1
+          write(111,1100) y(j), 0.5*y(j)*(1-y(j))
+       enddo
+       close(111)
     endif
 1100 FORMAT(es25.16e3,es25.16e3)
   end subroutine output_at_location

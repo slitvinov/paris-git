@@ -11,8 +11,8 @@ hypre    = T       ! use of hypre, if false, SOR solver is used
 restart  = F       ! T: start from backup of a previous simulation
 nBackup  = 45      ! number of time steps between backup writing. Only last two backups are kept.
 
-NSTEP   = 1000       ! maximum number of time steps
-EndTime = 1000.0     ! When to stop simulation
+NSTEP   = 2       ! maximum number of time steps
+EndTime = 1.0     ! When to stop simulation
 
 MaxDt   = 1e-1     ! maximum size of time step
 dtFlag  = 1        ! 1: fixed dt;  2: fixed CFL
@@ -29,7 +29,7 @@ BETA    = 1.2
 !=================================================================================================
 ! Output parameters
 
-NOUT    = 100       ! flush the solution every nout time steps
+NOUT    = 2       ! flush the solution every nout time steps
 output_format = 2  ! 1:tecplot 2:vtk
 
 out_path = 'out'     ! name of the output directory

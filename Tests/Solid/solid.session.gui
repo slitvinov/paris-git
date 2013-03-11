@@ -33,6 +33,13 @@
             <Field name="height" type="int">470</Field>
             <Field name="visible" type="bool">false</Field>
         </Object>
+        <Object name="Information">
+            <Field name="x" type="int">0</Field>
+            <Field name="y" type="int">295</Field>
+            <Field name="width" type="int">536</Field>
+            <Field name="height" type="int">304</Field>
+            <Field name="visible" type="bool">false</Field>
+        </Object>
         <Object name="MainWin">
             <Field name="x" type="int">0</Field>
             <Field name="y" type="int">0</Field>
@@ -48,7 +55,7 @@
             <Field name="visible" type="bool">false</Field>
             <Field name="posted" type="bool">false</Field>
         </Object>
-        <Field name="plotDatabases" type="stringVector">"localhost:/Users/stephanezaleski/darcs/paris-devel/Tests/Solid/solid.visit" </Field>
+        <Field name="plotDatabases" type="stringVector">"localhost:/Users/stephanezaleski/darcs/paris-devel/Tests/Solid/parallel.visit" "localhost:/Users/stephanezaleski/darcs/paris-devel/Tests/Solid/solid.visit" </Field>
         <Object name="TimeFormat">
             <Field name="displayMode" type="string">Cycles</Field>
             <Field name="precision" type="int">5</Field>
