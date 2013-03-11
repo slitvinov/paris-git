@@ -1,0 +1,10 @@
+&VOFPARAMETERS
+
+VOFBDRY_COND = 'wet' 'wet' 'wet' 
+                   ! Type of VOF boundary condition in x,y,z direction: 'wet', '90deg','periodic'
+
+TEST_TYPE = 'uniform_advection'
+!=================================================================================================
+
+&end
+! end of the namelist
