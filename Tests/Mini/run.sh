@@ -7,8 +7,8 @@ rm -fR out input
 ln -s miniinput input
 mpirun -np 8 paris > tmpout
 if [ `grep Step tmpout | tail -n 1 |  awk  '{print $2}'` == '100' ]; then 
-    echo PASS
+    echo "\033[32;1m PASS\033[0m"
 else 
-    echo FAIL
+    echo "\033[31;1m FAIL\033[0m"
 fi
 

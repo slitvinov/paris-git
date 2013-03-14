@@ -3,24 +3,22 @@
 #include <string.h>
 #include <math.h>
 
-#define MAXLINES 100
-#define MIN(a,b) ((a) < (b) ? (a) : (b))
-#define ABS(a) ((a) > 0. ? (a) : (-(a)))
-
-float minflt_(void);
+#define MAXLINES 10000
 
 int main (int argc, char * argv[])
 {
   if(argc < 4) 
     {
-      printf("%s: error: not enough command line argument\n",argv[0]);
+      printf("compare: error: not enough command line arguments.\n\n"
+             "Usage: compare FILE1 FILE2 TOLERANCE\n"
+             "FILE1 and FILE2 should contain two columns each.\n"
+             "The norm of the difference of the second columns is computed.\n"
+	     "\n");
       exit(1);
     }
-    //    strcpy(filename[1],argv[1]);
-  //  double tolerance=sscanf(argv[3],"%d",&tolerance);
   float tolerance;
   sscanf(argv[3],"%g",&tolerance);
-  //  printf(" %g ",tolerance);
+
   FILE * fd1;FILE * fd2;
   float * x1 = ( float *) malloc(MAXLINES*sizeof(float));
   float * x2 = ( float *) malloc(MAXLINES*sizeof(float));
@@ -34,7 +32,7 @@ int main (int argc, char * argv[])
     }
   if((fd2 = fopen(argv[2],"r")) == NULL) 
     {
-      fprintf(stderr,"argv[0]: error: could not open file %s\n",argv[2]);
+      fprintf(stderr,"%s: error: could not open file %s\n",argv[0],argv[2]);
       exit(3);
     }
   int returnscan1=0;
@@ -45,7 +43,7 @@ int main (int argc, char * argv[])
       nlines++;
       if(returnscan1 < 2 || returnscan2 < 2) 
 	{ 
-	  fprintf(stderr,"argv[0]: error on line %d counted %d %d items\n",nlines,returnscan1,returnscan2);
+	  fprintf(stderr,"%s: error on line %d counted %d %d items\n",argv[0],nlines,returnscan1,returnscan2);
 	  exit(2); 
 	}
       //      printf("%g %g %g %g\n",*x1,*y1,*x2,*y2);
@@ -58,13 +56,13 @@ int main (int argc, char * argv[])
   diff = sqrt(diff/nlines);
   if(diff < (double) tolerance) 
     {
-      printf("PASS\n");
+      printf("\033[32;1m PASS\033[0m\n");
     }
   else
     {
-      printf("FAIL error=%g \n",diff);
+      printf("\033[31;1m FAIL\033[0m error=%g \n",diff);
     }
-  exit(0);
+  return 0;
 }
 
 

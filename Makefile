@@ -35,8 +35,6 @@ install: $(OBJ)
 
 all: tags install compare
 
-
-
 clean:
 	@rm -fR *.o *.mod paris stats *~ track out* errftc tmp* *.tmp fort.* *.visit core.*
 	@cd Tests; sh ./clean.sh; cd ..
@@ -45,12 +43,12 @@ clean:
 distclean: clean
 	@rm -fR  session* *.xml TAGS tags input
 
-test:  install
+test:  install compare
 	@cd Tests; sh ./runtests.sh
 
 # single processor test
 minitest: install
-	cd Tests/Mini; rm -fR out input; ln -s minimono input; paris
+	cd Tests/Mini; sh run.sh
 
 tags:	$(SRC)
 # @SZ Create a tags file named TAGS for use by emacs
