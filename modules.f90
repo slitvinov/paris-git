@@ -35,6 +35,7 @@
 !-------------------------------------------------------------------------------------------------
 module module_grid
   implicit none
+  save
   integer :: Nx, Ny, Nz, Ng ! Ng isnumber of ghost cells
   integer :: Nxt, Nyt, Nzt ! total number of cells
   integer :: is, ie, js, je, ks, ke
@@ -44,11 +45,10 @@ module module_grid
   real(8), dimension(:), allocatable :: z, zh, dz, dzh
   real(8) :: xLength, yLength, zLength, xform, yform, zform !non-uniformity of grid
 
-  integer :: nPx, nPy, nPz, Mx, My, Mz, rank, ndim=3, numProcess
+  integer :: nPx, nPy, nPz, Mx, My, Mz, rank, ndim=3, nPdomain, NumProcess
   integer, dimension(:), allocatable :: dims, coords, periodic, reorder
-  integer :: MPI_Comm_Cart
+  integer :: MPI_Comm_Cart, MPI_Comm_Domain, MPI_Comm_Active
   integer :: imin, imax, jmin, jmax, kmin, kmax
-  logical :: hypre
 end module module_grid
 
 !=================================================================================================
@@ -61,7 +61,8 @@ module module_hello
   contains
 subroutine hello_coucou
   use module_grid
-  if(rank==0) write(6,*) 'coucou ',hello_count
+  if(rank==0) write(6,*) 'coucou ',hello_count, "Process0"
+  if(rank==nPdomain) write(6,*) 'coucou ',hello_count, "Front"
   hello_count = hello_count + 1
 end subroutine hello_coucou
 end module module_hello
@@ -71,17 +72,20 @@ end module module_hello
 !-------------------------------------------------------------------------------------------------
 module module_flow
   implicit none
-  real(8), dimension(:,:,:), allocatable :: u, v, w, uold, vold, wold, fx, fy, fz
-  real(8), dimension(:,:,:), allocatable :: p, rho, rhoo, muold, mu
+  save
+  real(8), dimension(:,:,:), allocatable :: u, v, w, uold, vold, wold, fx, fy, fz, color
+  real(8), dimension(:,:,:), allocatable :: p, rho, rhoo, muold, mu, dIdx, dIdy, dIdz
   real(8), dimension(:,:,:), allocatable :: du,dv,dw,drho
-  real(8) gx, gy, gz, mu1, mu2, r_avg, dt, dtFlag
-  real(8) max_velocity, maxTime, Time, EndTime, MaxDt, CFL, myfr, flowrate
-  logical :: TwoPhase
-  real(8) :: rho1, rho2, sigma, s
-  real(8), dimension(:), allocatable :: rad, xc, yc, zc
-  real(8) :: dpdx, dpdy, dpdz  !pressure gradients in case of pressure driven channel flow
+  real(8), dimension(:,:), allocatable :: averages,oldaverages, allaverages
+  real(8) gx, gy, gz, mu1, mu2, r_avg, dt, dtFlag, rho_ave, p_ave, vdt
+  real(8) max_velocity, maxTime, Time, EndTime, MaxDt, CFL, mystats(16), stats(16)
+  logical :: TwoPhase, DoVOF, DoFront, Implicit, hypre, GetPropertiesFromFront
+
+  real(8) :: rho1, rho2, s
+!  real(8) :: rad, xc, yc, zc
+  real(8) :: dpdx, dpdy, dpdz, W_ave  !pressure gradients in case of pressure driven channel flow
   real(8) :: beta, MaxError
-  integer :: maxit, it, itime_scheme, ii, BuoyancyCase, numBubble
+  integer :: maxit, it, itime_scheme, BuoyancyCase, drive
   integer :: sbx, sby, Nstep
   integer :: maxStep, itmax, iTimeStep
 end module module_flow
@@ -90,7 +94,7 @@ end module module_flow
 ! Temporary variables
 !-------------------------------------------------------------------------------------------------
 module module_tmpvar
-  real(8), dimension(:,:,:,:), allocatable :: work
+  real(8), dimension(:,:,:,:), allocatable :: work, A
   real(8), dimension(:,:,:), allocatable :: tmp
   real(8) :: tcpu(100),t0
 end module module_tmpvar
@@ -99,19 +103,18 @@ end module module_tmpvar
 ! module_IO: Contains input/output variables and procedures
 !-------------------------------------------------------------------------------------------------
 module module_IO
-  use module_flow
-  use module_grid
   implicit none
   save
   integer :: padding=5
   integer :: opened=0;
-  integer :: nout, out, output_format, nbackup
+  integer ::nout, out, output_format, nbackup, nstats
   character(len=20) :: out_path, x_file, y_file, z_file
-  logical :: read_x, read_y, read_z, restart, ICOut
-  integer outmin2term
+  logical :: read_x, read_y, read_z, restart, ICOut, restartFront, restartAverages
   contains
 ! append
     SUBROUTINE append_visit_file(rootname)
+      use module_flow
+      use module_grid
     implicit none
     character(*) :: rootname
     integer prank
@@ -155,11 +158,17 @@ subroutine backup_write
   use module_grid
   implicit none
   integer ::i,j,k
-  OPEN(UNIT=7,FILE=trim(out_path)//'/backup_'//int2text(rank,padding),status='unknown',action='write')
+  character(len=100) :: filename
+  filename = trim(out_path)//'/backup_'//int2text(rank,3)
+  call system('mv '//trim(filename)//' '//trim(filename)//'.old')
+  OPEN(UNIT=7,FILE=trim(filename),status='unknown',action='write')
   write(7,1100)time,itimestep,is,ie,js,je,ks,ke
   do k=ks,ke; do j=js,je; do i=is,ie
-    write(7,1200) u(i,j,k), v(i,j,k), w(i,j,k), p(i,j,k), rho(i,j,k)
+    write(7,1200) u(i,j,k), v(i,j,k), w(i,j,k), p(i,j,k), color(i,j,k)
   enddo; enddo; enddo
+  do i=1,10; do j=js,je
+    write(7,1200) averages(i,j)
+  enddo; enddo
   close(7)
   if(rank==0)print*,'Backup written at t=',time
   1100 FORMAT(es17.8e3,7I10)
@@ -172,16 +181,23 @@ subroutine backup_read
   use module_flow
   use module_grid
   implicit none
-  integer ::i,j,k,i1,i2,j1,j2,k1,k2
-  OPEN(UNIT=7,FILE=trim(out_path)//'/backup_'//int2text(rank,padding),status='old',action='read')
-  read(7,1100)time,itimestep,i1,i2,j1,j2,k1,k2
+  integer ::i,j,k,i1,i2,j1,j2,k1,k2,ierr
+  OPEN(UNIT=7,FILE=trim(out_path)//'/backup_'//int2text(rank,3),status='old',action='read')
+  read(7,*)time,itimestep,i1,i2,j1,j2,k1,k2
   if(i1/=is .or. i2/=ie .or. j1/=js .or. j2/=je .or. k1/=ks .or. k2/=ke) &
     stop 'Error: backup_read'
   do k=ks,ke; do j=js,je; do i=is,ie
-    read(7,1200) u(i,j,k), v(i,j,k), w(i,j,k), p(i,j,k), rho(i,j,k)
+    read(7,*) u(i,j,k), v(i,j,k), w(i,j,k), p(i,j,k), color(i,j,k)
   enddo; enddo; enddo
+  if(restartAverages)then
+    do i=1,20; do j=js,je
+      read(7,*,iostat=ierr) averages(i,j)
+      if(ierr/=0)return !no average data, return
+    enddo; enddo
+    !oldaverages=averages
+  endif
   close(7)
-  1100 FORMAT(es25.16e3,7I5)
+  1100 FORMAT(es25.16e3,7I10)
   1200 FORMAT(5es25.16e3)
 end subroutine backup_read
 !=================================================================================================
@@ -204,23 +220,45 @@ subroutine output1(nf,i1,i2,j1,j2,k1,k2)
   !use IO_mod
   implicit none
   integer ::nf,i1,i2,j1,j2,k1,k2,i,j,k
-!  logical, save :: first_time=.true.
+  logical, save :: first_time=.true.
+  
+  if(first_time)then
+    first_time = .false.
+    OPEN(UNIT=7,FILE=trim(out_path)//'/grid_'//int2text(rank,3)//'.dat')
+    write(7,*) 'FILETYPE = GRID'
+    write(7,*) 'variables = "x","y","z"'
+    write(7,2100) i2-i1+1, j2-j1+1, k2-k1+1
+    do k=k1,k2; do j=j1,j2; do i=i1,i2;
+      write(7,1200) x(i),y(j),z(k)
+    enddo; enddo; enddo
+    close(7)
+  endif
 
-  OPEN(UNIT=7,FILE=trim(out_path)//'/plot'//int2text(nf,padding)//'_'//int2text(rank,3)//'.dat')
-  write(7,1000)
+  OPEN(UNIT=7,FILE=trim(out_path)//'/plot'//int2text(nf,3)//'_'//int2text(rank,3)//'.dat')
+  write(7,*) 'FILETYPE = SOLUTION'
+  write(7,*) 'variables = "u","v","w","p","color"'
   write(7,1100) time, i2-i1+1, j2-j1+1, k2-k1+1
   do k=k1,k2; do j=j1,j2; do i=i1,i2;
-  write(7,1200) x(i),y(j),z(k),0.5d0*(u(i,j,k)+u(i-1,j,k)), &
-      0.5d0*(v(i,j,k)+v(i,j-1,k)),0.5d0*(w(i,j,k)+w(i,j,k-1)), &
-!  write(7,1200) x(i),y(j),z(k),0.5d0*(dIdx(i,j,k)+dIdx(i,j,k)), &
-!      0.5d0*(dIdy(i,j,k)+dIdy(i,j,k)),0.5d0*(dIdz(i,j,k)+dIdz(i,j,k)), &
-      p(i,j,k) !, rho(i,j,k)
+    write(7,1200) 0.5d0*(u(i,j,k)+u(i-1,j,k)), &
+                  0.5d0*(v(i,j,k)+v(i,j-1,k)), &
+                  0.5d0*(w(i,j,k)+w(i,j,k-1)), &
+                  p(i,j,k) , color(i,j,k)
   enddo; enddo; enddo
   close(7)
-  1000 FORMAT('variables = "x","y","z","u","v","w","p"') !,"rho"')
+  if(rank==0)then
+    OPEN(UNIT=7,FILE=trim(out_path)//'/averages.dat',access='append')
+    write(7,1110) time
+    do j=Ng,Ng+Ny+1
+      write(7,1200) y(j),real(allaverages(:,j)-oldaverages(:,j))
+    enddo
+    close(7)
+    oldaverages=allaverages
+  endif
+  1000 FORMAT('variables = "x","y","z","u","v","w","p","color"')
   1100 FORMAT('ZONE solutiontime=', 1PG15.7e2, ', I=',I4, 2X, ', J=',I4, 2X, ', K=',I4, 2X)
   1110 FORMAT('ZONE solutiontime=', 1PG15.7e2)
   1200 FORMAT(21es14.6e2)
+  2100 FORMAT('ZONE I=',I4, 2X, ', J=',I4, 2X, ', K=',I4, 2X)
 end subroutine output1
 !-------------------------------------------------------------------------------------------------
 subroutine output2(nf,i1,i2,j1,j2,k1,k2)
@@ -298,27 +336,6 @@ subroutine cminmax(var,umin_glob,umax_glob)
     call MPI_ALLREDUCE(umax, umax_glob, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_WORLD, ierr)
     call MPI_ALLREDUCE(umin, umin_glob, 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_WORLD, ierr)
 end subroutine cminmax
-!=================================================================================================
-!=================================================================================================
-! subroutine minmax
-!   writes the min and max of some fields
-!   called in:    program main
-!-------------------------------------------------------------------------------------------------
-subroutine minmax()
-  use module_grid
-  use module_flow
-  real(8) umin_glob,umax_glob,vmin_glob, vmax_glob
-  call cminmax(u,umin_glob,umax_glob)
-  call cminmax(v,vmin_glob,vmax_glob)
-  if(rank==0) then
-     open(unit=121,file=TRIM(out_path)//'/umax',access='append')
-     write(121,'("Step:",I6," bounds:",4es16.5e2)') itimestep,umin_glob,umax_glob,vmin_glob,vmax_glob
-     if(outmin2term==1) then
-        write(6,'("            Bounds:",4es16.5e2)')          umin_glob,umax_glob,vmin_glob,vmax_glob
-     endif
-     close(121)
-  endif
-end subroutine minmax
 !-------------------------------------------------------------------------------------------------
 end module module_IO
 !=================================================================================================
@@ -328,9 +345,10 @@ end module module_IO
 module module_BC
   use module_grid
   implicit none
-  character(20) :: bdry_cond(3)
+  integer :: bdry_cond(6)
   ! bdry_cond(i) = is the type if boundary condition in i'th direction
-  real(8) :: WallVel(6,3)
+  ! 0:wall;  1:periodic
+  real(8) :: WallVel(6,3), WallShear(6,3)
   ! Tangential velocities on the surfaces of domain. First index represent the 
   ! side on which the velocity in the direction of the second index is specified.
   ! The sides are in this order: -x,+x,-y,+y,-z,+z.
@@ -346,17 +364,17 @@ module module_BC
     real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: density
     real(8), save :: Large=1.0e20
   ! for walls set the density to a large value in the ghost cells
-    if(bdry_cond(1)=='wall')then
+    if(bdry_cond(1)==0)then
       if(coords(1)==0    ) density(is-1,js-1:je+1,ks-1:ke+1)=Large
       if(coords(1)==nPx-1) density(ie+1,js-1:je+1,ks-1:ke+1)=Large
     endif
 
-    if(bdry_cond(2)=='wall')then
+    if(bdry_cond(2)==0)then
       if(coords(2)==0    ) density(is-1:ie+1,js-1,ks-1:ke+1)=Large
       if(coords(2)==nPy-1) density(is-1:ie+1,je+1,ks-1:ke+1)=Large
     endif
 
-    if(bdry_cond(3)=='wall')then
+    if(bdry_cond(3)==0)then
       if(coords(3)==0    ) density(is-1:ie+1,js-1:je+1,ks-1)=Large
       if(coords(3)==nPz-1) density(is-1:ie+1,js-1:je+1,ke+1)=Large
     endif
@@ -370,41 +388,113 @@ module module_BC
     implicit none
     include 'mpif.h'
     real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: u, v, w
-    ! tangential velocity at boundaries
-    if(bdry_cond(1)=='wall')then
-      if(coords(1)==0    ) then
+    ! wall boundary condition
+    if(bdry_cond(1)==0 .and. coords(1)==0    ) then
+        u(is-1,:,:)=0d0
+        u(is-2,:,:)=-u(is,:,:)
         v(is-1,:,:)=2*WallVel(1,2)-v(is,:,:)
         w(is-1,:,:)=2*WallVel(1,3)-w(is,:,:)
-      endif
-      if(coords(1)==nPx-1) then
+    endif
+    if(bdry_cond(4)==0 .and. coords(1)==nPx-1) then
+        u(ie  ,:,:)=0d0
+        u(ie+1,:,:)=-u(ie-1,:,:)
         v(ie+1,:,:)=2*WallVel(2,2)-v(ie,:,:)
         w(ie+1,:,:)=2*WallVel(2,3)-w(ie,:,:)
-      endif
     endif
-    if(bdry_cond(2)=='wall')then
-      if(coords(2)==0    ) then
+    if(bdry_cond(2)==0 .and. coords(2)==0    ) then
+        v(:,js-1,:)=0d0
+        v(:,js-2,:)=-v(:,js,:)
         u(:,js-1,:)=2*WallVel(3,1)-u(:,js,:)
         w(:,js-1,:)=2*WallVel(3,3)-w(:,js,:)
-      endif
-      if(coords(2)==nPy-1) then
+    endif
+    if(bdry_cond(5)==0 .and. coords(2)==nPy-1) then
+        v(:,je  ,:)=0d0
+        v(:,je+1,:)=-v(:,je-1,:)
         u(:,je+1,:)=2*WallVel(4,1)-u(:,je,:)
         w(:,je+1,:)=2*WallVel(4,3)-w(:,je,:)
-      endif
     endif
-    if(bdry_cond(3)=='wall')then
-      if(coords(3)==0    ) then
+    if(bdry_cond(3)==0 .and. coords(3)==0    ) then
+        w(:,:,ks-1)=0d0
+        w(:,:,ks-2)=-w(:,:,ks)
         u(:,:,ks-1)=2*WallVel(5,1)-u(:,:,ks)
         v(:,:,ks-1)=2*WallVel(5,2)-v(:,:,ks)
-      endif
-      if(coords(3)==nPz-1) then
+    endif
+    if(bdry_cond(6)==0 .and. coords(3)==nPz-1) then
+        w(:,:,ke  )=0d0
+        w(:,:,ke+1)=-w(:,:,ke-1)
         u(:,:,ke+1)=2*WallVel(6,1)-u(:,:,ke)
         v(:,:,ke+1)=2*WallVel(6,2)-v(:,:,ke)
-      endif
+    endif
+    ! wall boundary condition: shear
+    if(bdry_cond(1)==2 .and. coords(1)==0    ) then
+        v(is-1,:,:) = -dxh(is-1)*WallShear(1,2)+v(is,:,:)
+        w(is-1,:,:) = -dxh(is-1)*WallShear(1,3)+w(is,:,:)
+    endif
+    if(bdry_cond(4)==2 .and. coords(1)==nPx-1) then
+        v(ie+1,:,:) = dxh(ie)*WallShear(2,2)+v(ie,:,:)
+        w(ie+1,:,:) = dxh(ie)*WallShear(2,3)+w(ie,:,:)
+    endif
+    if(bdry_cond(2)==2 .and. coords(2)==0    ) then
+        u(:,js-1,:) = -dyh(js-1)*WallShear(3,1)+u(:,js,:)
+        w(:,js-1,:) = -dyh(js-1)*WallShear(3,3)+w(:,js,:)
+    endif
+    if(bdry_cond(5)==2 .and. coords(2)==nPy-1) then
+        u(:,je+1,:) = dyh(je)*WallShear(4,1)+u(:,je,:)
+        w(:,je+1,:) = dyh(je)*WallShear(4,3)+w(:,je,:)
+    endif
+    if(bdry_cond(3)==2 .and. coords(3)==0    ) then
+        u(:,:,ks-1) = -dzh(ks-1)*WallShear(5,1)+u(:,:,ks)
+        v(:,:,ks-1) = -dzh(ks-1)*WallShear(5,2)+v(:,:,ks)
+    endif
+    if(bdry_cond(6)==2 .and. coords(3)==nPz-1) then
+        u(:,:,ke+1) = dzh(ke)*WallShear(6,1)+u(:,:,ke)
+        v(:,:,ke+1) = dzh(ke)*WallShear(6,2)+v(:,:,ke)
     endif
   end subroutine SetVelocityBC
 !=================================================================================================
 !=================================================================================================
-! subroutine ghost_x: fills the ghost cells in x-direction from the adjacent core
+! subroutine SetVelocityBC: Sets the velocity boundary condition
+!-------------------------------------------------------------------------------------------------
+  subroutine SetVectorBC(fx,fy,fz)
+    use module_grid
+    implicit none
+    include 'mpif.h'
+    real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: fx, fy, fz
+    ! Add the vector outside the domain to the neighboring cell inside the domain
+    ! This is used for color gradient vector and surface tension forces
+    if(bdry_cond(1)==0 .and. coords(1)==0    ) then
+        fx(is-1,:,:)=fx(is-1,:,:)+fx(is-2,:,:)
+        fy(is  ,:,:)=fy(is  ,:,:)+fy(is-1,:,:)+fy(is-2,:,:)
+        fz(is  ,:,:)=fz(is  ,:,:)+fz(is-1,:,:)+fz(is-2,:,:)
+    endif
+    if(bdry_cond(4)==0 .and. coords(1)==nPx-1) then
+        fx(ie,:,:)=fx(ie,:,:)+fx(ie+1,:,:)
+        fy(ie,:,:)=fy(ie,:,:)+fy(ie+1,:,:)+fy(ie+2,:,:)
+        fz(ie,:,:)=fz(ie,:,:)+fz(ie+1,:,:)+fz(ie+2,:,:)
+    endif
+    if(bdry_cond(2)==0 .and. coords(2)==0    ) then
+        fy(:,js-1,:)=fy(:,js-1,:)+fy(:,js-2,:)
+        fx(:,js  ,:)=fx(:,js  ,:)+fx(:,js-1,:)+fx(:,js-2,:)
+        fz(:,js  ,:)=fz(:,js  ,:)+fz(:,js-1,:)+fz(:,js-2,:)
+    endif
+    if(bdry_cond(5)==0 .and. coords(2)==nPy-1) then
+        fy(:,je,:)=fy(:,je,:)+fy(:,je+1,:)
+        fx(:,je,:)=fx(:,je,:)+fx(:,je+1,:)+fx(:,je+2,:)
+        fz(:,je,:)=fz(:,je,:)+fz(:,je+1,:)+fz(:,je+2,:)
+    endif
+    if(bdry_cond(3)==0 .and. coords(3)==0    ) then
+        fz(:,:,ks-1)=fz(:,:,ks-1)+fz(:,:,ks-2)
+        fx(:,:,ks  )=fx(:,:,ks  )+fx(:,:,ks-1)+fx(:,:,ks-2)
+        fy(:,:,ks  )=fy(:,:,ks  )+fy(:,:,ks-1)+fy(:,:,ks-2)
+    endif
+    if(bdry_cond(6)==0 .and. coords(3)==nPz-1) then
+        fz(:,:,ke)=fz(:,:,ke)+fz(:,:,ke+1)
+        fx(:,:,ke)=fx(:,:,ke)+fx(:,:,ke+1)+fx(:,:,ke+2)
+        fy(:,:,ke)=fy(:,:,ke)+fy(:,:,ke+1)+fy(:,:,ke+2)
+    endif
+  end subroutine SetVectorBC
+!=================================================================================================
+!=================================================================================================
 !-------------------------------------------------------------------------------------------------
   subroutine ghost_x(F,ngh,req)
     use module_grid
@@ -427,10 +517,10 @@ module module_BC
       call MPI_CART_SHIFT(MPI_COMM_CART, 0,-1, srcL, destL, ierr)
     endif
 
-    call MPI_IRECV(F(is-ngh  ,jmin,kmin),1,face(ngh),srcR ,0,MPI_COMM_WORLD,req(1),ierr)
-    call MPI_ISEND(F(ie-ngh+1,jmin,kmin),1,face(ngh),destR,0,MPI_COMM_WORLD,req(2),ierr)
-    call MPI_IRECV(F(ie+1    ,jmin,kmin),1,face(ngh),srcL ,0,MPI_COMM_WORLD,req(3),ierr)
-    call MPI_ISEND(F(is      ,jmin,kmin),1,face(ngh),destL,0,MPI_COMM_WORLD,req(4),ierr)
+    call MPI_IRECV(F(is-ngh  ,jmin,kmin),1,face(ngh),srcR ,0,MPI_COMM_Cart,req(1),ierr)
+    call MPI_ISEND(F(ie-ngh+1,jmin,kmin),1,face(ngh),destR,0,MPI_COMM_Cart,req(2),ierr)
+    call MPI_IRECV(F(ie+1    ,jmin,kmin),1,face(ngh),srcL ,0,MPI_COMM_Cart,req(3),ierr)
+    call MPI_ISEND(F(is      ,jmin,kmin),1,face(ngh),destL,0,MPI_COMM_Cart,req(4),ierr)
 !    call MPI_WAITALL(4,req,sta,ierr)
   end subroutine ghost_x
 !-------------------------------------------------------------------------------------------------
@@ -455,10 +545,10 @@ module module_BC
       call MPI_CART_SHIFT(MPI_COMM_CART, 1,-1, srcL, destL, ierr)
     endif
 
-    call MPI_IRECV(F(imin,js-ngh  ,kmin),1,face(ngh),srcR ,0,MPI_COMM_WORLD,req(1),ierr)
-    call MPI_ISEND(F(imin,je-ngh+1,kmin),1,face(ngh),destR,0,MPI_COMM_WORLD,req(2),ierr)
-    call MPI_IRECV(F(imin,je+1    ,kmin),1,face(ngh),srcL ,0,MPI_COMM_WORLD,req(3),ierr)
-    call MPI_ISEND(F(imin,js      ,kmin),1,face(ngh),destL,0,MPI_COMM_WORLD,req(4),ierr)
+    call MPI_IRECV(F(imin,js-ngh  ,kmin),1,face(ngh),srcR ,0,MPI_COMM_Cart,req(1),ierr)
+    call MPI_ISEND(F(imin,je-ngh+1,kmin),1,face(ngh),destR,0,MPI_COMM_Cart,req(2),ierr)
+    call MPI_IRECV(F(imin,je+1    ,kmin),1,face(ngh),srcL ,0,MPI_COMM_Cart,req(3),ierr)
+    call MPI_ISEND(F(imin,js      ,kmin),1,face(ngh),destL,0,MPI_COMM_Cart,req(4),ierr)
 !    call MPI_WAITALL(4,req,sta,ierr)
   end subroutine ghost_y
 !-------------------------------------------------------------------------------------------------
@@ -483,57 +573,173 @@ module module_BC
       call MPI_CART_SHIFT(MPI_COMM_CART, 2,-1, srcL, destL, ierr)
     endif
 
-    call MPI_IRECV(F(imin,jmin,ks-ngh  ),1,face(ngh),srcR ,0,MPI_COMM_WORLD,req(1),ierr)
-    call MPI_ISEND(F(imin,jmin,ke-ngh+1),1,face(ngh),destR,0,MPI_COMM_WORLD,req(2),ierr)
-    call MPI_IRECV(F(imin,jmin,ke+1    ),1,face(ngh),srcL ,0,MPI_COMM_WORLD,req(3),ierr)
-    call MPI_ISEND(F(imin,jmin,ks      ),1,face(ngh),destL,0,MPI_COMM_WORLD,req(4),ierr)
+    call MPI_IRECV(F(imin,jmin,ks-ngh  ),1,face(ngh),srcR ,0,MPI_COMM_Cart,req(1),ierr)
+    call MPI_ISEND(F(imin,jmin,ke-ngh+1),1,face(ngh),destR,0,MPI_COMM_Cart,req(2),ierr)
+    call MPI_IRECV(F(imin,jmin,ke+1    ),1,face(ngh),srcL ,0,MPI_COMM_Cart,req(3),ierr)
+    call MPI_ISEND(F(imin,jmin,ks      ),1,face(ngh),destL,0,MPI_COMM_Cart,req(4),ierr)
 !    call MPI_WAITALL(4,req,sta,ierr)
   end subroutine ghost_z
+!=================================================================================================
+!=================================================================================================
+!-------------------------------------------------------------------------------------------------
+  subroutine ghost_xAdd(F,ir1,is1,iwork,req)
+    use module_grid
+    use module_tmpvar
+    implicit none
+    include 'mpif.h'
+    integer, intent(in) :: ir1, is1, iwork
+    integer, intent(out) :: req(4)
+    real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: F
+    integer :: jlen, klen, ierr !,sta(MPI_STATUS_SIZE,4)
+    integer, save :: srcL, srcR, destL, destR, face
+    logical, save :: first_time=.true.
+
+    if(first_time)then
+      first_time=.false.
+      jlen=jmax-jmin+1; klen=kmax-kmin+1; !ilen=ngh
+      call para_type_block3a(imin, imax, jmin, jmax, 2, jlen, klen, MPI_DOUBLE_PRECISION, face)
+      call MPI_CART_SHIFT(MPI_COMM_CART, 0, 1, srcR, destR, ierr)
+      call MPI_CART_SHIFT(MPI_COMM_CART, 0,-1, srcL, destL, ierr)
+    endif
+
+    work(ir1:ir1+1,jmin:jmax,kmin:kmax,iwork) = 0d0
+    work(ie-1:ie  ,jmin:jmax,kmin:kmax,iwork) = 0d0
+    call MPI_IRECV(work(ir1 ,jmin,kmin,iwork),1,face,srcR ,0,MPI_Comm_Cart,req(1),ierr)
+    call MPI_ISEND(F   (is1 ,jmin,kmin      ),1,face,destR,0,MPI_Comm_Cart,req(2),ierr)
+    call MPI_IRECV(work(ie-1,jmin,kmin,iwork),1,face,srcL ,0,MPI_Comm_Cart,req(3),ierr)
+    call MPI_ISEND(F   (is-2,jmin,kmin      ),1,face,destL,0,MPI_Comm_Cart,req(4),ierr)
+!    call MPI_WAITALL(4,req,sta,ierr)
+
+  end subroutine ghost_xAdd
+!-------------------------------------------------------------------------------------------------
+  subroutine ghost_yAdd(F,jr1,js1,iwork,req)
+    use module_grid
+    use module_tmpvar
+    implicit none
+    include 'mpif.h'
+    integer, intent(in) :: jr1, js1, iwork
+    integer, intent(out) :: req(4)
+    real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: F
+    integer :: ilen, klen, ierr !,sta(MPI_STATUS_SIZE,4)
+    integer, save :: srcL, srcR, destL, destR, face
+    logical, save :: first_time=.true.
+
+    if(first_time)then
+      first_time=.false.
+      ilen=imax-imin+1; klen=kmax-kmin+1; !ilen=ngh
+      call para_type_block3a(imin, imax, jmin, jmax, ilen, 2, klen, MPI_DOUBLE_PRECISION, face)
+      call MPI_CART_SHIFT(MPI_COMM_CART, 1, 1, srcR, destR, ierr)
+      call MPI_CART_SHIFT(MPI_COMM_CART, 1,-1, srcL, destL, ierr)
+    endif
+
+    work(imin:imax,jr1:jr1+1,kmin:kmax,iwork) = 0d0
+    work(imin:imax,je-1:je  ,kmin:kmax,iwork) = 0d0
+    call MPI_IRECV(work(imin,jr1 ,kmin,iwork),1,face,srcR ,0,MPI_Comm_Cart,req(1),ierr)
+    call MPI_ISEND(F   (imin,js1 ,kmin      ),1,face,destR,0,MPI_Comm_Cart,req(2),ierr)
+    call MPI_IRECV(work(imin,je-1,kmin,iwork),1,face,srcL ,0,MPI_Comm_Cart,req(3),ierr)
+    call MPI_ISEND(F   (imin,js-2,kmin      ),1,face,destL,0,MPI_Comm_Cart,req(4),ierr)
+!    call MPI_WAITALL(4,req,sta,ierr)
+  end subroutine ghost_yAdd
+!-------------------------------------------------------------------------------------------------
+  subroutine ghost_zAdd(F,kr1,ks1,iwork,req)
+    use module_grid
+    use module_tmpvar
+    implicit none
+    include 'mpif.h'
+    integer, intent(in) :: kr1, ks1, iwork
+    integer, intent(out) :: req(4)
+    real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: F
+    integer :: ilen, jlen, ierr !,sta(MPI_STATUS_SIZE,4)
+    integer, save :: srcL, srcR, destL, destR, face
+    logical, save :: first_time=.true.
+
+    if(first_time)then
+      first_time=.false.
+      ilen=imax-imin+1; jlen=jmax-jmin+1; !ilen=ngh
+      call para_type_block3a(imin, imax, jmin, jmax, ilen, jlen, 2, MPI_DOUBLE_PRECISION, face)
+      call MPI_CART_SHIFT(MPI_COMM_CART, 2, 1, srcR, destR, ierr)
+      call MPI_CART_SHIFT(MPI_COMM_CART, 2,-1, srcL, destL, ierr)
+    endif
+
+    work(imin:imax,jmin:jmax,kr1:kr1+1,iwork) = 0d0
+    work(imin:imax,jmin:jmax,ke-1:ke  ,iwork) = 0d0
+    call MPI_IRECV(work(imin,jmin,kr1 ,iwork),1,face,srcR ,0,MPI_Comm_Cart,req(1),ierr)
+    call MPI_ISEND(F   (imin,jmin,ks1       ),1,face,destR,0,MPI_Comm_Cart,req(2),ierr)
+    call MPI_IRECV(work(imin,jmin,ke-1,iwork),1,face,srcL ,0,MPI_Comm_Cart,req(3),ierr)
+    call MPI_ISEND(F   (imin,jmin,ks-2      ),1,face,destL,0,MPI_Comm_Cart,req(4),ierr)
+!    call MPI_WAITALL(4,req,sta,ierr)
+  end subroutine ghost_zAdd
 !-------------------------------------------------------------------------------------------------
 end module module_BC
 !=================================================================================================
 !=================================================================================================
-! creates new data type for passing non-contiguous data in ghost_x
-!-------------------------------------------------------------------------------------------------
-SUBROUTINE para_type_block3a(imin, imax, jmin, jmax, ilen, jlen, klen, ioldtype,inewtype)
-  implicit none
-  INCLUDE 'mpif.h'
-  integer :: imin, imax, jmin, jmax, ilen, jlen, klen, ioldtype,inewtype,isize, ierr, itemp, idist
-  CALL MPI_TYPE_EXTENT(ioldtype, isize, ierr)
-  CALL MPI_TYPE_VECTOR(jlen, ilen, imax - imin + 1, ioldtype, itemp, ierr)
-  idist = (imax - imin + 1) * (jmax - jmin + 1) * isize
-  CALL MPI_TYPE_HVECTOR(klen, 1, idist, itemp, inewtype, ierr)
-  CALL MPI_TYPE_COMMIT(inewtype, ierr)
-END
-!=================================================================================================
-!=================================================================================================
-! module_poisson: solves the pressure poisson equation using hypre
+! module_poisson:
+! Using hypre library, solves linear equations with matrix A and solution P as
+! A7*Pijk = A1*Pi-1jk + A2*Pi+1jk + A3*Pij-1k + 
+!           A4*Pij+1k + A5*Pijk-1 + A6*Pijk+1 + A8
+! 
+! Syntax: call poi_initialize(mpi_comm_in,is,ie,js,je,ks,ke,Nx,Ny,Nz,bdry_cond)
+!
+!   Input:  integer :: mpi_comm_in               MPI communicator
+!                      is,ie,js,je,ks,ke         bounds of each subdomain
+!                      Nx,Ny,Nz                  total size of computational domain
+!                      bdry_cond(3)              boundary conditions: use 1 for periodic
+!
+! Syntax: call poi_solve(A,p,maxError,maxIteration,numIteration)
+!
+!   Input:  real(8) :: A(is:ie,js:je,ks:ke,1:8)  coefficients and source term
+!                      maxError                  criterion of convergence
+!                      p(is:ie,js:je,ks:ke)      initial guess
+!           integer :: maxIteration              maximum number of iterations
+!
+!   Output: real(8) :: p(is:ie,js:je,ks:ke)      solution
+!           integer :: numIteration              number of iterations performed
+!
+! Syntax: call poi_finalize
+!
+! written by Sadegh Dabiri sdabiri@nd.edu 10/2011
 !-------------------------------------------------------------------------------------------------
 module module_poisson
-  use module_grid
-  use module_BC
-  use module_tmpvar
-  use module_hello
   implicit none
+  save
+  private
+  public :: poi_initialize, poi_solve, poi_finalize
+
   integer :: nstencil
-  integer*8 :: grid_obj, stencil, Amat, Bvec, Xvec, solver, precond
+  integer*8 :: grid_obj, stencil, Amat, Bvec, Xvec, solver
   integer, dimension(:), allocatable :: stencil_indices, ilower, iupper
+  integer :: mpi_comm_poi,is,ie,js,je,ks,ke,Mx,My,Mz
+  integer, parameter :: ndim=3
   contains
-!-------------------------------------------------------------------------------------------------
-  subroutine poi_initialize
+!=================================================================================================
+!=================================================================================================
+  subroutine poi_initialize(mpi_comm_in,iis,iie,jjs,jje,kks,kke,Nx,Ny,Nz,bdry_cond)
     implicit none
     include 'mpif.h'
+    integer, intent(in) :: mpi_comm_in,iis,iie,jjs,jje,kks,kke,Nx,Ny,Nz,bdry_cond(3)
     integer :: ierr, periodic_array(3), i
     integer, dimension(:,:), allocatable :: offsets
-    nstencil = 2 * ndim + 1 !7
+    
+    mpi_comm_poi = mpi_comm_in
+    is = iis;   ie = iie;   Mx = ie-is+1
+    js = jjs;   je = jje;   My = je-js+1
+    ks = kks;   ke = kke;   Mz = ke-ks+1
+
+    nstencil = 2 * ndim + 1
     allocate(ilower(ndim), iupper(ndim), stencil_indices(nstencil) )
     ilower = (/is, js, ks/);  iupper = (/ie, je, ke/)
     periodic_array = 0
-    if( bdry_cond(1)=='periodic') periodic_array(1) = Nx
-    if( bdry_cond(2)=='periodic') periodic_array(2) = Ny
-    if( bdry_cond(3)=='periodic') periodic_array(3) = Nz
+    if( bdry_cond(1)==1) periodic_array(1) = Nx
+    if( bdry_cond(2)==1) periodic_array(2) = Ny
+    if( bdry_cond(3)==1) periodic_array(3) = Nz
 
-    allocate(offsets(ndim,nstencil), stat=ierr)
+    call HYPRE_StructGridCreate(mpi_comm_poi, ndim, grid_obj, ierr)    ! create a 3d grid object
+    call HYPRE_StructGridSetExtents(grid_obj, ilower, iupper, ierr)    ! add a box to the grid
+    call HYPRE_StructGridSetPeriodic(grid_obj, periodic_array, ierr)   ! set periodic
+    call HYPRE_StructGridAssemble(grid_obj, ierr)                      ! assemble the grid
+    call HYPRE_StructStencilCreate(ndim, nstencil, stencil, ierr)      ! create a 3d 7-pt stencil
+
+    allocate(offsets(ndim,nstencil), stat=ierr) ! define the geometry of the stencil
     offsets(:,1) = (/ 0, 0, 0/)
     offsets(:,2) = (/-1, 0, 0/)
     offsets(:,3) = (/ 1, 0, 0/)
@@ -541,122 +747,88 @@ module module_poisson
     offsets(:,5) = (/ 0, 1, 0/)
     offsets(:,6) = (/ 0, 0,-1/)
     offsets(:,7) = (/ 0, 0, 1/)
-
-    
-    call HYPRE_StructGridCreate(mpi_comm_world, ndim, grid_obj, ierr)  ! create a 3d grid object
-    call HYPRE_StructGridSetExtents(grid_obj, ilower, iupper, ierr)    ! add a box to the grid
-    call HYPRE_StructGridSetPeriodic(grid_obj, periodic_array, ierr)   ! set periodic
-    call HYPRE_StructGridAssemble(grid_obj, ierr)                      ! assemble the grid
-    call HYPRE_StructStencilCreate(ndim, nstencil, stencil, ierr)      ! create a 3d 7-pt stencil
-
-    do i = 1, nstencil          ! define the geometry of the stencil
+    do i = 1, nstencil
       stencil_indices(i) = i-1
       call HYPRE_StructStencilSetElement(stencil, stencil_indices(i), offsets(:,i), ierr)
     enddo
 
-    call HYPRE_StructMatrixCreate(mpi_comm_world, grid_obj, stencil, Amat, ierr) ! set up matrix A
+    call HYPRE_StructMatrixCreate(mpi_comm_poi, grid_obj, stencil, Amat, ierr)! set up matrix Amat
     call HYPRE_StructMatrixInitialize(Amat, ierr)
 
-    call HYPRE_StructVectorCreate(mpi_comm_world, grid_obj, Bvec, ierr)! create vector object B
+    call HYPRE_StructVectorCreate(mpi_comm_poi, grid_obj, Bvec, ierr)! create vector object Bvec
     call HYPRE_StructVectorInitialize(Bvec, ierr)
 
-    call HYPRE_StructVectorCreate(mpi_comm_world, grid_obj, Xvec, ierr)! create vector object X
+    call HYPRE_StructVectorCreate(mpi_comm_poi, grid_obj, Xvec, ierr)! create vector object Xvec
     call HYPRE_StructVectorInitialize(Xvec, ierr)
 
   end subroutine poi_initialize
-!-------------------------------------------------------------------------------------------------
-  subroutine poi_solve(utmp,vtmp,wtmp,rhot,dt,p,maxError,maxit)
-    use module_grid
+!=================================================================================================
+!=================================================================================================
+  subroutine poi_solve(A,p,maxError,maxit,num_iterations)
     implicit none
     include 'mpif.h'
     integer :: ierr, nvalues, ijk, i,j,k
     real(8), dimension(:), allocatable :: values
-    real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: utmp,vtmp,wtmp,rhot
-    real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: p
-    real(8), intent(in) :: dt,maxError
+    real(8), dimension(is:ie,js:je,ks:ke,8), intent(in) :: A
+    real(8), dimension(is:ie,js:je,ks:ke), intent(inout) :: p
+!    real(8), dimension(is-2:ie+2,js-2:je+2,ks-2:ke+2), intent(inout) :: p
+    real(8), intent(in) :: maxError
     integer, intent(in) :: maxit
-    !real(8) :: final_res_norm
-!---------------------------------------------Setup matrix A--------------------------------------
+    integer, intent(out):: num_iterations
+    real(8) :: final_res_norm
+!----------------------------------------Fill in matrix Amat--------------------------------------
+    num_iterations = 0
     nvalues = mx * my * mz * nstencil
     allocate(values(nvalues), stat=ierr)
     if(ierr/=0)stop '**** poi_solve: allocation error ****'
 
     ijk = 1
     do k=ks,ke;  do j=js,je;  do i=is,ie
-!      ijk = 1 + i-is + mx*( j-js + my*( k-ks ) )
-      values(ijk+1) = -(1./dx(i))*( 1./(dxh(i-1)*(rhot(i-1,j,k)+rhot(i,j,k))) )
-      values(ijk+2) = -(1./dx(i))*( 1./(dxh(i  )*(rhot(i+1,j,k)+rhot(i,j,k))) )
-      values(ijk+3) = -(1./dy(j))*( 1./(dyh(j-1)*(rhot(i,j-1,k)+rhot(i,j,k))) )
-      values(ijk+4) = -(1./dy(j))*( 1./(dyh(j  )*(rhot(i,j+1,k)+rhot(i,j,k))) )
-      values(ijk+5) = -(1./dz(k))*( 1./(dzh(k-1)*(rhot(i,j,k-1)+rhot(i,j,k))) )
-      values(ijk+6) = -(1./dz(k))*( 1./(dzh(k  )*(rhot(i,j,k+1)+rhot(i,j,k))) )
-      values(ijk  ) = -sum(values(ijk+1:ijk+6))
+      values(ijk+1) = -A(i,j,k,1)
+      values(ijk+2) = -A(i,j,k,2)
+      values(ijk+3) = -A(i,j,k,3)
+      values(ijk+4) = -A(i,j,k,4)
+      values(ijk+5) = -A(i,j,k,5)
+      values(ijk+6) = -A(i,j,k,6)
+      values(ijk  ) =  A(i,j,k,7)
       ijk = ijk + 7
     enddo;  enddo;  enddo
     call HYPRE_StructMatrixSetBoxValues(Amat, ilower, iupper, nstencil, stencil_indices, &
                                         values, ierr)
     deallocate(values, stat=ierr)
-    !if(rank==0)print*,'Matix A done.'
-!------------------------------------------SET UP THE SOURCE TERM and initial guess---------------
+!------------------------------Fill in source term and initial guess------------------------------
     nvalues = mx * my * mz
     allocate(values(nvalues), stat=ierr)
 
     ijk = 1
     do k=ks,ke;  do j=js,je;  do i=is,ie
-      values(ijk) = -0.5/dt *( (utmp(i,j,k)-utmp(i-1,j,k))/dx(i) &
-                              +(vtmp(i,j,k)-vtmp(i,j-1,k))/dy(j) &
-                              +(wtmp(i,j,k)-wtmp(i,j,k-1))/dz(k)   )
-      ijk = ijk + 1
-    enddo;  enddo;  enddo
-    call HYPRE_StructVectorSetBoxValues(Bvec, ilower, iupper, values, ierr)
-
-    ijk = 1
-    do k=ks,ke;  do j=js,je;  do i=is,ie
-      values(ijk) = p(i,j,k)
+      values(ijk) = A(i,j,k,8)
       ijk = ijk + 1
     enddo;  enddo;  enddo
     call HYPRE_StructVectorSetBoxValues(Xvec, ilower, iupper, values, ierr)
     deallocate(values, stat=ierr)
-    !if(rank==0)print*,'Vector B done.'
-!-----------------------------------------------Anchor point p(1,1,1)=0---------------------------
-    if(coords(1)==0 .and. coords(2)==0 .and. coords(3) == 0)then
-      nvalues = nstencil
-      allocate(values(nvalues), stat=ierr)
-      values = 0d0
-      values(1) = 1d0
-      call HYPRE_StructMatrixAddToBoxValues(Amat, ilower, ilower, nstencil, stencil_indices, &
-                                            values, ierr)
-      call HYPRE_StructVectorSetBoxValues(Bvec, ilower, ilower, 0d0, ierr)
-      deallocate(values, stat=ierr)
-    endif
-    !if(rank==0)print*,'Anchor done.'
-!-----------------------------------------------Assemble matrix A and vectors B,X-----------------
+!---------------------------Assemble matrix Amat and vectors Bvec,Xvec----------------------------
     call HYPRE_StructMatrixAssemble(Amat, ierr)
     call HYPRE_StructVectorAssemble(Bvec, ierr)
     call HYPRE_StructVectorAssemble(Xvec, ierr)
-    !if(rank==0)print*,'Assemble done.'
-!-----------------------------------------SOLVE THE EQUATIONS-------------------------------------
-    call HYPRE_StructPFMGCreate(mpi_comm_world, solver, ierr)
+!---------------------------------------Solve the equations---------------------------------------
+    call HYPRE_StructPFMGCreate(mpi_comm_poi, solver, ierr)
     call HYPRE_StructPFMGSetMaxIter(solver, maxit, ierr)
     call HYPRE_StructPFMGSetTol(solver, MaxError, ierr)
 
-!    call HYPRE_StructPFMGSetMaxLevels(solver, 4, ierr)    
-    call HYPRE_StructPFMGSetRelaxType(solver, 3, ierr)    
-!    call HYPRE_StructPFMGSetNumPreRelax(solver, 3, ierr)
-!    call HYPRE_StructPFMGSetNumPostRelax(solver, 0, ierr)
+    call HYPRE_StructPFMGSetRelaxType(solver, 3, ierr)
 
     call hypre_structPFMGsetLogging(solver, 1, ierr)
     call HYPRE_StructPFMGSetup(solver, Amat, Bvec, Xvec, ierr)
     call HYPRE_StructPFMGSolve(solver, Amat, Bvec, Xvec, ierr)
-!    call hypre_structPFMGgetnumiterations(solver, num_iterations, ierr)
-!    call hypre_structPFMGgetfinalrelative(solver, final_res_norm, ierr)
-
+    !call hypre_structPFMGgetnumiterations(solver, num_iterations, ierr)
+    !call hypre_structPFMGgetfinalrelative(solver, final_res_norm, ierr)
+!--------------------------------------Retrieve the solution--------------------------------------
     nvalues = mx * my * mz
     allocate(values(nvalues), stat=ierr)
     call HYPRE_StructVectorGetBoxValues(Xvec, ilower, iupper, values, ierr)
     call HYPRE_StructPFMGDestroy(solver, ierr)
 
-    ! set the values of b vector
     ijk = 1
     do k=ks,ke;  do j=js,je;  do i=is,ie
       p(i,j,k) = values(ijk)
@@ -679,3 +851,355 @@ module module_poisson
   end subroutine poi_finalize
 !-------------------------------------------------------------------------------------------------
 end module module_poisson
+!=================================================================================================
+!=================================================================================================
+! creates new data type for passing non-contiguous 
+!-------------------------------------------------------------------------------------------------
+SUBROUTINE para_type_block3a(imin, imax, jmin, jmax, ilen, jlen, klen, ioldtype,inewtype)
+  implicit none
+  INCLUDE 'mpif.h'
+  integer :: imin, imax, jmin, jmax, ilen, jlen, klen, ioldtype,inewtype,isize, ierr, itemp, idist
+  CALL MPI_TYPE_EXTENT(ioldtype, isize, ierr)
+  CALL MPI_TYPE_VECTOR(jlen, ilen, imax - imin + 1, ioldtype, itemp, ierr)
+  idist = (imax - imin + 1) * (jmax - jmin + 1) * isize
+  CALL MPI_TYPE_HVECTOR(klen, 1, idist, itemp, inewtype, ierr)
+  CALL MPI_TYPE_COMMIT(inewtype, ierr)
+END
+!=================================================================================================
+!=================================================================================================
+! The Poisson equation for the density is setup with matrix A as
+! A7*Pijk = A1*Pi-1jk + A2*Pi+1jk + A3*Pij-1k + 
+!           A4*Pij+1k + A5*Pijk-1 + A6*Pijk+1 + A8
+!-------------------------------------------------------------------------------------------------
+subroutine SetupDensity(dIdx,dIdy,dIdz,A,color) !,mask)
+  use module_grid
+  use module_BC
+  implicit none
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: dIdx,dIdy,dIdz, color
+  real(8), dimension(is:ie,js:je,ks:ke,8), intent(out) :: A
+  integer :: i,j,k
+  logical, save :: first=.true.
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax) :: dI
+  do k=ks,ke; do j=js,je; do i=is,ie
+      A(i,j,k,1) = 1d0/dx(i)/dxh(i-1)
+      A(i,j,k,2) = 1d0/dx(i)/dxh(i  )
+      A(i,j,k,3) = 1d0/dy(j)/dyh(j-1)
+      A(i,j,k,4) = 1d0/dy(j)/dyh(j  )
+      A(i,j,k,5) = 1d0/dz(k)/dzh(k-1)
+      A(i,j,k,6) = 1d0/dz(k)/dzh(k  )
+      A(i,j,k,7) = sum(A(i,j,k,1:6))
+      A(i,j,k,8) = -(dIdx(i,j,k)-dIdx(i-1,j,k))/dx(i) &
+                   -(dIdy(i,j,k)-dIdy(i,j-1,k))/dy(j) &
+                   -(dIdz(i,j,k)-dIdz(i,j,k-1))/dz(k)
+  enddo; enddo; enddo
+
+  if(bdry_cond(1)==0)then
+    if(coords(1)==0    ) A(is,:,:,8)=A(is,:,:,8)+A(is,:,:,1)
+    if(coords(1)==nPx-1) A(ie,:,:,8)=A(ie,:,:,8)+A(ie,:,:,2)
+    if(coords(1)==0    ) A(is,:,:,1) = 0d0
+    if(coords(1)==nPx-1) A(ie,:,:,2) = 0d0
+  endif
+  if(bdry_cond(2)==0)then
+    if(coords(2)==0    ) A(:,js,:,8)=A(:,js,:,8)+A(:,js,:,3)
+    if(coords(2)==nPy-1) A(:,je,:,8)=A(:,je,:,8)+A(:,je,:,4)
+    if(coords(2)==0    ) A(:,js,:,3) = 0d0
+    if(coords(2)==nPy-1) A(:,je,:,4) = 0d0
+  endif
+  if(bdry_cond(3)==0)then
+    if(coords(3)==0    ) A(:,:,ks,8)=A(:,:,ks,8)+A(:,:,ks,5)
+    if(coords(3)==nPz-1) A(:,:,ke,8)=A(:,:,ke,8)+A(:,:,ke,6)
+    if(coords(3)==0    ) A(:,:,ks,5) = 0d0
+    if(coords(3)==nPz-1) A(:,:,ke,6) = 0d0
+  endif
+
+  if(.not. first)then
+  	first=.false.
+    do k=ks,ke; do j=js,je; do i=is,ie
+      dI(i,j,k) = ( (dIdx(i,j,k)+dIdx(i-1,j,k))**2 + &
+                    (dIdx(i,j,k)+dIdx(i-1,j,k))**2 + &
+                    (dIdx(i,j,k)+dIdx(i-1,j,k))**2 )
+      if( dI(i,j,k)<1e-6 )then
+        A(i,j,k,1:6) = 0d0
+        A(i,j,k,7) = 1d0
+        A(i,j,k,8) = float(floor(color(i,j,k)+0.5))
+      endif
+    enddo; enddo; enddo
+	endif
+
+!  do k=ks,ke; do j=js,je; do i=is,ie
+!      A(i,j,k,7) = sum(A(i,j,k,1:6))
+!  enddo; enddo; enddo
+  ! Anchor a point to 1
+!  if(coords(1)==0 .and. coords(2)==0 .and. coords(3)==0) then
+!    A(is,js,ks,:)=0d0
+!    A(is,js,ks,7:8)=1d0
+!  endif
+end subroutine SetupDensity
+!=================================================================================================
+!=================================================================================================
+! The Poisson equation for the pressure is setup with matrix A as
+! A7*Pijk = A1*Pi-1jk + A2*Pi+1jk + A3*Pij-1k + 
+!           A4*Pij+1k + A5*Pijk-1 + A6*Pijk+1 + A8
+!-------------------------------------------------------------------------------------------------
+subroutine SetupPoisson(utmp,vtmp,wtmp,rhot,dt,A) !,mask)
+  use module_grid
+  use module_BC
+  implicit none
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: utmp,vtmp,wtmp,rhot
+  real(8), dimension(is:ie,js:je,ks:ke,8), intent(out) :: A
+!  logical, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: mask
+  real(8) :: dt
+  integer :: i,j,k
+  do k=ks,ke; do j=js,je; do i=is,ie;
+!    if(mask(i,j,k))then
+      A(i,j,k,1) = 2d0*dt/(dx(i)*dxh(i-1)*(rhot(i-1,j,k)+rhot(i,j,k)))
+      A(i,j,k,2) = 2d0*dt/(dx(i)*dxh(i  )*(rhot(i+1,j,k)+rhot(i,j,k)))
+      A(i,j,k,3) = 2d0*dt/(dy(j)*dyh(j-1)*(rhot(i,j-1,k)+rhot(i,j,k)))
+      A(i,j,k,4) = 2d0*dt/(dy(j)*dyh(j  )*(rhot(i,j+1,k)+rhot(i,j,k)))
+      A(i,j,k,5) = 2d0*dt/(dz(k)*dzh(k-1)*(rhot(i,j,k-1)+rhot(i,j,k)))
+      A(i,j,k,6) = 2d0*dt/(dz(k)*dzh(k  )*(rhot(i,j,k+1)+rhot(i,j,k)))
+      A(i,j,k,7) = sum(A(i,j,k,1:6))
+      A(i,j,k,8) = -( (utmp(i,j,k)-utmp(i-1,j,k))/dx(i) &
+                     +(vtmp(i,j,k)-vtmp(i,j-1,k))/dy(j) &
+                     +(wtmp(i,j,k)-wtmp(i,j,k-1))/dz(k) )
+!    endif
+  enddo; enddo; enddo
+end subroutine SetupPoisson
+!=================================================================================================
+!=================================================================================================
+! The equation for the U velocity is setup with matrix A as
+! A7*Uijk = A1*Ui-1jk + A2*Ui+1jk + A3*Uij-1k + 
+!           A4*Uij+1k + A5*Uijk-1 + A6*Uijk+1 + A8
+!-------------------------------------------------------------------------------------------------
+subroutine SetupUvel(u,du,rho,mu,dt,A) !,mask)
+  use module_grid
+  use module_BC
+  implicit none
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: u,du,rho,mu
+  real(8), dimension(is:ie,js:je,ks:ke,8), intent(out) :: A
+!  logical, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: mask
+  real(8) :: dt, rhom
+  integer :: i,j,k
+  do k=ks,ke; do j=js,je; do i=is,ie;
+    rhom = 0.5d0*(rho(i+1,j,k)+rho(i,j,k))
+    A(i,j,k,1) = dt/(dx(i  )*dxh(i)*rhom)*2d0*mu(i  ,j,k)
+    A(i,j,k,2) = dt/(dx(i+1)*dxh(i)*rhom)*2d0*mu(i+1,j,k)
+    A(i,j,k,3) = dt/(dy(j)*dyh(j-1)*rhom)*0.25d0*(mu(i,j,k)+mu(i+1,j,k)+mu(i,j-1,k)+mu(i+1,j-1,k))
+    A(i,j,k,4) = dt/(dy(j)*dyh(j  )*rhom)*0.25d0*(mu(i,j,k)+mu(i+1,j,k)+mu(i,j+1,k)+mu(i+1,j+1,k))
+    A(i,j,k,5) = dt/(dz(k)*dzh(k-1)*rhom)*0.25d0*(mu(i,j,k)+mu(i+1,j,k)+mu(i,j,k-1)+mu(i+1,j,k-1))
+    A(i,j,k,6) = dt/(dz(k)*dzh(k  )*rhom)*0.25d0*(mu(i,j,k)+mu(i+1,j,k)+mu(i,j,k+1)+mu(i+1,j,k+1))
+    A(i,j,k,7) = 1d0+sum(A(i,j,k,1:6))
+    A(i,j,k,8) = u(i,j,k) + dt*du(i,j,k)
+  enddo; enddo; enddo
+!-------------------------------------------------------------------------------------------------
+  !wall boundary conditions
+  if(bdry_cond(2)==0 .and. coords(2)==0    ) then
+    do k=ks,ke; do i=is,ie;
+      A(i,js,k,7) = A(i,js,k,7) + A(i,js,k,3)
+      A(i,js,k,3) = 0d0
+    enddo; enddo
+  endif
+  if(bdry_cond(5)==0 .and. coords(2)==nPy-1) then
+    do k=ks,ke; do i=is,ie;
+      A(i,je,k,7) = A(i,je,k,7) + A(i,je,k,4)
+      A(i,je,k,4) = 0d0
+    enddo; enddo
+  endif
+
+  if(bdry_cond(3)==0 .and. coords(3)==0    ) then
+    do j=js,je; do i=is,ie;
+      A(i,j,ks,7) = A(i,j,ks,7) + A(i,j,ks,5)
+      A(i,j,ks,5) = 0d0
+    enddo; enddo
+  endif
+  if(bdry_cond(6)==0 .and. coords(3)==nPz-1) then
+    do j=js,je; do i=is,ie;
+      A(i,j,ke,7) = A(i,j,ke,7) + A(i,j,ke,6)
+      A(i,j,ke,6) = 0d0
+    enddo; enddo
+  endif
+end subroutine SetupUvel
+!=================================================================================================
+!=================================================================================================
+subroutine SetupVvel(v,dv,rho,mu,dt,A) !,mask)
+  use module_grid
+  use module_BC
+  implicit none
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: v,dv,rho,mu
+  real(8), dimension(is:ie,js:je,ks:ke,8), intent(out) :: A
+!  logical, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: mask
+  real(8) :: dt, rhom
+  integer :: i,j,k
+  do k=ks,ke; do j=js,je; do i=is,ie;
+    rhom = 0.5d0*(rho(i,j+1,k)+rho(i,j,k))
+if((dy(j  )*dyh(j)*rhom)==0d0)then
+write(*,'(10I4,3f7.3)'),rank,i,j,k,is,ie,js,je,ks,ke,dy(j),dyh(j),rhom
+endif
+    A(i,j,k,3) = dt/(dy(j  )*dyh(j)*rhom)*2d0*mu(i,j  ,k)
+    A(i,j,k,4) = dt/(dy(j+1)*dyh(j)*rhom)*2d0*mu(i,j+1,k)
+    A(i,j,k,5) = dt/(dz(k)*dzh(k-1)*rhom)*0.25d0*(mu(i,j,k)+mu(i,j+1,k)+mu(i,j,k-1)+mu(i,j+1,k-1))
+    A(i,j,k,6) = dt/(dz(k)*dzh(k  )*rhom)*0.25d0*(mu(i,j,k)+mu(i,j+1,k)+mu(i,j,k+1)+mu(i,j+1,k+1))
+    A(i,j,k,1) = dt/(dx(i)*dxh(i-1)*rhom)*0.25d0*(mu(i,j,k)+mu(i,j+1,k)+mu(i-1,j,k)+mu(i-1,j+1,k))
+    A(i,j,k,2) = dt/(dx(i)*dxh(i  )*rhom)*0.25d0*(mu(i,j,k)+mu(i,j+1,k)+mu(i+1,j,k)+mu(i+1,j+1,k))
+    A(i,j,k,7) = 1d0+sum(A(i,j,k,1:6))
+    A(i,j,k,8) = v(i,j,k) + dt*dv(i,j,k)
+  enddo; enddo; enddo
+!-------------------------------------------------------------------------------------------------
+  !wall boundary conditions
+  if(bdry_cond(1)==0 .and. coords(1)==0    ) then
+    do k=ks,ke; do j=js,je;
+      A(is,j,k,7) = A(is,j,k,7) + A(is,j,k,1)
+      A(is,j,k,1) = 0d0
+    enddo; enddo
+  endif
+  if(bdry_cond(4)==0 .and. coords(1)==nPx-1) then
+    do k=ks,ke; do j=js,je;
+      A(ie,j,k,7) = A(ie,j,k,7) + A(ie,j,k,2)
+      A(ie,j,k,2) = 0d0
+    enddo; enddo
+  endif
+
+  if(bdry_cond(3)==0 .and. coords(3)==0    ) then
+    do j=js,je; do i=is,ie;
+      A(i,j,ks,7) = A(i,j,ks,7) + A(i,j,ks,5)
+      A(i,j,ks,5) = 0d0
+    enddo; enddo
+  endif
+  if(bdry_cond(6)==0 .and. coords(3)==nPz-1) then
+    do j=js,je; do i=is,ie;
+      A(i,j,ke,7) = A(i,j,ke,7) + A(i,j,ke,6)
+      A(i,j,ke,6) = 0d0
+    enddo; enddo
+  endif
+end subroutine SetupVvel
+!=================================================================================================
+!=================================================================================================
+subroutine SetupWvel(w,dw,rho,mu,dt,A) !,mask)
+  use module_grid
+  use module_BC
+  implicit none
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: w,dw,rho,mu
+  real(8), dimension(is:ie,js:je,ks:ke,8), intent(out) :: A
+!  logical, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: mask
+  real(8) :: dt, rhom
+  integer :: i,j,k
+  do k=ks,ke; do j=js,je; do i=is,ie;
+    rhom = 0.5d0*(rho(i,j,k+1)+rho(i,j,k))
+    A(i,j,k,5) = dt/(dz(k  )*dzh(k)*rhom)*2d0*mu(i,j,k  )
+    A(i,j,k,6) = dt/(dz(k+1)*dzh(k)*rhom)*2d0*mu(i,j,k+1)
+    A(i,j,k,1) = dt/(dx(i)*dxh(i-1)*rhom)*0.25d0*(mu(i,j,k)+mu(i,j,k+1)+mu(i-1,j,k)+mu(i-1,j,k+1))
+    A(i,j,k,2) = dt/(dx(i)*dxh(i  )*rhom)*0.25d0*(mu(i,j,k)+mu(i,j,k+1)+mu(i+1,j,k)+mu(i+1,j,k+1))
+    A(i,j,k,3) = dt/(dy(j)*dyh(j-1)*rhom)*0.25d0*(mu(i,j,k)+mu(i,j,k+1)+mu(i,j-1,k)+mu(i,j-1,k+1))
+    A(i,j,k,4) = dt/(dy(j)*dyh(j  )*rhom)*0.25d0*(mu(i,j,k)+mu(i,j,k+1)+mu(i,j+1,k)+mu(i,j+1,k+1))
+    A(i,j,k,7) = 1d0+sum(A(i,j,k,1:6))
+    A(i,j,k,8) = w(i,j,k) + dt*dw(i,j,k)
+  enddo; enddo; enddo
+!-------------------------------------------------------------------------------------------------
+  !wall boundary conditions
+  if(bdry_cond(1)==0 .and. coords(1)==0    ) then
+    do k=ks,ke; do j=js,je;
+      A(is,j,k,7) = A(is,j,k,7) + A(is,j,k,1)
+      A(is,j,k,1) = 0d0
+    enddo; enddo
+  endif
+  if(bdry_cond(4)==0 .and. coords(1)==nPx-1) then
+    do k=ks,ke; do j=js,je;
+      A(ie,j,k,7) = A(ie,j,k,7) + A(ie,j,k,2)
+      A(ie,j,k,2) = 0d0
+    enddo; enddo
+  endif
+
+  if(bdry_cond(2)==0 .and. coords(2)==0    ) then
+    do k=ks,ke; do i=is,ie;
+      A(i,js,k,7) = A(i,js,k,7) + A(i,js,k,3)
+      A(i,js,k,3) = 0d0
+    enddo; enddo
+  endif
+  if(bdry_cond(5)==0 .and. coords(2)==nPy-1) then
+    do k=ks,ke; do i=is,ie;
+      A(i,je,k,7) = A(i,je,k,7) + A(i,je,k,4)
+      A(i,je,k,4) = 0d0
+    enddo; enddo
+  endif
+end subroutine SetupWvel
+!=================================================================================================
+!=================================================================================================
+! Solves the following linear equiation:
+! A7*Pijk = A1*Pi-1jk + A2*Pi+1jk + A3*Pij-1k + 
+!           A4*Pij+1k + A5*Pijk-1 + A6*Pijk+1 + A8
+!-------------------------------------------------------------------------------------------------
+subroutine LinearSolver(A,p,maxError,beta,maxit,it,ierr)
+  use module_grid
+  use module_BC
+  implicit none
+  include 'mpif.h'
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: p
+  real(8), dimension(is:ie,js:je,ks:ke,8), intent(in) :: A
+  real(8), intent(in) :: beta, maxError
+  integer, intent(in) :: maxit
+  integer, intent(out) :: it, ierr
+  real(8) :: res, totalres
+  integer :: i,j,k
+  integer :: req(12),sta(MPI_STATUS_SIZE,12)
+  logical :: mask(imin:imax,jmin:jmax,kmin:kmax)
+!--------------------------------------ITTERATION LOOP--------------------------------------------  
+  do it=1,maxit
+    do k=ks,ke; do j=js,je; do i=is,ie
+      p(i,j,k)=(1d0-beta)*p(i,j,k)+beta* 1d0/A(i,j,k,7)*(              &
+        A(i,j,k,1) * p(i-1,j,k) + A(i,j,k,2) * p(i+1,j,k) +            &
+        A(i,j,k,3) * p(i,j-1,k) + A(i,j,k,4) * p(i,j+1,k) +            &
+        A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8))
+    enddo; enddo; enddo
+!---------------------------------CHECK FOR CONVERGENCE-------------------------------------------
+    res = 0d0
+    call ghost_x(p,1,req( 1: 4)); call ghost_y(p,1,req( 5: 8)); call ghost_z(p,1,req( 9:12))
+    do k=ks+1,ke-1; do j=js+1,je-1; do i=is+1,ie-1
+      res=res+abs(-p(i,j,k) * A(i,j,k,7) +                             &
+        A(i,j,k,1) * p(i-1,j,k) + A(i,j,k,2) * p(i+1,j,k) +            &
+        A(i,j,k,3) * p(i,j-1,k) + A(i,j,k,4) * p(i,j+1,k) +            &
+        A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8) )
+    enddo; enddo; enddo
+    call MPI_WAITALL(12,req,sta,ierr)
+    mask=.true.
+    mask(is+1:ie-1,js+1:je-1,ks+1:ke-1)=.false.
+    do k=ks,ke; do j=js,je; do i=is,ie
+      if(mask(i,j,k))res=res+abs(-p(i,j,k) * A(i,j,k,7) +                             &
+        A(i,j,k,1) * p(i-1,j,k) + A(i,j,k,2) * p(i+1,j,k) +            &
+        A(i,j,k,3) * p(i,j-1,k) + A(i,j,k,4) * p(i,j+1,k) +            &
+        A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8) )
+    enddo; enddo; enddo
+    res = res/float(Nx*Ny*Nz)
+    call MPI_ALLREDUCE(res, totalres, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr)
+    if (.not.(totalres<1e10)) then
+      ierr=1 !stop '***** solution has diverged *****'
+      print*,'Diverged after',it,'iterations.'
+      return
+    endif
+    if (totalres<maxError) exit
+  enddo
+  if(it==maxit+1 .and. rank==0) write(*,*) 'Warning: LinearSolver reached maxit.'
+end subroutine LinearSolver
+!=================================================================================================
+!=================================================================================================
+! Returns the residual
+!-------------------------------------------------------------------------------------------------
+subroutine calcResidual(A,p, Residual)
+  use module_grid
+  use module_BC
+  implicit none
+  include 'mpif.h'
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: p
+  real(8), dimension(is:ie,js:je,ks:ke,8), intent(in) :: A
+  real(8) :: res, totalres, Residual
+  integer :: i,j,k, ierr
+  res = 0d0
+  do k=ks,ke; do j=js,je; do i=is,ie
+    res=res+abs(-p(i,j,k) * A(i,j,k,7) +                             &
+      A(i,j,k,1) * p(i-1,j,k) + A(i,j,k,2) * p(i+1,j,k) +            &
+      A(i,j,k,3) * p(i,j-1,k) + A(i,j,k,4) * p(i,j+1,k) +            &
+      A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8) )**2
+  enddo; enddo; enddo
+  res = res/float(Nx*Ny*Nz)
+  call MPI_ALLREDUCE(res, totalres, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr)
+  Residual = sqrt(totalres)
+end subroutine calcResidual

@@ -1,8 +1,0 @@
--  "babbage2 weak scaling" "veronese weak scaling"
-1   .         642510
-8   1125082    1956299
-32  .           6786900
-64  8112774      .
-512 50006605     .
-
-

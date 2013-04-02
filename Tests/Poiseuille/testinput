@@ -1,99 +1,136 @@
-! input.dat
+! mono64-1
+! 
+! 64  grid points per dimension per domain
+! 1  mpi processes
 
-! The input file for running the code FTC3D2011
+! The input file for running the PARIS code
 ! Parameters are read using a namelist statement.
 ! Blank lines and commented lines are ignored.
 ! Location of the parameters in the list is not important.
 
 &PARAMETERS
-                   ! name of the namelist
-hypre    = T       ! use of hypre, if false, SOR solver is used
-restart  = F       ! T: start from backup of a previous simulation
-nBackup  = 45      ! number of time steps between backup writing. Only last two backups are kept.
+                   
+! name of the namelist
+!=================================================================================================
+! General parameters
 
-NSTEP   = 1000       ! maximum number of time steps
-EndTime = 1000.0     ! When to stop simulation
+TWOPHASE = F         ! TwoPhase: Is the flow two phase?
+DoVOF 	  = F
+DoFront   = F
+GetPropertiesFromFront = F ! T: uses Front-Tracking data to compute mu, rho and Surface Tension. 
+		           ! F: uses VOF data to compute mu and rho. 
 
-MaxDt   = 1e-3     ! maximum size of time step
+Implicit  = F     
+hypre    = T       ! T: uses hyprepackage, F: uses SOR solver 
+restart  = F       ! T: start the domain from a previous simulation
+restartFront = F   ! T: start the frontfrom  a previous simulation
+restartAverages = F
+nBackup = 100000   ! number of time steps between  backups are kept.
+
+NSTEP   = 1000     ! maximum number of time steps
+EndTime = 2000.0   ! When to stop simulation
+
+MaxDt   = 1.e-3    ! maximum size of time step
 dtFlag  = 2        ! 1: fixed dt;  2: fixed CFL
 dt      = 1e-2     ! dt in case of dtFlag=1
 CFL     = 0.9
 MAXERROR= 1d-4     ! Residual for Poisson solver
+MAXERRORVOL = 1d-4
+                   ! Numerical parameters
 
 ITIME_SCHEME = 2
-                   ! time scheme: 1:first order Euler, 2: second order TVD Runge-Kutta
+                   ! time scheme: 1:first order Euler, 2: second order quasi Crank-Nicolson
 
-MAXIT   = 20
-BETA    = 1.2
+MAXIT    = 20
+BETA     = 1.2
                     ! parameters for linear solver
 
 !=================================================================================================
 ! Output parameters
 
-NOUT    = 60       ! flush the solution every nout time steps
-output_format = 2  ! 1:tecplot 2:vtk
+ICOut    = F        ! output initial condition
+NOUT     = 100      ! write the solution to file every nout time steps
+output_format = 2   ! 1:tecplot 2:vtk
+out_path = 'out'    ! name of the output directory
 
-out_path = 'out'     ! name of the output directory
+nstats   = 20       ! number of time steps between flow statistics calculations
 
-ICOut   = F        ! output initial condition
 !=================================================================================================
-!Grid parameters
-npx     = 2
-npy     = 2
-npz     = 1
+! Grid parameters
+
+npx      = 2
+npy      = 2
+npz      = 1
                    ! number of processors in x,y,z direction
-
-Nx      = 8
-Ny      = 8
-Nz      = 8
-Ng      = 2
-                   ! grid size in x,y,z direction and number of ghost cells
-
-XLENGTH = 1.
-YLENGTH = 1.
-ZLENGTH = 1.
-                   ! domain size in x,y,z direction
-
-xform   = 0.0
-yform   = 0.0
-zform   = 0.0    ! non-uniformity of grid: 0:uniform; +:clustered at center; -:clustered near ends
+                   ! Total number of processes should be at least npx*npy*npz+1 since one process
+                   ! is dedicated to the front. Any extra processes will be idle.
+Nx       = 8
+Ny       = 8
+Nz       = 8
+Ng       = 2
+                   ! total grid size in x,y,z direction and number of ghost cells
 
 read_x   = F       ! read the grid file for x-grid; If true xLength and xform are neglected
 read_y   = F
 read_z   = F
-x_file   = 'xh.dat' !input file for xh (Nx+1 points)
+x_file   = 'xh.dat'	! input file for xh (Nx+1 points)
 y_file   = 'yh.dat'
 z_file   = 'zh.dat'
+
+xform    = 0.0		!1.0
+yform    = 0.0		!1.0
+zform    = 0.0       	! non-uniformity of the grid if not reading an input file
+                     	! 0:uniform; +:clustered at center; -:clustered near ends
+
+XLENGTH  = 1.0
+YLENGTH  = 1.0
+ZLENGTH  = 1.0
+                   ! domain size in x,y,z direction
 
 !=================================================================================================
 ! Flow parameters
 
-GX      = 0.0
+GX      = 1.0
 GY      = 0.0
 GZ      = 0.0
                    ! Components of the gravity in x,y,z direction
 
-BDRY_COND = 'periodic'    'wall'    'periodic'
-                   ! Type of boundary condition in x,y,z direction: 'wall', 'periodic'
-
-dPdX      = -1.0
+dPdX      = 0.0
 dPdY      = 0.0
 dPdZ      = 0.0
                    ! Px, Py, Pz: pressure gradients in case of pressure driven channel flow
                    ! Px = (P(xLength)-P(0))/xLength
-TWOPHASE= F
-                   ! TwoPhase: It only supports variable density front tracking
+BDRY_COND = 1    0    1   1   0   1
+                   !Type of boundary condition in x,y,z direction: 0:wall  1:periodic  2:shear
+                   !x- y- z- x+ y+ z+
 
-RHO1    = 1.0
-MU1     = 1.0
-                   ! rho1, mu1 : density and viscosity of the matrix phase
+WallVel(3, 1) =  0.0
+WallVel(4, 1)  = 0.0 ! can set wall velocities here
+WallVel(3, 3) =  0.0
+WallVel(4, 3)  = 0.0 ! can set wall velocities here
+! WallShear(4,1) = 0.0
 
-RHO2    = 1.0
-MU2     = 1.0 
-                   ! rho2, mu2 : properties of the drop
+RHO1     = 1.0
+MU1      = 1.0
+                    ! rho1, mu1 : density and viscosity of the matrix phase
 
-NumBubble =  0
-                   !number of bubbles
+RHO2     = 1.0
+MU2      = 1.0
+SIGMA    = 0.       ! rho2, mu2, sigma : properties of the drop and surface tension
+                   
+
+NumBubble = 0      !number of bubbles
+
+MaxPoint = 2000000
+MaxElem  = 4000000
+MaxFront = 100
+amin     = 0.32
+amax     = 0.96
+aspmax   = 1.54
+
+smooth   = T        !smooth the interface
+nsmooth  = 10       !every nsmooth time steps
+nregrid  = 10       !regrid the front every nregrid time steps
 
 BUOYANCYCASE = 0
                    ! BuoyancyCase : determines what density will be subtracted from the gravity 

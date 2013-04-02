@@ -85,6 +85,11 @@ contains
     endif
     allocate(cvof(imin:imax,jmin:jmax,kmin:kmax))
     cvof = 0.D0
+ !       if(test_type=='uniform_advection') then
+ !          u=1.
+ !       else
+ !          stop 'unknown initialization'
+ !       endif
    end subroutine initialize_VOF
 !
 !=================================================================================================

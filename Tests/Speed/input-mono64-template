@@ -1,7 +1,7 @@
-! mono64-1
+! mono64-NPROCESSES
 ! 
 ! 64  grid points per dimension per domain
-! 1 + 1  mpi processes
+! NPROCESSES + 1  mpi processes
 
 ! The input file for running the PARIS code
 ! Parameters are read using a namelist statement.
@@ -17,7 +17,7 @@
 
 TWOPHASE = T         ! TwoPhase: Is the flow two phase?
 DoVOF 	  = T
-DoFront   = T
+DoFront   = F
 GetPropertiesFromFront = F ! T: uses Front-Tracking data to compute mu, rho and Surface Tension. 
 		           ! F: uses VOF data to compute mu and rho. 
 
@@ -59,15 +59,15 @@ nstats   = 20       ! number of time steps between flow statistics calculations
 !=================================================================================================
 ! Grid parameters
 
-npx      = 1
-npy      = 1
-npz      = 1
+npx      = NPXTEMP
+npy      = NPXTEMP
+npz      = NPXTEMP
                    ! number of processors in x,y,z direction
                    ! Total number of processes should be at least npx*npy*npz+1 since one process
                    ! is dedicated to the front. Any extra processes will be idle.
-Nx       = 64
-Ny       = 64
-Nz       = 64
+Nx       = NXTEMP
+Ny       = NXTEMP
+Nz       = NXTEMP
 Ng       = 2
                    ! total grid size in x,y,z direction and number of ghost cells
 

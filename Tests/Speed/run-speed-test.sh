@@ -1,20 +1,44 @@
 #! /bin/bash
-set -x
+#set -x
 
+if [ $# -lt 1 ]; then
+    echo "missing list of np"
+    exit
+fi
+
+# input size of your machine here
+let maxcores=4
+let base=64
 # mono64-1  to mono64-512  run in less than 30 seconds on babbage cluster
-# 132 Mbytes/core
+for rootsize in $* ; do
+    rm -fr input out
+    let nx=$rootsize*$base
+    let size=$rootsize*$rootsize*$rootsize
+    sed s/NXTEMP/$nx/g input-mono64-template | sed s/NPXTEMP/$rootsize/g | sed s/NPROCESSES/$size/g  > input-mono64-$size
+    ln -s input-mono64-$size input
+    if [ `grep TWOPHASE input | awk '{print $3}'` == 'T' ]; then
+	let np=$size+1
+    else
+	let np=$size
+    fi
 
-make mono64-1
+    mpirun -np $np paris > tmpout-$size
 
-# 14 seconds
-make mono64-8
-
-# 21 seconds
-make mono64-64
-
-# 29 seconds
-make mono64-512
-
-make mono64-4096
-make mono64-32768
+    let Cores=$size
+    let nrofcells=$nx*$nx*$nx
+    if [ $size -gt $maxcores ]; then
+	Cores=$maxcores
+    fi
+    awk -v nrofcells=$nrofcells -v cores=$Cores -v size=$size ' /Step:/ { 
+    if ($2 == 1) {
+	time1 = $2;
+	cpu1 = $8;
+    }
+    else if   ($2 == 11) {
+	time2 = $2;
+	cpu2 = $8;
+    }
+} 
+END { print "size= " size "  cores= " cores "  Z/np= " nrofcells*(time2 - time1)/(cpu2-cpu1)/cores "  Z= " nrofcells*(time2 - time1)/(cpu2-cpu1)} ' < tmpout-$size
+done
 
