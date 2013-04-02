@@ -8,7 +8,8 @@ FC = mpif90
 # remove funny cflags from my environment
 
 FFLAGS = -O3 # -g -gstabs
-CFLAGS = -g -gstabs
+CFLAGS = -O # -g -gstabs
+BINDIR = $(HOME)/bin
 
 # select option for hypre
 # default hypre installation without root privileges:
@@ -37,7 +38,7 @@ install: $(OBJ)
 all: tags install compare
 
 clean:
-	@rm -fR *.o *.mod paris stats *~ track out* errftc tmp* *.tmp fort.* *.visit core.*
+	@rm -fR *.o *.mod paris stats *~ track out* errftc tmp* *.tmp fort.* *.visit core.* statsbub
 	@cd Tests; sh ./clean.sh; cd ..
 	@cd Documentation; make clean; cd ..
 
@@ -45,11 +46,11 @@ distclean: clean
 	@rm -fR  session* *.xml TAGS tags input
 
 test:  install compare
-	@cd Tests; bash ./runtests.sh
+	@cd Tests; ./runtests.sh
 
 # single processor test
 minitest: install
-	cd Tests/Mini; sh run.sh
+	cd Tests/Mini; ./run.sh
 
 tags:	$(SRC)
 # @SZ Create a tags file named TAGS for use by emacs
@@ -74,7 +75,7 @@ front.o:  front.f90 modules.o
 	$(FC) -c  $(FFLAGS) $<
 
 compare: $(OBJC)
-	$(CC) -o compare  $(OBJC) -lm
+	$(CC) -o compare  $(OBJC) 
 	mv compare ~/bin
 
 .c.o:   $< 

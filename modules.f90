@@ -84,6 +84,7 @@ module module_flow
   real(8) :: rho1, rho2, s
 !  real(8) :: rad, xc, yc, zc
   real(8) :: dpdx, dpdy, dpdz, W_ave  !pressure gradients in case of pressure driven channel flow
+  real(8) :: dpdx_stat, dpdy_stat, dpdz_stat
   real(8) :: beta, MaxError
   integer :: maxit, it, itime_scheme, BuoyancyCase, drive
   integer :: sbx, sby, Nstep

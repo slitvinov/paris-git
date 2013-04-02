@@ -6,11 +6,21 @@ if [ $# -lt 1 ]; then
     exit
 fi
 
-# 14 seconds
-make mono64-8
-
-# 21 seconds
-make mono64-64
+# input size of your machine here
+let maxcores=4
+let base=64
+# mono64-1  to mono64-512  run in less than 30 seconds on babbage cluster
+for rootsize in $* ; do
+    rm -fr input out
+    let nx=$rootsize*$base
+    let size=$rootsize*$rootsize*$rootsize
+    sed s/NXTEMP/$nx/g input-mono64-template | sed s/NPXTEMP/$rootsize/g | sed s/NPROCESSES/$size/g  > input-mono64-$size
+    ln -s input-mono64-$size input
+    if [ `grep TWOPHASE input | awk '{print $3}'` == 'T' ]; then
+	let np=$size+1
+    else
+	let np=$size
+    fi
 
     mpirun -np $np paris > tmpout-$size
 
