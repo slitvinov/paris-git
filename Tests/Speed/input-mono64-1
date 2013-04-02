@@ -1,7 +1,7 @@
 ! mono64-1
 ! 
 ! 64  grid points per dimension per domain
-! 1 + 1  mpi processes
+! 1  mpi processes
 
 ! The input file for running the PARIS code
 ! Parameters are read using a namelist statement.
@@ -54,10 +54,25 @@ NOUT     = 100      ! write the solution to file every nout time steps
 output_format = 2   ! 1:tecplot 2:vtk
 out_path = 'out'    ! name of the output directory
 
-nstats   = 20       ! number of time steps between flow statistics calculations
+out_path = 'out1'     ! name of the output directory
 
 !=================================================================================================
-! Grid parameters
+!Grid parameters
+npx     = 1
+npy     = 1
+npz     = 1
+                   ! number of processors in x,y,z direction
+
+Nx      = 64
+Ny      = 64
+Nz      = 64
+Ng      = 2
+                   ! grid size in x,y,z direction and number of ghost cells
+
+XLENGTH = 3.141593
+YLENGTH = 3.141593
+ZLENGTH = 3.141593
+                   ! domain size in x,y,z direction
 
 npx      = 1
 npy      = 1
@@ -103,16 +118,8 @@ dPdY      = 0.0
 dPdZ      = 0.0
                    ! Px, Py, Pz: pressure gradients in case of pressure driven channel flow
                    ! Px = (P(xLength)-P(0))/xLength
-BDRY_COND = 1    0    1   1   0   1
-                   !Type of boundary condition in x,y,z direction: 0:wall  1:periodic  2:shear
-                   !x- y- z- x+ y+ z+
-
-WallVel(4, 1)  = 0.0 ! can set wall velocities here
-WallShear(4,1) = 0.0
-
-RHO1     = 1.0
-MU1      = 0.0
-                    ! rho1, mu1 : density and viscosity of the matrix phase
+TWOPHASE= T
+                   ! TwoPhase: It only supports variable density front tracking
 
 RHO2     = 1.0
 MU2      = 0.000136

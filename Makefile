@@ -9,7 +9,6 @@ FC = mpif90
 
 FFLAGS = -O3 # -g -gstabs
 CFLAGS = -g -gstabs
-BINDIR = $(HOME)/bin
 
 # select option for hypre
 # default hypre installation without root privileges:

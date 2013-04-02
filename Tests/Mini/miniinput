@@ -23,10 +23,7 @@ restartFront = F   ! T: start the frontfrom  a previous simulation
 restartAverages = F
 nBackup  = 200     ! number of time steps between  backups are kept.
 
-GetPropertiesFromFront = T ! T: uses Front-Tracking data to compute mu, rho and Surface Tension. 
-		           ! F: uses VOF data to compute mu and rho. 
-
-NSTEP   = 3     ! maximum number of time steps
+NSTEP   = 100       ! maximum number of time steps
 EndTime = 1000.0     ! When to stop simulation
 
 MaxDt   = 1e-2     ! maximum size of time step

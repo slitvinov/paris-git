@@ -288,74 +288,38 @@ Program paris
         endif
         
 !--------------------------------------------OUTPUT-----------------------------------------------
-        call calcStats
-
-        if(mod(itimestep,nbackup)==0)call backup_write
-        if(mod(itimestep,nout)==0)call output(ITIMESTEP/nout,is,ie+1,js,je+1,ks,ke+1)
-        if(rank==0)then
-           end_time =  MPI_WTIME()
-           write(out,'("Step:",I9," Iterations:",I9," cpu(s):",f10.2)')itimestep,it,end_time-start_time
-           if(mod(itimestep,nstats)==0)then
-              !        open(unit=121,file='track')
-              !        write(121,'("Step:",I10," dt=",es16.5e2," time=",es16.5e2)')itimestep,dt,time
-              !        write(121,'("            Iterations:",I7," cpu(s):",f10.2)')it,end_time-start_time
-              !        close(121)
-              open(unit=121,file='stats',access='append')
-              write(121,'(20es14.6e2)')time,stats(1:12),dpdx,(stats(8)-stats(9))/dt,end_time-start_time
-              close(121)
-           endif
-        endif
-     enddo
-     !-------------------------------------------------------------------------------------------------
-     !--------------------------------------------End domain-------------------------------------------
-     !-------------------------------------------------------------------------------------------------
-  elseif((rank==nPdomain).and.DoFront)then !front tracking process (rank=nPdomain)
-     !-------------------------------------------------------------------------------------------------
-     !--------------------------------------------Begin front------------------------------------------
-     !-------------------------------------------------------------------------------------------------
-     if(ICout) call print_fronts(0,time)
-     !---------------------------------------MAIN TIME LOOP--------------------------------------------
-     do while(time<EndTime .and. iTimeStep<nstep)
-        if(dtFlag==2)call TimeStepSize(dt)
-        time=time+dt
-        itimestep=itimestep+1
-        
-        if(itime_scheme==2) call StoreOldFront
-        
-        do ii=1, itime_scheme
-           call CalcSurfaceTension
-           do irank=0,nPdomain-1
-              call DistributeFront(irank,'send') !,request(1:2,irank))
-           enddo
-           do irank=0,nPdomain-1
-              call DistributeFront(irank,'recv') !,request(1:2,irank))
-           enddo
-        enddo
-   
-        if(itime_scheme==2) call AverageFront
-        
-        print*,'Starting regrid'
-        if(mod(itimestep,nregrid)==0) call RegridFront
-        print*,'Finished regrid'
-        if(smooth.and.mod(itimestep,nsmooth)==0) call smoothFront
-        call CalcVolume
-        if(mod(itimestep,nsmooth)==0) call CorrectVolume
-        print*,'Finished volume correction'
-        !--------------------------------------------OUTPUT-----------------------------------------------
-        if(mod(itimestep,nout)==0)call print_fronts(ITIMESTEP/nout,time)
-        if(mod(itimestep,nbackup)==0)call backup_front_write(time,iTimeStep)
-        if(mod(itimestep,nstats)==0)then
-           open(unit=121,file='statsbub',access='append')
-           do i=1, NumBubble
-              write(121,'(6es16.8e2)')time,FrontProps(1,i),FrontProps(5:7,i), FrontProps(14,i)
-           enddo
-           close(121)
-        endif
-     enddo
-!-------------------------------------------------------------------------------------------------
-!--------------------------------------------End front--------------------------------------------
-  endif
-!-------------------------------------------------------------------------------------------------
+    ! calculate the volumetric flow rate in x-direction
+    i=is
+    myfr=0d0
+    do k=ks,ke;  do j=js,je
+      myfr=myfr+u(i,j,k)*dy(j)*dz(k)
+    enddo; enddo
+    call MPI_ALLREDUCE(myfr, flowrate, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, ierr)
+    flowrate = flowrate/dfloat(nPx)
+    if(mod(itimestep,nbackup)==0)call backup_write
+    if(mod(itimestep,nout)==0) then
+       call output(ITIMESTEP/nout,is,ie,js,je,ks,ke)
+       call output_VOF(ITIMESTEP/nout,imin,imax,jmin,jmax,kmin,kmax)
+    endif
+    if(rank==0) then
+      end_time =  MPI_WTIME()
+      write(out,'("Step:",I6," Iterations:",I5," cpu(s):",f10.2)')itimestep,it,end_time-start_time
+      open(unit=121,file='track')
+      write(121,'("Step:",I6," dt=",es16.5e2," time=",es16.5e2)')itimestep,dt,time
+      write(121,'("            Iterations:",I5," cpu(s):",f10.2)')it,end_time-start_time
+      close(121)
+      write(*,'("Step:",I6," dt=",es16.5e2," time=",es16.5e2)')itimestep,dt,time
+      write(*,'("            Iterations:",I5," cpu(s):",f10.2)')it,end_time-start_time
+      open(unit=121,file='stats',access='append')
+      write(121,'(5es16.5e2)')time,flowrate,end_time-start_time
+      close(121)
+    endif
+!
+!    if(mod(itimestep,nout)==0) then
+       call minmax()
+!    endif
+!
+  enddo
 !--------------- END OF MAIN TIME LOOP ----------------------------------------------------------
   if(rank==0) then 
      if(output_format==2) call close_visit_file()
