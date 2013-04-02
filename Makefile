@@ -74,7 +74,7 @@ front.o:  front.f90 modules.o
 	$(FC) -c  $(FFLAGS) $<
 
 compare: $(OBJC)
-	$(CC) -o compare  $(OBJC) 
+	$(CC) -o compare  $(OBJC) -lm
 	mv compare ~/bin
 
 .c.o:   $< 
