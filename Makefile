@@ -45,7 +45,7 @@ distclean: clean
 	@rm -fR  session* *.xml TAGS tags input
 
 test:  install compare
-	@cd Tests; sh ./runtests.sh
+	@cd Tests; bash ./runtests.sh
 
 # single processor test
 minitest: install

@@ -6,7 +6,8 @@ for dir in `ls`; do
 	cd $dir
 	if [ -e 'run.sh' ]; then
 	    echo running test in $dir
-	    sh run.sh > outtest
+	    chmod +x run.sh
+	    ./run.sh > outtest
 # last line in output of test should be PASS or FAIL
 	    tail -n 1 outtest
 	fi
