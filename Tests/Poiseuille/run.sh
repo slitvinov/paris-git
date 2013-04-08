@@ -3,7 +3,14 @@
 
 /bin/rm -fr out input
 let npstart=4
-ln -s testinput input
+if [ $1 == mono ]; then
+    ln -s testinput.mono input
+    precision=0.01
+else
+    ln -s testinput input
+    precision=0.002
+fi
+
 if [ `awk 'BEGIN {FS = "=";}  /npx/ {print $2}' < input` == '1' ]; then
   echo "mono"
   let npstart=1
@@ -31,7 +38,7 @@ if [ -d out ]; then
     else
 	echo "case not handled: npstart = ",$npstart
     fi
-	compare output1 Poiseuille_theory 0.002
+	compare output1 Poiseuille_theory $precision
     cd ..
 else
     echo "FAIL: directory out not created"

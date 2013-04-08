@@ -85,7 +85,7 @@ Program paris
   endif
 
   ! check number of processors
-  if ((NumProcess < nPdomain+1).and.DoFront) STOP '*** Main: Error with number of processes!'
+  if ((NumProcess < nPdomain+1).and.DoFront) STOP '*** Main: Error with number of processes - Front!'
   if (NumProcess < nPdomain) STOP '*** Main: Error with number of processes!'
 
   icolor = 0                                  ! Processes 0 to nPdomain-1 are used to solve domain
@@ -107,7 +107,7 @@ Program paris
 
   call initialize
   if(DoVOF) call initialize_VOF
-  call initialize_solids
+  if(rank<nPdomain) call initialize_solids
 
   if(DoFront) call InitFront
   if(rank==0) write(out,*)'initialized'
@@ -117,7 +117,7 @@ Program paris
                                                     is,ie,js,je,ks,ke,Nx,Ny,Nz,bdry_cond)
   if(HYPRE .and. rank==0) write(out,*)'hypre initialized'
   if(HYPRE .and. rank==0) write(*  ,*)'hypre initialized'
-
+  
   call InitCondition
 
   if(rank<nPdomain) then
@@ -171,7 +171,7 @@ Program paris
            fz = 0d0;    dIdz=0d0
 
            ! Wait to finish receiving front
-           if(DoFront)then
+           if(DoFront) then
               call GetFront('wait')
               call Front2GridVector(fx, fy, fz, dIdx, dIdy, dIdz)
               call AdvanceFront2(u, v, w, color, dt)
@@ -222,7 +222,7 @@ Program paris
            else
               call LinearSolver(A,p,maxError/2d0/dt,beta,maxit,it,ierr)
            endif
-           if(rank==0)write(*  ,'("              pressure iterations:",I9)')it
+           if(rank==0.and..not.hypre) write(*  ,'("              pressure iterations:",I9)')it
            
            do k=ks,ke;  do j=js,je; do i=is,ieu;    ! CORRECT THE u-velocity 
               u(i,j,k)=u(i,j,k)-dt*(2.0/dxh(i))*(p(i+1,j,k)-p(i,j,k))/(rho(i+1,j,k)+rho(i,j,k))
@@ -245,7 +245,7 @@ Program paris
                  else
                     call LinearSolver(A,color,maxError,beta,maxit,it,ierr)
                  endif
-                 if(rank==0)write(*  ,'("              density  iterations:",I9)')it
+                 if(rank==0.and..not.hypre)write(*  ,'("              density  iterations:",I9)')it
                  !adjust color function to 0-1 range
                  do k=ks,ke;  do j=js,je; do i=is,ie
                     color(i,j,k)=min(color(i,j,k),1d0)
@@ -274,6 +274,7 @@ Program paris
            !------------------------------------END VOF STUFF------------------------------------------------
               endif
            endif
+
            ! Wait for front to be sent back
            if(DoFront)call GetFront('wait')
            
@@ -288,13 +289,14 @@ Program paris
         endif
         
 !--------------------------------------------OUTPUT-----------------------------------------------
-        call calcStats
+       call calcStats
 
         if(mod(itimestep,nbackup)==0)call backup_write
         if(mod(itimestep,nout)==0)call output(ITIMESTEP/nout,is,ie+1,js,je+1,ks,ke+1)
         if(rank==0)then
            end_time =  MPI_WTIME()
            write(out,'("Step:",I9," Iterations:",I9," cpu(s):",f10.2)')itimestep,it,end_time-start_time
+           if(nstats==0) STOP " *** Main: nstats = 0"
            if(mod(itimestep,nstats)==0)then
               !        open(unit=121,file='track')
               !        write(121,'("Step:",I10," dt=",es16.5e2," time=",es16.5e2)')itimestep,dt,time
@@ -359,8 +361,9 @@ Program paris
 !--------------- END OF MAIN TIME LOOP ----------------------------------------------------------
   if(rank==0) then 
      if(output_format==2) call close_visit_file()
-!     call close_VOF_visit_file()
+     call close_VOF_visit_file()
   endif
+!--------------- END OF MAIN TIME LOOP ----------------------------------------------------------
   if(rank<nPdomain)  call output_at_location()
   if(HYPRE) call poi_finalize
   call MPI_BARRIER(MPI_COMM_WORLD, ierr)
@@ -898,10 +901,11 @@ subroutine InitCondition
         call ghost_z(u,2,req( 1: 4)); call ghost_z(v,2,req( 5: 8)); call ghost_z(w,2,req( 9:12))
         call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
      else
-        ! Set velocities and the color function. Used for density and viscosity in the domain when set by Front-Tracking.
+        ! Set velocities and the color function. 
+        ! The color function is used for density and viscosity in the domain 
+        ! when set by Front-Tracking.
         color = 0.; u = 1.;  v = 0;  w = 0.
      endif
-
      if(DoFront) then
         call GetFront('recv')
         call GetFront('wait')

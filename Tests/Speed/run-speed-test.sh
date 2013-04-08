@@ -39,6 +39,6 @@ for rootsize in $* ; do
 	cpu2 = $8;
     }
 } 
-END { print "size= " size "  cores= " cores "  Z/np= " nrofcells*(time2 - time1)/(cpu2-cpu1)/cores "  Z= " nrofcells*(time2 - time1)/(cpu2-cpu1)} ' < tmpout-$size
+END { print "\033[1;32m " "size= " size "  cores= " cores "  Z/np= " nrofcells*(time2 - time1)/(cpu2-cpu1)/cores "  Z= " nrofcells*(time2 - time1)/(cpu2-cpu1) " \033[0m" } ' < tmpout-$size
 done
 

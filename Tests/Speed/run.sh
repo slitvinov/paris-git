@@ -1,4 +1,4 @@
 #! /bin/bash
 set -x
 
-sh run-speed-test.sh 1 
+bash run-speed-test.sh 1 

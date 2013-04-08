@@ -14,14 +14,15 @@
 !=================================================================================================
 ! General parameters
 
+TWOPHASE = T         ! TwoPhase: Is the flow two-phase?
 DoVOF 	  = T
 DoFront   = T
-Implicit  = F     
+Implicit  = T     
 hypre     = T       ! T: uses hyprepackage, F: uses SOR solver 
 restart   = F       ! T: start the domain from a previous simulation
-restartFront = F   ! T: start the frontfrom  a previous simulation
+restartFront = F    ! T: start the frontfrom  a previous simulation
 restartAverages = F
-nBackup  = 200     ! number of time steps between  backups are kept.
+nBackup  = 200      ! number of time steps between  backups are kept.
 
 GetPropertiesFromFront = T ! T: uses Front-Tracking data to compute mu, rho and Surface Tension. 
 		           ! F: uses VOF data to compute mu and rho. 
@@ -107,9 +108,6 @@ BDRY_COND = 1    0    1   1   0   1
 
 WallVel(4, 1)  = 0.0 ! can set wall velocities here
 WallShear(4,1) = 0.0
-
-TWOPHASE = T
-                   ! TwoPhase: Is the flow two phase?
 
 RHO1     = 1.0
 MU1      = 0.0

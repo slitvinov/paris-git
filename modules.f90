@@ -61,9 +61,12 @@ module module_hello
   contains
 subroutine hello_coucou
   use module_grid
+  integer :: debug=1
+  if(debug == 1) then 
   if(rank==0) write(6,*) 'coucou ',hello_count, "Process0"
   if(rank==nPdomain) write(6,*) 'coucou ',hello_count, "Front"
   hello_count = hello_count + 1
+  end if
 end subroutine hello_coucou
 end module module_hello
 !=================================================================================================
@@ -181,6 +184,8 @@ end subroutine backup_write
 subroutine backup_read
   use module_flow
   use module_grid
+
+      use module_hello
   implicit none
   integer ::i,j,k,i1,i2,j1,j2,k1,k2,ierr
   OPEN(UNIT=7,FILE=trim(out_path)//'/backup_'//int2text(rank,3),status='old',action='read')
@@ -217,6 +222,8 @@ end subroutine output
 subroutine output1(nf,i1,i2,j1,j2,k1,k2)
   use module_flow
   use module_grid
+
+      use module_hello
 !  use module_tmpvar
   !use IO_mod
   implicit none
@@ -265,6 +272,8 @@ end subroutine output1
 subroutine output2(nf,i1,i2,j1,j2,k1,k2)
   use module_flow
   use module_grid
+
+      use module_hello
   !use IO_mod
   implicit none
   integer ::nf,i1,i2,j1,j2,k1,k2,i,j,k, itype=5
@@ -323,6 +332,8 @@ end subroutine output2
 !-------------------------------------------------------------------------------------------------
 subroutine cminmax(var,umin_glob,umax_glob)
   use module_grid
+
+      use module_hello
   use module_flow
   include 'mpif.h'
   real(8) var(imin:imax,jmin:jmax,kmin:kmax)
@@ -345,6 +356,8 @@ end module module_IO
 !-------------------------------------------------------------------------------------------------
 module module_BC
   use module_grid
+
+      use module_hello
   implicit none
   integer :: bdry_cond(6)
   ! bdry_cond(i) = is the type if boundary condition in i'th direction
@@ -386,6 +399,8 @@ module module_BC
 !-------------------------------------------------------------------------------------------------
   subroutine SetVelocityBC(u,v,w)
     use module_grid
+
+      use module_hello
     implicit none
     include 'mpif.h'
     real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: u, v, w
@@ -458,6 +473,8 @@ module module_BC
 !-------------------------------------------------------------------------------------------------
   subroutine SetVectorBC(fx,fy,fz)
     use module_grid
+
+      use module_hello
     implicit none
     include 'mpif.h'
     real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: fx, fy, fz
@@ -499,6 +516,8 @@ module module_BC
 !-------------------------------------------------------------------------------------------------
   subroutine ghost_x(F,ngh,req)
     use module_grid
+
+      use module_hello
     implicit none
     include 'mpif.h'
     integer, intent(in) :: ngh ! number of ghost cell layers to fill
@@ -527,6 +546,8 @@ module module_BC
 !-------------------------------------------------------------------------------------------------
   subroutine ghost_y(F,ngh,req)
     use module_grid
+
+      use module_hello
     implicit none
     include 'mpif.h'
     integer, intent(in) :: ngh
@@ -555,6 +576,8 @@ module module_BC
 !-------------------------------------------------------------------------------------------------
   subroutine ghost_z(F,ngh,req)
     use module_grid
+
+      use module_hello
     implicit none
     include 'mpif.h'
     integer, intent(in) :: ngh
@@ -585,6 +608,8 @@ module module_BC
 !-------------------------------------------------------------------------------------------------
   subroutine ghost_xAdd(F,ir1,is1,iwork,req)
     use module_grid
+
+      use module_hello
     use module_tmpvar
     implicit none
     include 'mpif.h'
@@ -615,6 +640,8 @@ module module_BC
 !-------------------------------------------------------------------------------------------------
   subroutine ghost_yAdd(F,jr1,js1,iwork,req)
     use module_grid
+
+      use module_hello
     use module_tmpvar
     implicit none
     include 'mpif.h'
@@ -644,6 +671,8 @@ module module_BC
 !-------------------------------------------------------------------------------------------------
   subroutine ghost_zAdd(F,kr1,ks1,iwork,req)
     use module_grid
+
+      use module_hello
     use module_tmpvar
     implicit none
     include 'mpif.h'
@@ -764,6 +793,7 @@ module module_poisson
 
   end subroutine poi_initialize
 !=================================================================================================
+! Solve Poisson equation. p is initial guess. 
 !=================================================================================================
   subroutine poi_solve(A,p,maxError,maxit,num_iterations)
     implicit none
@@ -804,6 +834,13 @@ module module_poisson
     ijk = 1
     do k=ks,ke;  do j=js,je;  do i=is,ie
       values(ijk) = A(i,j,k,8)
+      ijk = ijk + 1
+    enddo;  enddo;  enddo
+    call HYPRE_StructVectorSetBoxValues(Bvec, ilower, iupper, values, ierr)
+
+    ijk = 1
+    do k=ks,ke;  do j=js,je;  do i=is,ie
+      values(ijk) = p(i,j,k)
       ijk = ijk + 1
     enddo;  enddo;  enddo
     call HYPRE_StructVectorSetBoxValues(Xvec, ilower, iupper, values, ierr)
@@ -874,6 +911,8 @@ END
 !-------------------------------------------------------------------------------------------------
 subroutine SetupDensity(dIdx,dIdy,dIdz,A,color) !,mask)
   use module_grid
+
+      use module_hello
   use module_BC
   implicit none
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: dIdx,dIdy,dIdz, color
@@ -944,6 +983,8 @@ end subroutine SetupDensity
 !-------------------------------------------------------------------------------------------------
 subroutine SetupPoisson(utmp,vtmp,wtmp,rhot,dt,A) !,mask)
   use module_grid
+
+      use module_hello
   use module_BC
   implicit none
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: utmp,vtmp,wtmp,rhot
@@ -974,6 +1015,8 @@ end subroutine SetupPoisson
 !-------------------------------------------------------------------------------------------------
 subroutine SetupUvel(u,du,rho,mu,dt,A) !,mask)
   use module_grid
+
+      use module_hello
   use module_BC
   implicit none
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: u,du,rho,mu
@@ -1024,6 +1067,8 @@ end subroutine SetupUvel
 !=================================================================================================
 subroutine SetupVvel(v,dv,rho,mu,dt,A) !,mask)
   use module_grid
+
+      use module_hello
   use module_BC
   implicit none
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: v,dv,rho,mu
@@ -1077,6 +1122,8 @@ end subroutine SetupVvel
 !=================================================================================================
 subroutine SetupWvel(w,dw,rho,mu,dt,A) !,mask)
   use module_grid
+
+      use module_hello
   use module_BC
   implicit none
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: w,dw,rho,mu
@@ -1131,6 +1178,8 @@ end subroutine SetupWvel
 !-------------------------------------------------------------------------------------------------
 subroutine LinearSolver(A,p,maxError,beta,maxit,it,ierr)
   use module_grid
+
+      use module_hello
   use module_BC
   implicit none
   include 'mpif.h'
@@ -1186,6 +1235,8 @@ end subroutine LinearSolver
 !-------------------------------------------------------------------------------------------------
 subroutine calcResidual(A,p, Residual)
   use module_grid
+
+      use module_hello
   use module_BC
   implicit none
   include 'mpif.h'

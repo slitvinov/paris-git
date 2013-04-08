@@ -1,4 +1,4 @@
-! Test file for VOF test case
+! Test file for implicit Solid test case
 ! 
 ! 4  grid points per dimension per domain
 ! 8  mpi processes
@@ -16,7 +16,7 @@
 
 TWOPHASE = T         ! TwoPhase: Is the flow two-phase?
 DoVOF 	  = T
-DoFront   = F
+DoFront   = T
 GetPropertiesFromFront = F ! T: uses Front-Tracking data to compute mu, rho and Surface Tension. 
 		           ! F: uses VOF data to compute mu and rho. 
 
@@ -27,18 +27,18 @@ restartFront = F   ! T: start the frontfrom  a previous simulation
 restartAverages = F
 nBackup = 100000   ! number of time steps between  backups are kept.
 
-NSTEP   = 100       ! maximum number of time steps
-EndTime = 1000.0     ! When to stop simulation
+NSTEP   = 2       ! maximum number of time steps
+EndTime = 1.0     ! When to stop simulation
 
-MaxDt   = 1e-1     ! maximum size of time step
-dtFlag  = 2        ! 1: fixed dt;  2: fixed CFL
-dt      = 1e-2     ! dt in case of dtFlag=1
-CFL     = 0.25
-MAXERROR= 1d-6     ! Residual for Poisson solver
+MaxDt   = 0.1  ! maximum size of time step
+dtFlag  = 1        ! 1: fixed dt;  2: fixed CFL
+dt      = 40.     ! dt in case of dtFlag=1
+CFL     = 0.9
+MAXERROR= 1d-4     ! Residual for Poisson solver
 MAXERRORVOL = 1d-4
                    ! Numerical parameters
 
-ITIME_SCHEME = 2   ! time scheme: 1:first order Euler, 2: second order TVD Runge-Kutta
+ITIME_SCHEME = 1   ! time scheme: 1:first order Euler, 2: second order quasi Crank-Nicolson
                    ! Should use first order Euler for Stokes flow ! ! ! 
 MAXIT    = 20
 BETA     = 1.2
@@ -47,12 +47,10 @@ BETA     = 1.2
 !=================================================================================================
 ! Output parameters
 
-NOUT    = 2       ! flush the solution every nout time steps
-output_format = 2  ! 1:tecplot 2:vtk
-
-out_path = 'out'     ! name of the output directory
-
-ICOut   = F        ! output initial condition
+ICOut    = F        ! output initial condition
+NOUT     = 100      ! write the solution to file every nout time steps
+output_format = 2   ! 1:tecplot 2:vtk
+out_path = 'out'    ! name of the output directory
 
 nstats   = 20       ! number of time steps between flow statistics calculations
 
@@ -89,37 +87,30 @@ z_file   = 'zh.dat'
 !=================================================================================================
 ! Flow parameters
 
-GX      = 0.0
+GX      = 1.0
 GY      = 0.0
 GZ      = 0.0
                    ! Components of the gravity in x,y,z direction
-
-BDRY_COND = 1    1    1   1   1  1
-                   !Type of boundary condition in x,y,z direction: 0:wall  1:periodic  2:shear
-                   !x- y- z- x+ y+ z+
 
 dPdX      = 0.0
 dPdY      = 0.0
 dPdZ      = 0.0
                    ! Px, Py, Pz: pressure gradients in case of pressure driven channel flow
                    ! Px = (P(xLength)-P(0))/xLength
+BDRY_COND = 1    0    1   1   0   1
+                   !Type of boundary condition in x,y,z direction: 0:wall  1:periodic  2:shear
+                   !x- y- z- x+ y+ z+
 
-RHO1    = 1.0
-MU1     = 1.0
-                   ! rho1, mu1 : density and viscosity of the matrix phase
+RHO1     = 1.0
+MU1      = 1.0
+                    ! rho1, mu1 : density and viscosity of the matrix phase
 
-RHO2    = 1.0
-MU2     = 1.0
-                   ! rho2, mu2 : properties of the drop
+RHO2     = 1.0
+MU2      = 1.0
+SIGMA    = 0.       ! rho2, mu2, sigma : properties of the drop and surface tension
+                   
 
-NumBubble =  1
-                   ! number of bubbles
-
-xyzrad(1, 1)  = 0.5 
-xyzrad(2, 1)  = 0.5 
-xyzrad(3, 1)  = 0.5 
-xyzrad(4, 1)  = 0.25
-                   ! Initial bubble size and location
+NumBubble = 0      !number of bubbles
 
 MaxPoint = 2000000
 MaxElem  = 4000000

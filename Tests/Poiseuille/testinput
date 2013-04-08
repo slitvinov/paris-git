@@ -20,27 +20,26 @@ DoFront   = T
 GetPropertiesFromFront = T ! T: uses Front-Tracking data to compute mu, rho and Surface Tension. 
 		           ! F: uses VOF data to compute mu and rho. 
 
-Implicit  = T     
+Implicit = T     
 hypre    = T       ! T: uses hyprepackage, F: uses SOR solver 
 restart  = F       ! T: start the domain from a previous simulation
 restartFront = F   ! T: start the frontfrom  a previous simulation
 restartAverages = F
 nBackup = 100000   ! number of time steps between  backups are kept.
 
-NSTEP   = 1000     ! maximum number of time steps
+NSTEP   = 2    ! maximum number of time steps
 EndTime = 2000.0   ! When to stop simulation
 
-MaxDt   = 1.e-3    ! maximum size of time step
-dtFlag  = 2        ! 1: fixed dt;  2: fixed CFL
-dt      = 1e-2     ! dt in case of dtFlag=1
+MaxDt   = 0.1  ! maximum size of time step
+dtFlag  = 1        ! 1: fixed dt;  2: fixed CFL
+dt      = 40.     ! dt in case of dtFlag=1
 CFL     = 0.9
 MAXERROR= 1d-4     ! Residual for Poisson solver
 MAXERRORVOL = 1d-4
                    ! Numerical parameters
 
-ITIME_SCHEME = 2
-                   ! time scheme: 1:first order Euler, 2: second order quasi Crank-Nicolson
-
+ITIME_SCHEME = 1   ! time scheme: 1:first order Euler, 2: second order quasi Crank-Nicolson
+                   ! Should use first order Euler for Stokes flow ! ! ! 
 MAXIT    = 20
 BETA     = 1.2
                     ! parameters for linear solver
@@ -73,6 +72,7 @@ Ng       = 2
 read_x   = F       ! read the grid file for x-grid; If true xLength and xform are neglected
 read_y   = F
 read_z   = F
+
 x_file   = 'xh.dat'	! input file for xh (Nx+1 points)
 y_file   = 'yh.dat'
 z_file   = 'zh.dat'
