@@ -1,7 +1,7 @@
 #--------- paris-ParisSimulator main Makefile --------------------------
 
 # babbage
-OMPI_FC=gfortran44
+# OMPI_FC=gfortran44
 
 FC = mpif90
 
@@ -30,7 +30,7 @@ OBJC = compare.o
 SRC = $(wildcard  *.f90) 
 
 install: $(OBJ)
-	@echo compiler is FC = $(FC), mpi override is OMPI_FC = $(OMPI_FC)
+#	@echo compiler is FC = $(FC), mpi override is OMPI_FC = $(OMPI_FC)
 	$(FC) -o paris $(FOPTS) $(OBJ) $(FOBJ) $(HYPRE_LIBS) 
 	@if [ ! -d $(BINDIR) ] ; then echo "directory bin does not exist creating it" ; mkdir $(BINDIR) ; fi 
 	mv paris $(BINDIR)/paris	
@@ -46,11 +46,12 @@ distclean: clean
 	@rm -fR  session* *.xml TAGS tags input
 
 test:  install compare
-	@cd Tests; ./runtests.sh
+	@echo "This test takes approximately 1 minute on a 4-core intel i7 MacBookPro"
+	@cd Tests; chmod +x ./runtests.sh; ./runtests.sh
 
 # single processor test
 minitest: install
-	cd Tests/Mini; ./run.sh
+	@cd Tests/Mini; chmod +x ./run.sh; ./run.sh
 
 tags:	$(SRC)
 # @SZ Create a tags file named TAGS for use by emacs
