@@ -22,9 +22,9 @@
 ! Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
 ! 02111-1307, USA.  
 !=================================================================================================
-! module_solids: Contains definition of variables for the solids.
+! module_solid: Contains definition of variables for the solids.
 !-------------------------------------------------------------------------------------------------
-module module_solids
+module module_solid
   use module_grid
   use module_flow
   use module_IO
@@ -32,6 +32,7 @@ module module_solids
   implicit none
   real(8), dimension(:,:,:), allocatable :: solids
   logical :: dosolids = .false.
+  character(20) :: solid_type
   integer il,ih,jl,jh,kl,kh
   integer :: solid_opened=0 
 !***********************************************************************
@@ -46,12 +47,12 @@ contains
 
     if(solid_opened==0) then
        OPEN(UNIT=89,FILE='solid.visit')
-       write(89,10) numProcess
+       write(89,10) nPdomain
 10     format('!NBLOCKS ',I4)
        solid_opened=1
     endif
 
-    do prank=0,numProcess-1
+    do prank=0,NpDomain-1
        write(89,11) rootname//TRIM(int2text(prank,padding))//'.vtk'
  11 format(A)
     enddo
@@ -66,87 +67,123 @@ contains
     implicit none
     include 'mpif.h'
     integer :: i,j,k
-    real(8) :: ttt
-    real(8) :: xx,xy,xz,xl
+    real(8) :: s1
     integer :: ierr
     integer :: req(48),sta(MPI_STATUS_SIZE,48)
     
     call ReadSolidParameters
     if(dosolids) then
        allocate(solids(imin:imax,jmin:jmax,kmin:kmax))
+       solids=0.
+!       if(rank==0) print*, "***x ",x 
        do i=imin,imax; do j=jmin,jmax; do k=kmin,kmax; 
-          solids(i,j,k) = solid_func_CFC(x(i),y(j),z(k),xlength)
+          if(solid_type == 'CFC') then
+             s1 = solid_func_CFC(x(i),y(j),z(k),xlength) 
+          else if (solid_type == 'SingleSphere') then
+             s1 = solid_func_one_sphere(x(i),y(j),z(k),xlength) 
+          else if (solid_type == 'CFC1') then
+             s1 = solid_func_CFC1(x(i),y(j),z(k),xlength) 
+          else
+             stop 'invalid type'
+          endif
+          if(s1 > 0.) then
+             solids(i,j,k) = 1.d0
+          endif
        enddo; enddo; enddo
-       call output_solids(0,imin,imax,jmin,jmax,kmin,kmax)
-       if(rank==0) write(out,*)'solids initialized'
-       if(rank==0) write(6,*)  'solids initialized'
+!       if(rank==0) print*, "+++x ",x 
+
+       call output_solids(0,is,ie,js,je,ks,ke)
+       if(rank==0) write(out,*)'solids type ', solid_type, ' initialized'
+       if(rank==0) write(6,*)  'solids type ', solid_type, ' initialized'
        call ghost_x(solids,2,req(1:4));  call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
        call ghost_y(solids,2,req(1:4));  call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
        call ghost_z(solids,2,req(1:4));  call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
     endif
   END SUBROUTINE initialize_solids
   ! sphere definition function 
-  FUNCTION sphere_func(x,y,z,x0,y0,z0,radius)
+  FUNCTION sphere_func(x1,y1,z1,x0,y0,z0,radius)
     !***
     implicit none
-    real(8) sphere_func
-    real(8) x,y,z,x0,y0,z0,radius
-    sphere_func = -((x - x0)*(x - x0) + (y - y0)*(y - y0) + (z - z0)*(z - z0)) + radius*radius
+    real(8) :: sphere_func
+    real(8) , intent(in) :: x1,y1,z1,x0,y0,z0,radius
+    sphere_func = -((x1 - x0)*(x1 - x0) + (y1 - y0)*(y1 - y0) + (z1 - z0)*(z1 - z0)) + radius*radius
     return
   end function sphere_func
 
   ! example implicit solid definition function 
-  FUNCTION solid_func_one_sphere(x, y, z,boxL)
+  FUNCTION solid_func_one_sphere(x1, y1, z1,boxL)
     implicit none
-    real(8) solid_func_one_sphere
-    real(8) x,y,z,boxL
-    real(8) x0,y0,z0
-    real(8) radius
-    x0=0.;y0=0.;z0=0.
-    radius = 0.25*boxL
-    solid_func_one_sphere = sphere_func(x,y,z,x0,y0,z0,radius)
+    real(8) :: solid_func_one_sphere
+    real(8) , intent(in) :: x1,y1,z1,boxL
+    real(8) :: x0,y0,z0,x2,y2,z2
+    real(8) :: radius
+    x2 = x1/boxL
+    y2 = y1/boxL
+    z2 = z1/boxL
+    x0=0.5;y0=0.5;z0=0.5
+    radius = 0.45
+    solid_func_one_sphere = sphere_func(x2,y2,z2,x0,y0,z0,radius)
     return 
   end function  solid_func_one_sphere
+  ! Debuging CFC
+  FUNCTION solid_func_CFC1( x1,  y1,  z1,  boxL)
+    implicit none
+    intrinsic dmax1
+    real(8), intent(in) :: x1,  y1,  z1,  boxL
+    real(8) :: solid_func_CFC1, radius
+    real(8) :: x2, y2, z2, a , b, c
+    real(8) :: x0,y0,z0
+    !  rescale by boxL: no need 
+    x2 = x1/boxL
+    y2 = y1/boxL
+    z2 = z1/boxL
+    x0=0.5;y0=0.5;z0=0.5
+    radius = 0.45
+    solid_func_CFC1 =sphere_func(x2,y2,z2,x0,y0,z0,radius)
+    return 
+  end function solid_func_CFC1
 
   ! One basic CFC cell: one vertex + three faces
-  FUNCTION solid_func_CFC_scaled( x,  y,  z)
+  FUNCTION solid_func_CFC_scaled( x1,  y1,  z1)
     implicit none
-    !  intrinsic dmax1
-    real(8) solid_func_CFC_scaled
-    REAL(8)  x,y,z,a,b
-    real(8) radius 
+    intrinsic dmax1
+    real(8), intent(in) :: x1,  y1,  z1
+    real(8) :: solid_func_CFC_scaled
+    real(8) :: a,b,x2,y2,z2
+    real(8) :: radius 
     radius = 0.25*sqrt(2.d0)
+    x2=x1;y2=y1;z2=z1
     ! 1 lower vertex and x=0 face 
-    a = MAX(sphere_func(x,y,z,0.d0,0.d0,0.d0,radius),sphere_func(x,y,z,0.d0,0.5d0,0.5d0,radius))
-    b = MAX(sphere_func(x,y,z,0.5d0,0.d0,0.5d0,radius),sphere_func(x,y,z,0.5d0,0.5d0,0.d0,radius))
-    solid_func_CFC_scaled = MAX(a,b)
+    a  = DMAX1(sphere_func(x2,y2,z2,0.d0,0.d0,0.d0,radius),sphere_func(x2,y2,z2,0.d0,0.5d0,0.5d0,radius))
+    b = DMAX1(sphere_func(x2,y2,z2,0.5d0,0.d0,0.5d0,radius),sphere_func(x2,y2,z2,0.5d0,0.5d0,0.d0,radius))
+    solid_func_CFC_scaled =  DMAX1(a,b)
     return 
   end function solid_func_CFC_scaled
 
   ! One basic cube with CFC array and all vertices and faces 
-  FUNCTION solid_func_CFC( x,  y,  z,  boxL)
+  FUNCTION solid_func_CFC( x1,  y1,  z1,  boxL)
     implicit none
-    real(8) solid_func_CFC
-    real(8)  x,  y,  z,  boxL, a , b, c
-    !  rescale by boxL: no need 
-    x = x/boxL
-    y = y/boxL
-    z = z/boxL
-    !  printf("HAHAHAHA %g %g %g  %g \n",x,y,z,boxL)
-    !  stop
-    !  shift to lower left corner: no need ? (add shift variable later ? ) 
-    x = x+0.5 
-    y = y+0.5 
-    z = z+0.5 
+    intrinsic dmax1
+    real(8), intent(in) :: x1,  y1,  z1,  boxL
+    real(8) :: solid_func_CFC
+    real(8) ::  a,b,c,x2,y2,z2
+    !  rescale by boxL
+    x2 = x1/boxL
+    y2 = y1/boxL
+    z2 = z1/boxL
+    !  shift origin from lower left corner to center
+    x2 = x2+0.5 
+    y2 = y2+0.5 
+    z2 = z2+0.5 
     ! cells at root vertex and three first neighbors */
-    a = MAX(solid_func_CFC_scaled(x,y,z),solid_func_CFC_scaled(x-1.d0,y,z))
-    b = MAX(solid_func_CFC_scaled(x,y-1.d0,z),solid_func_CFC_scaled(x,y,z-1.d0))
-    a = MAX(a,b)
-! three next lower vertices 
-    c = MAX(solid_func_CFC_scaled(x-1.d0,y-1.d0,z-1.d0),solid_func_CFC_scaled(x-1.d0,y-1.d0,z))
-    b = MAX(solid_func_CFC_scaled(x,y-1.d0,z-1.d0),solid_func_CFC_scaled(x-1.d0,y,z-1.d0))
-    a = MAX(c,a)
-    solid_func_CFC = MAX(b,a)
+    a = DMAX1(solid_func_CFC_scaled(x2,y2,z2),solid_func_CFC_scaled(x2-1.d0,y2,z2))
+    b = DMAX1(solid_func_CFC_scaled(x2,y2-1.d0,z2),solid_func_CFC_scaled(x2,y2,z2-1.d0))
+    a = DMAX1(a,b)
+    ! three next lower vertices 
+    c = DMAX1(solid_func_CFC_scaled(x2-1.d0,y2-1.d0,z2-1.d0),solid_func_CFC_scaled(x2-1.d0,y2-1.d0,z2))
+    b = DMAX1(solid_func_CFC_scaled(x2,y2-1.d0,z2-1.d0),solid_func_CFC_scaled(x2-1.d0,y2,z2-1.d0))
+    a = DMAX1(c,a)
+    solid_func_CFC =  DMAX1(b,a)
     return 
   end function solid_func_CFC
 !***********************************************************************
@@ -168,7 +205,7 @@ contains
       include 'mpif.h'
       integer ierr,in
       logical file_is_there
-      namelist /solidparameters/ dosolids
+      namelist /solidparameters/ dosolids, solid_type
       in=1
       call MPI_COMM_RANK(MPI_COMM_WORLD, rank, ierr)
       inquire(file='inputsolids',exist=file_is_there)
@@ -270,4 +307,4 @@ contains
     if(rank==0) call close_solid_visit_file()
 end subroutine output_solids
 !***********************************************************************
-end module module_solids
+end module module_solid

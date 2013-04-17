@@ -209,7 +209,7 @@ module module_output_vof
   use module_IO
   use module_flow
   use module_grid
-  use module_solids
+  use module_solid
   use module_vof
   implicit none
   integer :: vof_opened=0;
@@ -222,12 +222,12 @@ contains
 
     if(vof_opened==0) then
        OPEN(UNIT=88,FILE='vof.visit')
-       write(88,10) numProcess
+       write(88,10) nPdomain
 10     format('!NBLOCKS ',I4)
        vof_opened=1
     endif
 
-    do prank=0,numProcess-1
+    do prank=0,NpDomain-1
        write(88,11) rootname//TRIM(int2text(prank,padding))//'.vtk'
  11 format(A)
     enddo

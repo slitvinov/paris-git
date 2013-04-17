@@ -36,7 +36,7 @@
 module module_grid
   implicit none
   save
-  integer :: Nx, Ny, Nz, Ng ! Ng isnumber of ghost cells
+  integer :: Nx, Ny, Nz, Ng ! Ng is the number of ghost cells
   integer :: Nxt, Nyt, Nzt ! total number of cells
   integer :: is, ie, js, je, ks, ke
   integer :: ieu, jev, kew
@@ -80,11 +80,11 @@ module module_flow
   real(8), dimension(:,:,:), allocatable :: p, rho, rhoo, muold, mu, dIdx, dIdy, dIdz
   real(8), dimension(:,:,:), allocatable :: du,dv,dw,drho
   real(8), dimension(:,:), allocatable :: averages,oldaverages, allaverages
-  real(8) gx, gy, gz, mu1, mu2, r_avg, dt, dtFlag, rho_ave, p_ave, vdt
-  real(8) max_velocity, maxTime, Time, EndTime, MaxDt, CFL, mystats(16), stats(16)
+  real(8) :: gx, gy, gz, mu1, mu2, r_avg, dt, dtFlag, rho_ave, p_ave, vdt
+  real(8) :: max_velocity, maxTime, Time, EndTime, MaxDt, CFL, mystats(16), stats(16)
   logical :: TwoPhase, DoVOF, DoFront, Implicit, hypre, GetPropertiesFromFront
-
   real(8) :: rho1, rho2, s
+  real(8) :: U_init
 !  real(8) :: rad, xc, yc, zc
   real(8) :: dpdx, dpdy, dpdz, W_ave  !pressure gradients in case of pressure driven channel flow
   real(8) :: dpdx_stat, dpdy_stat, dpdz_stat
@@ -126,12 +126,12 @@ module module_IO
 
     if(opened==0) then
        OPEN(UNIT=90,FILE='parallel.visit')
-       write(90,10) numProcess
+       write(90,10) nPdomain
 10     format('!NBLOCKS ',I4)
        opened=1
     endif
 
-    do prank=0,numProcess-1
+    do prank=0,NpDomain-1
        write(90,11) rootname//TRIM(int2text(prank,padding))//'.vtk'
  11 format(A)
     enddo
@@ -184,8 +184,7 @@ end subroutine backup_write
 subroutine backup_read
   use module_flow
   use module_grid
-
-      use module_hello
+  use module_hello
   implicit none
   integer ::i,j,k,i1,i2,j1,j2,k1,k2,ierr
   OPEN(UNIT=7,FILE=trim(out_path)//'/backup_'//int2text(rank,3),status='old',action='read')
@@ -222,12 +221,11 @@ end subroutine output
 subroutine output1(nf,i1,i2,j1,j2,k1,k2)
   use module_flow
   use module_grid
-
-      use module_hello
+  use module_hello
 !  use module_tmpvar
   !use IO_mod
   implicit none
-  integer ::nf,i1,i2,j1,j2,k1,k2,i,j,k
+  integer :: nf,i1,i2,j1,j2,k1,k2,i,j,k
   logical, save :: first_time=.true.
   
   if(first_time)then
@@ -272,8 +270,7 @@ end subroutine output1
 subroutine output2(nf,i1,i2,j1,j2,k1,k2)
   use module_flow
   use module_grid
-
-      use module_hello
+  use module_hello
   !use IO_mod
   implicit none
   integer ::nf,i1,i2,j1,j2,k1,k2,i,j,k, itype=5
@@ -324,30 +321,6 @@ subroutine output2(nf,i1,i2,j1,j2,k1,k2)
 
     close(8)
 end subroutine output2
-!=================================================================================================
-!=================================================================================================
-! subroutine cminmax
-!   computes the min and max of some fields
-!   called in:    program main
-!-------------------------------------------------------------------------------------------------
-subroutine cminmax(var,umin_glob,umax_glob)
-  use module_grid
-
-      use module_hello
-  use module_flow
-  include 'mpif.h'
-  real(8) var(imin:imax,jmin:jmax,kmin:kmax)
-  real(8) umin, umax, umin_glob, umax_glob
-  integer i,j,k,ierr
-    ! calculate the min/max of u velocity
-    umin = -1d300 ; umax = 1.d300
-    do k=ks,ke;  do j=js,je;  do i=is,ie
-     if (var(i,j,k) < umax) umax = var(i,j,k)
-     if (var(i,j,k) > umin) umin = var(i,j,k)
-    enddo;  enddo;  enddo
-    call MPI_ALLREDUCE(umax, umax_glob, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_WORLD, ierr)
-    call MPI_ALLREDUCE(umin, umin_glob, 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_WORLD, ierr)
-end subroutine cminmax
 !-------------------------------------------------------------------------------------------------
 end module module_IO
 !=================================================================================================
@@ -356,8 +329,7 @@ end module module_IO
 !-------------------------------------------------------------------------------------------------
 module module_BC
   use module_grid
-
-      use module_hello
+  use module_hello
   implicit none
   integer :: bdry_cond(6)
   ! bdry_cond(i) = is the type if boundary condition in i'th direction
@@ -373,6 +345,7 @@ module module_BC
 ! subroutine SetPressureBC: Sets the pressure boundary condition
 !-------------------------------------------------------------------------------------------------
   subroutine SetPressureBC(density)
+    use module_grid
     implicit none
     include 'mpif.h'
     real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: density
@@ -392,6 +365,7 @@ module module_BC
       if(coords(3)==0    ) density(is-1:ie+1,js-1:je+1,ks-1)=Large
       if(coords(3)==nPz-1) density(is-1:ie+1,js-1:je+1,ke+1)=Large
     endif
+
   end subroutine SetPressureBC
 !=================================================================================================
 !=================================================================================================
@@ -399,8 +373,7 @@ module module_BC
 !-------------------------------------------------------------------------------------------------
   subroutine SetVelocityBC(u,v,w)
     use module_grid
-
-      use module_hello
+    use module_hello
     implicit none
     include 'mpif.h'
     real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: u, v, w
@@ -473,8 +446,7 @@ module module_BC
 !-------------------------------------------------------------------------------------------------
   subroutine SetVectorBC(fx,fy,fz)
     use module_grid
-
-      use module_hello
+    use module_hello
     implicit none
     include 'mpif.h'
     real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: fx, fy, fz
@@ -516,8 +488,7 @@ module module_BC
 !-------------------------------------------------------------------------------------------------
   subroutine ghost_x(F,ngh,req)
     use module_grid
-
-      use module_hello
+    use module_hello
     implicit none
     include 'mpif.h'
     integer, intent(in) :: ngh ! number of ghost cell layers to fill
@@ -528,7 +499,7 @@ module module_BC
     logical, save :: first_time=.true.
 
     if(ngh>Ng) stop 'ghost error: not enough ghost layers to fill'
-    if(first_time)then
+    if(first_time) then
       first_time=.false.
       jlen=jmax-jmin+1; klen=kmax-kmin+1; !ilen=ngh
       call para_type_block3a(imin, imax, jmin, jmax, 1, jlen, klen, MPI_DOUBLE_PRECISION, face(1))
@@ -546,8 +517,7 @@ module module_BC
 !-------------------------------------------------------------------------------------------------
   subroutine ghost_y(F,ngh,req)
     use module_grid
-
-      use module_hello
+    use module_hello
     implicit none
     include 'mpif.h'
     integer, intent(in) :: ngh
@@ -576,8 +546,7 @@ module module_BC
 !-------------------------------------------------------------------------------------------------
   subroutine ghost_z(F,ngh,req)
     use module_grid
-
-      use module_hello
+    use module_hello
     implicit none
     include 'mpif.h'
     integer, intent(in) :: ngh
@@ -608,8 +577,7 @@ module module_BC
 !-------------------------------------------------------------------------------------------------
   subroutine ghost_xAdd(F,ir1,is1,iwork,req)
     use module_grid
-
-      use module_hello
+    use module_hello
     use module_tmpvar
     implicit none
     include 'mpif.h'
@@ -640,8 +608,7 @@ module module_BC
 !-------------------------------------------------------------------------------------------------
   subroutine ghost_yAdd(F,jr1,js1,iwork,req)
     use module_grid
-
-      use module_hello
+    use module_hello
     use module_tmpvar
     implicit none
     include 'mpif.h'
@@ -911,8 +878,7 @@ END
 !-------------------------------------------------------------------------------------------------
 subroutine SetupDensity(dIdx,dIdy,dIdz,A,color) !,mask)
   use module_grid
-
-      use module_hello
+  use module_hello
   use module_BC
   implicit none
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: dIdx,dIdy,dIdz, color
@@ -964,7 +930,7 @@ subroutine SetupDensity(dIdx,dIdy,dIdz,A,color) !,mask)
         A(i,j,k,8) = float(floor(color(i,j,k)+0.5))
       endif
     enddo; enddo; enddo
-	endif
+ endif
 
 !  do k=ks,ke; do j=js,je; do i=is,ie
 !      A(i,j,k,7) = sum(A(i,j,k,1:6))
@@ -983,8 +949,7 @@ end subroutine SetupDensity
 !-------------------------------------------------------------------------------------------------
 subroutine SetupPoisson(utmp,vtmp,wtmp,rhot,dt,A) !,mask)
   use module_grid
-
-      use module_hello
+  use module_hello
   use module_BC
   implicit none
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: utmp,vtmp,wtmp,rhot
@@ -1015,8 +980,7 @@ end subroutine SetupPoisson
 !-------------------------------------------------------------------------------------------------
 subroutine SetupUvel(u,du,rho,mu,dt,A) !,mask)
   use module_grid
-
-      use module_hello
+  use module_hello
   use module_BC
   implicit none
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: u,du,rho,mu
@@ -1067,8 +1031,7 @@ end subroutine SetupUvel
 !=================================================================================================
 subroutine SetupVvel(v,dv,rho,mu,dt,A) !,mask)
   use module_grid
-
-      use module_hello
+  use module_hello
   use module_BC
   implicit none
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: v,dv,rho,mu
@@ -1122,8 +1085,7 @@ end subroutine SetupVvel
 !=================================================================================================
 subroutine SetupWvel(w,dw,rho,mu,dt,A) !,mask)
   use module_grid
-
-      use module_hello
+  use module_hello
   use module_BC
   implicit none
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: w,dw,rho,mu
@@ -1178,8 +1140,7 @@ end subroutine SetupWvel
 !-------------------------------------------------------------------------------------------------
 subroutine LinearSolver(A,p,maxError,beta,maxit,it,ierr)
   use module_grid
-
-      use module_hello
+  use module_hello
   use module_BC
   implicit none
   include 'mpif.h'
@@ -1192,7 +1153,7 @@ subroutine LinearSolver(A,p,maxError,beta,maxit,it,ierr)
   integer :: i,j,k
   integer :: req(12),sta(MPI_STATUS_SIZE,12)
   logical :: mask(imin:imax,jmin:jmax,kmin:kmax)
-!--------------------------------------ITTERATION LOOP--------------------------------------------  
+!--------------------------------------ITERATION LOOP--------------------------------------------  
   do it=1,maxit
     do k=ks,ke; do j=js,je; do i=is,ie
       p(i,j,k)=(1d0-beta)*p(i,j,k)+beta* 1d0/A(i,j,k,7)*(              &

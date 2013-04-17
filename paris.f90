@@ -50,7 +50,7 @@ Program paris
 
   use module_poisson
   use module_IO
-  use module_solids
+  use module_solid
   use module_vof
   use module_output_vof
   use module_hello
@@ -63,7 +63,9 @@ Program paris
   integer :: req(48),sta(MPI_STATUS_SIZE,48)
   logical, allocatable, dimension(:,:,:) :: mask
   INTEGER :: irank, ii, i, j, k
-
+  integer :: switch=1
+  real(8) :: Large=1e4
+  real(8) :: sphere
 !---------------------------------------INITIALIZATION--------------------------------------------
   ! Initialize MPI
   call MPI_INIT(ierr)
@@ -107,6 +109,7 @@ Program paris
 
   call initialize
   if(DoVOF) call initialize_VOF
+
   if(rank<nPdomain) call initialize_solids
 
   if(DoFront) call InitFront
@@ -119,7 +122,7 @@ Program paris
   if(HYPRE .and. rank==0) write(*  ,*)'hypre initialized'
   
   call InitCondition
-
+  if(U_init == 0.) stop "missing U_init"
   if(rank<nPdomain) then
 !-------------------------------------------------------------------------------------------------
 !------------------------------------------Begin domain-------------------------------------------
@@ -136,6 +139,7 @@ Program paris
         end_time =  MPI_WTIME()
         if(rank==0)write(out,'("Step: ",I10," dt=",es16.5e2," time=",es16.5e2)')itimestep,dt,time
         if(rank==0)write(*,'("Step:",I6," dt=",es16.5e2," time=",es16.5e2," cpu(s):",f11.3)')itimestep,dt,time,end_time-start_time
+
         if(itime_scheme==2) then
            uold = u
            vold = v
@@ -143,13 +147,14 @@ Program paris
            rhoo = rho
            muold  = mu
         endif
-        if(dosolids) then
-           u = u*(1.d0 -solids) 
-           v = v*(1.d0 -solids) 
-           w = w*(1.d0 -solids) 
-        endif
-        !------------------------------------ADVECTION & DIFFUSION----------------------------------------
+ !------------------------------------ADVECTION & DIFFUSION----------------------------------------
         do ii=1, itime_scheme
+
+           if(dosolids) then
+              u = u*(1.d0 -solids) 
+              v = v*(1.d0 -solids) 
+              w = w*(1.d0 -solids) 
+           endif
 
            if(TwoPhase.and.(.not.Getpropertiesfromfront)) then
               call linfunc(rho,rho1,rho2)
@@ -161,10 +166,12 @@ Program paris
            
            if(Implicit) then
               call momentumDiffusion(u,v,w,rho,mu,du,dv,dw)
+!              du=0.d0; dv=0.d0; dw=0.d0
            else
               call explicitMomDiff(u,v,w,rho,mu,du,dv,dw)
            endif
-           call momentumConvection(u,v,w,du,dv,dw)
+!           call momentumConvection(u,v,w,du,dv,dw)
+
            ! reset the surface tension force on the fixed grid
            fx = 0d0;    dIdx=0d0
            fy = 0d0;    dIdy=0d0
@@ -179,12 +186,14 @@ Program paris
               ! Send the updated front back
               call GetFront('send')
            endif
-           !------------------------------------VOF STUFF ---------------------------------------------------
+!------------------------------------VOF STUFF ---------------------------------------------------
            if(DoVOF) call vofsweeps(itimestep)
-           !------------------------------------END VOF STUFF------------------------------------------------          
+!------------------------------------END VOF STUFF------------------------------------------------ 
            call volumeForce(rho,rho1,rho2,dpdx,dpdy,dpdz,BuoyancyCase,fx,fy,fz,gx,gy,gz,du,dv,dw, &
                 rho_ave)
-
+           if(dosolids) then
+              du = du*(1.d0 - solids); dv = dv*(1.d0 - solids); dw = dw*(1.d0 - solids)
+           endif
            if(Implicit) then
               call SetupUvel(u,du,rho,mu,dt,A)
               call poi_solve(A,u(is:ie,js:je,ks:ke),maxError,maxit,it)
@@ -210,7 +219,16 @@ Program paris
 
 !-----------------------------------------PROJECTION STEP-----------------------------------------
            ! Compute source term and the coefficient do p(i,j,k)
-           tmp = rho
+!           if(dosolids) then
+!              tmp = rho*(1.d0 - solids) + Large*solids
+!           else
+              tmp = rho
+!           endif
+!           do k=kmin,kmax;  do j=jmin,jmax; do i=imin,imax
+!              tmp(i,j,k) = rho(i,j,k)*(1. - sphere(x(i),y(j),z(k))) + Large*sphere(x(i),y(j),z(k))
+!           enddo; enddo; enddo
+!           print*, "rank = ",rank,"tmp = ",tmp
+           
            call SetPressureBC(tmp)
            call SetupPoisson(u,v,w,tmp,dt,A)
            if(HYPRE)then
@@ -232,13 +250,11 @@ Program paris
               v(i,j,k)=v(i,j,k)-dt*(2.0/dyh(j))*(p(i,j+1,k)-p(i,j,k))/(rho(i,j+1,k)+rho(i,j,k))
            enddo; enddo; enddo
       
-           do k=ks,kew;  do j=js,je; do i=is,ie;   ! CORRECT THE v-velocity
+           do k=ks,kew;  do j=js,je; do i=is,ie;   ! CORRECT THE w-velocity
               w(i,j,k)=w(i,j,k)-dt*(2.0/dzh(k))*(p(i,j,k+1)-p(i,j,k))/(rho(i,j,k+1)+rho(i,j,k))
            enddo; enddo; enddo
-
            !--------------------------------------UPDATE COLOR---------------------------------------------
            if (TwoPhase)then
- !             if(GetPropertiesFromFront) then
                  call SetupDensity(dIdx,dIdy,dIdz,A,color)
                  if(hypre)then
                     call poi_solve(A,color(is:ie,js:je,ks:ke),maxError,maxit,it)
@@ -251,7 +267,6 @@ Program paris
                     color(i,j,k)=min(color(i,j,k),1d0)
                     color(i,j,k)=max(color(i,j,k),0d0)
                  enddo; enddo; enddo
-  !            endif
            endif
 
            call SetVelocityBC(u,v,w)
@@ -262,16 +277,16 @@ Program paris
            call ghost_z(u  ,2,req( 1: 4));  call ghost_z(v,2,req( 5: 8)); call ghost_z(w,2,req( 9:12)); 
            call ghost_z(color,1,req(13:16));  call MPI_WAITALL(16,req(1:16),sta(:,1:16),ierr)
            
-           !--------------------------------------UPDATE DENSITY/VISCOSITY------------------------------------
+!--------------------------------------UPDATE DENSITY/VISCOSITY------------------------------------
            if(TwoPhase) then
               if(GetPropertiesFromFront) then
                  rho = rho2 + (rho1-rho2)*color
                  mu  = mu2  + (mu1 -mu2 )*color
               else
-           !------------------------------------deduce rho, mu from cvof-------------------------------------
+!------------------------------------deduce rho, mu from cvof-------------------------------------
                  call linfunc(rho,rho1,rho2)
                  call linfunc(mu,mu1,mu2)
-           !------------------------------------END VOF STUFF------------------------------------------------
+!------------------------------------END VOF STUFF------------------------------------------------
               endif
            endif
 
@@ -302,7 +317,7 @@ Program paris
               !        write(121,'("Step:",I10," dt=",es16.5e2," time=",es16.5e2)')itimestep,dt,time
               !        write(121,'("            Iterations:",I7," cpu(s):",f10.2)')it,end_time-start_time
               !        close(121)
-              open(unit=121,file='stats',access='append')
+                open(unit=121,file='stats',access='append')
               write(121,'(20es14.6e2)')time,stats(1:12),dpdx,(stats(8)-stats(9))/dt,end_time-start_time
               close(121)
            endif
@@ -343,7 +358,7 @@ Program paris
         call CalcVolume
         if(mod(itimestep,nsmooth)==0) call CorrectVolume
         print*,'Finished volume correction'
-        !--------------------------------------------OUTPUT-----------------------------------------------
+!--------------------------------------------OUTPUT-----------------------------------------------
         if(mod(itimestep,nout)==0)call print_fronts(ITIMESTEP/nout,time)
         if(mod(itimestep,nbackup)==0)call backup_front_write(time,iTimeStep)
         if(mod(itimestep,nstats)==0)then
@@ -361,9 +376,9 @@ Program paris
 !--------------- END OF MAIN TIME LOOP ----------------------------------------------------------
   if(rank==0) then 
      if(output_format==2) call close_visit_file()
-     call close_VOF_visit_file()
+     if(DoVOF) call close_VOF_visit_file()
   endif
-!--------------- END OF MAIN TIME LOOP ----------------------------------------------------------
+
   if(rank<nPdomain)  call output_at_location()
   if(HYPRE) call poi_finalize
   call MPI_BARRIER(MPI_COMM_WORLD, ierr)
@@ -411,6 +426,8 @@ subroutine calcStats
   mystats(1:9)=0d0
   do k=ks,ke;  do j=js,je;  do i=is,ie
     vol = dx(i)*dy(j)*dz(k)
+!@@@    print *, "vol=",rank,vol
+! Average u component
     mystats(2)=mystats(2)+u(i,j,k)*vol
     mystats(3)=mystats(3)+fx(i,j,k)*dxh(i)*dy(j)*dz(k)
     mystats(4)=mystats(4)+fy(i,j,k)*dx(i)*dyh(j)*dz(k)
@@ -436,10 +453,12 @@ subroutine calcStats
   call MPI_ALLREDUCE(mystats(1), stats(1), 16, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_Domain, ierr)
   rho_ave = stats(6)
   p_ave = stats(7)
-  if(stats(2).ne.stats(2))stop"********** Invalid flow rate **********"
+! This stops the code in case the average velocity (stats(2)) becomes NaN.
+  if(stats(2).ne.stats(2)) stop "********** Invalid flow rate **********"
   W_int = W_int + dt*(stats(2)-1d0)
   dpdx_stat = 1.0d0*(stats(2)-1d0) + 0.2d0*W_int
   !dpdz_stat = min(max(dpdz_stat,-2),2)
+  ! time averages
   averages(1,:)=averages(1,:)+dt
   do k=ks,ke;  do j=js,je;  do i=is,ie
     Vdt = dx(i)*dy(j)*dz(k)*dt
@@ -614,7 +633,6 @@ subroutine momentumDiffusion(u,v,w,rho,mu,du,dv,dw)
 !-------------------------------------PREDICTED v-velocity-DIFFUSION------------------------------
   do k=ks,ke; do j=js,jev; do i=is,ie
     dv(i,j,k)= ( & ! dv(i,j,k)+(   &
-
       (1./dx(i))*( 0.25*(mu(i,j,k)+mu(i+1,j,k)+mu(i+1,j+1,k)+mu(i,j+1,k))*               &
          ( (1./dyh(j))*(u(i,j+1,k)-u(i,j,k)) ) -      &
                    0.25*(mu(i,j,k)+mu(i,j+1,k)+mu(i-1,j+1,k)+mu(i-1,j,k))*               &
@@ -701,8 +719,8 @@ end subroutine explicitMomDiff
 !-------------------------------------------------------------------------------------------------
 subroutine volumeForce(rho,rho1,rho2,dpdx,dpdy,dpdz,BuoyancyCase,fx,fy,fz,gx,gy,gz,du,dv,dw, &
                        rho_ave)
+!  use module_solid
   use module_grid
-  use module_hello
   implicit none
   integer, intent(in) :: BuoyancyCase
   real(8), intent(in) :: gx,gy,gz,rho1,rho2, dpdx, dpdy, dpdz, rho_ave
@@ -726,16 +744,20 @@ subroutine volumeForce(rho,rho1,rho2,dpdx,dpdy,dpdz,BuoyancyCase,fx,fy,fz,gx,gy,
     fx(i,j,k)=fx(i,j,k)-dpdx+(0.5*(rho(i+1,j,k)+rho(i,j,k))-rro)*gx
     du(i,j,k)=du(i,j,k) + fx(i,j,k)/(0.5*(rho(i+1,j,k)+rho(i,j,k)))
   enddo; enddo; enddo
-
+!  du = du*(1.d0 - solids)
+  
   do k=ks,ke;  do j=js,jev; do i=is,ie
     fy(i,j,k)=fy(i,j,k)-dpdy+(0.5*(rho(i,j+1,k)+rho(i,j,k))-rro)*gy
     dv(i,j,k)=dv(i,j,k) + fy(i,j,k)/(0.5*(rho(i,j+1,k)+rho(i,j,k)))
   enddo; enddo; enddo
+!  dv = dv*(1.d0 - solids)
 
   do k=ks,kew;  do j=js,je; do i=is,ie
     fz(i,j,k)=fz(i,j,k)-dpdz+(0.5*(rho(i,j,k+1)+rho(i,j,k))-rro)*gz
     dw(i,j,k)=dw(i,j,k) + fz(i,j,k)/(0.5*(rho(i,j,k+1)+rho(i,j,k)))
   enddo; enddo; enddo
+!  dw = dw*(1.d0 - solids)
+
 end subroutine volumeForce
 !=================================================================================================
 !=================================================================================================
@@ -755,24 +777,24 @@ subroutine initialize
   integer :: ierr, i,j,k
   Nxt=Nx+2*Ng; Nyt=Ny+2*Ng; Nzt=Nz+2*Ng ! total number of cells
 
+ 
   if(rank<nPdomain)then
     allocate(dims(ndim),periodic(ndim),reorder(ndim),coords(ndim),STAT=ierr)
     dims(1) = nPx; dims(2) = nPy; dims(3) = nPz
-
+    
+    reorder = 1
     periodic = 0; 
     do i=1,ndim 
-!    periodic = (bdry_cond==1)
        if (bdry_cond(i) == 1) then
           periodic(i) = 1
           if (bdry_cond(i+3) /= 1) then
              if(rank==0) print*,  "inconsistent boundary conditions"
-             stop
              call MPI_BARRIER(MPI_COMM_WORLD, ierr)
              call MPI_finalize(ierr)
+             stop
           endif
        endif
     enddo
-    reorder = 1
 
     call MPI_Cart_Create(MPI_Comm_Domain,ndim,dims,periodic,reorder,MPI_Comm_Cart,ierr)
     if (ierr /= 0) STOP '*** Grid: unsuccessful Cartesian MPI-initialization'
@@ -904,8 +926,9 @@ subroutine InitCondition
         ! Set velocities and the color function. 
         ! The color function is used for density and viscosity in the domain 
         ! when set by Front-Tracking.
-        color = 0.; u = 1.;  v = 0;  w = 0.
+        color = 0.; u = U_init;  v = 0;  w = 0.
      endif
+
      if(DoFront) then
         call GetFront('recv')
         call GetFront('wait')
@@ -926,7 +949,6 @@ subroutine InitCondition
            color(i,j,k)=max(color(i,j,k),0d0)
         enddo; enddo; enddo
      endif
-
      if(TwoPhase) then
         if(GetPropertiesFromFront) then
            rho = rho2 + (rho1-rho2)*color
@@ -946,7 +968,7 @@ subroutine InitCondition
      enddo;  enddo;  enddo
      my_ave = my_ave/(xLength*yLength*zLength)
      call MPI_ALLREDUCE(my_ave, rho_ave, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_Domain, ierr)
-     !----------------------------------------------Front----------------------------------------------
+ !----------------------------------------------Front----------------------------------------------
   elseif((rank==nPdomain).and.DoFront)then
      if(restartFront)then
         call backup_front_read(time,iTimeStep)
@@ -958,10 +980,12 @@ subroutine InitCondition
         write(*,'(3f20.10)') FrontProps(:,1)
         FrontProps(2,1:NumBubble) = FrontProps(1,1:NumBubble)
      endif
+
      call CalcSurfaceTension
      do irank=0,nPdomain-1
         call DistributeFront(irank,'send') !,request(1:2,irank))
      enddo
+
   endif
   !---------------------------------------------End Front----------------------------------------------
 
@@ -1044,12 +1068,18 @@ function int2text(number,length)
   integer :: number, length, i
   character(len=length) :: int2text
   character, dimension(0:9) :: num = (/'0', '1', '2', '3', '4', '5', '6', '7', '8', '9'/)
-  if(number>=10**length)stop 'int2text error: not enough large string'
+  if(number>=10**length)stop 'int2text error: string is not large enough'
   do i=1,length
     int2text(length+1-i:length+1-i) = num(mod(number/(10**(i-1)),10))
   enddo
 end function
 !=================================================================================================
+function sphere(x,y,z)
+  real(8) :: sphere
+  real(8) :: x,y,z
+  sphere=0.d0
+  if(x*x + y*y + z*z < 0.09) sphere=1.d0
+end function
 !=================================================================================================
 ! subroutine ReadParameters
 !   Reads the parameters in "input" file for the calculation
@@ -1075,7 +1105,7 @@ subroutine ReadParameters
                         nPy,           nPz,           amin,          amax,          aspmax,      &
                         MaxPoint,      MaxElem,       MaxFront,      xform,         yform,       &
                         zform,         dt,            nregrid,       GetPropertiesFromFront,     &
-                        DoVOF,         DoFront,       Implicit,                                  &
+                        DoVOF,         DoFront,       Implicit,      U_init,                     &
                         CFL,           EndTime,       MaxDt,         smooth,        nsmooth,     &
                         output_format, read_x,        read_y,        read_z,        x_file,      &
                         y_file,        z_file,        restart,       nBackup,       NumBubble,   &

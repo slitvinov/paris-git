@@ -1,12 +1,24 @@
 #!/bin/bash
-#set -x
+set -x
 
-echo running test in `pwd`
+rm -fr input out stats tmpout
 
-rm -fR out input
-ln -s testinput.solid input
+if [ $# -gt 0 ] ; then
+    if [ $1 == "exp" ] ; then
+	ln -s testinput.explicit input
+	mpirun -np 9 paris > tmpout
+    elif [ $1 == "mono" ] ; then
+	ln -s testinput.mono input
+	paris > tmpout
+    else
+	echo "$0: invalid option " $1
+	exit 1
+    fi
+else
+    ln -s testinput.solid input
+    mpirun -np 9 paris > tmpout
+fi 
 
-mpirun -np 9 paris
 
 NORMAL="\\033[0;39m"
 GREEN="\\033[1;32m"

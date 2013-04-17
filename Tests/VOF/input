@@ -43,6 +43,7 @@ ITIME_SCHEME = 2   ! time scheme: 1:first order Euler, 2: second order TVD Runge
 MAXIT    = 20
 BETA     = 1.2
                     ! parameters for linear solver
+U_init   = 1.d0
 
 !=================================================================================================
 ! Output parameters
