@@ -1,7 +1,7 @@
 &SOLIDPARAMETERS
 
 dosolids = T
-solid_type ='CFC'
+solid_type ='SingleSphere'
 
 !=================================================================================================
 

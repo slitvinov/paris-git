@@ -150,12 +150,6 @@ Program paris
  !------------------------------------ADVECTION & DIFFUSION----------------------------------------
         do ii=1, itime_scheme
 
-           if(dosolids) then
-              u = u*(1.d0 -solids) 
-              v = v*(1.d0 -solids) 
-              w = w*(1.d0 -solids) 
-           endif
-
            if(TwoPhase.and.(.not.Getpropertiesfromfront)) then
               call linfunc(rho,rho1,rho2)
               call linfunc(mu,mu1,mu2)
@@ -165,7 +159,8 @@ Program paris
            if(DoFront) call GetFront('recv')
            
            if(Implicit) then
-              call momentumDiffusion(u,v,w,rho,mu,du,dv,dw)
+              call momentumDiffusion(u,v,w,rho,mu,du,dv,dw)   ! nabla u^T . nabla mu_n   ???
+                                                              ! or \nabla ( mu \nabla u^T ) ???
 !              du=0.d0; dv=0.d0; dw=0.d0
            else
               call explicitMomDiff(u,v,w,rho,mu,du,dv,dw)
@@ -191,10 +186,10 @@ Program paris
 !------------------------------------END VOF STUFF------------------------------------------------ 
            call volumeForce(rho,rho1,rho2,dpdx,dpdy,dpdz,BuoyancyCase,fx,fy,fz,gx,gy,gz,du,dv,dw, &
                 rho_ave)
-           if(dosolids) then
-              du = du*(1.d0 - solids); dv = dv*(1.d0 - solids); dw = dw*(1.d0 - solids)
-           endif
-           if(Implicit) then
+!           if(dosolids) then
+!              du = du*(1.d0 - solids); dv = dv*(1.d0 - solids); dw = dw*(1.d0 - solids)
+!           endif
+           if(Implicit) then    ! mu \laplacian u_*  ??? as in Gerris ???
               call SetupUvel(u,du,rho,mu,dt,A)
               call poi_solve(A,u(is:ie,js:je,ks:ke),maxError,maxit,it)
            
@@ -219,16 +214,16 @@ Program paris
 
 !-----------------------------------------PROJECTION STEP-----------------------------------------
            ! Compute source term and the coefficient do p(i,j,k)
-!           if(dosolids) then
-!              tmp = rho*(1.d0 - solids) + Large*solids
-!           else
+           if(dosolids) then
+              tmp = rho*(1.d0 - solids) + Large*solids
+           else
               tmp = rho
-!           endif
+           endif
 !           do k=kmin,kmax;  do j=jmin,jmax; do i=imin,imax
 !              tmp(i,j,k) = rho(i,j,k)*(1. - sphere(x(i),y(j),z(k))) + Large*sphere(x(i),y(j),z(k))
 !           enddo; enddo; enddo
 !           print*, "rank = ",rank,"tmp = ",tmp
-           
+      
            call SetPressureBC(tmp)
            call SetupPoisson(u,v,w,tmp,dt,A)
            if(HYPRE)then
