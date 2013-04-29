@@ -131,6 +131,10 @@ Program paris
      ! output initial condition
      if(ICOut .and. rank<nPdomain)call output(0,is,ie+1,js,je+1,ks,ke+1)
      if(rank==0) start_time = MPI_WTIME()
+     
+     call write_vec_gnuplot(u,v,w,itimestep)
+
+
 !-----------------------------------------MAIN TIME LOOP------------------------------------------
      do while(time<EndTime .and. itimestep<nstep)
         if(dtFlag==2)call TimeStepSize(dt)
@@ -158,14 +162,16 @@ Program paris
            ! Receive front from master of front
            if(DoFront) call GetFront('recv')
            
+           if(dosolids) call solidzero(u,v,w,solids)
            if(Implicit) then
-              call momentumDiffusion(u,v,w,rho,mu,du,dv,dw)   ! nabla u^T . nabla mu_n   ???
-                                                              ! or \nabla ( mu \nabla u^T ) ???
-!              du=0.d0; dv=0.d0; dw=0.d0
+              call momentumDiffusion(u,v,w,rho,mu,du,dv,dw)  
            else
               call explicitMomDiff(u,v,w,rho,mu,du,dv,dw)
            endif
-!           call momentumConvection(u,v,w,du,dv,dw)
+           if(dosolids) call solidzero(u,v,w,solids)
+           call momentumConvection(u,v,w,du,dv,dw)
+           if(dosolids) call solidzero(u,v,w,solids)
+           
 
            ! reset the surface tension force on the fixed grid
            fx = 0d0;    dIdx=0d0
@@ -186,23 +192,40 @@ Program paris
 !------------------------------------END VOF STUFF------------------------------------------------ 
            call volumeForce(rho,rho1,rho2,dpdx,dpdy,dpdz,BuoyancyCase,fx,fy,fz,gx,gy,gz,du,dv,dw, &
                 rho_ave)
-!           if(dosolids) then
-!              du = du*(1.d0 - solids); dv = dv*(1.d0 - solids); dw = dw*(1.d0 - solids)
-!           endif
-           if(Implicit) then    ! mu \laplacian u_*  ??? as in Gerris ???
-              call SetupUvel(u,du,rho,mu,dt,A)
-              call poi_solve(A,u(is:ie,js:je,ks:ke),maxError,maxit,it)
+           if(dosolids.and..not.implicit) then
+              du = du*(1.d0 - solids); dv = dv*(1.d0 - solids); dw = dw*(1.d0 - solids)
+           endif
+           if(Implicit) then   
+              call SetupUvel(u,du,rho,mu,dt,A,solids)
+              if(hypre)then
+                 call poi_solve(A,u(is:ie,js:je,ks:ke),maxError,maxit,it)
+              else
+                 call LinearSolver(A,u,maxError,beta,maxit,it,ierr)
+                 if(rank==0)write(*  ,'("              density  iterations:",I9)')it
+              endif
            
-              call SetupVvel(v,dv,rho,mu,dt,A)
-              call poi_solve(A,v(is:ie,js:je,ks:ke),maxError,maxit,it)
+              call SetupVvel(v,dv,rho,mu,dt,A,solids)
+              if(hypre)then
+                 call poi_solve(A,v(is:ie,js:je,ks:ke),maxError,maxit,it)
+              else
+                 call LinearSolver(A,v,maxError,beta,maxit,it,ierr)
+                 if(rank==0)write(*  ,'("              density  iterations:",I9)')it
+              endif
 
-              call SetupWvel(w,dw,rho,mu,dt,A)
-              call poi_solve(A,w(is:ie,js:je,ks:ke),maxError,maxit,it)
+              call SetupWvel(w,dw,rho,mu,dt,A,solids)
+              if(hypre)then
+                 call poi_solve(A,w(is:ie,js:je,ks:ke),maxError,maxit,it)
+              else
+                 call LinearSolver(A,w,maxError,beta,maxit,it,ierr)
+                 if(rank==0)write(*  ,'("              density  iterations:",I9)')it
+              endif
            else
               u = u + dt * du
               v = v + dt * dv
               w = w + dt * dw
+              if(dosolids) call solidzero(u,v,w,solids)
            endif
+           call write_vec_gnuplot(u,v,w,itimestep)
            call SetVelocityBC(u,v,w)
            
            call ghost_x(u  ,2,req( 1: 4));  call ghost_x(v,2,req( 5: 8)); call ghost_x(w,2,req( 9:12)) 
@@ -213,17 +236,14 @@ Program paris
            call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
 
 !-----------------------------------------PROJECTION STEP-----------------------------------------
-           ! Compute source term and the coefficient do p(i,j,k)
-           if(dosolids) then
-              tmp = rho*(1.d0 - solids) + Large*solids
-           else
-              tmp = rho
-           endif
-!           do k=kmin,kmax;  do j=jmin,jmax; do i=imin,imax
-!              tmp(i,j,k) = rho(i,j,k)*(1. - sphere(x(i),y(j),z(k))) + Large*sphere(x(i),y(j),z(k))
-!           enddo; enddo; enddo
-!           print*, "rank = ",rank,"tmp = ",tmp
-      
+           ! Compute the coefficient of grad p(i,j,k)
+ !          if(dosolids) then
+ !             tmp = rho*(1.d0 - solids) + Large*solids
+!           else
+           tmp = rho
+!           endif
+
+           if(dosolids.and..not.implicit) call solidzero(u,v,w,solids)
            call SetPressureBC(tmp)
            call SetupPoisson(u,v,w,tmp,dt,A)
            if(HYPRE)then
@@ -248,6 +268,8 @@ Program paris
            do k=ks,kew;  do j=js,je; do i=is,ie;   ! CORRECT THE w-velocity
               w(i,j,k)=w(i,j,k)-dt*(2.0/dzh(k))*(p(i,j,k+1)-p(i,j,k))/(rho(i,j,k+1)+rho(i,j,k))
            enddo; enddo; enddo
+
+
            !--------------------------------------UPDATE COLOR---------------------------------------------
            if (TwoPhase)then
                  call SetupDensity(dIdx,dIdy,dIdz,A,color)
@@ -1142,3 +1164,55 @@ subroutine ReadParameters
 end subroutine ReadParameters
 !=================================================================================================
 !=================================================================================================
+subroutine solidzero(u,v,w,solids)
+  use module_grid
+  implicit none
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: u, v, w
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: solids
+     u= u*(1.d0 -solids) 
+     v= v*(1.d0 -solids) 
+     w= w*(1.d0 -solids)
+end subroutine solidzero
+
+subroutine write_vec_gnuplot(u,v,w,iout)
+  use module_grid
+  use module_IO
+  implicit none
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: u, v, w
+  integer, intent(in) :: iout
+  integer :: i,j,k
+  real(8) :: norm=0.d0, coeff
+
+  intrinsic dsqrt
+
+  OPEN(UNIT=89,FILE='UV-'//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout,padding))//'.txt')
+
+  norm=0.d0
+  k=nz/2
+  do i=imin,imax; do j=jmin,jmax
+     norm = norm + u(i,j,k)**2 + v(i,j,k)**2
+  enddo; enddo
+  norm = dsqrt(norm/(jmax-jmin+1)*(imax-imin+1))
+  coeff = 8./norm
+  print *," norm, rank ",norm,rank
+  do i=is,ie; do j=js,je
+     write(89,310) x(i),y(j),coeff*dx(i)*u(i,j,k),coeff*dx(i)*v(i,j,k)
+  enddo; enddo
+  close(unit=89)
+310 format(e14.5,e14.5,e14.5,e14.5)
+end subroutine  write_vec_gnuplot
+
+subroutine solidzero2(u,v,w,solids)
+  use module_grid
+  implicit none
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: u, v, w
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: solids
+  integer :: i,j,k
+  
+  do i=imin,imax; do j=jmin,jmax; do k=kmin,kmax
+     u(i,j,k)= u(i,j,k)*(1.d0 -solids(i,j,k)) 
+     v(i,j,k)= v(i,j,k)*(1.d0 -solids(i,j,k)) 
+     w(i,j,k)= w(i,j,k)*(1.d0 -solids(i,j,k))
+  enddo; enddo; enddo
+
+end subroutine solidzero2

@@ -83,6 +83,7 @@ module module_flow
   real(8) :: gx, gy, gz, mu1, mu2, r_avg, dt, dtFlag, rho_ave, p_ave, vdt
   real(8) :: max_velocity, maxTime, Time, EndTime, MaxDt, CFL, mystats(16), stats(16)
   logical :: TwoPhase, DoVOF, DoFront, Implicit, hypre, GetPropertiesFromFront
+  logical :: dosolids = .false.
   real(8) :: rho1, rho2, s
   real(8) :: U_init
 !  real(8) :: rad, xc, yc, zc
@@ -978,14 +979,17 @@ end subroutine SetupPoisson
 ! A7*Uijk = A1*Ui-1jk + A2*Ui+1jk + A3*Uij-1k + 
 !           A4*Uij+1k + A5*Uijk-1 + A6*Uijk+1 + A8
 !-------------------------------------------------------------------------------------------------
-subroutine SetupUvel(u,du,rho,mu,dt,A) !,mask)
+subroutine SetupUvel(u,du,rho,mu,dt,A,solids) !,mask)
   use module_grid
   use module_hello
   use module_BC
+
   implicit none
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: u,du,rho,mu
   real(8), dimension(is:ie,js:je,ks:ke,8), intent(out) :: A
 !  logical, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: mask
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: solids
+  real(8) :: Large=1e20
   real(8) :: dt, rhom
   integer :: i,j,k
   do k=ks,ke; do j=js,je; do i=is,ie;
@@ -996,7 +1000,7 @@ subroutine SetupUvel(u,du,rho,mu,dt,A) !,mask)
     A(i,j,k,4) = dt/(dy(j)*dyh(j  )*rhom)*0.25d0*(mu(i,j,k)+mu(i+1,j,k)+mu(i,j+1,k)+mu(i+1,j+1,k))
     A(i,j,k,5) = dt/(dz(k)*dzh(k-1)*rhom)*0.25d0*(mu(i,j,k)+mu(i+1,j,k)+mu(i,j,k-1)+mu(i+1,j,k-1))
     A(i,j,k,6) = dt/(dz(k)*dzh(k  )*rhom)*0.25d0*(mu(i,j,k)+mu(i+1,j,k)+mu(i,j,k+1)+mu(i+1,j,k+1))
-    A(i,j,k,7) = 1d0+sum(A(i,j,k,1:6))
+    A(i,j,k,7) = 1d0+sum(A(i,j,k,1:6))! +Large*solids(i,j,k)
     A(i,j,k,8) = u(i,j,k) + dt*du(i,j,k)
   enddo; enddo; enddo
 !-------------------------------------------------------------------------------------------------
@@ -1029,7 +1033,7 @@ subroutine SetupUvel(u,du,rho,mu,dt,A) !,mask)
 end subroutine SetupUvel
 !=================================================================================================
 !=================================================================================================
-subroutine SetupVvel(v,dv,rho,mu,dt,A) !,mask)
+subroutine SetupVvel(v,dv,rho,mu,dt,A,solids) !,mask)
   use module_grid
   use module_hello
   use module_BC
@@ -1037,6 +1041,8 @@ subroutine SetupVvel(v,dv,rho,mu,dt,A) !,mask)
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: v,dv,rho,mu
   real(8), dimension(is:ie,js:je,ks:ke,8), intent(out) :: A
 !  logical, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: mask
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: solids
+  real(8) :: Large=1e20
   real(8) :: dt, rhom
   integer :: i,j,k
   do k=ks,ke; do j=js,je; do i=is,ie;
@@ -1050,7 +1056,7 @@ endif
     A(i,j,k,6) = dt/(dz(k)*dzh(k  )*rhom)*0.25d0*(mu(i,j,k)+mu(i,j+1,k)+mu(i,j,k+1)+mu(i,j+1,k+1))
     A(i,j,k,1) = dt/(dx(i)*dxh(i-1)*rhom)*0.25d0*(mu(i,j,k)+mu(i,j+1,k)+mu(i-1,j,k)+mu(i-1,j+1,k))
     A(i,j,k,2) = dt/(dx(i)*dxh(i  )*rhom)*0.25d0*(mu(i,j,k)+mu(i,j+1,k)+mu(i+1,j,k)+mu(i+1,j+1,k))
-    A(i,j,k,7) = 1d0+sum(A(i,j,k,1:6))
+    A(i,j,k,7) = 1d0+sum(A(i,j,k,1:6))! +Large*solids(i,j,k)
     A(i,j,k,8) = v(i,j,k) + dt*dv(i,j,k)
   enddo; enddo; enddo
 !-------------------------------------------------------------------------------------------------
@@ -1083,7 +1089,7 @@ endif
 end subroutine SetupVvel
 !=================================================================================================
 !=================================================================================================
-subroutine SetupWvel(w,dw,rho,mu,dt,A) !,mask)
+subroutine SetupWvel(w,dw,rho,mu,dt,A,solids) !,mask)
   use module_grid
   use module_hello
   use module_BC
@@ -1091,6 +1097,8 @@ subroutine SetupWvel(w,dw,rho,mu,dt,A) !,mask)
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: w,dw,rho,mu
   real(8), dimension(is:ie,js:je,ks:ke,8), intent(out) :: A
 !  logical, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: mask
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: solids
+  real(8) :: Large=1e20
   real(8) :: dt, rhom
   integer :: i,j,k
   do k=ks,ke; do j=js,je; do i=is,ie;
@@ -1101,7 +1109,7 @@ subroutine SetupWvel(w,dw,rho,mu,dt,A) !,mask)
     A(i,j,k,2) = dt/(dx(i)*dxh(i  )*rhom)*0.25d0*(mu(i,j,k)+mu(i,j,k+1)+mu(i+1,j,k)+mu(i+1,j,k+1))
     A(i,j,k,3) = dt/(dy(j)*dyh(j-1)*rhom)*0.25d0*(mu(i,j,k)+mu(i,j,k+1)+mu(i,j-1,k)+mu(i,j-1,k+1))
     A(i,j,k,4) = dt/(dy(j)*dyh(j  )*rhom)*0.25d0*(mu(i,j,k)+mu(i,j,k+1)+mu(i,j+1,k)+mu(i,j+1,k+1))
-    A(i,j,k,7) = 1d0+sum(A(i,j,k,1:6))
+    A(i,j,k,7) = 1d0+sum(A(i,j,k,1:6))! +Large*solids(i,j,k)
     A(i,j,k,8) = w(i,j,k) + dt*dw(i,j,k)
   enddo; enddo; enddo
 !-------------------------------------------------------------------------------------------------

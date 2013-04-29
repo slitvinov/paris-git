@@ -16,7 +16,7 @@
 
 TWOPHASE = T         ! TwoPhase: Is the flow two-phase?
 DoVOF 	  = T
-DoFront   = T
+DoFront   = F
 GetPropertiesFromFront = F ! T: uses Front-Tracking data to compute mu, rho and Surface Tension. 
 		           ! F: uses VOF data to compute mu and rho. 
 
@@ -27,18 +27,18 @@ restartFront = F   ! T: start the frontfrom  a previous simulation
 restartAverages = F
 nBackup = 100000   ! number of time steps between  backups are kept.
 
-NSTEP   = 50       ! maximum number of time steps
-EndTime = 50.0     ! When to stop simulation
+NSTEP   = 20       ! maximum number of time steps
+EndTime = 10.0     ! When to stop simulation
 
 MaxDt   = 0.1  ! maximum size of time step
 dtFlag  = 1        ! 1: fixed dt;  2: fixed CFL
-dt      = 1.0     ! dt in case of dtFlag=1
+dt      = 0.01     ! dt in case of dtFlag=1
 CFL     = 0.9
 MAXERROR= 1d-4     ! Residual for Poisson solver
 MAXERRORVOL = 1d-4
                    ! Numerical parameters
 
-ITIME_SCHEME = 2   ! time scheme: 1:first order Euler, 2: second order quasi Crank-Nicolson
+ITIME_SCHEME = 1   ! time scheme: 1:first order Euler, 2: second order quasi Crank-Nicolson
                    ! Should use first order Euler for Stokes flow ! ! ! 
 MAXIT    = 20
 BETA     = 1.2
@@ -56,14 +56,14 @@ nstats   = 1       ! number of time steps between flow statistics calculations
 
 !=================================================================================================
 !Grid parameters
-npx     = 2
-npy     = 2
-npz     = 2
+npx     = 1
+npy     = 1
+npz     = 1
                    ! number of processors in x,y,z direction
 
-Nx      = 16
-Ny      = 16
-Nz      = 16
+Nx      = 32
+Ny      = 32
+Nz      = 32
 Ng      = 2
                    ! grid size in x,y,z direction and number of ghost cells
 
@@ -98,7 +98,7 @@ dPdY      = 0.0
 dPdZ      = 0.0
                    ! Px, Py, Pz: pressure gradients in case of pressure driven channel flow
                    ! Px = (P(xLength)-P(0))/xLength
-BDRY_COND = 1  1    1   1   1   1
+BDRY_COND = 1    0    1   1   0   1
                    !Type of boundary condition in x,y,z direction: 0:wall  1:periodic  2:shear
                    !x- y- z- x+ y+ z+
 

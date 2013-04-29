@@ -1,12 +1,13 @@
 #!/bin/bash
 #set -x
 
+let np=5
 rm -fr input out stats tmpout
 
 if [ $# -gt 0 ] ; then
     if [ $1 == "exp" ] ; then
 	ln -s testinput.explicit input
-	mpirun -np 9 paris > tmpout
+	mpirun -np $np paris > tmpout
     elif [ $1 == "mono" ] ; then
 	ln -s testinput.mono input
 	paris > tmpout
@@ -16,7 +17,7 @@ if [ $# -gt 0 ] ; then
     fi
 else
     ln -s testinput.solid input
-    mpirun -np 9 paris > tmpout
+    mpirun -np $np paris > tmpout
 fi 
 
 

@@ -31,7 +31,6 @@ module module_solid
   use module_BC
   implicit none
   real(8), dimension(:,:,:), allocatable :: solids
-  logical :: dosolids = .false.
   character(20) :: solid_type
   integer il,ih,jl,jh,kl,kh
   integer :: solid_opened=0 
@@ -81,9 +80,7 @@ contains
              s1 = solid_func_CFC(x(i),y(j),z(k),xlength) 
           else if (solid_type == 'SingleSphere') then
              s1 = solid_func_one_sphere(x(i),y(j),z(k),xlength) 
-          else if (solid_type == 'CFC1') then
-             s1 = solid_func_CFC1(x(i),y(j),z(k),xlength) 
-          else
+           else
              stop 'invalid type'
           endif
           if(s1 > 0.) then
@@ -125,23 +122,6 @@ contains
     solid_func_one_sphere = sphere_func(x2,y2,z2,x0,y0,z0,radius)
     return 
   end function  solid_func_one_sphere
-  ! Debuging CFC
-  FUNCTION solid_func_CFC1( x1,  y1,  z1,  boxL)
-    implicit none
-    intrinsic dmax1
-    real(8), intent(in) :: x1,  y1,  z1,  boxL
-    real(8) :: solid_func_CFC1, radius
-    real(8) :: x2, y2, z2, a , b, c
-    real(8) :: x0,y0,z0
-    !  rescale by boxL: no need 
-    x2 = x1/boxL
-    y2 = y1/boxL
-    z2 = z1/boxL
-    x0=0.5;y0=0.5;z0=0.5
-    radius = 0.45
-    solid_func_CFC1 =sphere_func(x2,y2,z2,x0,y0,z0,radius)
-    return 
-  end function solid_func_CFC1
 
   ! One basic CFC cell: one vertex + three faces
   FUNCTION solid_func_CFC_scaled( x1,  y1,  z1)
@@ -154,7 +134,7 @@ contains
     radius = 0.25*sqrt(2.d0)
     x2=x1;y2=y1;z2=z1
     ! 1 lower vertex and x=0 face 
-    a  = DMAX1(sphere_func(x2,y2,z2,0.d0,0.d0,0.d0,radius),sphere_func(x2,y2,z2,0.d0,0.5d0,0.5d0,radius))
+    a = DMAX1(sphere_func(x2,y2,z2,0.d0,0.d0,0.d0,radius),sphere_func(x2,y2,z2,0.d0,0.5d0,0.5d0,radius))
     b = DMAX1(sphere_func(x2,y2,z2,0.5d0,0.d0,0.5d0,radius),sphere_func(x2,y2,z2,0.5d0,0.5d0,0.d0,radius))
     solid_func_CFC_scaled =  DMAX1(a,b)
     return 
