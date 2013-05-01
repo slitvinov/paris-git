@@ -78,6 +78,7 @@ module module_flow
   save
   real(8), dimension(:,:,:), allocatable :: u, v, w, uold, vold, wold, fx, fy, fz, color
   real(8), dimension(:,:,:), allocatable :: p, rho, rhoo, muold, mu, dIdx, dIdy, dIdz
+  real(8), dimension(:,:,:), allocatable :: umask,vmask,wmask
   real(8), dimension(:,:,:), allocatable :: du,dv,dw,drho
   real(8), dimension(:,:), allocatable :: averages,oldaverages, allaverages
   real(8) :: gx, gy, gz, mu1, mu2, r_avg, dt, dtFlag, rho_ave, p_ave, vdt
@@ -116,6 +117,32 @@ module module_IO
   character(len=20) :: out_path, x_file, y_file, z_file
   logical :: read_x, read_y, read_z, restart, ICOut, restartFront, restartAverages
   contains
+!=================================================================================================
+subroutine write_vec_gnuplot(u,v,w,iout)
+  use module_grid
+  implicit none
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: u, v, w
+  integer, intent(in) :: iout
+  integer :: i,j,k
+  real(8) :: norm=0.d0, coeff
+  intrinsic dsqrt
+  OPEN(UNIT=89,FILE=TRIM(out_path)//'/UV-'//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout,padding))//'.txt')
+  norm=0.d0
+  k=nz/2
+  do i=imin,imax; do j=jmin,jmax
+     norm = norm + u(i,j,k)**2 + v(i,j,k)**2
+  enddo; enddo
+  norm = dsqrt(norm/((jmax-jmin+1)*(imax-imin+1)))
+  coeff = 0.8/norm
+  print *," norm, rank ",norm,rank
+  do i=is,ie; do j=js,je
+     write(89,310) x(i),y(j),coeff*dx(i)*u(i,j,k),coeff*dx(i)*v(i,j,k)
+    ! write(89,310) x(i),y(j), u(i,j,k),v(i,j,k)
+  enddo; enddo
+  close(unit=89)
+310 format(e14.5,e14.5,e14.5,e14.5)
+end subroutine  write_vec_gnuplot
+!=================================================================================================
 ! append
     SUBROUTINE append_visit_file(rootname)
       use module_flow
@@ -345,39 +372,44 @@ module module_BC
 !=================================================================================================
 ! subroutine SetPressureBC: Sets the pressure boundary condition
 !-------------------------------------------------------------------------------------------------
-  subroutine SetPressureBC(density)
+    subroutine SetPressureBC(umask,vmask,wmask)
     use module_grid
     implicit none
     include 'mpif.h'
-    real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: density
-    real(8), save :: Large=1.0e20
-  ! for walls set the density to a large value in the ghost cells
+    real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: umask,vmask,wmask
+
+  ! for walls set the mask to zero
     if(bdry_cond(1)==0)then
-      if(coords(1)==0    ) density(is-1,js-1:je+1,ks-1:ke+1)=Large
-      if(coords(1)==nPx-1) density(ie+1,js-1:je+1,ks-1:ke+1)=Large
+      if(coords(1)==0    ) umask(is-1,js-1:je+1,ks-1:ke+1)=0d0
+      if(coords(1)==nPx-1) umask(ie,js-1:je+1,ks-1:ke+1)=0d0
     endif
 
     if(bdry_cond(2)==0)then
-      if(coords(2)==0    ) density(is-1:ie+1,js-1,ks-1:ke+1)=Large
-      if(coords(2)==nPy-1) density(is-1:ie+1,je+1,ks-1:ke+1)=Large
+      if(coords(2)==0    ) vmask(is-1:ie+1,js-1,ks-1:ke+1)=0d0
+      if(coords(2)==nPy-1) vmask(is-1:ie+1,je,ks-1:ke+1)=0d0
     endif
 
     if(bdry_cond(3)==0)then
-      if(coords(3)==0    ) density(is-1:ie+1,js-1:je+1,ks-1)=Large
-      if(coords(3)==nPz-1) density(is-1:ie+1,js-1:je+1,ke+1)=Large
+      if(coords(3)==0    ) wmask(is-1:ie+1,js-1:je+1,ks-1)=0d0
+      if(coords(3)==nPz-1) wmask(is-1:ie+1,js-1:je+1,ke)=0d0
     endif
-
   end subroutine SetPressureBC
 !=================================================================================================
 !=================================================================================================
 ! subroutine SetVelocityBC: Sets the velocity boundary condition
 !-------------------------------------------------------------------------------------------------
-  subroutine SetVelocityBC(u,v,w)
+  subroutine SetVelocityBC(u,v,w,umask,vmask,wmask)
     use module_grid
     use module_hello
     implicit none
     include 'mpif.h'
     real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: u, v, w
+    real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: umask,vmask,wmask
+    ! solid obstacles
+    u = u*umask
+    v = v*vmask
+    w = w*wmask
+
     ! wall boundary condition
     if(bdry_cond(1)==0 .and. coords(1)==0    ) then
         u(is-1,:,:)=0d0
@@ -948,25 +980,25 @@ end subroutine SetupDensity
 ! A7*Pijk = A1*Pi-1jk + A2*Pi+1jk + A3*Pij-1k + 
 !           A4*Pij+1k + A5*Pijk-1 + A6*Pijk+1 + A8
 !-------------------------------------------------------------------------------------------------
-subroutine SetupPoisson(utmp,vtmp,wtmp,rhot,dt,A) !,mask)
+subroutine SetupPoisson(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A) !,mask)
   use module_grid
   use module_hello
   use module_BC
   implicit none
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: utmp,vtmp,wtmp,rhot
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: umask,vmask,wmask
   real(8), dimension(is:ie,js:je,ks:ke,8), intent(out) :: A
-!  logical, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: mask
   real(8) :: dt
   integer :: i,j,k
   do k=ks,ke; do j=js,je; do i=is,ie;
 !    if(mask(i,j,k))then
-      A(i,j,k,1) = 2d0*dt/(dx(i)*dxh(i-1)*(rhot(i-1,j,k)+rhot(i,j,k)))
-      A(i,j,k,2) = 2d0*dt/(dx(i)*dxh(i  )*(rhot(i+1,j,k)+rhot(i,j,k)))
-      A(i,j,k,3) = 2d0*dt/(dy(j)*dyh(j-1)*(rhot(i,j-1,k)+rhot(i,j,k)))
-      A(i,j,k,4) = 2d0*dt/(dy(j)*dyh(j  )*(rhot(i,j+1,k)+rhot(i,j,k)))
-      A(i,j,k,5) = 2d0*dt/(dz(k)*dzh(k-1)*(rhot(i,j,k-1)+rhot(i,j,k)))
-      A(i,j,k,6) = 2d0*dt/(dz(k)*dzh(k  )*(rhot(i,j,k+1)+rhot(i,j,k)))
-      A(i,j,k,7) = sum(A(i,j,k,1:6))
+      A(i,j,k,1) = 2d0*dt*umask(i-1,j,k)/(dx(i)*dxh(i-1)*(rhot(i-1,j,k)+rhot(i,j,k)))
+      A(i,j,k,2) = 2d0*dt*umask(i,j,k)/(dx(i)*dxh(i  )*(rhot(i+1,j,k)+rhot(i,j,k)))
+      A(i,j,k,3) = 2d0*dt*vmask(i,j-1,k)/(dy(j)*dyh(j-1)*(rhot(i,j-1,k)+rhot(i,j,k)))
+      A(i,j,k,4) = 2d0*dt*vmask(i,j,k)/(dy(j)*dyh(j  )*(rhot(i,j+1,k)+rhot(i,j,k)))
+      A(i,j,k,5) = 2d0*dt*wmask(i,j,k-1)/(dz(k)*dzh(k-1)*(rhot(i,j,k-1)+rhot(i,j,k)))
+      A(i,j,k,6) = 2d0*dt*wmask(i,j,k)/(dz(k)*dzh(k  )*(rhot(i,j,k+1)+rhot(i,j,k)))
+      A(i,j,k,7) = sum(A(i,j,k,1:6)) + 1d-49
       A(i,j,k,8) = -( (utmp(i,j,k)-utmp(i-1,j,k))/dx(i) &
                      +(vtmp(i,j,k)-vtmp(i,j-1,k))/dy(j) &
                      +(wtmp(i,j,k)-wtmp(i,j,k-1))/dz(k) )
@@ -1000,7 +1032,7 @@ subroutine SetupUvel(u,du,rho,mu,dt,A,solids) !,mask)
     A(i,j,k,4) = dt/(dy(j)*dyh(j  )*rhom)*0.25d0*(mu(i,j,k)+mu(i+1,j,k)+mu(i,j+1,k)+mu(i+1,j+1,k))
     A(i,j,k,5) = dt/(dz(k)*dzh(k-1)*rhom)*0.25d0*(mu(i,j,k)+mu(i+1,j,k)+mu(i,j,k-1)+mu(i+1,j,k-1))
     A(i,j,k,6) = dt/(dz(k)*dzh(k  )*rhom)*0.25d0*(mu(i,j,k)+mu(i+1,j,k)+mu(i,j,k+1)+mu(i+1,j,k+1))
-    A(i,j,k,7) = 1d0+sum(A(i,j,k,1:6))! +Large*solids(i,j,k)
+    A(i,j,k,7) = 1d0+sum(A(i,j,k,1:6)) !+Large*solids(i,j,k)
     A(i,j,k,8) = u(i,j,k) + dt*du(i,j,k)
   enddo; enddo; enddo
 !-------------------------------------------------------------------------------------------------
@@ -1056,7 +1088,7 @@ endif
     A(i,j,k,6) = dt/(dz(k)*dzh(k  )*rhom)*0.25d0*(mu(i,j,k)+mu(i,j+1,k)+mu(i,j,k+1)+mu(i,j+1,k+1))
     A(i,j,k,1) = dt/(dx(i)*dxh(i-1)*rhom)*0.25d0*(mu(i,j,k)+mu(i,j+1,k)+mu(i-1,j,k)+mu(i-1,j+1,k))
     A(i,j,k,2) = dt/(dx(i)*dxh(i  )*rhom)*0.25d0*(mu(i,j,k)+mu(i,j+1,k)+mu(i+1,j,k)+mu(i+1,j+1,k))
-    A(i,j,k,7) = 1d0+sum(A(i,j,k,1:6))! +Large*solids(i,j,k)
+    A(i,j,k,7) = 1d0+sum(A(i,j,k,1:6)) !+Large*solids(i,j,k)
     A(i,j,k,8) = v(i,j,k) + dt*dv(i,j,k)
   enddo; enddo; enddo
 !-------------------------------------------------------------------------------------------------
@@ -1109,7 +1141,7 @@ subroutine SetupWvel(w,dw,rho,mu,dt,A,solids) !,mask)
     A(i,j,k,2) = dt/(dx(i)*dxh(i  )*rhom)*0.25d0*(mu(i,j,k)+mu(i,j,k+1)+mu(i+1,j,k)+mu(i+1,j,k+1))
     A(i,j,k,3) = dt/(dy(j)*dyh(j-1)*rhom)*0.25d0*(mu(i,j,k)+mu(i,j,k+1)+mu(i,j-1,k)+mu(i,j-1,k+1))
     A(i,j,k,4) = dt/(dy(j)*dyh(j  )*rhom)*0.25d0*(mu(i,j,k)+mu(i,j,k+1)+mu(i,j+1,k)+mu(i,j+1,k+1))
-    A(i,j,k,7) = 1d0+sum(A(i,j,k,1:6))! +Large*solids(i,j,k)
+    A(i,j,k,7) = 1d0+sum(A(i,j,k,1:6)) !+Large*solids(i,j,k)
     A(i,j,k,8) = w(i,j,k) + dt*dw(i,j,k)
   enddo; enddo; enddo
 !-------------------------------------------------------------------------------------------------
@@ -1182,7 +1214,7 @@ subroutine LinearSolver(A,p,maxError,beta,maxit,it,ierr)
     mask=.true.
     mask(is+1:ie-1,js+1:je-1,ks+1:ke-1)=.false.
     do k=ks,ke; do j=js,je; do i=is,ie
-      if(mask(i,j,k))res=res+abs(-p(i,j,k) * A(i,j,k,7) +                             &
+      if(mask(i,j,k))res=res+abs(-p(i,j,k) * A(i,j,k,7) +              &
         A(i,j,k,1) * p(i-1,j,k) + A(i,j,k,2) * p(i+1,j,k) +            &
         A(i,j,k,3) * p(i,j-1,k) + A(i,j,k,4) * p(i,j+1,k) +            &
         A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8) )
@@ -1204,8 +1236,6 @@ end subroutine LinearSolver
 !-------------------------------------------------------------------------------------------------
 subroutine calcResidual(A,p, Residual)
   use module_grid
-
-      use module_hello
   use module_BC
   implicit none
   include 'mpif.h'
@@ -1224,3 +1254,52 @@ subroutine calcResidual(A,p, Residual)
   call MPI_ALLREDUCE(res, totalres, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr)
   Residual = sqrt(totalres)
 end subroutine calcResidual
+!=================================================================================================
+!=================================================================================================
+! Returns the flow rate
+!-------------------------------------------------------------------------------------------------
+subroutine calcsum(p)
+  use module_grid
+  use module_BC
+  implicit none
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: p
+  real(8) :: flow
+  call calcsum_shift(p,flow,0,0,0)
+end subroutine calcsum
+
+subroutine calcsum2(p,flowrate)
+  use module_grid
+  use module_BC
+  implicit none
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: p
+  real(8) :: flow, totalflow, flowrate
+  integer :: i,j,k, ierr
+  call calcsum_shift(p,flow,1,0,0)
+  call calcsum_shift(p,flow,0,1,0)
+  call calcsum_shift(p,flow,0,0,1)
+  call calcsum_shift(p,flow,-1,0,0)
+  call calcsum_shift(p,flow,0,-1,0)
+  call calcsum_shift(p,flow,0,0,-1)
+  call calcsum_shift(p,flow,0,0,0)
+  flowrate = -1.
+end subroutine calcsum2
+!
+subroutine calcsum_shift(p,flowrate,sx,sy,sz)
+  use module_grid
+  use module_BC
+  implicit none
+  include 'mpif.h'
+  integer, intent(in) :: sx,sy,sz
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: p
+  real(8) :: flow, totalflow
+  real(8), intent(out) :: flowrate
+  integer :: i,j,k, ierr
+  flow=0.d0
+  do k=ks,ke; do j=js,je; do i=is,ie;
+     flow=flow+p(i+sx,j+sy,k+sz)
+  enddo;enddo;enddo
+  ! print *, "rank, sum ",rank,flow
+  call MPI_REDUCE(flow, totalflow, 1, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_Domain, ierr)
+  flowrate=totalflow
+  if(rank==0) print *,"s =",sx,sy,sz," sum",totalflow, "ierr =",ierr
+end subroutine calcsum_shift

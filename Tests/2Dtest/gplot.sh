@@ -10,12 +10,12 @@ fi
 if  [ $# -lt 2 ] 
 then
   rm -f 2plot.txt
-  cat  UV-00000-000$1.txt >> 2plot.txt   
-  cat  UV-00001-000$1.txt >> 2plot.txt   
-  cat  UV-00002-000$1.txt >> 2plot.txt   
-  cat  UV-00003-000$1.txt >> 2plot.txt   
+  cat  out/UV-00000-000$1.txt >> 2plot.txt   
+  cat  out/UV-00001-000$1.txt >> 2plot.txt   
+  cat  out/UV-00002-000$1.txt >> 2plot.txt   
+  cat  out/UV-00003-000$1.txt >> 2plot.txt   
 else
-    cp UV-0000$2-000$1.txt 2plot.txt
+    cp out/UV-0000$2-000$1.txt 2plot.txt
 fi
 gnuplot <<EOF
 set size square

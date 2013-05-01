@@ -131,7 +131,8 @@ Program paris
      ! output initial condition
      if(ICOut .and. rank<nPdomain)call output(0,is,ie+1,js,je+1,ks,ke+1)
      if(rank==0) start_time = MPI_WTIME()
-     
+     call calcsum(umask)
+     call setvelocityBC(umask,vmask,wmask,u,v,w)
      call write_vec_gnuplot(u,v,w,itimestep)
 
 
@@ -162,15 +163,15 @@ Program paris
            ! Receive front from master of front
            if(DoFront) call GetFront('recv')
            
-           if(dosolids) call solidzero(u,v,w,solids)
+!           if(dosolids) call solidzero(u,v,w,solids)
            if(Implicit) then
               call momentumDiffusion(u,v,w,rho,mu,du,dv,dw)  
            else
               call explicitMomDiff(u,v,w,rho,mu,du,dv,dw)
            endif
-           if(dosolids) call solidzero(u,v,w,solids)
+!           if(dosolids) call solidzero(u,v,w,solids)
            call momentumConvection(u,v,w,du,dv,dw)
-           if(dosolids) call solidzero(u,v,w,solids)
+!           if(dosolids) call solidzero(u,v,w,solids)
            
 
            ! reset the surface tension force on the fixed grid
@@ -223,11 +224,9 @@ Program paris
               u = u + dt * du
               v = v + dt * dv
               w = w + dt * dw
-              if(dosolids) call solidzero(u,v,w,solids)
+!              if(dosolids) call solidzero(u,v,w,solids)
            endif
-           call write_vec_gnuplot(u,v,w,itimestep)
-           call SetVelocityBC(u,v,w)
-           
+           call SetVelocityBC(u,v,w,umask,vmask,wmask)
            call ghost_x(u  ,2,req( 1: 4));  call ghost_x(v,2,req( 5: 8)); call ghost_x(w,2,req( 9:12)) 
            call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
            call ghost_y(u  ,2,req( 1: 4));  call ghost_y(v,2,req( 5: 8)); call ghost_y(w,2,req( 9:12)) 
@@ -236,16 +235,10 @@ Program paris
            call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
 
 !-----------------------------------------PROJECTION STEP-----------------------------------------
-           ! Compute the coefficient of grad p(i,j,k)
- !          if(dosolids) then
- !             tmp = rho*(1.d0 - solids) + Large*solids
-!           else
-           tmp = rho
-!           endif
 
-           if(dosolids.and..not.implicit) call solidzero(u,v,w,solids)
-           call SetPressureBC(tmp)
-           call SetupPoisson(u,v,w,tmp,dt,A)
+           ! if(dosolids.and..not.implicit) call solidzero(u,v,w,solids)
+           ! call SetPressureBC(umask,vmask,wmask)   ! called in solids
+           call SetupPoisson(u,v,w,umask,vmask,wmask,rho,dt,A)
            if(HYPRE)then
               call poi_solve(A,p(is:ie,js:je,ks:ke),maxError,maxit,it)
               call ghost_x(p,1,req(1:4 ))
@@ -286,7 +279,9 @@ Program paris
                  enddo; enddo; enddo
            endif
 
-           call SetVelocityBC(u,v,w)
+           call SetVelocityBC(umask,vmask,wmask,u,v,w)
+           call write_vec_gnuplot(u,v,w,itimestep)
+
            call ghost_x(u  ,2,req( 1: 4));  call ghost_x(v,2,req( 5: 8)); call ghost_x(w,2,req( 9:12)); 
            call ghost_x(color,1,req(13:16));  call MPI_WAITALL(16,req(1:16),sta(:,1:16),ierr)
            call ghost_y(u  ,2,req( 1: 4));  call ghost_y(v,2,req( 5: 8)); call ghost_y(w,2,req( 9:12)); 
@@ -324,7 +319,10 @@ Program paris
        call calcStats
 
         if(mod(itimestep,nbackup)==0)call backup_write
-        if(mod(itimestep,nout)==0)call output(ITIMESTEP/nout,is,ie+1,js,je+1,ks,ke+1)
+        if(mod(itimestep,nout)==0) then 
+           call write_vec_gnuplot(u,v,w,itimestep)
+           call output(ITIMESTEP/nout,is,ie+1,js,je+1,ks,ke+1)
+        endif
         if(rank==0)then
            end_time =  MPI_WTIME()
            write(out,'("Step:",I9," Iterations:",I9," cpu(s):",f10.2)')itimestep,it,end_time-start_time
@@ -836,7 +834,9 @@ subroutine initialize
             drho(imin:imax,jmin:jmax,kmin:kmax),    p(imin:imax,jmin:jmax,kmin:kmax), &
               mu(imin:imax,jmin:jmax,kmin:kmax),muold(imin:imax,jmin:jmax,kmin:kmax), &
            color(imin:imax,jmin:jmax,kmin:kmax), dIdx(imin:imax,jmin:jmax,kmin:kmax), &
-            dIdy(imin:imax,jmin:jmax,kmin:kmax), dIdz(imin:imax,jmin:jmax,kmin:kmax)  )
+            dIdy(imin:imax,jmin:jmax,kmin:kmax), dIdz(imin:imax,jmin:jmax,kmin:kmax), &
+           umask(imin:imax,jmin:jmax,kmin:kmax),vmask(imin:imax,jmin:jmax,kmin:kmax), &
+           wmask(imin:imax,jmin:jmax,kmin:kmax))
 
     allocate(tmp(imin:imax,jmin:jmax,kmin:kmax), work(imin:imax,jmin:jmax,kmin:kmax,3), &
                A(is:ie,js:je,ks:ke,1:8), averages(10,Ng:Ny+Ng+1), oldaverages(10,Ng:Ny+Ng+1), &
@@ -932,7 +932,7 @@ subroutine InitCondition
 
      if(restart)then
         call backup_read
-        call SetVelocityBC(u,v,w)
+        call SetVelocityBC(umask,vmask,wmask,u,v,w)
         call ghost_x(u,2,req( 1: 4)); call ghost_x(v,2,req( 5: 8)); call ghost_x(w,2,req( 9:12))
         call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
         call ghost_y(u,2,req( 1: 4)); call ghost_y(v,2,req( 5: 8)); call ghost_y(w,2,req( 9:12))
@@ -1163,56 +1163,3 @@ subroutine ReadParameters
   call MPI_BARRIER(MPI_COMM_WORLD, ierr)
 end subroutine ReadParameters
 !=================================================================================================
-!=================================================================================================
-subroutine solidzero(u,v,w,solids)
-  use module_grid
-  implicit none
-  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: u, v, w
-  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: solids
-     u= u*(1.d0 -solids) 
-     v= v*(1.d0 -solids) 
-     w= w*(1.d0 -solids)
-end subroutine solidzero
-
-subroutine write_vec_gnuplot(u,v,w,iout)
-  use module_grid
-  use module_IO
-  implicit none
-  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: u, v, w
-  integer, intent(in) :: iout
-  integer :: i,j,k
-  real(8) :: norm=0.d0, coeff
-
-  intrinsic dsqrt
-
-  OPEN(UNIT=89,FILE='UV-'//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout,padding))//'.txt')
-
-  norm=0.d0
-  k=nz/2
-  do i=imin,imax; do j=jmin,jmax
-     norm = norm + u(i,j,k)**2 + v(i,j,k)**2
-  enddo; enddo
-  norm = dsqrt(norm/(jmax-jmin+1)*(imax-imin+1))
-  coeff = 8./norm
-  print *," norm, rank ",norm,rank
-  do i=is,ie; do j=js,je
-     write(89,310) x(i),y(j),coeff*dx(i)*u(i,j,k),coeff*dx(i)*v(i,j,k)
-  enddo; enddo
-  close(unit=89)
-310 format(e14.5,e14.5,e14.5,e14.5)
-end subroutine  write_vec_gnuplot
-
-subroutine solidzero2(u,v,w,solids)
-  use module_grid
-  implicit none
-  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: u, v, w
-  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: solids
-  integer :: i,j,k
-  
-  do i=imin,imax; do j=jmin,jmax; do k=kmin,kmax
-     u(i,j,k)= u(i,j,k)*(1.d0 -solids(i,j,k)) 
-     v(i,j,k)= v(i,j,k)*(1.d0 -solids(i,j,k)) 
-     w(i,j,k)= w(i,j,k)*(1.d0 -solids(i,j,k))
-  enddo; enddo; enddo
-
-end subroutine solidzero2

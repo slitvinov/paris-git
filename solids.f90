@@ -67,15 +67,19 @@ contains
     include 'mpif.h'
     integer :: i,j,k
     real(8) :: s1
-    integer :: ierr
+    integer :: ierr, ins(4)
     integer :: req(48),sta(MPI_STATUS_SIZE,48)
     
     call ReadSolidParameters
+    umask = 1d0; vmask = 1d0; wmask = 1d0
+
     if(dosolids) then
        allocate(solids(imin:imax,jmin:jmax,kmin:kmax))
-       solids=0.
-!       if(rank==0) print*, "***x ",x 
-       do i=imin,imax; do j=jmin,jmax; do k=kmin,kmax; 
+       solids=0d0
+       !call calcsum(solids)
+       !if(rank==0) print *, "all 1 : ", s1
+       !call print_small_solid(solids)
+       do i=is,ie; do j=js,je; do k=ks,ke; 
           if(solid_type == 'CFC') then
              s1 = solid_func_CFC(x(i),y(j),z(k),xlength) 
           else if (solid_type == 'SingleSphere') then
@@ -84,18 +88,37 @@ contains
              stop 'invalid type'
           endif
           if(s1 > 0.) then
-             solids(i,j,k) = 1.d0
+             solids(i,j,k) = 1d0
           endif
        enddo; enddo; enddo
-!       if(rank==0) print*, "+++x ",x 
 
        call output_solids(0,is,ie,js,je,ks,ke)
        if(rank==0) write(out,*)'solids type ', solid_type, ' initialized'
        if(rank==0) write(6,*)  'solids type ', solid_type, ' initialized'
+       !call print_small_solid(solids)
+
+       !if(rank==0) print *, "before ghost"
        call ghost_x(solids,2,req(1:4));  call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+       !if(rank==0) print *, "after ghost ierr", ierr
        call ghost_y(solids,2,req(1:4));  call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+       !if(rank==0) print *, "after ghost ierr", ierr
        call ghost_z(solids,2,req(1:4));  call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+       !if(rank==0) print *, "after ghost ierr", ierr
+       !if(rank==0) print *," NOW S1 :"
+       !call print_small_solid(solids)
+       !call calcsum(solids)
+
+       ! For solid objects set mask according to placement of solids
+       call calcsum(umask)
+       do i=imin,imax-1; do j=jmin,jmax-1; do k=kmin,kmax-1
+          if((solids(i,j,k) + solids(i+1,j,k)) > 0.5d0) umask(i,j,k) = 0d0
+          if((solids(i,j,k) + solids(i,j+1,k)) > 0.5d0) vmask(i,j,k) = 0d0
+          if((solids(i,j,k) + solids(i,j,k+1)) > 0.5d0) wmask(i,j,k) = 0d0
+       enddo; enddo; enddo
     endif
+    call SetPressureBC(umask,vmask,wmask)
+!    call calcsum(umask)
+
   END SUBROUTINE initialize_solids
   ! sphere definition function 
   FUNCTION sphere_func(x1,y1,z1,x0,y0,z0,radius)
@@ -287,4 +310,65 @@ contains
     if(rank==0) call close_solid_visit_file()
 end subroutine output_solids
 !***********************************************************************
+!=================================================================================================
+! subroutine SetPressureBC: Sets the pressure boundary condition
+!-------------------------------------------------------------------------------------------------
+  subroutine SetSolidsBC(solids)
+    use module_grid
+    implicit none
+    include 'mpif.h'
+    real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: solids
+  ! for walls set the solids to one (no effect). 
+    if(bdry_cond(1)==0)then
+      if(coords(1)==0    ) solids(is-1,js-1:je+1,ks-1:ke+1)=1.d0
+      if(coords(1)==nPx-1) solids(ie+1,js-1:je+1,ks-1:ke+1)=1.d0
+    endif
+
+    if(bdry_cond(2)==0)then
+      if(coords(2)==0    ) solids(is-1:ie+1,js-1,ks-1:ke+1)=1.d0
+      if(coords(2)==nPy-1) solids(is-1:ie+1,je+1,ks-1:ke+1)=1.d0
+    endif
+
+    if(bdry_cond(3)==0)then
+      if(coords(3)==0    ) solids(is-1:ie+1,js-1:je+1,ks-1)=1.d0
+      if(coords(3)==nPz-1) solids(is-1:ie+1,js-1:je+1,ke+1)=1.d0
+    endif
+
+  end subroutine SetSolidsBC
+!=================================================================================================
+  subroutine print_small_solid(solids)
+    use module_grid
+    implicit none
+    INCLUDE 'mpif.h'
+    real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: solids
+    integer i,j,k,ins(4),jins, IERR
+
+       do k=ks-1,ke+1
+          if(rank==0) write(6,*) '-----' , k
+          do i=is-1,ie+1
+             ins = 0
+             jins = 1
+             do j=js-1,je+1; 
+                if(solids(i,j,k) > 0.5)  ins(jins)=1
+                jins = jins+1
+             enddo
+             if(rank==0) write(6,'(I1,"  ",4(I1," "))') i, ins
+          enddo
+          call mpi_barrier(MPI_COMM_CART, ierr)
+          if(rank==1) write(6,*) '*****' , k
+          do i=is-1,ie+1
+             ins = 0
+             jins = 1
+             do j=js-1,je+1; 
+                if(solids(i,j,k) > 0.5)  ins(jins)=1
+                jins = jins+1
+             enddo
+             if(rank==1) write(6,'(I1,"  ",4(I1," "))') i, ins
+          enddo
+       enddo
+
+    if(rank==0) write(6,*) '@@@@@@@@@@@@@@' , k
+  end subroutine print_small_solid
+
+!=================================================================================================
 end module module_solid

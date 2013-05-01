@@ -5,7 +5,7 @@ gnuplot <<EOF
 set grid
 # set xrange[1:512]
 # set yrange[-0.05:0.8]
-set xtics 0.1
+#set xtics 0.1
 set xlabel "time"
 set ylabel "flow rate"
 #set key left
