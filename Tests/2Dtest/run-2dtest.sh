@@ -17,7 +17,7 @@ precision=$6
 
 dt=$dt0
 
-/bin/rm flowrates-IMP-$imp*
+/bin/rm -f flowrates-IMP-$imp*
 
 while [ $idt -lt $ndt ] ; do
     rm -fr input out stats
