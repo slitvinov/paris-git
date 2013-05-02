@@ -1,8 +1,8 @@
 &SOLIDPARAMETERS
 
 dosolids = T
-solid_type ='SingleSphere'
-
+solid_type ='SingleDisk'
+solid_radius=0.3
 !=================================================================================================
 
 &end

@@ -75,6 +75,7 @@ Ng       = 2
 read_x   = F       ! read the grid file for x-grid; If true xLength and xform are neglected
 read_y   = F
 read_z   = F
+
 x_file   = 'xh.dat'	! input file for xh (Nx+1 points)
 y_file   = 'yh.dat'
 z_file   = 'zh.dat'
@@ -120,12 +121,7 @@ MU2      = 0.000136
 SIGMA    = 0.25
                    ! rho2, mu2, sigma : properties of the drop and surface tension
 
-xyzrad(1, 1)  = 0.5 
-xyzrad(2, 1)  = 0.5 
-xyzrad(3, 1)  = 0.5 
-xyzrad(4, 1)  = 0.25
-
-                   ! Initial bubble size and location : x,y,z,radius
+NumBubble = 0      !number of bubbles
 
 MaxPoint = 2000000
 MaxElem  = 4000000

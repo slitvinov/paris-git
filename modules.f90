@@ -121,26 +121,27 @@ module module_IO
 subroutine write_vec_gnuplot(u,v,w,iout)
   use module_grid
   implicit none
-  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: u, v, w
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: u, v, w
   integer, intent(in) :: iout
   integer :: i,j,k
   real(8) :: norm=0.d0, coeff
   intrinsic dsqrt
   OPEN(UNIT=89,FILE=TRIM(out_path)//'/UV-'//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout,padding))//'.txt')
   norm=0.d0
-  k=nz/2
+  k=nz/2+ng
   do i=imin,imax; do j=jmin,jmax
      norm = norm + u(i,j,k)**2 + v(i,j,k)**2
   enddo; enddo
   norm = dsqrt(norm/((jmax-jmin+1)*(imax-imin+1)))
   coeff = 0.8/norm
-  print *," norm, rank ",norm,rank
+  ! print *," norm, rank ",norm,rank
   do i=is,ie; do j=js,je
      write(89,310) x(i),y(j),coeff*dx(i)*u(i,j,k),coeff*dx(i)*v(i,j,k)
-    ! write(89,310) x(i),y(j), u(i,j,k),v(i,j,k)
+     ! write(89,311) i,j,k, u(i,j,k),v(i,j,k)
   enddo; enddo
   close(unit=89)
 310 format(e14.5,e14.5,e14.5,e14.5)
+311 format(I2,I2,I2,e14.5,e14.5)
 end subroutine  write_vec_gnuplot
 !=================================================================================================
 ! append

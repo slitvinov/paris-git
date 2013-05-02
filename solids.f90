@@ -31,6 +31,7 @@ module module_solid
   use module_BC
   implicit none
   real(8), dimension(:,:,:), allocatable :: solids
+  real(8) :: solid_radius
   character(20) :: solid_type
   integer il,ih,jl,jh,kl,kh
   integer :: solid_opened=0 
@@ -84,6 +85,8 @@ contains
              s1 = solid_func_CFC(x(i),y(j),z(k),xlength) 
           else if (solid_type == 'SingleSphere') then
              s1 = solid_func_one_sphere(x(i),y(j),z(k),xlength) 
+          else if (solid_type == 'SingleDisk') then
+             s1 = solid_func_one_disk(x(i),y(j),xlength) 
            else
              stop 'invalid type'
           endif
@@ -130,6 +133,15 @@ contains
     return
   end function sphere_func
 
+  FUNCTION disk_func(x1,y1,x0,y0,radius)
+    !***
+    implicit none
+    real(8) :: disk_func
+    real(8) , intent(in) :: x1,y1,x0,y0,radius
+    disk_func = -((x1 - x0)*(x1 - x0) + (y1 - y0)*(y1 - y0)) + radius*radius
+    return
+  end function disk_func
+
   ! example implicit solid definition function 
   FUNCTION solid_func_one_sphere(x1, y1, z1,boxL)
     implicit none
@@ -141,10 +153,24 @@ contains
     y2 = y1/boxL
     z2 = z1/boxL
     x0=0.5;y0=0.5;z0=0.5
-    radius = 0.45
+    radius = solid_radius
     solid_func_one_sphere = sphere_func(x2,y2,z2,x0,y0,z0,radius)
     return 
   end function  solid_func_one_sphere
+
+ FUNCTION solid_func_one_disk(x1, y1, boxL)
+    implicit none
+    real(8) :: solid_func_one_disk
+    real(8) , intent(in) :: x1,y1,boxL
+    real(8) :: x0,y0,x2,y2
+    real(8) :: radius
+    x2 = x1/boxL
+    y2 = y1/boxL
+    x0=0.5;y0=0.5
+    radius = solid_radius
+    solid_func_one_disk = disk_func(x2,y2,x0,y0,radius)
+    return 
+  end function  solid_func_one_disk
 
   ! One basic CFC cell: one vertex + three faces
   FUNCTION solid_func_CFC_scaled( x1,  y1,  z1)
@@ -208,7 +234,7 @@ contains
       include 'mpif.h'
       integer ierr,in
       logical file_is_there
-      namelist /solidparameters/ dosolids, solid_type
+      namelist /solidparameters/ dosolids, solid_type, solid_radius
       in=1
       call MPI_COMM_RANK(MPI_COMM_WORLD, rank, ierr)
       inquire(file='inputsolids',exist=file_is_there)
@@ -369,6 +395,15 @@ end subroutine output_solids
 
     if(rank==0) write(6,*) '@@@@@@@@@@@@@@' , k
   end subroutine print_small_solid
-
+!=================================================================================================
+subroutine final_output(flowrate)
+  use module_grid
+  use module_IO
+  implicit none
+  real(8) flowrate
+  open(unit=121,file=TRIM(out_path)//'/flowrate.txt',access='append')
+  write(121,'(e16.8,e16.8)') dx(3),flowrate
+  close(121)
+ end subroutine final_output
 !=================================================================================================
 end module module_solid

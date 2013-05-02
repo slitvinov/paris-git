@@ -64,7 +64,7 @@ Program paris
   logical, allocatable, dimension(:,:,:) :: mask
   INTEGER :: irank, ii, i, j, k
   integer :: switch=1
-  real(8) :: Large=1e4
+  real(8) :: residual
   real(8) :: sphere
 !---------------------------------------INITIALIZATION--------------------------------------------
   ! Initialize MPI
@@ -108,7 +108,7 @@ Program paris
   endif
 
   call initialize
-  if(DoVOF) call initialize_VOF
+  if(DoVOF.and.rank<nPdomain) call initialize_VOF
 
   if(rank<nPdomain) call initialize_solids
 
@@ -127,15 +127,21 @@ Program paris
 !-------------------------------------------------------------------------------------------------
 !------------------------------------------Begin domain-------------------------------------------
 !-------------------------------------------------------------------------------------------------
-     allocate(mask(imin:imax,jmin:jmax,kmin:kmax))
+     allocate(mask(imin:imax,jmin:jmax,kmin:kmax))  ! used in LinearSolver
      ! output initial condition
-     if(ICOut .and. rank<nPdomain)call output(0,is,ie+1,js,je+1,ks,ke+1)
      if(rank==0) start_time = MPI_WTIME()
-     call calcsum(umask)
-     call setvelocityBC(umask,vmask,wmask,u,v,w)
-     call write_vec_gnuplot(u,v,w,itimestep)
-
-
+     if(ICOut .and. rank<nPdomain) then
+        call output(0,is,ie+1,js,je+1,ks,ke+1)
+        call setvelocityBC(u,v,w,umask,vmask,wmask)
+        call write_vec_gnuplot(u,v,w,itimestep)
+        call calcstats
+        if(rank==0) then
+           end_time =  MPI_WTIME()
+           open(unit=121,file='stats',access='append')
+           write(121,'(20es14.6e2)')time,stats(1:12),dpdx,(stats(8)-stats(9))/dt,end_time-start_time
+           close(121)
+        endif
+     endif
 !-----------------------------------------MAIN TIME LOOP------------------------------------------
      do while(time<EndTime .and. itimestep<nstep)
         if(dtFlag==2)call TimeStepSize(dt)
@@ -202,29 +208,34 @@ Program paris
                  call poi_solve(A,u(is:ie,js:je,ks:ke),maxError,maxit,it)
               else
                  call LinearSolver(A,u,maxError,beta,maxit,it,ierr)
-                 if(rank==0)write(*  ,'("              density  iterations:",I9)')it
-              endif
+                 if(rank==0)write(*,'("U implicit momentum diffusion iterations:",I9)')it
+             endif
+             call calcresidual(A,u,residual)
+             if(rank==0)write(*,'("U implicit momentum diffusion residual:",e8.2)') residual
            
               call SetupVvel(v,dv,rho,mu,dt,A,solids)
               if(hypre)then
                  call poi_solve(A,v(is:ie,js:je,ks:ke),maxError,maxit,it)
               else
                  call LinearSolver(A,v,maxError,beta,maxit,it,ierr)
-                 if(rank==0)write(*  ,'("              density  iterations:",I9)')it
+                 if(rank==0)write(*  ,'("V implicit momentum diffusion  iterations:",I9)')it
               endif
+             call calcresidual(A,v,residual)
+             if(rank==0)write(*,'("V implicit momentum diffusion residual:",e8.2)') residual
 
               call SetupWvel(w,dw,rho,mu,dt,A,solids)
               if(hypre)then
                  call poi_solve(A,w(is:ie,js:je,ks:ke),maxError,maxit,it)
               else
                  call LinearSolver(A,w,maxError,beta,maxit,it,ierr)
-                 if(rank==0)write(*  ,'("              density  iterations:",I9)')it
+                 if(rank==0)write(*  ,'("W implicit momentum diffusion  iterations:",I9)')it
               endif
+             call calcresidual(A,w,residual)
+             if(rank==0)write(*,'("W implicit momentum diffusion residual:",e8.2)') residual
            else
               u = u + dt * du
               v = v + dt * dv
               w = w + dt * dw
-!              if(dosolids) call solidzero(u,v,w,solids)
            endif
            call SetVelocityBC(u,v,w,umask,vmask,wmask)
            call ghost_x(u  ,2,req( 1: 4));  call ghost_x(v,2,req( 5: 8)); call ghost_x(w,2,req( 9:12)) 
@@ -248,6 +259,8 @@ Program paris
            else
               call LinearSolver(A,p,maxError/2d0/dt,beta,maxit,it,ierr)
            endif
+           call calcresidual(A,p,residual)
+           if(rank==0)          write(*  ,'("              pressure residual  :   ",e7.1)') residual
            if(rank==0.and..not.hypre) write(*  ,'("              pressure iterations:",I9)')it
            
            do k=ks,ke;  do j=js,je; do i=is,ieu;    ! CORRECT THE u-velocity 
@@ -279,8 +292,8 @@ Program paris
                  enddo; enddo; enddo
            endif
 
-           call SetVelocityBC(umask,vmask,wmask,u,v,w)
-           call write_vec_gnuplot(u,v,w,itimestep)
+           call SetVelocityBC(u,v,w,umask,vmask,wmask)
+!            call write_vec_gnuplot(u,v,w,itimestep)
 
            call ghost_x(u  ,2,req( 1: 4));  call ghost_x(v,2,req( 5: 8)); call ghost_x(w,2,req( 9:12)); 
            call ghost_x(color,1,req(13:16));  call MPI_WAITALL(16,req(1:16),sta(:,1:16),ierr)
@@ -395,6 +408,7 @@ Program paris
   endif
 
   if(rank<nPdomain)  call output_at_location()
+  if(rank==0)  call final_output(stats(2))
   if(HYPRE) call poi_finalize
   call MPI_BARRIER(MPI_COMM_WORLD, ierr)
   call MPI_FINALIZE(ierr)
@@ -438,10 +452,17 @@ subroutine calcStats
   integer :: i,j,k,ierr
   real(8) :: vol
   real(8), save :: W_int=-0.02066
+  integer :: checkvol=0
   mystats(1:9)=0d0
+  if(checkvol==1) then
+     do  k=ks,ke;  do j=js,je;  do i=is,ie
+        vol = vol + dx(i)*dy(j)*dz(k)
+     enddo;enddo;enddo
+     if(rank==0) print *, "vol=",vol, "all",xlength*ylength*zlength/4
+     stop
+  endif
   do k=ks,ke;  do j=js,je;  do i=is,ie
     vol = dx(i)*dy(j)*dz(k)
-!@@@    print *, "vol=",rank,vol
 ! Average u component
     mystats(2)=mystats(2)+u(i,j,k)*vol
     mystats(3)=mystats(3)+fx(i,j,k)*dxh(i)*dy(j)*dz(k)
@@ -932,7 +953,7 @@ subroutine InitCondition
 
      if(restart)then
         call backup_read
-        call SetVelocityBC(umask,vmask,wmask,u,v,w)
+        call SetVelocityBC(u,v,w,umask,vmask,wmask)
         call ghost_x(u,2,req( 1: 4)); call ghost_x(v,2,req( 5: 8)); call ghost_x(w,2,req( 9:12))
         call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
         call ghost_y(u,2,req( 1: 4)); call ghost_y(v,2,req( 5: 8)); call ghost_y(w,2,req( 9:12))

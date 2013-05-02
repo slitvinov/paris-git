@@ -1,4 +1,5 @@
 #! /bin/bash
-set -x
+#set -x
 
-bash run-speed-test.sh 1 
+echo `./run-speed-test.sh 1`
+

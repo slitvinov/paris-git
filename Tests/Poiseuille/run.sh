@@ -3,18 +3,21 @@
 
 /bin/rm -fr out input
 let npstart=4
-if [ $1 == mono ]; then
-    ln -s testinput.mono input
-    precision=0.01
+if [ $# -gt 0 ]; then
+    if [ $1 == mono ]; then
+	echo "mono"
+	let npstart=1
+	ln -s testinput.mono input
+	precision=0.01
+    else
+	echo "unknown option" $1
+	exit 1
+    fi
 else
     ln -s testinput input
     precision=0.002
 fi
 
-if [ `awk 'BEGIN {FS = "=";}  /npx/ {print $2}' < input` == '1' ]; then
-  echo "mono"
-  let npstart=1
-fi
 
 if [ `awk 'BEGIN {FS = "=";}  /DoFront/ {print $2}' < input` == 'T' ]; then
     let np=$npstart+1
@@ -27,6 +30,8 @@ if [ $np -gt 1 ]; then
 else
     paris > tmpout
 fi
+
+awk ' /Step:/ { cpu = $8 } END { print "cpu = " cpu } ' < tmpout
 
 if [ -d out ]; then
     cd out

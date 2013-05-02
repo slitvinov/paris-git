@@ -9,9 +9,9 @@ set grid
 set xlabel "time"
 set ylabel "flow rate"
 #set key left
-plot "stats" w lines
+plot "stats" u 1:3 w lines
 set term pdf
 set out 'tmp.pdf'
-plot "stats" w lines
+plot "stats" u 1:3 w lines
 exit
 EOF

@@ -9,7 +9,7 @@ for dir in `ls`; do
 	    chmod +x run.sh
 	    ./run.sh > outtest
 # last line in output of test should be PASS or FAIL
-	    tail -n 1 outtest
+	    tail -n 2 outtest
 	fi
 	cd ..
     fi

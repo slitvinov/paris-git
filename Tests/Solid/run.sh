@@ -18,6 +18,7 @@ else
     ln -s testinput.solid input
     mpirun -np 9 paris > tmpout
 fi 
+echo `awk ' /Step:/ { cpu = $8 } END { print "cpu = " cpu } ' < tmpout`
 
 
 NORMAL="\\033[0;39m"
