@@ -1,5 +1,8 @@
 #! /bin/bash
 #set -x
 
-echo `./run-speed-test.sh 1`
+
+chmod +x run-speed-test.sh	  
+./run-speed-test.sh 1
+
 
