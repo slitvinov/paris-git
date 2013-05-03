@@ -82,7 +82,7 @@ zform    = 0.0       	! non-uniformity of the grid if not reading an input file
 
 XLENGTH  = 1.0
 YLENGTH  = 1.0
-ZLENGTH  = 1.0
+ZLENGTH  = ZLTEMP
                    ! domain size in x,y,z direction
 
 !=================================================================================================

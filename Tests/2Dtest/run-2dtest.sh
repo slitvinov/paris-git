@@ -1,19 +1,18 @@
 #! /bin/bash
 #set -x
 
-if [ $# -lt 6 ]; then
+if [ $# -lt 5 ]; then
     echo "missing arguments"
-    echo usage $0 nr_of_dt_values nr_of_nx_values dt0 nx0 Implicit:T/F precision
+    echo usage $0 nr_of_dt_values dt0 nx0 Implicit:T/F precision
     exit
 fi
 
 let ndt=$1
-let ndx=$2
-dt0=$3
-let nx0=$4
+dt0=$2
+let nx0=$3
 let idt=0
-imp=$5
-precision=$6
+imp=$4
+precision=$5
 
 dt=$dt0
 
@@ -22,7 +21,8 @@ dt=$dt0
 while [ $idt -lt $ndt ] ; do
     rm -fr input out stats
     let nx=$nx0
-    sed s/NXTEMP/$nx/g testinput.template | sed s/DTTEMP/$dt/g | sed s/IMPTEMP/$imp/g > testinput-$nx-$idt
+    zlength=`awk -v nx=$nx 'BEGIN { print 2./nx}'`
+    sed s/NXTEMP/$nx/g testinput.template | sed s/DTTEMP/$dt/ | sed s/IMPTEMP/$imp/ | sed s/ZLTEMP/$zlength/  > testinput-$nx-$idt
     ln -s testinput-$nx-$idt input
     if [ `grep DoFront input | awk '{print $3}'` == 'T' ]; then
 	let np=5

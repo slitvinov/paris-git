@@ -7,8 +7,8 @@ if [ $# -lt 1 ]; then
     exit
 fi
 
-./run-2Dtest.sh 4 1 2e-4 $1 F 5e-4
-./run-2Dtest.sh 4 1 2e-4 $1 T 5e-4
+./run-2Dtest.sh 4  2e-4 $1 F 5e-4
+./run-2Dtest.sh 4  2e-4 $1 T 5e-4
 
 
 gnuplot <<EOF
