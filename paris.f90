@@ -169,17 +169,17 @@ Program paris
            ! Receive front from master of front
            if(DoFront) call GetFront('recv')
            
-!           if(dosolids) call solidzero(u,v,w,solids)
            if(Implicit) then
-              call momentumDiffusion(u,v,w,rho,mu,du,dv,dw)  
+              if(Twophase) then 
+                 call momentumDiffusion(u,v,w,rho,mu,du,dv,dw)  
+              else
+                 du = 0d0; dv = 0d0; dw = 0d0
+              endif
            else
               call explicitMomDiff(u,v,w,rho,mu,du,dv,dw)
            endif
-!           if(dosolids) call solidzero(u,v,w,solids)
-           call momentumConvection(u,v,w,du,dv,dw)
-!           if(dosolids) call solidzero(u,v,w,solids)
+           if(.not.ZeroReynolds) call momentumConvection(u,v,w,du,dv,dw)
            
-
            ! reset the surface tension force on the fixed grid
            fx = 0d0;    dIdx=0d0
            fy = 0d0;    dIdy=0d0
@@ -199,11 +199,11 @@ Program paris
 !------------------------------------END VOF STUFF------------------------------------------------ 
            call volumeForce(rho,rho1,rho2,dpdx,dpdy,dpdz,BuoyancyCase,fx,fy,fz,gx,gy,gz,du,dv,dw, &
                 rho_ave)
-           if(dosolids.and..not.implicit) then
+           if(dosolids) then
               du = du*(1.d0 - solids); dv = dv*(1.d0 - solids); dw = dw*(1.d0 - solids)
            endif
            if(Implicit) then   
-              call SetupUvel(u,du,rho,mu,dt,A,solids)
+              call SetupUvel(u,du,rho,mu,rho1,mu1,dt,A,solids)
               if(hypre)then
                  call poi_solve(A,u(is:ie,js:je,ks:ke),maxError,maxit,it)
               else
@@ -213,7 +213,7 @@ Program paris
              call calcresidual(A,u,residual)
              if(rank==0)write(*,'("U implicit momentum diffusion residual:",e8.2)') residual
            
-              call SetupVvel(v,dv,rho,mu,dt,A,solids)
+              call SetupVvel(v,dv,rho,mu,rho1,mu1,dt,A,solids)
               if(hypre)then
                  call poi_solve(A,v(is:ie,js:je,ks:ke),maxError,maxit,it)
               else
@@ -223,7 +223,7 @@ Program paris
              call calcresidual(A,v,residual)
              if(rank==0)write(*,'("V implicit momentum diffusion residual:",e8.2)') residual
 
-              call SetupWvel(w,dw,rho,mu,dt,A,solids)
+              call SetupWvel(w,dw,rho,mu,rho1,mu1,dt,A,solids)
               if(hypre)then
                  call poi_solve(A,w(is:ie,js:je,ks:ke),maxError,maxit,it)
               else
@@ -987,6 +987,7 @@ subroutine InitCondition
            color(i,j,k)=max(color(i,j,k),0d0)
         enddo; enddo; enddo
      endif
+
      if(TwoPhase) then
         if(GetPropertiesFromFront) then
            rho = rho2 + (rho1-rho2)*color
@@ -1148,7 +1149,8 @@ subroutine ReadParameters
                         output_format, read_x,        read_y,        read_z,        x_file,      &
                         y_file,        z_file,        restart,       nBackup,       NumBubble,   &
                         xyzrad,        hypre,         dtFlag,        ICOut,         WallVel,     &
-                        maxErrorVol,   restartFront,  nstats,        WallShear,     restartAverages
+                        maxErrorVol,   restartFront,  nstats,        WallShear,     ZeroReynolds,&
+                        restartAverages
   in=1
   out=2
 

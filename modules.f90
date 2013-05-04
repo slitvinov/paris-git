@@ -44,7 +44,7 @@ module module_grid
   real(8), dimension(:), allocatable :: y, yh, dy, dyh
   real(8), dimension(:), allocatable :: z, zh, dz, dzh
   real(8) :: xLength, yLength, zLength, xform, yform, zform !non-uniformity of grid
-
+  logical :: TwoPhase
   integer :: nPx, nPy, nPz, Mx, My, Mz, rank, ndim=3, nPdomain, NumProcess
   integer, dimension(:), allocatable :: dims, coords, periodic, reorder
   integer :: MPI_Comm_Cart, MPI_Comm_Domain, MPI_Comm_Active
@@ -83,7 +83,7 @@ module module_flow
   real(8), dimension(:,:), allocatable :: averages,oldaverages, allaverages
   real(8) :: gx, gy, gz, mu1, mu2, r_avg, dt, dtFlag, rho_ave, p_ave, vdt
   real(8) :: max_velocity, maxTime, Time, EndTime, MaxDt, CFL, mystats(16), stats(16)
-  logical :: TwoPhase, DoVOF, DoFront, Implicit, hypre, GetPropertiesFromFront
+  logical :: ZeroReynolds,DoVOF, DoFront, Implicit, hypre, GetPropertiesFromFront
   logical :: dosolids = .false.
   real(8) :: rho1, rho2, s
   real(8) :: U_init
@@ -1012,7 +1012,7 @@ end subroutine SetupPoisson
 ! A7*Uijk = A1*Ui-1jk + A2*Ui+1jk + A3*Uij-1k + 
 !           A4*Uij+1k + A5*Uijk-1 + A6*Uijk+1 + A8
 !-------------------------------------------------------------------------------------------------
-subroutine SetupUvel(u,du,rho,mu,dt,A,solids) !,mask)
+subroutine SetupUvel(u,du,rho,mu,rho1,mu1,dt,A,solids) !,mask)
   use module_grid
   use module_hello
   use module_BC
@@ -1022,20 +1022,36 @@ subroutine SetupUvel(u,du,rho,mu,dt,A,solids) !,mask)
   real(8), dimension(is:ie,js:je,ks:ke,8), intent(out) :: A
 !  logical, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: mask
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: solids
-  real(8) :: Large=1e20
-  real(8) :: dt, rhom
+!  real(8) :: Large=1e20
+  real(8), intent(in) :: dt,rho1,mu1
+  real(8) :: rhom
   integer :: i,j,k
-  do k=ks,ke; do j=js,je; do i=is,ie;
-    rhom = 0.5d0*(rho(i+1,j,k)+rho(i,j,k))
-    A(i,j,k,1) = dt/(dx(i  )*dxh(i)*rhom)*2d0*mu(i  ,j,k)
-    A(i,j,k,2) = dt/(dx(i+1)*dxh(i)*rhom)*2d0*mu(i+1,j,k)
-    A(i,j,k,3) = dt/(dy(j)*dyh(j-1)*rhom)*0.25d0*(mu(i,j,k)+mu(i+1,j,k)+mu(i,j-1,k)+mu(i+1,j-1,k))
-    A(i,j,k,4) = dt/(dy(j)*dyh(j  )*rhom)*0.25d0*(mu(i,j,k)+mu(i+1,j,k)+mu(i,j+1,k)+mu(i+1,j+1,k))
-    A(i,j,k,5) = dt/(dz(k)*dzh(k-1)*rhom)*0.25d0*(mu(i,j,k)+mu(i+1,j,k)+mu(i,j,k-1)+mu(i+1,j,k-1))
-    A(i,j,k,6) = dt/(dz(k)*dzh(k  )*rhom)*0.25d0*(mu(i,j,k)+mu(i+1,j,k)+mu(i,j,k+1)+mu(i+1,j,k+1))
-    A(i,j,k,7) = 1d0+sum(A(i,j,k,1:6)) !+Large*solids(i,j,k)
-    A(i,j,k,8) = u(i,j,k) + dt*du(i,j,k)
-  enddo; enddo; enddo
+  if(TwoPhase) then
+     do k=ks,ke; do j=js,je; do i=is,ie;
+        rhom = 0.5d0*(rho(i+1,j,k)+rho(i,j,k))
+        A(i,j,k,1) = dt/(dx(i  )*dxh(i)*rhom)*2d0*mu(i  ,j,k)
+        A(i,j,k,2) = dt/(dx(i+1)*dxh(i)*rhom)*2d0*mu(i+1,j,k)
+        A(i,j,k,3) = dt/(dy(j)*dyh(j-1)*rhom)*0.25d0*(mu(i,j,k)+mu(i+1,j,k)+mu(i,j-1,k)+mu(i+1,j-1,k))
+        A(i,j,k,4) = dt/(dy(j)*dyh(j  )*rhom)*0.25d0*(mu(i,j,k)+mu(i+1,j,k)+mu(i,j+1,k)+mu(i+1,j+1,k))
+        A(i,j,k,5) = dt/(dz(k)*dzh(k-1)*rhom)*0.25d0*(mu(i,j,k)+mu(i+1,j,k)+mu(i,j,k-1)+mu(i+1,j,k-1))
+        A(i,j,k,6) = dt/(dz(k)*dzh(k  )*rhom)*0.25d0*(mu(i,j,k)+mu(i+1,j,k)+mu(i,j,k+1)+mu(i+1,j,k+1))
+        A(i,j,k,7) = 1d0+sum(A(i,j,k,1:6)) !+Large*solids(i,j,k)
+        A(i,j,k,8) = u(i,j,k) + dt*du(i,j,k)
+     enddo; enddo; enddo
+  else
+     do k=ks,ke; do j=js,je; do i=is,ie;
+        rhom = rho1
+        A(i,j,k,1) = dt/(dx(i  )*dxh(i)*rhom)*mu1
+        A(i,j,k,2) = dt/(dx(i+1)*dxh(i)*rhom)*mu1
+        A(i,j,k,3) = dt/(dy(j)*dyh(j-1)*rhom)*mu1
+        A(i,j,k,4) = dt/(dy(j)*dyh(j  )*rhom)*mu1
+        A(i,j,k,5) = dt/(dz(k)*dzh(k-1)*rhom)*mu1
+        A(i,j,k,6) = dt/(dz(k)*dzh(k  )*rhom)*mu1
+        A(i,j,k,7) = 1d0+sum(A(i,j,k,1:6))
+        A(i,j,k,8) = u(i,j,k) + dt*du(i,j,k)
+     enddo; enddo; enddo
+  endif
+
 !-------------------------------------------------------------------------------------------------
   !wall boundary conditions
   if(bdry_cond(2)==0 .and. coords(2)==0    ) then
@@ -1066,7 +1082,7 @@ subroutine SetupUvel(u,du,rho,mu,dt,A,solids) !,mask)
 end subroutine SetupUvel
 !=================================================================================================
 !=================================================================================================
-subroutine SetupVvel(v,dv,rho,mu,dt,A,solids) !,mask)
+subroutine SetupVvel(v,dv,rho,mu,rho1,mu1,dt,A,solids) !,mask)
   use module_grid
   use module_hello
   use module_BC
@@ -1075,28 +1091,43 @@ subroutine SetupVvel(v,dv,rho,mu,dt,A,solids) !,mask)
   real(8), dimension(is:ie,js:je,ks:ke,8), intent(out) :: A
 !  logical, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: mask
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: solids
-  real(8) :: Large=1e20
-  real(8) :: dt, rhom
+!  real(8) :: Large=1e20
+  real(8), intent(in) :: dt,rho1,mu1
+  real(8) :: rhom
   integer :: i,j,k
-  do k=ks,ke; do j=js,je; do i=is,ie;
-    rhom = 0.5d0*(rho(i,j+1,k)+rho(i,j,k))
-if((dy(j  )*dyh(j)*rhom)==0d0)then
-write(*,'(10I4,3f7.3)'),rank,i,j,k,is,ie,js,je,ks,ke,dy(j),dyh(j),rhom
-endif
-    A(i,j,k,3) = dt/(dy(j  )*dyh(j)*rhom)*2d0*mu(i,j  ,k)
-    A(i,j,k,4) = dt/(dy(j+1)*dyh(j)*rhom)*2d0*mu(i,j+1,k)
-    A(i,j,k,5) = dt/(dz(k)*dzh(k-1)*rhom)*0.25d0*(mu(i,j,k)+mu(i,j+1,k)+mu(i,j,k-1)+mu(i,j+1,k-1))
-    A(i,j,k,6) = dt/(dz(k)*dzh(k  )*rhom)*0.25d0*(mu(i,j,k)+mu(i,j+1,k)+mu(i,j,k+1)+mu(i,j+1,k+1))
-    A(i,j,k,1) = dt/(dx(i)*dxh(i-1)*rhom)*0.25d0*(mu(i,j,k)+mu(i,j+1,k)+mu(i-1,j,k)+mu(i-1,j+1,k))
-    A(i,j,k,2) = dt/(dx(i)*dxh(i  )*rhom)*0.25d0*(mu(i,j,k)+mu(i,j+1,k)+mu(i+1,j,k)+mu(i+1,j+1,k))
-    A(i,j,k,7) = 1d0+sum(A(i,j,k,1:6)) !+Large*solids(i,j,k)
-    A(i,j,k,8) = v(i,j,k) + dt*dv(i,j,k)
-  enddo; enddo; enddo
-!-------------------------------------------------------------------------------------------------
+  if(TwoPhase) then
+     do k=ks,ke; do j=js,je; do i=is,ie;
+        rhom = 0.5d0*(rho(i,j+1,k)+rho(i,j,k))
+        if((dy(j  )*dyh(j)*rhom)==0d0)then
+           write(*,'(10I4,3f7.3)'),rank,i,j,k,is,ie,js,je,ks,ke,dy(j),dyh(j),rhom
+        endif
+        A(i,j,k,3) = dt/(dy(j  )*dyh(j)*rhom)*2d0*mu(i,j  ,k)
+        A(i,j,k,4) = dt/(dy(j+1)*dyh(j)*rhom)*2d0*mu(i,j+1,k)
+        A(i,j,k,5) = dt/(dz(k)*dzh(k-1)*rhom)*0.25d0*(mu(i,j,k)+mu(i,j+1,k)+mu(i,j,k-1)+mu(i,j+1,k-1))
+        A(i,j,k,6) = dt/(dz(k)*dzh(k  )*rhom)*0.25d0*(mu(i,j,k)+mu(i,j+1,k)+mu(i,j,k+1)+mu(i,j+1,k+1))
+        A(i,j,k,1) = dt/(dx(i)*dxh(i-1)*rhom)*0.25d0*(mu(i,j,k)+mu(i,j+1,k)+mu(i-1,j,k)+mu(i-1,j+1,k))
+        A(i,j,k,2) = dt/(dx(i)*dxh(i  )*rhom)*0.25d0*(mu(i,j,k)+mu(i,j+1,k)+mu(i+1,j,k)+mu(i+1,j+1,k))
+        A(i,j,k,7) = 1d0+sum(A(i,j,k,1:6)) !+Large*solids(i,j,k)
+        A(i,j,k,8) = v(i,j,k) + dt*dv(i,j,k)
+     enddo; enddo; enddo
+  else
+     do k=ks,ke; do j=js,je; do i=is,ie;
+        rhom = rho1
+        A(i,j,k,3) = dt/(dy(j  )*dyh(j)*rhom)*mu1
+        A(i,j,k,4) = dt/(dy(j+1)*dyh(j)*rhom)*mu1
+        A(i,j,k,5) = dt/(dz(k)*dzh(k-1)*rhom)*mu1
+        A(i,j,k,6) = dt/(dz(k)*dzh(k  )*rhom)*mu1
+        A(i,j,k,1) = dt/(dx(i-1)*dxh(i)*rhom)*mu1
+        A(i,j,k,2) = dt/(dx(i)*dxh(i)*rhom)*mu1
+        A(i,j,k,7) = 1d0+sum(A(i,j,k,1:6))
+        A(i,j,k,8) = v(i,j,k) + dt*dv(i,j,k)
+     enddo; enddo; enddo
+  endif
+  !-------------------------------------------------------------------------------------------------
   !wall boundary conditions
   if(bdry_cond(1)==0 .and. coords(1)==0    ) then
-    do k=ks,ke; do j=js,je;
-      A(is,j,k,7) = A(is,j,k,7) + A(is,j,k,1)
+     do k=ks,ke; do j=js,je;
+        A(is,j,k,7) = A(is,j,k,7) + A(is,j,k,1)
       A(is,j,k,1) = 0d0
     enddo; enddo
   endif
@@ -1122,7 +1153,7 @@ endif
 end subroutine SetupVvel
 !=================================================================================================
 !=================================================================================================
-subroutine SetupWvel(w,dw,rho,mu,dt,A,solids) !,mask)
+subroutine SetupWvel(w,dw,rho,mu,rho1,mu1,dt,A,solids) !,mask)
   use module_grid
   use module_hello
   use module_BC
@@ -1131,27 +1162,42 @@ subroutine SetupWvel(w,dw,rho,mu,dt,A,solids) !,mask)
   real(8), dimension(is:ie,js:je,ks:ke,8), intent(out) :: A
 !  logical, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: mask
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: solids
-  real(8) :: Large=1e20
-  real(8) :: dt, rhom
+!  real(8) :: Large=1e20
+  real(8), intent(in) :: dt,rho1,mu1
+  real(8) :: rhom
   integer :: i,j,k
-  do k=ks,ke; do j=js,je; do i=is,ie;
-    rhom = 0.5d0*(rho(i,j,k+1)+rho(i,j,k))
-    A(i,j,k,5) = dt/(dz(k  )*dzh(k)*rhom)*2d0*mu(i,j,k  )
-    A(i,j,k,6) = dt/(dz(k+1)*dzh(k)*rhom)*2d0*mu(i,j,k+1)
-    A(i,j,k,1) = dt/(dx(i)*dxh(i-1)*rhom)*0.25d0*(mu(i,j,k)+mu(i,j,k+1)+mu(i-1,j,k)+mu(i-1,j,k+1))
-    A(i,j,k,2) = dt/(dx(i)*dxh(i  )*rhom)*0.25d0*(mu(i,j,k)+mu(i,j,k+1)+mu(i+1,j,k)+mu(i+1,j,k+1))
-    A(i,j,k,3) = dt/(dy(j)*dyh(j-1)*rhom)*0.25d0*(mu(i,j,k)+mu(i,j,k+1)+mu(i,j-1,k)+mu(i,j-1,k+1))
-    A(i,j,k,4) = dt/(dy(j)*dyh(j  )*rhom)*0.25d0*(mu(i,j,k)+mu(i,j,k+1)+mu(i,j+1,k)+mu(i,j+1,k+1))
-    A(i,j,k,7) = 1d0+sum(A(i,j,k,1:6)) !+Large*solids(i,j,k)
-    A(i,j,k,8) = w(i,j,k) + dt*dw(i,j,k)
-  enddo; enddo; enddo
-!-------------------------------------------------------------------------------------------------
+  if(TwoPhase) then
+     do k=ks,ke; do j=js,je; do i=is,ie;
+        rhom = 0.5d0*(rho(i,j,k+1)+rho(i,j,k))
+        A(i,j,k,5) = dt/(dz(k  )*dzh(k)*rhom)*2d0*mu(i,j,k  )
+        A(i,j,k,6) = dt/(dz(k+1)*dzh(k)*rhom)*2d0*mu(i,j,k+1)
+        A(i,j,k,1) = dt/(dx(i)*dxh(i-1)*rhom)*0.25d0*(mu(i,j,k)+mu(i,j,k+1)+mu(i-1,j,k)+mu(i-1,j,k+1))
+        A(i,j,k,2) = dt/(dx(i)*dxh(i  )*rhom)*0.25d0*(mu(i,j,k)+mu(i,j,k+1)+mu(i+1,j,k)+mu(i+1,j,k+1))
+        A(i,j,k,3) = dt/(dy(j)*dyh(j-1)*rhom)*0.25d0*(mu(i,j,k)+mu(i,j,k+1)+mu(i,j-1,k)+mu(i,j-1,k+1))
+        A(i,j,k,4) = dt/(dy(j)*dyh(j  )*rhom)*0.25d0*(mu(i,j,k)+mu(i,j,k+1)+mu(i,j+1,k)+mu(i,j+1,k+1))
+        A(i,j,k,7) = 1d0+sum(A(i,j,k,1:6)) !+Large*solids(i,j,k)
+        A(i,j,k,8) = w(i,j,k) + dt*dw(i,j,k)
+     enddo; enddo; enddo
+  else
+      do k=ks,ke; do j=js,je; do i=is,ie;
+        rhom = rho1
+        A(i,j,k,5) = dt/(dz(k  )*dzh(k)*rhom)*mu1
+        A(i,j,k,6) = dt/(dz(k+1)*dzh(k)*rhom)*mu1
+        A(i,j,k,1) = dt/(dx(i)*dxh(i-1)*rhom)*mu1
+        A(i,j,k,2) = dt/(dx(i)*dxh(i  )*rhom)*mu1
+        A(i,j,k,3) = dt/(dy(j)*dyh(j-1)*rhom)*mu1
+        A(i,j,k,4) = dt/(dy(j)*dyh(j  )*rhom)*mu1
+        A(i,j,k,7) = 1d0+sum(A(i,j,k,1:6)) !+Large*solids(i,j,k)
+        A(i,j,k,8) = w(i,j,k) + dt*dw(i,j,k)
+     enddo; enddo; enddo
+  endif
+  !-------------------------------------------------------------------------------------------------
   !wall boundary conditions
   if(bdry_cond(1)==0 .and. coords(1)==0    ) then
-    do k=ks,ke; do j=js,je;
-      A(is,j,k,7) = A(is,j,k,7) + A(is,j,k,1)
-      A(is,j,k,1) = 0d0
-    enddo; enddo
+     do k=ks,ke; do j=js,je;
+        A(is,j,k,7) = A(is,j,k,7) + A(is,j,k,1)
+        A(is,j,k,1) = 0d0
+     enddo; enddo
   endif
   if(bdry_cond(4)==0 .and. coords(1)==nPx-1) then
     do k=ks,ke; do j=js,je;

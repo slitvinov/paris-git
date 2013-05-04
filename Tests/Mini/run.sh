@@ -19,7 +19,7 @@ if [ `grep Step tmpout | tail -n 1 |  awk  '{print $2}'` == '3' ]; then
 else 
     echo -e "\033[31;1m FAIL\033[0m"
 fi
-rm tmpout input
+
 
 
 
