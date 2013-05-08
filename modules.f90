@@ -1022,7 +1022,7 @@ subroutine SetupUvel(u,du,rho,mu,rho1,mu1,dt,A,solids) !,mask)
   real(8), dimension(is:ie,js:je,ks:ke,8), intent(out) :: A
 !  logical, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: mask
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: solids
-!  real(8) :: Large=1e20
+  real(8) :: Large=1e20
   real(8), intent(in) :: dt,rho1,mu1
   real(8) :: rhom
   integer :: i,j,k
@@ -1047,7 +1047,7 @@ subroutine SetupUvel(u,du,rho,mu,rho1,mu1,dt,A,solids) !,mask)
         A(i,j,k,4) = dt/(dy(j)*dyh(j  )*rhom)*mu1
         A(i,j,k,5) = dt/(dz(k)*dzh(k-1)*rhom)*mu1
         A(i,j,k,6) = dt/(dz(k)*dzh(k  )*rhom)*mu1
-        A(i,j,k,7) = 1d0+sum(A(i,j,k,1:6))
+        A(i,j,k,7) = 1d0+sum(A(i,j,k,1:6)) !+Large*solids(i,j,k)
         A(i,j,k,8) = u(i,j,k) + dt*du(i,j,k)
      enddo; enddo; enddo
   endif
@@ -1091,7 +1091,7 @@ subroutine SetupVvel(v,dv,rho,mu,rho1,mu1,dt,A,solids) !,mask)
   real(8), dimension(is:ie,js:je,ks:ke,8), intent(out) :: A
 !  logical, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: mask
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: solids
-!  real(8) :: Large=1e20
+  real(8) :: Large=1e20
   real(8), intent(in) :: dt,rho1,mu1
   real(8) :: rhom
   integer :: i,j,k
@@ -1119,7 +1119,7 @@ subroutine SetupVvel(v,dv,rho,mu,rho1,mu1,dt,A,solids) !,mask)
         A(i,j,k,6) = dt/(dz(k)*dzh(k  )*rhom)*mu1
         A(i,j,k,1) = dt/(dx(i-1)*dxh(i)*rhom)*mu1
         A(i,j,k,2) = dt/(dx(i)*dxh(i)*rhom)*mu1
-        A(i,j,k,7) = 1d0+sum(A(i,j,k,1:6))
+        A(i,j,k,7) = 1d0+sum(A(i,j,k,1:6)) !+Large*solids(i,j,k)
         A(i,j,k,8) = v(i,j,k) + dt*dv(i,j,k)
      enddo; enddo; enddo
   endif
@@ -1162,7 +1162,7 @@ subroutine SetupWvel(w,dw,rho,mu,rho1,mu1,dt,A,solids) !,mask)
   real(8), dimension(is:ie,js:je,ks:ke,8), intent(out) :: A
 !  logical, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: mask
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: solids
-!  real(8) :: Large=1e20
+  real(8) :: Large=1e20
   real(8), intent(in) :: dt,rho1,mu1
   real(8) :: rhom
   integer :: i,j,k
@@ -1187,7 +1187,7 @@ subroutine SetupWvel(w,dw,rho,mu,rho1,mu1,dt,A,solids) !,mask)
         A(i,j,k,2) = dt/(dx(i)*dxh(i  )*rhom)*mu1
         A(i,j,k,3) = dt/(dy(j)*dyh(j-1)*rhom)*mu1
         A(i,j,k,4) = dt/(dy(j)*dyh(j  )*rhom)*mu1
-        A(i,j,k,7) = 1d0+sum(A(i,j,k,1:6)) !+Large*solids(i,j,k)
+        A(i,j,k,7) = 1d0+sum(A(i,j,k,1:6)) +Large*solids(i,j,k)
         A(i,j,k,8) = w(i,j,k) + dt*dw(i,j,k)
      enddo; enddo; enddo
   endif

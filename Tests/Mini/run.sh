@@ -7,7 +7,7 @@
 let np=8
 rm -fR out input
 ln -s miniinput input
-if [ `grep TWOPHASE input | awk '{print $3}'` == 'T' ]; then
+if [ `grep -i DoFront input | awk '{print $3}'` == 'T' ]; then
     let np=$np+1
 fi
 

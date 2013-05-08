@@ -1,14 +1,14 @@
 !=================================================================================================
 !=================================================================================================
 ! Paris-0.2
-! Extended from Code: FTC3D2011 (Front Tracking Code for 3D simulations)
+! Extended from Codes: FTC3D2011 (Front Tracking Code for 3D simulations)
 ! and Surfer. 
 ! 
 ! Authors: Sadegh Dabiri, Gretar Tryggvason.
-! Author for VOF extensions Stephane Zaleski (zaleski@dalembert.upmc.fr).
+! Author for VOF extensions and solid obstacles Stephane Zaleski (zaleski@dalembert.upmc.fr).
 ! Contact: sdabiri@gmail.com .
-! A three dimensional Navier-Stokes flow solver with front tracking for modeling of multiphase 
-! flows. Flow can be driven by wall motion, density difference or pressure gradient.
+! A three dimensional Navier-Stokes flow solver with Front Tracking and VOF for modeling of 
+! multiphase flows. Flow can be driven by wall motion, density difference or pressure gradient.
 ! Boundary conditions supported: wall and periodic
 !
 !  HISTORY
@@ -127,7 +127,7 @@ Program paris
 !-------------------------------------------------------------------------------------------------
 !------------------------------------------Begin domain-------------------------------------------
 !-------------------------------------------------------------------------------------------------
-     allocate(mask(imin:imax,jmin:jmax,kmin:kmax))  ! used in LinearSolver
+     allocate(mask(imin:imax,jmin:jmax,kmin:kmax))  ! was used in LinearSolver
      ! output initial condition
      if(rank==0) start_time = MPI_WTIME()
      if(ICOut .and. rank<nPdomain) then
