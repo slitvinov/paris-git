@@ -1,14 +1,14 @@
 !=================================================================================================
 !=================================================================================================
 ! Paris-0.2
-! Extended from Codes: FTC3D2011 (Front Tracking Code for 3D simulations)
+! Extended from Code: FTC3D2011 (Front Tracking Code for 3D simulations)
 ! and Surfer. 
 ! 
 ! Authors: Sadegh Dabiri, Gretar Tryggvason.
-! Author for VOF extensions and solid obstacles Stephane Zaleski (zaleski@dalembert.upmc.fr).
+! Author for VOF extensions Stephane Zaleski (zaleski@dalembert.upmc.fr).
 ! Contact: sdabiri@gmail.com .
-! A three dimensional Navier-Stokes flow solver with Front Tracking and VOF for modeling of 
-! multiphase flows. Flow can be driven by wall motion, density difference or pressure gradient.
+! A three dimensional Navier-Stokes flow solver with front tracking for modeling of multiphase 
+! flows. Flow can be driven by wall motion, density difference or pressure gradient.
 ! Boundary conditions supported: wall and periodic
 !
 !  HISTORY
@@ -132,6 +132,7 @@ Program paris
      if(rank==0) start_time = MPI_WTIME()
      if(ICOut .and. rank<nPdomain) then
         call output(0,is,ie+1,js,je+1,ks,ke+1)
+        call output_VOF(0,imin,imax,jmin,jmax,kmin,kmax)
         call setvelocityBC(u,v,w,umask,vmask,wmask)
         call write_vec_gnuplot(u,v,w,itimestep)
         call calcstats
@@ -335,6 +336,7 @@ Program paris
         if(mod(itimestep,nout)==0) then 
            call write_vec_gnuplot(u,v,w,itimestep)
            call output(ITIMESTEP/nout,is,ie+1,js,je+1,ks,ke+1)
+           call output_VOF(ITIMESTEP/nout,imin,imax,jmin,jmax,kmin,kmax)
         endif
         if(rank==0)then
            end_time =  MPI_WTIME()
@@ -946,11 +948,10 @@ subroutine InitCondition
   use module_vof
   implicit none
   include 'mpif.h'
-  integer :: i,j,k, ierr, irank, req(12),sta(MPI_STATUS_SIZE,12)
+  integer :: i,j,k,ib, ierr, irank, req(12),sta(MPI_STATUS_SIZE,12)
   real(8) :: my_ave
   !---------------------------------------------Domain----------------------------------------------
   if(rank<nPdomain)then
-
      if(restart)then
         call backup_read
         call SetVelocityBC(u,v,w,umask,vmask,wmask)
@@ -965,8 +966,37 @@ subroutine InitCondition
         ! The color function is used for density and viscosity in the domain 
         ! when set by Front-Tracking.
         color = 0.; u = U_init;  v = 0;  w = 0.
+        if(DoVOF) then
+!           do i=imin,imax-1; do j=jmin,jmax-1; do k=kmin,kmax-1
+!              x1=x(i); y1=y(j); z1=z(k)
+           !    x0 = 0.5d0
+           !    y0 = 0.5d0
+           !    z0 = 0.5d0
+           !    radius = 0.25d0
+           !    if((-((x1 - x0)*(x1 - x0) + (y1 - y0)*(y1 - y0) + (z1 - z0)*(z1 - z0)) + radius*radius) > 0d0) then 
+           !       cvof(i,j,k) = 1d0
+           !    else
+           !       cvof(i,j,k) = 0d0
+           !    endif
+           ! enddo; enddo; enddo
+     do ib=1,numBubble
+        do i=imin,imax
+           do j=jmin,jmax
+              do k=kmin,kmax 
+                 du(i,j,k) =  rad(ib)**2 - ((x(i)-xc(ib))**2+(y(j)-yc(ib))**2+(z(k)-zc(ib))**2) 
+                 !  if ( (x(i)-xc(ib))**2+(y(j)-yc(ib))**2+(z(k)-zc(ib))**2 < rad(ib)**2) then 
+                 !                      cvof(i,j,k) = 1.
+                 !  endif
+              enddo
+           enddo
+        enddo
+     enddo
+     i = imax-imin+1
+     j = jmax-jmin+1
+     k = kmax-kmin+1
+     call levelset2vof(du,cvof,i,j,k)
+        endif
      endif
-
      if(DoFront) then
         call GetFront('recv')
         call GetFront('wait')
@@ -1159,7 +1189,17 @@ subroutine ReadParameters
   read(UNIT=in,NML=parameters)
   close(in)
   if(MaxFront>10000) stop 'Error: ReadParameters: increase size of xyzrad array'
+
+  if(numBubble>MaxFront) stop 'Error: ReadParameters: increase size of xyzrad array (MaxFront)'
+
+  allocate(xc(MaxFront), yc(MaxFront), zc(MaxFront))
   allocate(FrontProps(1:14,MaxFront),rad(MaxFront))
+
+  xc (1:NumBubble) = xyzrad(1,1:NumBubble)
+  yc (1:NumBubble) = xyzrad(2,1:NumBubble)
+  zc (1:NumBubble) = xyzrad(3,1:NumBubble)
+  rad(1:NumBubble) = xyzrad(4,1:NumBubble)
+
 
   FrontProps(5,1:NumBubble) = xyzrad(1,1:NumBubble)
   FrontProps(6,1:NumBubble) = xyzrad(2,1:NumBubble)

@@ -38,7 +38,7 @@ MAXERROR= 1d-6     ! Residual for Poisson solver
 MAXERRORVOL = 1d-4
                    ! Numerical parameters
 
-ITIME_SCHEME = 2   ! time scheme: 1:first order Euler, 2: second order TVD Runge-Kutta
+ITIME_SCHEME = 1  ! time scheme: 1:first order Euler, 2: second order TVD Runge-Kutta
                    ! Should use first order Euler for Stokes flow ! ! ! 
 MAXIT    = 20
 BETA     = 1.2
@@ -64,9 +64,9 @@ npy     = 2
 npz     = 2
                    ! number of processors in x,y,z direction
 
-Nx      = 32
-Ny      = 32
-Nz      = 32
+Nx      = 16
+Ny      = 16
+Nz      = 16
 Ng      = 2
                    ! grid size in x,y,z direction and number of ghost cells
 
