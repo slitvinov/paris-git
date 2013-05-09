@@ -176,11 +176,6 @@ contains
     end where
 
   end subroutine c_mask
-!=================================================================================================
-! Following the advection method of Wyemouth & Yue : Weymouth, G D, and Dick K P Yue,
-! "Conservative Volume-of-Fluid Method for Free-Surface Simulations on Cartesian-Grids."
-! Journal of Computational Physics 229, no. 8 (April 2010): 2853-2865. doi:10.1016/j.jcp.2009.12.018.
-!=================================================================================================
   subroutine vofsweepsr(tswap)
     use module_BC
     use module_flow
@@ -518,24 +513,28 @@ end subroutine swpz
 !
 !=================================================================================================
 ! split 1D advection of the interface along the x,y,z (d=1,2,3) directions
+!
+! Following the advection method of Weymouth & Yue : Weymouth, G D, and Dick K P Yue,
+! "Conservative Volume-of-Fluid Method for Free-Surface Simulations on Cartesian-Grids."
+! Journal of Computational Physics 229, no. 8 (April 2010): 2853-2865. doi:10.1016/j.jcp.2009.12.018.
 !=================================================================================================
 SUBROUTINE swpr(us,c,vof1,cg,vof3,dir)
-!
-    USE module_grid
-    USE module_flow
-    USE module_vof
-    use module_hello
-    IMPLICIT NONE
-    INTEGER :: i,j,k
-    INTEGER :: invx,invy,invz,ii,jj,kk,i0,j0,k0
-    INTEGER, INTENT(IN) :: dir
-    REAL (8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), INTENT(IN) :: us,cg
-    REAL (8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), INTENT(INOUT) :: c,vof1,vof3
-    REAL(8), TARGET :: dmx,dmy,dmz,dxyz
-    REAL(8), POINTER :: dm1,dm2,dm3
-    REAL(8) :: a1,a2,alpha,AL3D,FL3D
-    real(8) :: mxyz(3),stencil3x3(-1:1,-1:1,-1:1)
-    INTRINSIC DMAX1,DMIN1
+!***
+  USE module_grid
+  USE module_flow
+  USE module_vof
+  IMPLICIT NONE
+  INTEGER :: i,j,k
+  INTEGER :: invx,invy,invz,ii,jj,kk,i0,j0,k0
+  INTEGER, INTENT(IN) :: dir
+  REAL (8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), INTENT(IN) :: us,cg
+  REAL (8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), INTENT(INOUT) :: c,vof1,vof3
+  REAL(8), TARGET :: dmx,dmy,dmz
+  REAL(8) :: dxyz
+  REAL(8), POINTER :: dm1,dm2,dm3
+  REAL(8) :: a1,a2,alpha,AL3D,FL3D
+  REAL(8) :: mxyz(3),stencil3x3(-1:1,-1:1,-1:1)
+  INTRINSIC DMAX1,DMIN1
 !
   if(ng < 2) stop "wrong ng"
   ii=0; jj=0; kk=0
@@ -546,7 +545,6 @@ SUBROUTINE swpr(us,c,vof1,cg,vof3,dir)
   else if (dir == 3) then
      kk=1; dm1 => dmz;  dm2 => dmx;  dm3 => dmy 
   endif
-  call hello_coucou
   dxyz = dxh(is)
   if(dyh(js).ne.dxyz.or.dzh(ks).ne.dxyz) stop "non-cubic cells"
 
@@ -611,12 +609,11 @@ SUBROUTINE swpr(us,c,vof1,cg,vof3,dir)
         enddo
      enddo
   enddo
-!=================================================================================================
-
   ! apply proper boundary conditions to c
   call setvofbc(c)
-!
 end subroutine swpr
+!=================================================================================================
+!=================================================================================================
 ! ****** 1 ******* 2 ******* 3 ******* 4 ******* 5 ******* 6 ******* 7 *
 ! PROGRAM TO FIND alpha IN: m1 x1 + m2 x2 + m3 x3 = alpha,
 ! GIVEN m1+m2+m3=1 (all > 0) AND THE VOLUMETRIC FRACTION cc
