@@ -92,79 +92,6 @@ contains
  !       endif
    end subroutine initialize_VOF
 !=================================================================================================
-!=================================================================================================
-  subroutine vofsweeps(tswap)
-    integer, intent(inout) :: tswap
-    if(VOF_advect=='CIAM') then
-       call  vofsweepsz(tswap)
-    elseif (VOF_advect=='Dick_Yue') then
-       call  vofsweepsr(tswap)
-    else
-       stop "unknown VOF Type"
-    endif
-  end subroutine vofsweeps
-!
-!=================================================================================================
-!=================================================================================================
-  subroutine vofsweepsz(tswap)
-    use module_BC
-    use module_flow
-    use module_tmpvar
-    implicit none
-    include 'mpif.h'
-    integer, intent(in) :: tswap
-    integer :: req(48),sta(MPI_STATUS_SIZE,48)
-    integer :: ngh=2, ierr
-
-    if (MOD(tswap,3) .eq. 0) then
-       call swpz(w,cvof,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3),3)
-       call ghost_x(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
-       call ghost_y(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
-       call ghost_z(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
-
-       call swpz(u,cvof,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3),1)
-       call ghost_x(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
-       call ghost_y(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
-       call ghost_z(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
-
-       call swpz(v,cvof,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3),2)
-       call ghost_x(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
-       call ghost_y(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
-       call ghost_z(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
-    elseif (MOD(tswap,2) .eq. 0) then
-       call swpz(v,cvof,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3),2)
-       call ghost_x(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
-       call ghost_y(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
-       call ghost_z(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
-
-       call swpz(w,cvof,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3),3)
-       call ghost_x(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
-       call ghost_y(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
-       call ghost_z(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
-
-       call swpz(u,cvof,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3),1)
-       call ghost_x(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
-       call ghost_y(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
-       call ghost_z(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
-    else 
-       call swpz(u,cvof,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3),1)
-       call ghost_x(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
-       call ghost_y(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
-       call ghost_z(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
-
-       call swpz(v,cvof,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3),2)
-       call ghost_x(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
-       call ghost_y(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
-       call ghost_z(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
-
-       call swpz(w,cvof,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3),3)
-       call ghost_x(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
-       call ghost_y(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
-       call ghost_z(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
-    endif
-  end subroutine vofsweepsz
-!=================================================================================================
-!=================================================================================================
   subroutine c_mask(cbinary)
     implicit none
     real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(out) :: cbinary
@@ -174,9 +101,9 @@ contains
     elsewhere
        cbinary = 0.d0
     end where
-
   end subroutine c_mask
-  subroutine vofsweepsr(tswap)
+!=================================================================================================
+  subroutine vofsweeps(tswap)
     use module_BC
     use module_flow
     use module_tmpvar
@@ -186,54 +113,54 @@ contains
     integer :: req(48),sta(MPI_STATUS_SIZE,48)
     integer :: ngh=2, ierr
 
-    call c_mask(work(:,:,:,2))
+    if (VOF_advect=='Dick_Yue') call c_mask(work(:,:,:,2))
     if (MOD(tswap,3) .eq. 0) then
-       call swpr(w,cvof,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3),3)
+       call swp(w,cvof,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3),3)
        call ghost_x(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
        call ghost_y(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
        call ghost_z(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
 
-       call swpr(u,cvof,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3),1)
+       call swp(u,cvof,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3),1)
        call ghost_x(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
        call ghost_y(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
        call ghost_z(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
 
-       call swpr(v,cvof,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3),2)
+       call swp(v,cvof,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3),2)
        call ghost_x(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
        call ghost_y(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
        call ghost_z(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
     elseif (MOD(tswap,2) .eq. 0) then
-       call swpr(v,cvof,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3),2)
+       call swp(v,cvof,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3),2)
        call ghost_x(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
        call ghost_y(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
        call ghost_z(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
 
-       call swpr(w,cvof,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3),3)
+       call swp(w,cvof,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3),3)
        call ghost_x(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
        call ghost_y(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
        call ghost_z(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
 
-       call swpr(u,cvof,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3),1)
+       call swp(u,cvof,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3),1)
        call ghost_x(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
        call ghost_y(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
        call ghost_z(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
     else 
-       call swpr(u,cvof,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3),1)
+       call swp(u,cvof,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3),1)
        call ghost_x(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
        call ghost_y(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
        call ghost_z(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
 
-       call swpr(v,cvof,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3),2)
+       call swp(v,cvof,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3),2)
        call ghost_x(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
        call ghost_y(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
        call ghost_z(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
 
-       call swpr(w,cvof,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3),3)
+       call swp(w,cvof,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3),3)
        call ghost_x(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
        call ghost_y(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
        call ghost_z(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
     endif
-  end subroutine vofsweepsr
+  end subroutine vofsweeps
 !=================================================================================================
 ! subroutine SetVelocityBC: Sets the velocity boundary condition
 !-------------------------------------------------------------------------------------------------
@@ -362,6 +289,24 @@ end subroutine output_VOF
 !-------------------------------------------------------------------------------------------------
 !=================================================================================================
 end module module_output_vof
+!
+subroutine swp(us,c,vof1,vof2,vof3,d)
+  use module_vof
+  implicit none
+  real (8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: us
+  integer, intent(in) :: d
+  real (8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: c,vof1,vof2,vof3
+  if (VOF_advect=='Dick_Yue') then
+     call swpr(us,c,vof1,vof2,vof3,d)
+  elseif (VOF_advect=='CIAM') then
+     call swpz(us,c,vof1,vof2,vof3,d)
+  else
+     STOP "*** unknown vof scheme"
+  endif
+end subroutine swp
+
+!  Implements the CIAM advection method of Jie Li. 
+! 
 ! ****** 1 ******* 2 ******* 3 ******* 4 ******* 5 ******* 6 ******* 7 *
 ! split advection of the interface along the x (d=1), y (d=2) and z (d=3)
 ! direction
@@ -518,23 +463,24 @@ end subroutine swpz
 ! "Conservative Volume-of-Fluid Method for Free-Surface Simulations on Cartesian-Grids."
 ! Journal of Computational Physics 229, no. 8 (April 2010): 2853-2865. doi:10.1016/j.jcp.2009.12.018.
 !=================================================================================================
+!=================================================================================================
 SUBROUTINE swpr(us,c,vof1,cg,vof3,dir)
 !***
-  USE module_grid
-  USE module_flow
-  USE module_vof
-  IMPLICIT NONE
-  INTEGER :: i,j,k
-  INTEGER :: invx,invy,invz,ii,jj,kk,i0,j0,k0
-  INTEGER, INTENT(IN) :: dir
-  REAL (8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), INTENT(IN) :: us,cg
-  REAL (8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), INTENT(INOUT) :: c,vof1,vof3
-  REAL(8), TARGET :: dmx,dmy,dmz
-  REAL(8) :: dxyz
-  REAL(8), POINTER :: dm1,dm2,dm3
-  REAL(8) :: a1,a2,alpha,AL3D,FL3D
-  REAL(8) :: mxyz(3),stencil3x3(-1:1,-1:1,-1:1)
-  INTRINSIC DMAX1,DMIN1
+    USE module_grid
+    USE module_flow
+    USE module_vof
+    use module_hello
+    IMPLICIT NONE
+    INTEGER :: i,j,k
+    INTEGER :: invx,invy,invz,ii,jj,kk,i0,j0,k0
+    INTEGER, INTENT(IN) :: dir
+    REAL (8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), INTENT(IN) :: us,cg
+    REAL (8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), INTENT(INOUT) :: c,vof1,vof3
+    REAL(8), TARGET :: dmx,dmy,dmz,dxyz
+    REAL(8), POINTER :: dm1,dm2,dm3
+    REAL(8) :: EPSC,a1,a2,alpha,AL3D,FL3D
+    real(8) :: mxyz(3),stencil3x3(-1:1,-1:1,-1:1)
+    INTRINSIC DMAX1,DMIN1
 !
   if(ng < 2) stop "wrong ng"
   ii=0; jj=0; kk=0
@@ -545,6 +491,7 @@ SUBROUTINE swpr(us,c,vof1,cg,vof3,dir)
   else if (dir == 3) then
      kk=1; dm1 => dmz;  dm2 => dmx;  dm3 => dmy 
   endif
+  EPSC = 1.d-12
   dxyz = dxh(is)
   if(dyh(js).ne.dxyz.or.dzh(ks).ne.dxyz) stop "non-cubic cells"
 
@@ -605,7 +552,12 @@ SUBROUTINE swpr(us,c,vof1,cg,vof3,dir)
            a1 = us(i-ii,j-jj,k-kk)*dt/dxyz
            c(i,j,k) = c(i,j,k) - (vof3(i,j,k) - vof1(i+ii,j+jj,k+kk)) + & 
                       (vof3(i-ii,j-jj,k-kk) - vof1(i,j,k)) + cg(i,j,k)*(a2-a1);
-           c(i,j,k) = DMAX1(0.d0,DMIN1(1.d0,c(i,j,k)))
+!!$           c(i,j,k) = DMAX1(0.d0,DMIN1(1.d0,c(i,j,k)))
+           if (c(i,j,k) < EPSC) then
+              c(i,j,k) = 0.d0
+           elseif (c(i,j,k) >  (1.d0 - EPSC)) then
+              c(i,j,k) = 1.d0
+           endif
         enddo
      enddo
   enddo

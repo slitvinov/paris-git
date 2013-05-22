@@ -25,7 +25,7 @@ HYPRE_LIBS =  -L$(HYPRE_DIR)/lib -lHYPRE
 #------------------------No changes needed beyond this line----------------------------------------------
 
 
-OBJ = paris.o solids.o modules.o vofmodules.o front.o
+OBJ = paris.o solids.o modules.o vofmodules.o front.o # uzawa.o
 OBJC = compare.o
 SRC = $(wildcard  *.f90) 
 
@@ -71,6 +71,9 @@ solids.o:  solids.f90 modules.o
 
 front.o:  front.f90 modules.o
 	$(FC) -c   $(FFLAGS) $<
+
+#uzawa.o:  uzawa.f90 modules.o
+#	$(FC) -c   $(FFLAGS) $<
 
 %.o : %.f90
 	$(FC) -c  $(FFLAGS) $<

@@ -72,7 +72,6 @@ contains
     integer :: req(48),sta(MPI_STATUS_SIZE,48)
     
     call ReadSolidParameters
-    umask = 1d0; vmask = 1d0; wmask = 1d0
 
     if(dosolids) then
        allocate(solids(imin:imax,jmin:jmax,kmin:kmax))
@@ -112,14 +111,13 @@ contains
        !call calcsum(solids)
 
        ! For solid objects set mask according to placement of solids
-       call calcsum(umask)
+       ! call calcsum(umask)
        do i=imin,imax-1; do j=jmin,jmax-1; do k=kmin,kmax-1
           if((solids(i,j,k) + solids(i+1,j,k)) > 0.5d0) umask(i,j,k) = 0d0
           if((solids(i,j,k) + solids(i,j+1,k)) > 0.5d0) vmask(i,j,k) = 0d0
           if((solids(i,j,k) + solids(i,j,k+1)) > 0.5d0) wmask(i,j,k) = 0d0
        enddo; enddo; enddo
     endif
-    call SetPressureBC(umask,vmask,wmask)
 !    call calcsum(umask)
 
   END SUBROUTINE initialize_solids

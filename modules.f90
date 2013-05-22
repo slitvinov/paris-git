@@ -81,6 +81,8 @@ module module_flow
   real(8), dimension(:,:,:), allocatable :: umask,vmask,wmask
   real(8), dimension(:,:,:), allocatable :: du,dv,dw,drho
   real(8), dimension(:,:), allocatable :: averages,oldaverages, allaverages
+  logical, allocatable, dimension(:,:,:) :: mask
+
   real(8) :: gx, gy, gz, mu1, mu2, r_avg, dt, dtFlag, rho_ave, p_ave, vdt
   real(8) :: max_velocity, maxTime, Time, EndTime, MaxDt, CFL, mystats(16), stats(16)
   logical :: ZeroReynolds,DoVOF, DoFront, Implicit, hypre, GetPropertiesFromFront
@@ -113,7 +115,7 @@ module module_IO
   save
   integer :: padding=5
   integer :: opened=0;
-  integer ::nout, out, output_format, nbackup, nstats
+  integer ::nout, out, output_format, nbackup, nstats, termout
   character(len=20) :: out_path, x_file, y_file, z_file
   logical :: read_x, read_y, read_z, restart, ICOut, restartFront, restartAverages
   contains
@@ -912,7 +914,6 @@ END
 !-------------------------------------------------------------------------------------------------
 subroutine SetupDensity(dIdx,dIdy,dIdz,A,color) !,mask)
   use module_grid
-  use module_hello
   use module_BC
   implicit none
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: dIdx,dIdy,dIdz, color
@@ -1012,7 +1013,7 @@ end subroutine SetupPoisson
 ! A7*Uijk = A1*Ui-1jk + A2*Ui+1jk + A3*Uij-1k + 
 !           A4*Uij+1k + A5*Uijk-1 + A6*Uijk+1 + A8
 !-------------------------------------------------------------------------------------------------
-subroutine SetupUvel(u,du,rho,mu,rho1,mu1,dt,A,solids) !,mask)
+subroutine SetupUvel(u,du,rho,mu,rho1,mu1,dt,A)
   use module_grid
   use module_hello
   use module_BC
@@ -1020,9 +1021,6 @@ subroutine SetupUvel(u,du,rho,mu,rho1,mu1,dt,A,solids) !,mask)
   implicit none
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: u,du,rho,mu
   real(8), dimension(is:ie,js:je,ks:ke,8), intent(out) :: A
-!  logical, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: mask
-  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: solids
-!  real(8) :: Large=1e20
   real(8), intent(in) :: dt,rho1,mu1
   real(8) :: rhom
   integer :: i,j,k
@@ -1035,7 +1033,7 @@ subroutine SetupUvel(u,du,rho,mu,rho1,mu1,dt,A,solids) !,mask)
         A(i,j,k,4) = dt/(dy(j)*dyh(j  )*rhom)*0.25d0*(mu(i,j,k)+mu(i+1,j,k)+mu(i,j+1,k)+mu(i+1,j+1,k))
         A(i,j,k,5) = dt/(dz(k)*dzh(k-1)*rhom)*0.25d0*(mu(i,j,k)+mu(i+1,j,k)+mu(i,j,k-1)+mu(i+1,j,k-1))
         A(i,j,k,6) = dt/(dz(k)*dzh(k  )*rhom)*0.25d0*(mu(i,j,k)+mu(i+1,j,k)+mu(i,j,k+1)+mu(i+1,j,k+1))
-        A(i,j,k,7) = 1d0+sum(A(i,j,k,1:6)) !+Large*solids(i,j,k)
+        A(i,j,k,7) = 1d0+sum(A(i,j,k,1:6))
         A(i,j,k,8) = u(i,j,k) + dt*du(i,j,k)
      enddo; enddo; enddo
   else
@@ -1082,16 +1080,13 @@ subroutine SetupUvel(u,du,rho,mu,rho1,mu1,dt,A,solids) !,mask)
 end subroutine SetupUvel
 !=================================================================================================
 !=================================================================================================
-subroutine SetupVvel(v,dv,rho,mu,rho1,mu1,dt,A,solids) !,mask)
+subroutine SetupVvel(v,dv,rho,mu,rho1,mu1,dt,A) 
   use module_grid
   use module_hello
   use module_BC
   implicit none
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: v,dv,rho,mu
   real(8), dimension(is:ie,js:je,ks:ke,8), intent(out) :: A
-!  logical, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: mask
-  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: solids
-!  real(8) :: Large=1e20
   real(8), intent(in) :: dt,rho1,mu1
   real(8) :: rhom
   integer :: i,j,k
@@ -1107,7 +1102,7 @@ subroutine SetupVvel(v,dv,rho,mu,rho1,mu1,dt,A,solids) !,mask)
         A(i,j,k,6) = dt/(dz(k)*dzh(k  )*rhom)*0.25d0*(mu(i,j,k)+mu(i,j+1,k)+mu(i,j,k+1)+mu(i,j+1,k+1))
         A(i,j,k,1) = dt/(dx(i)*dxh(i-1)*rhom)*0.25d0*(mu(i,j,k)+mu(i,j+1,k)+mu(i-1,j,k)+mu(i-1,j+1,k))
         A(i,j,k,2) = dt/(dx(i)*dxh(i  )*rhom)*0.25d0*(mu(i,j,k)+mu(i,j+1,k)+mu(i+1,j,k)+mu(i+1,j+1,k))
-        A(i,j,k,7) = 1d0+sum(A(i,j,k,1:6)) !+Large*solids(i,j,k)
+        A(i,j,k,7) = 1d0+sum(A(i,j,k,1:6))
         A(i,j,k,8) = v(i,j,k) + dt*dv(i,j,k)
      enddo; enddo; enddo
   else
@@ -1153,16 +1148,13 @@ subroutine SetupVvel(v,dv,rho,mu,rho1,mu1,dt,A,solids) !,mask)
 end subroutine SetupVvel
 !=================================================================================================
 !=================================================================================================
-subroutine SetupWvel(w,dw,rho,mu,rho1,mu1,dt,A,solids) !,mask)
+subroutine SetupWvel(w,dw,rho,mu,rho1,mu1,dt,A)
   use module_grid
   use module_hello
   use module_BC
   implicit none
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: w,dw,rho,mu
   real(8), dimension(is:ie,js:je,ks:ke,8), intent(out) :: A
-!  logical, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: mask
-  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: solids
-!  real(8) :: Large=1e20
   real(8), intent(in) :: dt,rho1,mu1
   real(8) :: rhom
   integer :: i,j,k
@@ -1175,7 +1167,7 @@ subroutine SetupWvel(w,dw,rho,mu,rho1,mu1,dt,A,solids) !,mask)
         A(i,j,k,2) = dt/(dx(i)*dxh(i  )*rhom)*0.25d0*(mu(i,j,k)+mu(i,j,k+1)+mu(i+1,j,k)+mu(i+1,j,k+1))
         A(i,j,k,3) = dt/(dy(j)*dyh(j-1)*rhom)*0.25d0*(mu(i,j,k)+mu(i,j,k+1)+mu(i,j-1,k)+mu(i,j-1,k+1))
         A(i,j,k,4) = dt/(dy(j)*dyh(j  )*rhom)*0.25d0*(mu(i,j,k)+mu(i,j,k+1)+mu(i,j+1,k)+mu(i,j+1,k+1))
-        A(i,j,k,7) = 1d0+sum(A(i,j,k,1:6)) !+Large*solids(i,j,k)
+        A(i,j,k,7) = 1d0+sum(A(i,j,k,1:6))
         A(i,j,k,8) = w(i,j,k) + dt*dw(i,j,k)
      enddo; enddo; enddo
   else
@@ -1187,7 +1179,7 @@ subroutine SetupWvel(w,dw,rho,mu,rho1,mu1,dt,A,solids) !,mask)
         A(i,j,k,2) = dt/(dx(i)*dxh(i  )*rhom)*mu1
         A(i,j,k,3) = dt/(dy(j)*dyh(j-1)*rhom)*mu1
         A(i,j,k,4) = dt/(dy(j)*dyh(j  )*rhom)*mu1
-        A(i,j,k,7) = 1d0+sum(A(i,j,k,1:6)) !+Large*solids(i,j,k)
+        A(i,j,k,7) = 1d0+sum(A(i,j,k,1:6))
         A(i,j,k,8) = w(i,j,k) + dt*dw(i,j,k)
      enddo; enddo; enddo
   endif
@@ -1270,13 +1262,72 @@ subroutine LinearSolver(A,p,maxError,beta,maxit,it,ierr)
     call MPI_ALLREDUCE(res, totalres, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr)
     if (.not.(totalres<1e10)) then
       ierr=1 !stop '***** solution has diverged *****'
-      print*,'Diverged after',it,'iterations.'
+      if(rank==0) print*,'Solver 0 diverged after',it,'iterations.'
       return
     endif
     if (totalres<maxError) exit
   enddo
   if(it==maxit+1 .and. rank==0) write(*,*) 'Warning: LinearSolver reached maxit.'
 end subroutine LinearSolver
+!=================================================================================================
+!=================================================================================================
+! Solves the following linear equiation:
+! A7*Uijk = umask*(A1*Ui-1jk + A2*Ui+1jk + A3*Uij-1k + 
+!           A4*Uij+1k + A5*Uijk-1 + A6*Uijk+1 + A8)
+!-------------------------------------------------------------------------------------------------
+subroutine LinearSolver1(A,u,umask,maxError,beta,maxit,it,ierr)
+  use module_grid
+  use module_hello
+  use module_BC
+  implicit none
+  include 'mpif.h'
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: u
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: umask
+  real(8), dimension(is:ie,js:je,ks:ke,8), intent(in) :: A
+  real(8), intent(in) :: beta, maxError
+  integer, intent(in) :: maxit
+  integer, intent(out) :: it, ierr
+  real(8) :: res, totalres
+  integer :: i,j,k
+  integer :: req(12),sta(MPI_STATUS_SIZE,12)
+  logical :: mask(imin:imax,jmin:jmax,kmin:kmax)
+!--------------------------------------ITERATION LOOP--------------------------------------------  
+  do it=1,maxit
+    do k=ks,ke; do j=js,je; do i=is,ie
+      u(i,j,k)=umask(i,j,k)*((1d0-beta)*u(i,j,k)+beta* 1d0/A(i,j,k,7)*(              &
+        A(i,j,k,1) * u(i-1,j,k) + A(i,j,k,2) * u(i+1,j,k) +            &
+        A(i,j,k,3) * u(i,j-1,k) + A(i,j,k,4) * u(i,j+1,k) +            &
+        A(i,j,k,5) * u(i,j,k-1) + A(i,j,k,6) * u(i,j,k+1) + A(i,j,k,8)))
+    enddo; enddo; enddo
+!---------------------------------CHECK FOR CONVERGENCE-------------------------------------------
+    res = 0d0
+    call ghost_x(u,1,req( 1: 4)); call ghost_y(u,1,req( 5: 8)); call ghost_z(u,1,req( 9:12))
+    do k=ks+1,ke-1; do j=js+1,je-1; do i=is+1,ie-1
+      res=res+ umask(i,j,k)*abs(-u(i,j,k) * A(i,j,k,7) +                             &
+        A(i,j,k,1) * u(i-1,j,k) + A(i,j,k,2) * u(i+1,j,k) +            &
+        A(i,j,k,3) * u(i,j-1,k) + A(i,j,k,4) * u(i,j+1,k) +            &
+        A(i,j,k,5) * u(i,j,k-1) + A(i,j,k,6) * u(i,j,k+1) + A(i,j,k,8) )
+    enddo; enddo; enddo
+    call MPI_WAITALL(12,req,sta,ierr)
+    mask=.true.
+    mask(is+1:ie-1,js+1:je-1,ks+1:ke-1)=.false.
+    do k=ks,ke; do j=js,je; do i=is,ie
+      if(mask(i,j,k))res=res+umask(i,j,k)*abs(-u(i,j,k) * A(i,j,k,7) +              &
+        A(i,j,k,1) * u(i-1,j,k) + A(i,j,k,2) * u(i+1,j,k) +            &
+        A(i,j,k,3) * u(i,j-1,k) + A(i,j,k,4) * u(i,j+1,k) +            &
+        A(i,j,k,5) * u(i,j,k-1) + A(i,j,k,6) * u(i,j,k+1) + A(i,j,k,8) )
+    enddo; enddo; enddo
+    res = res/float(Nx*Ny*Nz)
+    call MPI_ALLREDUCE(res, totalres, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr)
+    if (.not.(totalres<1e10)) then
+      ierr=1 !stop '***** solution has diverged *****'
+      if(rank==0) print*,'Solver 1 diverged after',it,'iterations.'
+      return
+    endif
+    if (totalres<maxError) exit
+  enddo
+  if(it==maxit+1 .and. rank==0) write(*,*) 'Warning: LinearSolver reached maxit.'
+end subroutine LinearSolver1
 !=================================================================================================
 !=================================================================================================
 ! Returns the residual
@@ -1301,6 +1352,31 @@ subroutine calcResidual(A,p, Residual)
   call MPI_ALLREDUCE(res, totalres, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr)
   Residual = sqrt(totalres)
 end subroutine calcResidual
+!=================================================================================================
+!=================================================================================================
+! Returns the residual
+!-------------------------------------------------------------------------------------------------
+subroutine calcResidual1(A,p,pmask,Residual)
+  use module_grid
+  use module_BC
+  implicit none
+  include 'mpif.h'
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: p
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: pmask
+  real(8), dimension(is:ie,js:je,ks:ke,8), intent(in) :: A
+  real(8) :: res, totalres, Residual
+  integer :: i,j,k, ierr
+  res = 0d0
+  do k=ks,ke; do j=js,je; do i=is,ie
+    res=res+pmask(i,j,k)*abs(-p(i,j,k) * A(i,j,k,7) +                             &
+      A(i,j,k,1) * p(i-1,j,k) + A(i,j,k,2) * p(i+1,j,k) +            &
+      A(i,j,k,3) * p(i,j-1,k) + A(i,j,k,4) * p(i,j+1,k) +            &
+      A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8) )**2
+  enddo; enddo; enddo
+  res = res/float(Nx*Ny*Nz)
+  call MPI_ALLREDUCE(res, totalres, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr)
+  Residual = sqrt(totalres)
+end subroutine calcResidual1
 !=================================================================================================
 !=================================================================================================
 ! Returns the flow rate

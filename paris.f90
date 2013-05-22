@@ -61,7 +61,6 @@ Program paris
   ! Locals for marching and timing
   real(8) :: start_time, end_time
   integer :: req(48),sta(MPI_STATUS_SIZE,48)
-  logical, allocatable, dimension(:,:,:) :: mask
   INTEGER :: irank, ii, i, j, k
   integer :: switch=1
   real(8) :: residual
@@ -127,12 +126,12 @@ Program paris
 !-------------------------------------------------------------------------------------------------
 !------------------------------------------Begin domain-------------------------------------------
 !-------------------------------------------------------------------------------------------------
-     allocate(mask(imin:imax,jmin:jmax,kmin:kmax))  ! was used in LinearSolver
+
      ! output initial condition
      if(rank==0) start_time = MPI_WTIME()
      if(ICOut .and. rank<nPdomain) then
         call output(0,is,ie+1,js,je+1,ks,ke+1)
-        call output_VOF(0,imin,imax,jmin,jmax,kmin,kmax)
+!        call output_VOF(0,imin,imax,jmin,jmax,kmin,kmax)
         call setvelocityBC(u,v,w,umask,vmask,wmask)
         call write_vec_gnuplot(u,v,w,itimestep)
         call calcstats
@@ -148,9 +147,13 @@ Program paris
         if(dtFlag==2)call TimeStepSize(dt)
         time=time+dt
         itimestep=itimestep+1
-        end_time =  MPI_WTIME()
-        if(rank==0)write(out,'("Step: ",I10," dt=",es16.5e2," time=",es16.5e2)')itimestep,dt,time
-        if(rank==0)write(*,'("Step:",I6," dt=",es16.5e2," time=",es16.5e2," cpu(s):",f11.3)')itimestep,dt,time,end_time-start_time
+
+        if(mod(itimestep,termout)==0) then
+           end_time =  MPI_WTIME()
+           if(rank==0)write(out,'("Step: ",I10," dt=",es16.5e2," time=",es16.5e2)')itimestep,dt,time
+           if(rank==0)write(*,'("Step:",I6," dt=",es16.5e2," time=",es16.5e2," cpu(s):",f11.3)')   &
+                itimestep,dt,time,end_time-start_time
+        endif
 
         if(itime_scheme==2) then
            uold = u
@@ -163,23 +166,29 @@ Program paris
         do ii=1, itime_scheme
 
            if(TwoPhase.and.(.not.Getpropertiesfromfront)) then
-              call linfunc(rho,rho1,rho2)
-              call linfunc(mu,mu1,mu2)
+             call linfunc(rho,rho1,rho2)
+             call linfunc(mu,mu1,mu2)
            endif
 
            ! Receive front from master of front
            if(DoFront) call GetFront('recv')
-           
-           if(Implicit) then
-              if(Twophase) then 
-                 call momentumDiffusion(u,v,w,rho,mu,du,dv,dw)  
+
+           !           if(Implicit.and.ZeroReynolds.and..not.DoFront.and..not.Hypre) then ! Uzawa
+           !------------------------------------VOF STUFF -------------------------------------------------
+           !              if(DoVOF) call vofsweeps(itimestep)
+           !------------------------------------END VOF STUFF---------------------------------------------- 
+           !               call uzawa(u,v,w,rho,mu,du,dv,dw,p,umask,vmask,wmask,A,dt,beta,maxit,rho1,rho2,dpdx,dpdy,dpdz,BuoyancyCase,fx,fy,fz,gx,gy,gz,rho_ave)
+           !           else  ! not Uzawa
+              if(Implicit) then
+                 if(Twophase) then 
+                    call momentumDiffusion(u,v,w,rho,mu,du,dv,dw)  
+                 else
+                    du = 0d0; dv = 0d0; dw = 0d0
+                 endif
               else
-                 du = 0d0; dv = 0d0; dw = 0d0
+                 call explicitMomDiff(u,v,w,rho,mu,du,dv,dw)
               endif
-           else
-              call explicitMomDiff(u,v,w,rho,mu,du,dv,dw)
-           endif
-           if(.not.ZeroReynolds) call momentumConvection(u,v,w,du,dv,dw)
+              if(.not.ZeroReynolds) call momentumConvection(u,v,w,du,dv,dw)
            
            ! reset the surface tension force on the fixed grid
            fx = 0d0;    dIdx=0d0
@@ -201,44 +210,45 @@ Program paris
            call volumeForce(rho,rho1,rho2,dpdx,dpdy,dpdz,BuoyancyCase,fx,fy,fz,gx,gy,gz,du,dv,dw, &
                 rho_ave)
            if(dosolids) then
-              du = du*(1.d0 - solids); dv = dv*(1.d0 - solids); dw = dw*(1.d0 - solids)
+              du = du*umask; dv = dv*vmask; dw = dw*wmask
            endif
            if(Implicit) then   
-              call SetupUvel(u,du,rho,mu,rho1,mu1,dt,A,solids)
+              call SetupUvel(u,du,rho,mu,rho1,mu1,dt,A)
               if(hypre)then
                  call poi_solve(A,u(is:ie,js:je,ks:ke),maxError,maxit,it)
               else
-                 call LinearSolver(A,u,maxError,beta,maxit,it,ierr)
-                 if(rank==0)write(*,'("U implicit momentum diffusion iterations:",I9)')it
+                 call LinearSolver1(A,u,umask,maxError,beta,maxit,it,ierr)
+!                 if(rank==0)write(*,'("U implicit momentum diffusion iterations:",I9)')it
              endif
-             call calcresidual(A,u,residual)
-             if(rank==0)write(*,'("U implicit momentum diffusion residual:",e8.2)') residual
+!             call calcresidual1(A,u,umask,residual)
+!             if(rank==0)write(*,'("U implicit momentum diffusion residual:",e8.2)') residual
            
-              call SetupVvel(v,dv,rho,mu,rho1,mu1,dt,A,solids)
+              call SetupVvel(v,dv,rho,mu,rho1,mu1,dt,A)
               if(hypre)then
                  call poi_solve(A,v(is:ie,js:je,ks:ke),maxError,maxit,it)
               else
-                 call LinearSolver(A,v,maxError,beta,maxit,it,ierr)
-                 if(rank==0)write(*  ,'("V implicit momentum diffusion  iterations:",I9)')it
+                 call LinearSolver1(A,v,vmask,maxError,beta,maxit,it,ierr)
+!                 if(rank==0)write(*  ,'("V implicit momentum diffusion  iterations:",I9)')it
               endif
-             call calcresidual(A,v,residual)
-             if(rank==0)write(*,'("V implicit momentum diffusion residual:",e8.2)') residual
+!             call calcresidual1(A,v,vmask,residual)
+!             if(rank==0)write(*,'("V implicit momentum diffusion residual:",e8.2)') residual
 
-              call SetupWvel(w,dw,rho,mu,rho1,mu1,dt,A,solids)
+              call SetupWvel(w,dw,rho,mu,rho1,mu1,dt,A)
               if(hypre)then
                  call poi_solve(A,w(is:ie,js:je,ks:ke),maxError,maxit,it)
               else
-                 call LinearSolver(A,w,maxError,beta,maxit,it,ierr)
-                 if(rank==0)write(*  ,'("W implicit momentum diffusion  iterations:",I9)')it
+                 call LinearSolver1(A,w,wmask,maxError,beta,maxit,it,ierr)
+!                 if(rank==0)write(*  ,'("W implicit momentum diffusion  iterations:",I9)')it
               endif
-             call calcresidual(A,w,residual)
-             if(rank==0)write(*,'("W implicit momentum diffusion residual:",e8.2)') residual
+!             call calcresidual1(A,w,wmask,residual)
+!             if(rank==0)write(*,'("W implicit momentum diffusion residual:",e8.2)') residual
            else
               u = u + dt * du
               v = v + dt * dv
               w = w + dt * dw
            endif
            call SetVelocityBC(u,v,w,umask,vmask,wmask)
+
            call ghost_x(u  ,2,req( 1: 4));  call ghost_x(v,2,req( 5: 8)); call ghost_x(w,2,req( 9:12)) 
            call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
            call ghost_y(u  ,2,req( 1: 4));  call ghost_y(v,2,req( 5: 8)); call ghost_y(w,2,req( 9:12)) 
@@ -247,9 +257,7 @@ Program paris
            call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
 
 !-----------------------------------------PROJECTION STEP-----------------------------------------
-
-           ! if(dosolids.and..not.implicit) call solidzero(u,v,w,solids)
-           ! call SetPressureBC(umask,vmask,wmask)   ! called in solids
+           call SetPressureBC(umask,vmask,wmask)
            call SetupPoisson(u,v,w,umask,vmask,wmask,rho,dt,A)
            if(HYPRE)then
               call poi_solve(A,p(is:ie,js:je,ks:ke),maxError,maxit,it)
@@ -260,9 +268,11 @@ Program paris
            else
               call LinearSolver(A,p,maxError/2d0/dt,beta,maxit,it,ierr)
            endif
-           call calcresidual(A,p,residual)
-           if(rank==0)          write(*  ,'("              pressure residual  :   ",e7.1)') residual
-           if(rank==0.and..not.hypre) write(*  ,'("              pressure iterations:",I9)')it
+           if(mod(itimestep,termout)==0) then
+              call calcresidual(A,p,residual)
+              if(rank==0)          write(*  ,    '("              pressure residual  :   ",e7.1)') residual
+              if(rank==0.and..not.hypre) write(*,'("              pressure iterations:",I9)')it
+           endif
            
            do k=ks,ke;  do j=js,je; do i=is,ieu;    ! CORRECT THE u-velocity 
               u(i,j,k)=u(i,j,k)-dt*(2.0/dxh(i))*(p(i+1,j,k)-p(i,j,k))/(rho(i+1,j,k)+rho(i,j,k))
@@ -276,16 +286,18 @@ Program paris
               w(i,j,k)=w(i,j,k)-dt*(2.0/dzh(k))*(p(i,j,k+1)-p(i,j,k))/(rho(i,j,k+1)+rho(i,j,k))
            enddo; enddo; enddo
 
-
+!        endif  ! end "Uzawa" if 
            !--------------------------------------UPDATE COLOR---------------------------------------------
-           if (TwoPhase)then
+           if (DoFront) then
                  call SetupDensity(dIdx,dIdy,dIdz,A,color)
                  if(hypre)then
                     call poi_solve(A,color(is:ie,js:je,ks:ke),maxError,maxit,it)
                  else
                     call LinearSolver(A,color,maxError,beta,maxit,it,ierr)
+                    if(mod(itimestep,termout)==0) then
+                       if(rank==0.and..not.hypre)write(*  ,'("              density  iterations:",I9)')it
+                    endif
                  endif
-                 if(rank==0.and..not.hypre)write(*  ,'("              density  iterations:",I9)')it
                  !adjust color function to 0-1 range
                  do k=ks,ke;  do j=js,je; do i=is,ie
                     color(i,j,k)=min(color(i,j,k),1d0)
@@ -294,7 +306,6 @@ Program paris
            endif
 
            call SetVelocityBC(u,v,w,umask,vmask,wmask)
-!            call write_vec_gnuplot(u,v,w,itimestep)
 
            call ghost_x(u  ,2,req( 1: 4));  call ghost_x(v,2,req( 5: 8)); call ghost_x(w,2,req( 9:12)); 
            call ghost_x(color,1,req(13:16));  call MPI_WAITALL(16,req(1:16),sta(:,1:16),ierr)
@@ -330,33 +341,33 @@ Program paris
         endif
         
 !--------------------------------------------OUTPUT-----------------------------------------------
-       call calcStats
+        call calcStats
 
         if(mod(itimestep,nbackup)==0)call backup_write
         if(mod(itimestep,nout)==0) then 
            call write_vec_gnuplot(u,v,w,itimestep)
            call output(ITIMESTEP/nout,is,ie+1,js,je+1,ks,ke+1)
            call output_VOF(ITIMESTEP/nout,imin,imax,jmin,jmax,kmin,kmax)
+           if(rank==0)then
+              end_time =  MPI_WTIME()
+              write(out,'("Step:",I9," Iterations:",I9," cpu(s):",f10.2)')itimestep,it,end_time-start_time
+           endif
         endif
-        if(rank==0)then
-           end_time =  MPI_WTIME()
-           write(out,'("Step:",I9," Iterations:",I9," cpu(s):",f10.2)')itimestep,it,end_time-start_time
-           if(nstats==0) STOP " *** Main: nstats = 0"
-           if(mod(itimestep,nstats)==0)then
+        if(nstats==0) STOP " *** Main: nstats = 0"
+        if(mod(itimestep,nstats)==0.and.rank==0)then
               !        open(unit=121,file='track')
               !        write(121,'("Step:",I10," dt=",es16.5e2," time=",es16.5e2)')itimestep,dt,time
               !        write(121,'("            Iterations:",I7," cpu(s):",f10.2)')it,end_time-start_time
               !        close(121)
-                open(unit=121,file='stats',access='append')
-              write(121,'(20es14.6e2)')time,stats(1:12),dpdx,(stats(8)-stats(9))/dt,end_time-start_time
-              close(121)
-           endif
+           open(unit=121,file='stats',access='append')
+           write(121,'(20es14.6e2)')time,stats(1:12),dpdx,(stats(8)-stats(9))/dt,end_time-start_time
+           close(121)
         endif
      enddo
      !-------------------------------------------------------------------------------------------------
      !--------------------------------------------End domain-------------------------------------------
      !-------------------------------------------------------------------------------------------------
-  elseif((rank==nPdomain).and.DoFront)then !front tracking process (rank=nPdomain)
+     elseif((rank==nPdomain).and.DoFront)then !front tracking process (rank=nPdomain)
      !-------------------------------------------------------------------------------------------------
      !--------------------------------------------Begin front------------------------------------------
      !-------------------------------------------------------------------------------------------------
@@ -381,13 +392,17 @@ Program paris
    
         if(itime_scheme==2) call AverageFront
         
-        print*,'Starting regrid'
-        if(mod(itimestep,nregrid)==0) call RegridFront
-        print*,'Finished regrid'
+         if(mod(itimestep,nregrid)==0) then
+            print*,'Starting regrid'
+            call RegridFront
+            print*,'Finished regrid'
+         endif
         if(smooth.and.mod(itimestep,nsmooth)==0) call smoothFront
         call CalcVolume
-        if(mod(itimestep,nsmooth)==0) call CorrectVolume
-        print*,'Finished volume correction'
+        if(mod(itimestep,nsmooth)==0) then 
+           call CorrectVolume
+           print*,'Finished volume correction'
+        endif
 !--------------------------------------------OUTPUT-----------------------------------------------
         if(mod(itimestep,nout)==0)call print_fronts(ITIMESTEP/nout,time)
         if(mod(itimestep,nbackup)==0)call backup_front_write(time,iTimeStep)
@@ -454,15 +469,7 @@ subroutine calcStats
   integer :: i,j,k,ierr
   real(8) :: vol
   real(8), save :: W_int=-0.02066
-  integer :: checkvol=0
   mystats(1:9)=0d0
-  if(checkvol==1) then
-     do  k=ks,ke;  do j=js,je;  do i=is,ie
-        vol = vol + dx(i)*dy(j)*dz(k)
-     enddo;enddo;enddo
-     if(rank==0) print *, "vol=",vol, "all",xlength*ylength*zlength/4
-     stop
-  endif
   do k=ks,ke;  do j=js,je;  do i=is,ie
     vol = dx(i)*dy(j)*dz(k)
 ! Average u component
@@ -782,19 +789,16 @@ subroutine volumeForce(rho,rho1,rho2,dpdx,dpdy,dpdz,BuoyancyCase,fx,fy,fz,gx,gy,
     fx(i,j,k)=fx(i,j,k)-dpdx+(0.5*(rho(i+1,j,k)+rho(i,j,k))-rro)*gx
     du(i,j,k)=du(i,j,k) + fx(i,j,k)/(0.5*(rho(i+1,j,k)+rho(i,j,k)))
   enddo; enddo; enddo
-!  du = du*(1.d0 - solids)
   
   do k=ks,ke;  do j=js,jev; do i=is,ie
     fy(i,j,k)=fy(i,j,k)-dpdy+(0.5*(rho(i,j+1,k)+rho(i,j,k))-rro)*gy
     dv(i,j,k)=dv(i,j,k) + fy(i,j,k)/(0.5*(rho(i,j+1,k)+rho(i,j,k)))
   enddo; enddo; enddo
-!  dv = dv*(1.d0 - solids)
 
   do k=ks,kew;  do j=js,je; do i=is,ie
     fz(i,j,k)=fz(i,j,k)-dpdz+(0.5*(rho(i,j,k+1)+rho(i,j,k))-rro)*gz
     dw(i,j,k)=dw(i,j,k) + fz(i,j,k)/(0.5*(rho(i,j,k+1)+rho(i,j,k)))
   enddo; enddo; enddo
-!  dw = dw*(1.d0 - solids)
 
 end subroutine volumeForce
 !=================================================================================================
@@ -864,17 +868,22 @@ subroutine initialize
     allocate(tmp(imin:imax,jmin:jmax,kmin:kmax), work(imin:imax,jmin:jmax,kmin:kmax,3), &
                A(is:ie,js:je,ks:ke,1:8), averages(10,Ng:Ny+Ng+1), oldaverages(10,Ng:Ny+Ng+1), &
                allaverages(10,Ng:Ny+Ng+1))
+
+    allocate(mask(imin:imax,jmin:jmax,kmin:kmax)) 
+
     du=0.0;dv=0.0;dw=0.0
     u=0.0;v=0.0;w=0.0;p=0.0;tmp=0.0;fx=0.0;fy=0.0;fz=0.0;drho=0.0;rho=0.0;mu=0.0;work=0.0;A=0.0
     averages=0.0; oldaverages=0.0; allaverages=0d0
-  else
+    umask = 1d0; vmask = 1d0; wmask = 1d0
+
+  else  !   if(rank<nPdomain)then
     is = Ng+1;  ie = Nx+Ng;  imin = 1;  imax = Nxt
     js = Ng+1;  je = Ny+Ng;  jmin = 1;  jmax = Nyt
     ks = Ng+1;  ke = Nz+Ng;  kmin = 1;  kmax = Nzt
     ieu = ie;  if(bdry_cond(1)/=1) ieu = ie-1
     jev = je;  if(bdry_cond(2)/=1) jev = je-1
     kew = ke;  if(bdry_cond(3)/=1) kew = ke-1
-  endif
+  endif !   if(rank<nPdomain)then
 
   allocate(x(Nxt), xh(Nxt), dx(Nxt), dxh(Nxt), &
            y(Nyt), yh(Nyt), dy(Nyt), dyh(Nyt), &
@@ -931,6 +940,12 @@ subroutine initialize
 end subroutine initialize
 
 !=================================================================================================
+subroutine pariserror(message) 
+    character(*) :: message
+    if(rank==0) write(6,*) message
+    stop "*** Paris error exit"
+end subroutine pariserror
+
 !=================================================================================================
 ! subroutine InitCondition
 !   Sets the initial conditions
@@ -967,36 +982,28 @@ subroutine InitCondition
         ! when set by Front-Tracking.
         color = 0.; u = U_init;  v = 0;  w = 0.
         if(DoVOF) then
-!           do i=imin,imax-1; do j=jmin,jmax-1; do k=kmin,kmax-1
-!              x1=x(i); y1=y(j); z1=z(k)
-           !    x0 = 0.5d0
-           !    y0 = 0.5d0
-           !    z0 = 0.5d0
-           !    radius = 0.25d0
-           !    if((-((x1 - x0)*(x1 - x0) + (y1 - y0)*(y1 - y0) + (z1 - z0)*(z1 - z0)) + radius*radius) > 0d0) then 
-           !       cvof(i,j,k) = 1d0
-           !    else
-           !       cvof(i,j,k) = 0d0
-           !    endif
-           ! enddo; enddo; enddo
-     do ib=1,numBubble
-        do i=imin,imax
-           do j=jmin,jmax
-              do k=kmin,kmax 
-                 du(i,j,k) =  rad(ib)**2 - ((x(i)-xc(ib))**2+(y(j)-yc(ib))**2+(z(k)-zc(ib))**2) 
-                 !  if ( (x(i)-xc(ib))**2+(y(j)-yc(ib))**2+(z(k)-zc(ib))**2 < rad(ib)**2) then 
-                 !                      cvof(i,j,k) = 1.
-                 !  endif
+           if(numbubble > 0) then 
+              do ib=1,numBubble
+                 do i=imin,imax
+                    do j=jmin,jmax
+                       do k=kmin,kmax 
+                          du(i,j,k) =  rad(ib)**2 - ((x(i)-xc(ib))**2+(y(j)-yc(ib))**2+(z(k)-zc(ib))**2) 
+                       enddo
+                    enddo
+                 enddo
               enddo
-           enddo
-        enddo
-     enddo
-     i = imax-imin+1
-     j = jmax-jmin+1
-     k = kmax-kmin+1
-     call levelset2vof(du,cvof,i,j,k)
+              i = imax-imin+1
+              j = jmax-jmin+1
+              k = kmax-kmin+1
+              call levelset2vof(du,cvof,i,j,k)
+           else 
+              cvof=0.d0
+              if(rank==0) print *, "Warning: no VOF field."
+           endif
         endif
+        du = 0d0
      endif
+
      if(DoFront) then
         call GetFront('recv')
         call GetFront('wait')
@@ -1010,8 +1017,8 @@ subroutine InitCondition
            call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
         else
            call LinearSolver(A,color,maxError,beta,maxit,it,ierr)
+           if(rank==0)print*,it,'iterations for initial density.'
         endif
-        if(rank==0)print*,it,'iterations for initial density.'
         do k=ks,ke;  do j=js,je; do i=is,ie
            color(i,j,k)=min(color(i,j,k),1d0)
            color(i,j,k)=max(color(i,j,k),0d0)
@@ -1180,7 +1187,7 @@ subroutine ReadParameters
                         y_file,        z_file,        restart,       nBackup,       NumBubble,   &
                         xyzrad,        hypre,         dtFlag,        ICOut,         WallVel,     &
                         maxErrorVol,   restartFront,  nstats,        WallShear,     ZeroReynolds,&
-                        restartAverages
+                        restartAverages, termout
   in=1
   out=2
 
@@ -1223,6 +1230,14 @@ subroutine ReadParameters
   if(mod(Nz,nPz) /= 0) Stop 'ReadParameters: Nz not divisible by nPz!'
   Mx = Nx/nPx; My = Ny/nPy; Mz = Nz/nPz
   nPdomain = nPx*nPy*nPz
+
+!--- output frequency
+
+  if(termout==0) then
+     termout=nout
+  endif
+
   call MPI_BARRIER(MPI_COMM_WORLD, ierr)
 end subroutine ReadParameters
+!=================================================================================================
 !=================================================================================================

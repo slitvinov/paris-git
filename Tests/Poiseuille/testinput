@@ -48,6 +48,7 @@ U_init   = 1.d0
 !=================================================================================================
 ! Output parameters
 
+termout  = 1
 ICOut    = F        ! output initial condition
 NOUT     = 100      ! write the solution to file every nout time steps
 output_format = 2   ! 1:tecplot 2:vtk
