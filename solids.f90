@@ -86,6 +86,8 @@ contains
              s1 = solid_func_one_sphere(x(i),y(j),z(k),xlength) 
           else if (solid_type == 'SingleDisk') then
              s1 = solid_func_one_disk(x(i),y(j),xlength) 
+          else if (solid_type == 'RandomSpheres') then
+             s1 = solid_func_one_disk(x(i),y(j),xlength) 
            else
              stop 'invalid type'
           endif

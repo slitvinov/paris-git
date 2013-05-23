@@ -107,6 +107,8 @@ Program paris
   endif
 
   call initialize
+  call check_stability
+
   if(DoVOF.and.rank<nPdomain) call initialize_VOF
 
   if(rank<nPdomain) call initialize_solids
@@ -939,12 +941,6 @@ subroutine initialize
 
 end subroutine initialize
 
-!=================================================================================================
-subroutine pariserror(message) 
-    character(*) :: message
-    if(rank==0) write(6,*) message
-    stop "*** Paris error exit"
-end subroutine pariserror
 
 !=================================================================================================
 ! subroutine InitCondition
@@ -1241,3 +1237,26 @@ subroutine ReadParameters
 end subroutine ReadParameters
 !=================================================================================================
 !=================================================================================================
+!=================================================================================================
+subroutine pariserror(message) 
+    character(*) :: message
+    if(rank==0) write(6,*) message
+    stop "*** Paris error exit"
+end subroutine pariserror
+
+!=================================================================================================
+subroutine check_stability() 
+  use module_grid
+  use module_flow
+  use module_BC
+  use module_IO
+  use module_front
+  use module_hello
+  implicit none
+  include 'mpif.h'
+  integer :: in, ierr
+  real(8) von_neumann
+
+  von_neumann = dx(ng)**2*rho1/(dt*mu1)
+  if(rank==0) print *, "dx**2*rho/(dt*mu) = ", von_neumann
+end subroutine check_stability

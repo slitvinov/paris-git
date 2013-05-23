@@ -13,7 +13,7 @@
 !=================================================================================================
 ! General parameters
 
-TwoPhase  = F         ! TwoPhase: Is the flow two-phase?
+TWOPHASE  = F         ! TwoPhase: Is the flow two-phase?
 DoVOF 	  = F
 DoFront   = F
 GetPropertiesFromFront = F ! T: uses Front-Tracking data to compute mu, rho and Surface Tension. 
@@ -28,13 +28,13 @@ restartAverages = F
 nBackup = 90000   ! number of time steps between  backups are kept.
 
 NSTEP   = 80000       ! maximum number of time steps
-EndTime = 0.4       ! When to stop simulation
+EndTime = 0.01         ! When to stop simulation
 
 MaxDt   = 0.1  ! maximum size of time step
 dtFlag  = 1        ! 1: fixed dt;  2: fixed CFL
 dt      = DTTEMP    ! dt in case of dtFlag=1
 CFL     = 0.9
-MAXERROR= 1d-9     ! Residual for Poisson solver
+MAXERROR= 1d-10     ! Residual for Poisson solver
 MAXERRORVOL = 1d-4
                    ! Numerical parameters
 
@@ -47,24 +47,25 @@ BETA     = 1.3
 !=================================================================================================
 ! Output parameters
 
+termout  = 25
 ICOut    = T        ! output initial condition
-NOUT     = 1000      ! write the solution to file every nout time steps
+NOUT     = 100      ! write the solution to file every nout time steps
 output_format = 2   ! 1:tecplot 2:vtk
 out_path = 'out'    ! name of the output directory
 
-nstats   = 2      ! number of time steps between flow statistics calculations
+nstats   = 5       ! number of time steps between flow statistics calculations
 
 !=================================================================================================
 !Grid parameters
 npx     = 2
 npy     = 2
-npz     = 1
+npz     = 2
                    ! number of processors in x,y,z direction
                    ! Total number of processes should be at least npx*npy*npz+1 since one process
                    ! is dedicated to the front. Any extra processes will be idle.
 Nx       = NXTEMP
 Ny       = NXTEMP
-Nz       = 2
+Nz       = NXTEMP
 Ng       = 2
                    ! total grid size in x,y,z direction and number of ghost cells
 
@@ -83,13 +84,13 @@ zform    = 0.0       	! non-uniformity of the grid if not reading an input file
 
 XLENGTH  = 1.0
 YLENGTH  = 1.0
-ZLENGTH  = ZLTEMP
+ZLENGTH  = 1.0
                    ! domain size in x,y,z direction
 
 !=================================================================================================
 ! Flow parameters
 
-U_init = 1d0
+U_init = 1d-4
 GX      = 1.0
 GY      = 0.0
 GZ      = 0.0
@@ -100,7 +101,7 @@ dPdY      = 0.0
 dPdZ      = 0.0
                    ! Px, Py, Pz: pressure gradients in case of pressure driven channel flow
                    ! Px = (P(xLength)-P(0))/xLength
-BDRY_COND = 1  1    1   1   1   1
+BDRY_COND = 1    1    1    1    1    1
                    !Type of boundary condition in x,y,z direction: 0:wall  1:periodic  2:shear
                    !x- y- z- x+ y+ z+
 
@@ -114,6 +115,12 @@ SIGMA    = 0.       ! rho2, mu2, sigma : properties of the drop and surface tens
                    
 
 NumBubble = 0      !number of bubbles
+ 
+! xyzrad(1, 1)  = 0.5 ! Initial bubble size and location : x,y,z,radius
+! xyzrad(2, 1)  = 0.5 
+! xyzrad(3, 1)  = 0.5 
+! xyzrad(4, 1)  = 0.25
+                   
 
 MaxPoint = 2000000
 MaxElem  = 4000000

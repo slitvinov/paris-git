@@ -33,7 +33,8 @@ install: $(OBJ)
 #	@echo compiler is FC = $(FC), mpi override is OMPI_FC = $(OMPI_FC)
 	$(FC) -o paris $(FOPTS) $(OBJ) $(FOBJ) $(HYPRE_LIBS) 
 	@if [ ! -d $(BINDIR) ] ; then echo "directory bin does not exist creating it" ; mkdir $(BINDIR) ; fi 
-	mv paris $(BINDIR)/paris	
+	mv paris $(BINDIR)/paris
+	find .  -name "*.sh" -exec chmod +x  {} \; 
 
 all: tags install compare
 
