@@ -39,6 +39,25 @@ while [ $idt -lt $ndt ] ; do
     let idt=$idt+1
 done
 
+end=`grep -i EndTime input |  awk 'BEGIN {FS = "="}{print $2}' | awk '{print $1}'`
+phi=`cat out/porosity.txt | awk '{print $1}'`
+# echo phi = $phi
+
+awk '{print $1 " " $3}' < stats > deriv
+parisdeconv deriv > toplot.txt
+
+gnuplot <<EOF > tmp 2>&1
+f(x) = a*x + b
+FIT_LIMIT = 1e-6
+fit [2*$end/3:$end] f(x) "toplot.txt" via a, b
+plot "toplot.txt", f(x)
+print "decaytime = ",-1/a
+EOF
+
+grep deccaytime tmp | awk -v phi=$phi '{print "decaytime = " $3*phi}' > perm.txt
+
+awk '{radius=0.0625; print "K/R^2 = " $2/(radius*radius)}' < out/flowrate.txt >> perm.txt
+
 if [ -d out ]; then
     cd out
 	compare ../reference.txt flowrate.txt $precision

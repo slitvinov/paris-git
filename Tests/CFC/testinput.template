@@ -34,7 +34,7 @@ MaxDt   = 0.1  ! maximum size of time step
 dtFlag  = 1        ! 1: fixed dt;  2: fixed CFL
 dt      = DTTEMP    ! dt in case of dtFlag=1
 CFL     = 0.9
-MAXERROR= 1d-10     ! Residual for Poisson solver
+MAXERROR= 1d-12     ! Residual for Poisson solver
 MAXERRORVOL = 1d-4
                    ! Numerical parameters
 
@@ -47,13 +47,13 @@ BETA     = 1.3
 !=================================================================================================
 ! Output parameters
 
-termout  = 25
+termout  = 5
 ICOut    = T        ! output initial condition
 NOUT     = 100      ! write the solution to file every nout time steps
 output_format = 2   ! 1:tecplot 2:vtk
 out_path = 'out'    ! name of the output directory
 
-nstats   = 5       ! number of time steps between flow statistics calculations
+nstats   = 1       ! number of time steps between flow statistics calculations
 
 !=================================================================================================
 !Grid parameters

@@ -1259,4 +1259,5 @@ subroutine check_stability()
 
   von_neumann = dx(ng)**2*rho1/(dt*mu1)
   if(rank==0) print *, "dx**2*rho/(dt*mu) = ", von_neumann
+  if(von_neumann < 6d0.and..not.Implicit) call pariserror("time step too large for viscous terms")
 end subroutine check_stability

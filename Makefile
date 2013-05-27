@@ -26,7 +26,6 @@ HYPRE_LIBS =  -L$(HYPRE_DIR)/lib -lHYPRE
 
 
 OBJ = paris.o solids.o modules.o vofmodules.o front.o # uzawa.o
-OBJC = compare.o
 SRC = $(wildcard  *.f90) 
 
 install: $(OBJ)
@@ -34,9 +33,9 @@ install: $(OBJ)
 	$(FC) -o paris $(FOPTS) $(OBJ) $(FOBJ) $(HYPRE_LIBS) 
 	@if [ ! -d $(BINDIR) ] ; then echo "directory bin does not exist creating it" ; mkdir $(BINDIR) ; fi 
 	mv paris $(BINDIR)/paris
-	find .  -name "*.sh" -exec chmod +x  {} \; 
+	@find .  -name "*.sh" -exec chmod +x  {} \; 
 
-all: tags install compare
+all: tags install compare parisdeconv
 
 clean:
 	@rm -fR *.o *.mod paris stats *~ track out* errftc tmp* *.tmp fort.* *.visit core.* statsbub
@@ -46,7 +45,7 @@ clean:
 distclean: clean
 	@rm -fR  session* *.xml TAGS tags input
 
-test:  install compare
+test:  install compare parisdeconv
 	@echo "This test takes approximately 1 minute on a 4-core intel i7 MacBookPro"
 	@cd Tests; chmod +x ./runtests.sh; ./runtests.sh
 
@@ -79,9 +78,13 @@ front.o:  front.f90 modules.o
 %.o : %.f90
 	$(FC) -c  $(FFLAGS) $<
 
-compare: $(OBJC)
-	$(CC) -o compare  $(OBJC) -lm
+compare: compare.o
+	@$(CC) -o compare compare.o -lm
 	mv compare ~/bin
 
+parisdeconv: parisdeconv.o
+	@$(CC) -o parisdeconv parisdeconv.o -lm
+	mv parisdeconv ~/bin
+
 .c.o:   $< 
-	cc -c $(CFLAGS)   $< 
+	@cc -c $(CFLAGS)   $< 

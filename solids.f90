@@ -35,6 +35,8 @@ module module_solid
   character(20) :: solid_type
   integer il,ih,jl,jh,kl,kh
   integer :: solid_opened=0 
+  real(8) :: sxyzrad(4,10000)
+  integer NumSpheres
 !***********************************************************************
 contains
 !***********************************************************************
@@ -66,10 +68,11 @@ contains
   SUBROUTINE initialize_solids()
     implicit none
     include 'mpif.h'
-    integer :: i,j,k
+    integer :: i,j,k,index
     real(8) :: s1
     integer :: ierr, ins(4)
     integer :: req(48),sta(MPI_STATUS_SIZE,48)
+    real(8) :: x0,y0,z0,radius,x2,y2,z2
     
     call ReadSolidParameters
 
@@ -86,43 +89,45 @@ contains
              s1 = solid_func_one_sphere(x(i),y(j),z(k),xlength) 
           else if (solid_type == 'SingleDisk') then
              s1 = solid_func_one_disk(x(i),y(j),xlength) 
-          else if (solid_type == 'RandomSpheres') then
-             s1 = solid_func_one_disk(x(i),y(j),xlength) 
+          else if (solid_type == 'List_of_Spheres') then
+             s1=-1d0
+             do index=1,NumSpheres
+                x0 = sxyzrad(1,index)/xlength
+                y0 = sxyzrad(2,index)/xlength
+                z0 = sxyzrad(3,index)/xlength
+                x2 = x(i)/xlength
+                y2 = y(j)/xlength
+                z2 = z(k)/xlength
+                radius = sxyzrad(4,index)/xlength
+                s1 = MAX(s1, sphere_func(x2,y2,z2,x0,y0,z0,radius))
+             enddo
            else
              stop 'invalid type'
           endif
           if(s1 > 0.) then
              solids(i,j,k) = 1d0
           endif
+!          solids(i,j,k) = s1
        enddo; enddo; enddo
 
        call output_solids(0,is,ie,js,je,ks,ke)
        if(rank==0) write(out,*)'solids type ', solid_type, ' initialized'
        if(rank==0) write(6,*)  'solids type ', solid_type, ' initialized'
-       !call print_small_solid(solids)
-
-       !if(rank==0) print *, "before ghost"
        call ghost_x(solids,2,req(1:4));  call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
-       !if(rank==0) print *, "after ghost ierr", ierr
        call ghost_y(solids,2,req(1:4));  call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
-       !if(rank==0) print *, "after ghost ierr", ierr
        call ghost_z(solids,2,req(1:4));  call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
-       !if(rank==0) print *, "after ghost ierr", ierr
-       !if(rank==0) print *," NOW S1 :"
-       !call print_small_solid(solids)
-       !call calcsum(solids)
 
        ! For solid objects set mask according to placement of solids
-       ! call calcsum(umask)
+
        do i=imin,imax-1; do j=jmin,jmax-1; do k=kmin,kmax-1
-          if((solids(i,j,k) + solids(i+1,j,k)) > 0.5d0) umask(i,j,k) = 0d0
-          if((solids(i,j,k) + solids(i,j+1,k)) > 0.5d0) vmask(i,j,k) = 0d0
-          if((solids(i,j,k) + solids(i,j,k+1)) > 0.5d0) wmask(i,j,k) = 0d0
+          if((solids(i,j,k) + solids(i+1,j,k)) > 1.5d0) umask(i,j,k) = 0d0
+          if((solids(i,j,k) + solids(i,j+1,k)) > 1.5d0) vmask(i,j,k) = 0d0
+          if((solids(i,j,k) + solids(i,j,k+1)) > 1.5d0) wmask(i,j,k) = 0d0
        enddo; enddo; enddo
     endif
-!    call calcsum(umask)
-
+    call calcpor(umask,1)
   END SUBROUTINE initialize_solids
+
   ! sphere definition function 
   FUNCTION sphere_func(x1,y1,z1,x0,y0,z0,radius)
     !***
@@ -234,7 +239,7 @@ contains
       include 'mpif.h'
       integer ierr,in
       logical file_is_there
-      namelist /solidparameters/ dosolids, solid_type, solid_radius
+      namelist /solidparameters/ dosolids, solid_type, solid_radius,NumSpheres,sxyzrad
       in=1
       call MPI_COMM_RANK(MPI_COMM_WORLD, rank, ierr)
       inquire(file='inputsolids',exist=file_is_there)
@@ -253,7 +258,6 @@ contains
          endif
       endif
       close(in)
-!      if(rank==0) print  * , "dosolids =",dosolids
     end subroutine ReadSolidParameters
 !
 ! Output the velocity profile
@@ -335,33 +339,7 @@ contains
     close(8)
     if(rank==0) call close_solid_visit_file()
 end subroutine output_solids
-!***********************************************************************
-!=================================================================================================
-! subroutine SetPressureBC: Sets the pressure boundary condition
-!-------------------------------------------------------------------------------------------------
-  subroutine SetSolidsBC(solids)
-    use module_grid
-    implicit none
-    include 'mpif.h'
-    real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: solids
-  ! for walls set the solids to one (no effect). 
-    if(bdry_cond(1)==0)then
-      if(coords(1)==0    ) solids(is-1,js-1:je+1,ks-1:ke+1)=1.d0
-      if(coords(1)==nPx-1) solids(ie+1,js-1:je+1,ks-1:ke+1)=1.d0
-    endif
 
-    if(bdry_cond(2)==0)then
-      if(coords(2)==0    ) solids(is-1:ie+1,js-1,ks-1:ke+1)=1.d0
-      if(coords(2)==nPy-1) solids(is-1:ie+1,je+1,ks-1:ke+1)=1.d0
-    endif
-
-    if(bdry_cond(3)==0)then
-      if(coords(3)==0    ) solids(is-1:ie+1,js-1:je+1,ks-1)=1.d0
-      if(coords(3)==nPz-1) solids(is-1:ie+1,js-1:je+1,ke+1)=1.d0
-    endif
-
-  end subroutine SetSolidsBC
-!=================================================================================================
   subroutine print_small_solid(solids)
     use module_grid
     implicit none
@@ -407,3 +385,30 @@ subroutine final_output(flowrate)
  end subroutine final_output
 !=================================================================================================
 end module module_solid
+
+subroutine calcpor(smask,type)
+  use module_grid
+  use module_BC
+  use module_IO
+  implicit none
+  include 'mpif.h'
+  integer, intent(in) :: type
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: smask
+  real(8) :: sum, totalsum
+  real(8) :: porosity
+  real(8) volume
+  integer :: i,j,k, ierr
+  sum=0.d0
+  volume=Nx*Ny*Nz
+  do k=ks,ke; do j=js,je; do i=is,ie;
+     sum=sum+smask(i,j,k)
+  enddo;enddo;enddo
+  call MPI_REDUCE(sum, totalsum, 1, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_Domain, ierr)
+  porosity=type*totalsum/volume + (1-type)*(1d0 - totalsum/volume)
+  if(rank==0) then 
+     open(UNIT=89,file=trim(out_path)//'/porosity.txt')
+     write(89,310)  porosity
+     close(unit=89)
+  endif
+  310 format(F17.11)
+end subroutine calcpor

@@ -1406,23 +1406,31 @@ subroutine calcsum2(p,flowrate)
   call calcsum_shift(p,flow,0,0,0)
   flowrate = -1.
 end subroutine calcsum2
-!
-subroutine calcsum_shift(p,flowrate,sx,sy,sz)
+
+subroutine calcsum_shift(p,porosity,sx,sy,sz)
   use module_grid
   use module_BC
+  use module_IO
   implicit none
   include 'mpif.h'
   integer, intent(in) :: sx,sy,sz
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: p
   real(8) :: flow, totalflow
-  real(8), intent(out) :: flowrate
+  real(8), intent(out) :: porosity
+  real(8) volume
   integer :: i,j,k, ierr
   flow=0.d0
+  volume=Nx*Ny*Nz
   do k=ks,ke; do j=js,je; do i=is,ie;
      flow=flow+p(i+sx,j+sy,k+sz)
   enddo;enddo;enddo
-  ! print *, "rank, sum ",rank,flow
   call MPI_REDUCE(flow, totalflow, 1, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_Domain, ierr)
-  flowrate=totalflow
-  if(rank==0) print *,"s =",sx,sy,sz," sum",totalflow, "ierr =",ierr
+  porosity=totalflow/volume
+  if(rank==0) then 
+     open(UNIT=89,file=trim(out_path)//'/porosity.txt')
+     write(89,310)  porosity
+     close(unit=89)
+  endif
+  310 format(F17.11)
 end subroutine calcsum_shift
+

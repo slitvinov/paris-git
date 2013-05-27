@@ -108,11 +108,11 @@ dPdZ      = 0.0
                    ! Px = (P(xLength)-P(0))/xLength
 
 RHO1    = 1.0
-MU1     = 1.0
+MU1     = 1.d-2
                    ! rho1, mu1 : density and viscosity of the matrix phase
 
 RHO2    = 1.0
-MU2     = 1.0
+MU2     = 1.d-2
                    ! rho2, mu2 : properties of the drop
 SIGMA    = 0.25
 NumBubble =  1
