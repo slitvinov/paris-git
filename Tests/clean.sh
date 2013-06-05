@@ -8,7 +8,7 @@ for dir in `ls`; do
 	cd $dir
 #	echo "in dir " `pwd`
 #	echo "rm -fR *.o *.mod paris stats *~ track out* errftc tmp* *.tmp fort.* *.visit core.*"
-	rm -fR *.o *.mod paris stats *~ track out* errftc tmp* *.tmp fort.* *.visit core.* statsbub out/*.txt testinput-* 
+	rm -fR *.o *.mod paris stats *~ track out* errftc tmp* *.tmp fort.* *.visit core.* statsbub out/*.txt testinput-* *.log
 	cd ..
     fi
 done

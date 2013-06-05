@@ -120,13 +120,38 @@ contains
        ! For solid objects set mask according to placement of solids
 
        do i=imin,imax-1; do j=jmin,jmax-1; do k=kmin,kmax-1
-          if((solids(i,j,k) + solids(i+1,j,k)) > 1.5d0) umask(i,j,k) = 0d0
-          if((solids(i,j,k) + solids(i,j+1,k)) > 1.5d0) vmask(i,j,k) = 0d0
-          if((solids(i,j,k) + solids(i,j,k+1)) > 1.5d0) wmask(i,j,k) = 0d0
+          if((solids(i,j,k) + solids(i+1,j,k)) > 0.5d0) umask(i,j,k) = 0d0
+          if((solids(i,j,k) + solids(i,j+1,k)) > 0.5d0) vmask(i,j,k) = 0d0
+          if((solids(i,j,k) + solids(i,j,k+1)) > 0.5d0) wmask(i,j,k) = 0d0
        enddo; enddo; enddo
     endif
+    call printpor(solids)
     call calcpor(umask,1)
   END SUBROUTINE initialize_solids
+
+  subroutine printpor(solids)
+    implicit none
+    include 'mpif.h'
+    real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: solids
+    integer i,j,k
+    if(rank==0) then
+       OPEN(UNIT=105,FILE=trim(out_path)//'/rockcube.txt',status='unknown',action='write')
+       do i=is,ie
+          do j=js,je; 
+             do k=ks,ke; 
+                if(solids(i,j,k) <= 0.5d0) then   ! free space
+                   write(105,'(" 0")',advance='no') 
+                else
+                   write(105,'(" 1")',advance='no') 
+                endif
+             enddo
+             write(105,'(" ")')
+          enddo
+          write(105,'(" ")')
+       enddo
+       close(105)
+    endif
+  end subroutine printpor
 
   ! sphere definition function 
   FUNCTION sphere_func(x1,y1,z1,x0,y0,z0,radius)
