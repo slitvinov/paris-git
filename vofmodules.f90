@@ -228,7 +228,6 @@ contains
     character(*) :: rootname
     integer prank
     if(rank.ne.0) stop 'rank.ne.0 in append_VOF'
-
     if(vof_opened==0) then
        OPEN(UNIT=88,FILE='vof.visit')
        write(88,10) nPdomain

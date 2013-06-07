@@ -111,7 +111,7 @@ Program paris
 
   if(DoVOF.and.rank<nPdomain) call initialize_VOF
 
-  if(rank<nPdomain) call initialize_solids
+  if(DoSolids.and.rank<nPdomain) call initialize_solids
 
   if(DoFront) call InitFront
   if(rank==0) write(out,*)'initialized'
@@ -349,7 +349,7 @@ Program paris
         if(mod(itimestep,nout)==0) then 
            call write_vec_gnuplot(u,v,w,itimestep)
            call output(ITIMESTEP/nout,is,ie+1,js,je+1,ks,ke+1)
-           call output_VOF(ITIMESTEP/nout,imin,imax,jmin,jmax,kmin,kmax)
+           if(DoVOF) call output_VOF(ITIMESTEP/nout,imin,imax,jmin,jmax,kmin,kmax)
            if(rank==0)then
               end_time =  MPI_WTIME()
               write(out,'("Step:",I9," Iterations:",I9," cpu(s):",f10.2)')itimestep,it,end_time-start_time
