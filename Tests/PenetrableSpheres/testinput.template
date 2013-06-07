@@ -34,15 +34,14 @@ MaxDt   = 0.1  ! maximum size of time step
 dtFlag  = 1        ! 1: fixed dt;  2: fixed CFL
 dt      = DTTEMP    ! dt in case of dtFlag=1
 CFL     = 0.9
-MAXERROR= 1d-12     ! Residual for Poisson solver
+MAXERROR= 1d-14     ! Residual for Poisson solver
 MAXERRORVOL = 1d-4
                    ! Numerical parameters
 
 ITIME_SCHEME = 1   ! time scheme: 1:first order Euler, 2: second order quasi Crank-Nicolson
                    ! Should use first order Euler for Stokes flow ! ! ! 
 MAXIT    = 1000
-BETA     = 0.7
-                    ! parameters for linear solver
+BETA     = 1.0     ! parameters for linear solver
 
 !=================================================================================================
 ! Output parameters
@@ -90,7 +89,7 @@ ZLENGTH  = 1.0
 !=================================================================================================
 ! Flow parameters
 
-U_init = 1d-6
+U_init = 1d-8
 GX      = 1.0
 GY      = 0.0
 GZ      = 0.0
