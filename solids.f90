@@ -73,7 +73,7 @@ contains
     integer :: ierr, ins(4)
     integer :: req(48),sta(MPI_STATUS_SIZE,48)
     real(8) :: x0,y0,z0,radius,x2,y2,z2
-    
+
     call ReadSolidParameters
 
     if(dosolids) then
@@ -124,9 +124,10 @@ contains
           if((solids(i,j,k) + solids(i,j+1,k)) > 0.5d0) vmask(i,j,k) = 0d0
           if((solids(i,j,k) + solids(i,j,k+1)) > 0.5d0) wmask(i,j,k) = 0d0
        enddo; enddo; enddo
-    endif
-    call printpor(solids)
-    call calcpor(umask,1)
+       call printpor(solids)
+       call calcpor(umask,1)
+   endif
+
   END SUBROUTINE initialize_solids
 
   subroutine printpor(solids)

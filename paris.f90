@@ -111,7 +111,7 @@ Program paris
 
   if(DoVOF.and.rank<nPdomain) call initialize_VOF
 
-  if(DoSolids.and.rank<nPdomain) call initialize_solids
+  if(rank<nPdomain) call initialize_solids
 
   if(DoFront) call InitFront
   if(rank==0) write(out,*)'initialized'
