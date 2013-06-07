@@ -1,6 +1,6 @@
 #! /bin/bash
 
-gnuplot <<EOF
+gnuplot <<EOF &
 #set size square
 set grid
 # set xrange[1:512]
@@ -10,6 +10,7 @@ set xlabel "time"
 set ylabel "flow rate"
 #set key left
 plot "stats" u 1:3 w lines
+pause 100
 set term pdf
 set out 'tmp.pdf'
 plot "stats" u 1:3 w lines

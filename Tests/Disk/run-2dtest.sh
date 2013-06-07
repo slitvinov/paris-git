@@ -43,12 +43,13 @@ phi=`cat out/porosity.txt | awk '{print $1}'`
 awk '{print $1 " " $3}' < stats > deriv
 parisdeconv deriv > toplot.txt
 
-gnuplot <<EOF > tmp 2>&1
+gnuplot <<EOF > tmp 2>&1  &
 f(x) = a*x + b
 FIT_LIMIT = 1e-6
 fit [2*$end/3:$end] f(x) "toplot.txt" via a, b
 plot "toplot.txt", f(x)
 print "permeability = ",-1/a
+pause 100
 EOF
 
 grep permeability tmp | awk -v phi=$phi '{print $3*phi}' > perm.txt

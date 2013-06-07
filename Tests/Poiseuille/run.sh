@@ -49,13 +49,14 @@ else
     echo "FAIL: directory out not created"
 fi
 
-gnuplot <<EOF
+gnuplot <<EOF &
 set size square
 set grid
 set nolabel
 set xrange[-0.1:1.1]
 set yrange[-0.05:0.15]
 plot "out/output1" w lp notitle, 0.5*x*(1-x) w l notitle, 0 w l notitle
+pause 100
 set term pdf
 set out 'Poiseuille_plot.pdf'
 plot "out/output1" w lp notitle, 0.5*x*(1-x) w l notitle, 0 w l notitle

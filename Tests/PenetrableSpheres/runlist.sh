@@ -26,7 +26,7 @@ for nrofcenters in `cat tmplist` ; do
 ! end of the namelist
 EOF
 
-    Tend=`awk -v n=$nrofcenters 'BEGIN {R=0.0625; phi=exp(-4*3.14157*R*R*R*n/3.); print 400*R**2*phi/(54*log(phi)**2) }'`
+    Tend=`awk -v n=$nrofcenters 'BEGIN {R=0.0625; phi=exp(-4*3.14157*R*R*R*n/3.); print 800*R**2*phi/(54*log(phi)**2) }'`
     echo $Tend
     rm -fr input out stats
     let nx=$nx0
