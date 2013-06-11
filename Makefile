@@ -13,9 +13,9 @@ BINDIR = $(HOME)/bin
 
 # select option for hypre
 # default hypre installation without root privileges:
-# HYPRE_DIR = $(HOME)/hypre-2.8.0b/src
+HYPRE_DIR = $(HOME)/hypre-2.8.0b/src
 # Macport installation in /opt 
-HYPRE_DIR = /opt/hypre
+# HYPRE_DIR = /opt/hypre
 # babbage
 # HYPRE_DIR = /share/apps/hypre
 
@@ -33,7 +33,7 @@ install: $(OBJ)
 	$(FC) -o paris $(FOPTS) $(OBJ) $(FOBJ) $(HYPRE_LIBS) 
 	@if [ ! -d $(BINDIR) ] ; then echo "directory bin does not exist creating it" ; mkdir $(BINDIR) ; fi 
 	mv paris $(BINDIR)/paris
-	@find .  -name "*.sh" -exec chmod +x  {} \; 
+	find .  -name "*.sh" -exec chmod +x  {} \; 
 
 all: tags install compare parisdeconv
 

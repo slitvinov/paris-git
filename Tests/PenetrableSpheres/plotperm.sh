@@ -8,7 +8,7 @@ if [ $# -lt 1 ]; then
 fi
 
 
-cp perm-$1-all.txt permgp.txt
+cp perm-$1-all.txt permgp.tmp
 gnuplot <<EOF &
 load "perm.gp"
 pause mouse any 
