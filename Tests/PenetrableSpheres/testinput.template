@@ -34,7 +34,7 @@ MaxDt   = 0.1  ! maximum size of time step
 dtFlag  = 1        ! 1: fixed dt;  2: fixed CFL
 dt      = DTTEMP    ! dt in case of dtFlag=1
 CFL     = 0.9
-MAXERROR= 1d-14     ! Residual for Poisson solver
+MAXERROR= 1d-10     ! Residual for Poisson solver
 MAXERRORVOL = 1d-4
                    ! Numerical parameters
 
@@ -56,9 +56,9 @@ nstats   = 1       ! number of time steps between flow statistics calculations
 
 !=================================================================================================
 !Grid parameters
-npx     = 2
-npy     = 2
-npz     = 2
+npx     = NPXTEMP
+npy     = NPXTEMP
+npz     = NPXTEMP
                    ! number of processors in x,y,z direction
                    ! Total number of processes should be at least npx*npy*npz+1 since one process
                    ! is dedicated to the front. Any extra processes will be idle.

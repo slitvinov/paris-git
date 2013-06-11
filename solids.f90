@@ -136,7 +136,7 @@ contains
     real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: solids
     integer i,j,k
     if(rank==0) then
-       OPEN(UNIT=105,FILE=trim(out_path)//'/rockcube.txt',status='unknown',action='write')
+       OPEN(UNIT=105,FILE=trim(out_path)//'/rockcube.txt',status='new',action='write')
        do i=is,ie
           do j=js,je; 
              do k=ks,ke; 

@@ -3,7 +3,9 @@
 
 if [ $# -lt 7 ]; then
     echo "missing arguments"
-    echo usage $0 nr_of_dt_values dt0 nx0 Implicit:T/F precision nrofcenters Tend
+    echo usage $0 nr_of_dt_values dt0 nx0 Implicit:T/F precision nrofcenters Tend 
+    echo "if Tend=0 just compute rock porosity, Tend=-1 automatic computation of Tend"
+    echo "if Tend=0 npx=1 otherwise npx=2"
     exit
 fi
 
@@ -16,35 +18,45 @@ precision=$5
 nrofcenters=$6
 
 dt=$dt0
-# Tend=`awk -v n=$nrofcenters 'BEGIN {R=0.0625; phi=exp(-4*3.14157*R*R*R*n/3.); print 400*R**2*phi/(54*log(phi)**2) }'`
-Tend=$7
+if [ $7 == "-1" ]; then
+    Tend=`awk -v n=$nrofcenters 'BEGIN {R=0.0625; phi=exp(-4*3.14157*R*R*R*n/3.); print 400*R**2*phi/(54*log(phi)**2) }'`
+    echo "using default Tend = " $Tend
+else
+    Tend=$7
+fi
 
 if [ $Tend == 0 ] ; then
     Tend=$dt
+    npx=1
+else
+    npx=2
+fi
+
+
+if ! [ -f centers/centers_$nrofcenters.txt ]; then
+  echo -e "\033[31;1m $0: error:  no file centers_$nrofcenters.txt \033[0m"
+  exit 1
 fi
 
 /bin/rm -f flowrates-IMP-$imp*
 cat < inputsolids.BEGIN > inputsolids
 centers2input.sh centers/centers_$nrofcenters.txt 
-cat < inputcenters >> inputsolids
+cat < inputcenters.tmp >> inputsolids
 cat >> inputsolids <<EOF
 &end
-! end of the namelist
+! end of the namelist<
 EOF
 
 while [ $idt -lt $ndt ] ; do
     rm -fr input out stats
     let nx=$nx0
-    sed s/NXTEMP/$nx/g testinput.template | sed s/DTTEMP/$dt/g | sed s/IMPTEMP/$imp/g | sed s/ENDTIMETEMP/$Tend/g > testinput-$nx-$idt
+    sed s/NXTEMP/$nx/g testinput.template | sed s/DTTEMP/$dt/g | sed s/IMPTEMP/$imp/g | sed s/ENDTIMETEMP/$Tend/g > testinput-$nx-$idt.tmp
+    sed s/NPXTEMP/$npx/g testinput-$nx-$idt.tmp > testinput-$nx-$idt
     ln -s testinput-$nx-$idt input
-    let npx=`grep -i NPX input |  awk 'BEGIN {FS = "="}{print $2}' | awk '{print $1}'`
-    let npy=`grep -i NPY input |  awk 'BEGIN {FS = "="}{print $2}' | awk '{print $1}'`
-    let npz=`grep -i NPZ input |  awk 'BEGIN {FS = "="}{print $2}' | awk '{print $1}'`
-#    echo $npx $npy $npz
     if [ `grep DoFront input | awk '{print $3}'` == 'T' ]; then
-	let np=$npx*$npy*$npz+1
+	let np=$npx*$npx*$npx+1
     else
-	let np=$npx*$npy*$npz
+	let np=$npx*$npx*$npx
     fi
     mpirun -np $np paris > tmpout-$nx-$idt
     awk ' /Step:/ { cpu = $8 } END { print "cpu = " cpu } ' < tmpout-$nx-$idt
@@ -81,7 +93,7 @@ if [ -d out ]; then
 	compare ../reference.txt flowrate.txt $precision
     cd ..
 else
-    echo "FAIL: directory out not created"
+    echo -e "\033[31;1m FAIL: directory out not created\033[0m"
 fi
 #! /bin/bash
 

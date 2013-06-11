@@ -56,9 +56,10 @@ int main (int argc, char * argv[])
     }
   else if(argv[1] == NULL) 
     {
-      printf("%s: error: command line argument NULL"
-             "Usage: %s size\n"
+      printf("%s: error: command line argument is NULL\n"
+             "Usage: %s size < FILE\n"
              "size is the integer length of a cube edge\n"
+	     "FILE contains solid location data\n"
              "various rock statistics are computed\n"
 	     "\n",argv[0],argv[0]);
       exit(1);

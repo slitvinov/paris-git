@@ -12,6 +12,7 @@ let nx0=$2
 imp=F
 dt=$dt0
 permfile=perm-$nx0.txt
+npx=2
 
 /bin/rm -f $permfile
 
@@ -25,20 +26,21 @@ for nrofcenters in `cat tmplist` ; do
 &end
 ! end of the namelist
 EOF
+    
+    factor=`grep " $nrofcenters " centers/centers.txt | awk  '{ print $7 }' `
+    Tend=`awk -v n=$nrofcenters -v f=$factor 'BEGIN {R=0.0625; phi=exp(-4*3.14157*R*R*R*n/3.); print f*400*R**2*phi/(54*log(phi)**2) }'`
+    echo nr of spheres = $nrofcenters Tend = $Tend factor = $factor
 
-    Tend=`awk -v n=$nrofcenters 'BEGIN {R=0.0625; phi=exp(-4*3.14157*R*R*R*n/3.); print 2400*R**2*phi/(54*log(phi)**2) }'`
-    echo $Tend
     rm -fr input out stats
     let nx=$nx0
-    sed s/NXTEMP/$nx/g testinput.template | sed s/DTTEMP/$dt/g | sed s/IMPTEMP/$imp/g  | sed s/ENDTIMETEMP/$Tend/g > testinput-$nx
+    sed s/NXTEMP/$nx/g testinput.template | sed s/DTTEMP/$dt/g | sed s/IMPTEMP/$imp/g | sed s/ENDTIMETEMP/$Tend/g > testinput-$nx.tmp
+    sed s/NPXTEMP/$npx/g testinput-$nx.tmp > testinput-$nx
     ln -s testinput-$nx input
-    let npx=`grep -i NPX input |  awk 'BEGIN {FS = "="}{print $2}' | awk '{print $1}'`
-    let npy=`grep -i NPY input |  awk 'BEGIN {FS = "="}{print $2}' | awk '{print $1}'`
-    let npz=`grep -i NPZ input |  awk 'BEGIN {FS = "="}{print $2}' | awk '{print $1}'`
+
     if [ `grep DoFront input | awk '{print $3}'` == 'T' ]; then
-	let np=$npx*$npy*$npz+1
+	let np=$npx*$npx*$npx+1
     else
-	let np=$npx*$npy*$npz
+	let np=$npx*$npx*$npx
     fi
     mpirun -np $np paris > tmpout-$nx-$nrofcenters
     awk ' /Step:/ { cpu = $8 } END { print "cpu = " cpu } ' < tmpout-$nx-$nrofcenters
