@@ -13,9 +13,9 @@ BINDIR = $(HOME)/bin
 
 # select option for hypre
 # default hypre installation without root privileges:
-# HYPRE_DIR = $(HOME)/hypre-2.8.0b/src
+HYPRE_DIR = $(HOME)/hypre-2.8.0b/src
 # Macport installation in /opt 
-HYPRE_DIR = /opt/hypre
+# HYPRE_DIR = /opt/hypre
 # babbage
 # HYPRE_DIR = /share/apps/hypre
 

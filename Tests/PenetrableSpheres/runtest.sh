@@ -30,6 +30,8 @@ if [ $Tend == 0 ] ; then
     npx=1
 else
     npx=2
+    npy=$npx
+    npz=1
 fi
 
 
@@ -51,7 +53,7 @@ while [ $idt -lt $ndt ] ; do
     rm -fr input out stats
     let nx=$nx0
     sed s/NXTEMP/$nx/g testinput.template | sed s/DTTEMP/$dt/g | sed s/IMPTEMP/$imp/g | sed s/ENDTIMETEMP/$Tend/g > testinput-$nx-$idt.tmp
-    sed s/NPXTEMP/$npx/g testinput-$nx-$idt.tmp > testinput-$nx-$idt
+    sed s/NPXTEMP/$npx/g testinput-$nx-$idt.tmp |  sed s/NPYTEMP/$npy/g |  sed s/NPZTEMP/$npz/g > testinput-$nx-$idt
     ln -s testinput-$nx-$idt input
     if [ `grep DoFront input | awk '{print $3}'` == 'T' ]; then
 	let np=$npx*$npx*$npx+1
@@ -81,10 +83,11 @@ f(x) = a*x + b
 FIT_LIMIT = 1e-6
 fit [2*$end/3:$end] f(x) "toplot.tmp" via a, b
 plot "toplot.tmp", f(x)
+pause 10
 print "permeability = ",-1/a
 EOF
 
-grep deccaytime tmp | awk -v phi=$phi '{print "decaytime = " $3*phi}' > perm.txt
+grep permeability tmp | awk -v phi=$phi '{print "decaytime = " $3*phi}' > perm.txt
 
 awk '{radius=0.0625; print "K/R^2 = " $2/(radius*radius)}' < out/flowrate.txt >> perm.txt
 

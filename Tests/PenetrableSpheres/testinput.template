@@ -57,8 +57,8 @@ nstats   = 1       ! number of time steps between flow statistics calculations
 !=================================================================================================
 !Grid parameters
 npx     = NPXTEMP
-npy     = NPXTEMP
-npz     = NPXTEMP
+npy     = NPYTEMP
+npz     = NPZTEMP
                    ! number of processors in x,y,z direction
                    ! Total number of processes should be at least npx*npy*npz+1 since one process
                    ! is dedicated to the front. Any extra processes will be idle.

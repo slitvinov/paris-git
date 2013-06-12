@@ -12,8 +12,15 @@ dt0=$1
 let nx0=$2
 imp=F
 dt=$dt0
-permfile=perm-$nx0.txt
+if [ $dt = 0 ]; then
+    permfile=phi-$nx0.txt
+else
+    permfile=perm-$nx0.txt
+fi
+
 npx=2
+npy=$npx
+npz=2
 
 /bin/rm -f $permfile
 
@@ -40,7 +47,7 @@ EOF
     rm -fr input out stats
     let nx=$nx0
     sed s/NXTEMP/$nx/g testinput.template | sed s/DTTEMP/$dt/g | sed s/IMPTEMP/$imp/g | sed s/ENDTIMETEMP/$Tend/g > testinput-$nx.tmp
-    sed s/NPXTEMP/$npx/g testinput-$nx.tmp > testinput-$nx
+    sed s/NPXTEMP/$npx/g testinput-$nx.tmp |  sed s/NPYTEMP/$npy/g |  sed s/NPZTEMP/$npz/g > testinput-$nx
     ln -s testinput-$nx input
 
     if [ `grep DoFront input | awk '{print $3}'` == 'T' ]; then
@@ -53,7 +60,7 @@ EOF
 
     phi=`cat out/porosity.txt | awk '{print $1}'`
 if [ $dt = 0 ]; then
-    awk -v phi=$phi -v nr=$nrofcenters 'BEGIN {print nr " " phi}'  >> $permfile
+    awk -v phi=$phi -v nr=$nrofcenters 'BEGIN { printf "%d  %.2f\n", nr, 100*phi}'  >> $permfile
 else
     awk -v dt=$dt '{ print dt " " $1 " " $2}' < out/flowrate.txt >> flowrates-IMP-$imp.txt
     plot.sh
