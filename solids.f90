@@ -125,7 +125,7 @@ contains
           if((solids(i,j,k) + solids(i,j,k+1)) > 0.5d0) wmask(i,j,k) = 0d0
        enddo; enddo; enddo
        call printpor(solids)
-       call calcpor(umask,1)
+       call calcpor(solids,0)
    endif
 
   END SUBROUTINE initialize_solids

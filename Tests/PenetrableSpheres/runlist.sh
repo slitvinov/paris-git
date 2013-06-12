@@ -4,6 +4,7 @@
 if [ $# -lt 2 ]; then
     echo "missing arguments"
     echo usage $0 dt0 nx0 
+    echo "dt0 = 0 for porosity computations"
     exit
 fi
 
@@ -29,8 +30,13 @@ EOF
     
     factor=`grep " $nrofcenters " centers/centers.txt | awk  '{ print $7 }' `
     Tend=`awk -v n=$nrofcenters -v f=$factor 'BEGIN {R=0.0625; phi=exp(-4*3.14157*R*R*R*n/3.); print f*400*R**2*phi/(54*log(phi)**2) }'`
-    echo nr of spheres = $nrofcenters Tend = $Tend factor = $factor
 
+    if [ $dt == 0 ]; then
+	echo nr of spheres = $nrofcenters
+	Tend=0
+    else
+	echo nr of spheres = $nrofcenters Tend = $Tend factor = $factor
+    fi
     rm -fr input out stats
     let nx=$nx0
     sed s/NXTEMP/$nx/g testinput.template | sed s/DTTEMP/$dt/g | sed s/IMPTEMP/$imp/g | sed s/ENDTIMETEMP/$Tend/g > testinput-$nx.tmp
@@ -44,8 +50,14 @@ EOF
     fi
     mpirun -np $np paris > tmpout-$nx-$nrofcenters
     awk ' /Step:/ { cpu = $8 } END { print "cpu = " cpu } ' < tmpout-$nx-$nrofcenters
-    awk -v dt=$dt '{ print dt " " $1 " " $2}' < out/flowrate.txt >> flowrates-IMP-$imp.txt
+
     phi=`cat out/porosity.txt | awk '{print $1}'`
+if [ $dt = 0 ]; then
+    awk -v phi=$phi -v nr=$nrofcenters 'BEGIN {print nr " " phi}'  >> $permfile
+else
+    awk -v dt=$dt '{ print dt " " $1 " " $2}' < out/flowrate.txt >> flowrates-IMP-$imp.txt
     plot.sh
     awk -v phi=$phi -v nr=$nrofcenters '{radius=0.0625; print nr " " phi " " $2/(radius*radius) " "  phi/(54*log(phi)**2) }' < out/flowrate.txt >> $permfile
+fi
+
 done
