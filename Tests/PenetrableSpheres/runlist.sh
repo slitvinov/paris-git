@@ -63,8 +63,8 @@ if [ $dt = 0 ]; then
     awk -v phi=$phi -v nr=$nrofcenters 'BEGIN { printf "%d  %.2f\n", nr, 100*phi}'  >> $permfile
 else
     awk -v dt=$dt '{ print dt " " $1 " " $2}' < out/flowrate.txt >> flowrates-IMP-$imp.txt
-    plot.sh
-    cp tmp.pdf tmp-history-$nrofcenters.pdf
+    plot.sh $nrofcenters
+
     awk -v phi=$phi -v nr=$nrofcenters '{radius=0.0625; print nr " " phi " " $2/(radius*radius) " "  phi/(54*log(phi)**2) }' < out/flowrate.txt >> $permfile
 fi
 
