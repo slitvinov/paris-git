@@ -4922,7 +4922,7 @@
                         </Object>
                         <Object name="ViewerPlotList">
                             <Object name="timeSliders">
-                                <Field name="SOURCE00" type="int">40</Field>
+                                <Field name="SOURCE00" type="int">0</Field>
                             </Object>
                             <Field name="activeTimeSlider" type="string">SOURCE00</Field>
                             <Object name="plot00">
@@ -4935,7 +4935,7 @@
                                 <Field name="realized" type="bool">true</Field>
                                 <Object name="ViewerPlot">
                                     <Field name="plotDescription" type="string"></Field>
-                                    <Field name="cacheIndex" type="int">40</Field>
+                                    <Field name="cacheIndex" type="int">0</Field>
                                     <Field name="spatialExtentsType" type="string">AVT_ORIGINAL_EXTENTS</Field>
                                     <Field name="bgColor" type="doubleArray" length="3">1 1 1 </Field>
                                     <Field name="fgColor" type="doubleArray" length="3">0 0 0 </Field>
@@ -5079,7 +5079,7 @@
                 <Object name="RunningEngines">
                     <Object name="MachineProfile">
                         <Field name="hostNickname" type="string"></Field>
-                        <Field name="host" type="string">mac.local</Field>
+                        <Field name="host" type="string">mac-2-001.bouyguesbox.fr</Field>
                         <Field name="userName" type="string">stephanezaleski</Field>
                         <Field name="hostAliases" type="string"></Field>
                         <Field name="directory" type="string"></Field>

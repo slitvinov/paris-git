@@ -26,30 +26,23 @@
             <Field name="defaultOrientation" type="int">0</Field>
         </Object>
         <Field name="postWhenShown" type="bool">false</Field>
-        <Object name="File open">
-            <Field name="x" type="int">0</Field>
-            <Field name="y" type="int">212</Field>
-            <Field name="width" type="int">676</Field>
-            <Field name="height" type="int">470</Field>
-            <Field name="visible" type="bool">false</Field>
-        </Object>
         <Object name="Information">
             <Field name="x" type="int">0</Field>
-            <Field name="y" type="int">295</Field>
+            <Field name="y" type="int">315</Field>
             <Field name="width" type="int">536</Field>
             <Field name="height" type="int">304</Field>
             <Field name="visible" type="bool">false</Field>
         </Object>
         <Object name="MainWin">
             <Field name="x" type="int">0</Field>
-            <Field name="y" type="int">0</Field>
+            <Field name="y" type="int">2</Field>
             <Field name="width" type="int">412</Field>
             <Field name="height" type="int">876</Field>
             <Field name="SPLITTER_VALUES_V2" type="floatVector">0 1 </Field>
         </Object>
         <Object name="Contour plot attributes">
             <Field name="x" type="int">222</Field>
-            <Field name="y" type="int">76</Field>
+            <Field name="y" type="int">96</Field>
             <Field name="width" type="int">521</Field>
             <Field name="height" type="int">600</Field>
             <Field name="visible" type="bool">false</Field>

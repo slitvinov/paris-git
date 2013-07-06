@@ -2,7 +2,7 @@
 #set -x
 
 rm -fR out
-mpirun -np 9 paris > tmpout
+mpirun -np 8 paris > tmpout
 echo `awk ' /Step:/ { cpu = $8 } END { print "cpu = " cpu } ' < tmpout`
 
 GREEN="\\033[1;32m"

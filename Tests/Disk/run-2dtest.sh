@@ -49,7 +49,7 @@ FIT_LIMIT = 1e-6
 fit [2*$end/3:$end] f(x) "toplot.txt" via a, b
 plot "toplot.txt", f(x)
 print "permeability = ",-1/a
-pause 100
+# pause 10
 EOF
 
 grep permeability tmp | awk -v phi=$phi '{print $3*phi}' > perm.txt
@@ -59,7 +59,6 @@ awk '{print $2}' < out/flowrate.txt >> perm.txt
 if [ -d out ]; then
     cd out
 	compare ../reference.txt flowrate.txt $precision
-	
     cd ..
 else
     echo "FAIL: directory out not created"

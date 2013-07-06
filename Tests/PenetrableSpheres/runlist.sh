@@ -18,9 +18,10 @@ else
     permfile=perm-$nx0.txt
 fi
 
-npx=2
+maxerr=1d-10
+npx=1
 npy=$npx
-npz=2
+npz=1
 
 /bin/rm -f $permfile
 
@@ -47,7 +48,7 @@ EOF
     rm -fr input out stats
     let nx=$nx0
     sed s/NXTEMP/$nx/g testinput.template | sed s/DTTEMP/$dt/g | sed s/IMPTEMP/$imp/g | sed s/ENDTIMETEMP/$Tend/g > testinput-$nx.tmp
-    sed s/NPXTEMP/$npx/g testinput-$nx.tmp |  sed s/NPYTEMP/$npy/g |  sed s/NPZTEMP/$npz/g > testinput-$nx
+    sed s/NPXTEMP/$npx/g testinput-$nx.tmp |  sed s/NPYTEMP/$npy/g |  sed s/NPZTEMP/$npz/g | sed s/MAXERRTEMP/$maxerr/g > testinput-$nx
     ln -s testinput-$nx input
 
     if [ `grep DoFront input | awk '{print $3}'` == 'T' ]; then
