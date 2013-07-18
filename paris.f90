@@ -1067,54 +1067,6 @@ subroutine InitCondition
   endif
 end subroutine InitCondition
 !=================================================================================================
-!=================================================================================================
-! subroutine density
-!   calculates drho/dt
-!   called in:    program paris
-!-------------------------------------------------------------------------------------------------
-subroutine density(rho,u,v,w,drho)
-  use module_grid
-  use module_tmpvar
-  implicit none
-  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: u, v, w,rho
-  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(out) :: drho
-  real(8), external :: minabs
-  integer :: i,j,k
-
-  do k=ks,ke; do j=js,je; do i=is-1,ie
-    if(u(i,j,k)>0.0) then
-      tmp(i,j,k) = rho(i  ,j,k)+0.5*minabs( rho(i+1,j,k)-rho(i,j,k)  ,rho(i,j,k)-rho(i-1,j,k) )
-    else
-      tmp(i,j,k) = rho(i+1,j,k)-0.5*minabs( rho(i+2,j,k)-rho(i+1,j,k),rho(i+1,j,k)-rho(i,j,k) )
-    endif
-  enddo;enddo;enddo
-  do k=ks,ke; do j=js,je; do i=is,ie
-    drho(i,j,k) = -0.5*(u(i,j,k)+u(i-1,j,k))*(tmp(i,j,k)-tmp(i-1,j,k))/dx(i)
-  enddo; enddo; enddo
-  do k=ks,ke; do j=js-1,je; do i=is,ie
-    if(v(i,j,k)>0.0) then
-      tmp(i,j,k) = rho(i  ,j,k)+0.5*minabs( rho(i,j+1,k)-rho(i,j,k)  ,rho(i,j,k)-rho(i,j-1,k) )
-    else
-      tmp(i,j,k) = rho(i,j+1,k)-0.5*minabs( rho(i,j+2,k)-rho(i,j+1,k),rho(i,j+1,k)-rho(i,j,k) )
-    endif
-  enddo;enddo;enddo
-  do k=ks,ke; do j=js,je; do i=is,ie
-    drho(i,j,k) = drho(i,j,k)-0.5*(v(i,j,k)+v(i,j-1,k))*(tmp(i,j,k)-tmp(i,j-1,k))/dy(j)
-  enddo; enddo; enddo
-  do k=ks-1,ke; do j=js,je; do i=is,ie
-    if(w(i,j,k)>0.0) then
-      tmp(i,j,k) = rho(i  ,j,k)+0.5*minabs( rho(i,j,k+1)-rho(i,j,k)  ,rho(i,j,k)-rho(i,j,k-1) )
-    else
-      tmp(i,j,k) = rho(i,j,k+1)-0.5*minabs( rho(i,j,k+2)-rho(i,j,k+1),rho(i,j,k+1)-rho(i,j,k) )
-    endif
-  enddo;enddo;enddo
-  do k=ks,ke; do j=js,je; do i=is,ie
-    drho(i,j,k) = drho(i,j,k)-0.5*(w(i,j,k)+w(i,j,k-1))*(tmp(i,j,k)-tmp(i,j,k-1))/dz(k)
-  enddo; enddo; enddo
-
-end subroutine density
-!=================================================================================================
-!=================================================================================================
 ! function minabs
 !   used for ENO interpolations
 !   called in:    subroutine momentumConvection
