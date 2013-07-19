@@ -65,6 +65,7 @@ Program paris
   integer :: switch=1
   real(8) :: residual
   real(8) :: sphere
+  logical :: test_heights = .true. ! fix this
 !---------------------------------------INITIALIZATION--------------------------------------------
   ! Initialize MPI
   call MPI_INIT(ierr)
@@ -181,6 +182,11 @@ Program paris
            !------------------------------------END VOF STUFF---------------------------------------------- 
            !               call uzawa(u,v,w,rho,mu,du,dv,dw,p,umask,vmask,wmask,A,dt,beta,maxit,rho1,rho2,dpdx,dpdy,dpdz,BuoyancyCase,fx,fy,fz,gx,gy,gz,rho_ave)
            !           else  ! not Uzawa
+
+           call get_heights()
+           if(call output_heights()
+           if(test_heights) stop "done"
+
               if(Implicit) then
                  if(Twophase) then 
                     call momentumDiffusion(u,v,w,rho,mu,du,dv,dw)  
@@ -959,6 +965,7 @@ subroutine InitCondition
   use module_vof
   implicit none
   include 'mpif.h'
+  logical test_heights = .true.  ! fix this, should be somewhere else; 
   integer :: i,j,k,ib, ierr, irank, req(12),sta(MPI_STATUS_SIZE,12)
   real(8) :: my_ave
   !---------------------------------------------Domain----------------------------------------------
@@ -992,7 +999,19 @@ subroutine InitCondition
               j = jmax-jmin+1
               k = kmax-kmin+1
               call levelset2vof(du,cvof,i,j,k)
-           else 
+           else if(test_heights) then
+              do i=imin,imax
+                 do j=jmin,jmax
+                    do k=kmin,kmax 
+                       du(i,j,k) =  z(k) - zlength/2.d0  - 3.*dx(nx/2)*cos(2.*3.14159*x(i)/xlength) 
+                    enddo
+                 enddo
+              enddo
+              i = imax-imin+1
+              j = jmax-jmin+1
+              k = kmax-kmin+1
+              call levelset2vof(du,cvof,i,j,k)
+           else
               cvof=0.d0
               if(rank==0) print *, "Warning: no VOF field."
            endif
