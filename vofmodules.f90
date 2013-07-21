@@ -33,6 +33,7 @@ module module_VOF
   real(8), dimension(:,:,:), allocatable :: cvof ! VOF tracer variable
   character(20) :: vofbdry_cond(3),test_type,vof_advect
   integer :: parameters_read=0
+  logical :: test_heights = .false.  
 contains
 !=================================================================================================
 !=================================================================================================
@@ -85,11 +86,13 @@ contains
     endif
     allocate(cvof(imin:imax,jmin:jmax,kmin:kmax))
     cvof = 0.D0
- !       if(test_type=='uniform_advection') then
- !          u=1.
- !       else
- !          stop 'unknown initialization'
- !       endif
+    if(test_type=='uniform_advection') then
+       test_heights = .false.
+    else if(test_type=='height_test') then
+       test_heights = .true.
+    else
+       stop 'unknown initialization'
+    endif
    end subroutine initialize_VOF
 !=================================================================================================
   subroutine c_mask(cbinary)
@@ -706,13 +709,18 @@ end function fl3d
 !   On output: cc: becomes the volume fraction, ls: untouched.
 ! ****** 1 ******* 2 ******* 3 ******* 4 ******* 5 ******* 6 ******* 7 *
 subroutine levelset2vof(ls,cc,nx,ny,nz)
+!  use module_BC
   implicit none
+  include 'mpif.h'
   integer nx,ny,nz
   real(8) cc(nx,ny,nz),ls(nx,ny,nz)
   real(8) zero, one, norml1
   real(8) mm1,mm2,mm3,mx,my,mz,alpha
   real(8) fl3d
   integer i,j,k
+  integer :: req(48),sta(MPI_STATUS_SIZE,48)
+  integer :: ngh=2, ierr
+
 
   zero=0.d0
   one=1.d0

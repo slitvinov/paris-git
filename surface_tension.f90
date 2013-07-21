@@ -28,12 +28,14 @@
 !-------------------------------------------------------------------------------------------------
 module module_surface_tension
   use module_grid
+  use module_BC
   use module_IO
   use module_tmpvar
   use module_VOF
   implicit none
   real(8), dimension(:,:,:), allocatable :: n1,n2,n3 ! normals
   real(8), dimension(:,:,:,:), allocatable :: height ! normals
+
    ! 4th index: 1 for positive height in x, 2 for negative height in x
    !            3 for positive height in y, 4 for negative height in y, etc... 
  integer, dimension(:,:,:), allocatable :: vof_flag ! 
@@ -47,15 +49,20 @@ module module_surface_tension
   !   3 other cases (for instance empty cell)
   ! 4th index: 1 for positive height in x, 2 for negative height in x, etc... 
   !            3 for positive height in y, 4 for negative height in y, etc... 
-  logical st_initialized = .false.
+  logical :: st_initialized = .false.
 contains
 !=================================================================================================
   subroutine initialize_surface_tension()
     allocate(  n1(imin:imax,jmin:jmax,kmin:kmax), n2(imin:imax,jmin:jmax,kmin:kmax),  &
-               n3(imin:imax,jmin:jmax,kmin:kmax))
+               n3(imin:imax,jmin:jmax,kmin:kmax), vof_flag(imin:imax,jmin:jmax,kmin:kmax), &
+               height_flag(imin:imax,jmin:jmax,kmin:kmax,6), height(imin:imax,jmin:jmax,kmin:kmax,6))
   end subroutine initialize_surface_tension
 
   subroutine get_normals()
+    real(8) :: stencil3x3(-1:1,-1:1,-1:1)
+    integer :: i,j,k
+    integer :: i0,j0,k0
+    real(8) :: mxyz(3)
     if(.not.st_initialized) call initialize_surface_tension()
     st_initialized=.true.
     if(ng.lt.2) stop "wrong ng"
@@ -63,7 +70,7 @@ contains
        do j=js-1,je+1
           do i=is-1,ie+1
              do i0=-1,1; do j0=-1,1; do k0=-1,1
-                 stencil3x3(i0,j0,k0) = c(i+i0,j+j0,k+k0)
+                 stencil3x3(i0,j0,k0) = cvof(i+i0,j+j0,k+k0)
               enddo;enddo;enddo
               call mycs(stencil3x3,mxyz)
               n1(i,j,k) = mxyz(1)
@@ -74,9 +81,33 @@ contains
      enddo
    end subroutine get_normals
 
+  subroutine get_flags()
+     integer :: i,j,k
+     if(.not.st_initialized) call initialize_surface_tension()
+     st_initialized=.true.
+     if(ng.lt.2) stop "wrong ng"
+     do k=ks,ke
+        do j=js,je
+           do i=is,ie
+              if(cvof(i,j,k).le.0.d0) then
+                 vof_flag(i,j,k) = 0
+              else if(cvof(i,j,k).ge.1.d0) then
+                 vof_flag(i,j,k) = 1
+              else
+                 vof_flag(i,j,k) = 2
+              endif
+           enddo
+        enddo
+     enddo
+   end subroutine get_flags
+
    subroutine get_all_heights
-     integer :: direction
+     include 'mpif.h'
+     integer :: direction, ierr
      integer :: req(24),sta(MPI_STATUS_SIZE,24)
+     if(.not.st_initialized) call initialize_surface_tension()
+     st_initialized=.true.
+
      do direction=1,3
         call get_heights(direction)
      enddo
@@ -107,12 +138,15 @@ contains
    end subroutine get_all_heights
 
    subroutine get_heights(direction)
-     integer, intent=in :: direction
+     integer, intent(in) :: direction
      integer :: index
-     logical base_not_found
-     real(8) height_p, height_n
-     integer NDEPTH=3
-     integer si,sj,sk
+     logical :: base_not_found, bottom_n_found, bottom_p_found, top_n_found, top_p_found
+     real(8) :: height_p, height_n
+     integer :: NDEPTH=3
+     integer :: si,sj,sk
+     integer :: i,j,k
+     integer :: i0,j0,k0
+     integer :: nd, ierr
      ! NDEPTH is the depth of layers tested above or below the reference cell. 
      ! including the central layer
      ! NDEPTH*2 - 1 = 5 means a 5 x 3 stencil. 
@@ -126,6 +160,8 @@ contains
         si=0; sj=1; sk=0;
      else if (direction.eq.3) then
         si=0; sj=0; sk=1
+     else
+       stop "bad direction"
      endif
    
      do k=ks,ke
@@ -146,7 +182,7 @@ contains
                  height_flag(i,j,k,index) = 2
               endif
 
-!  even index: normal pointing down
+!  even index: normal pointing down (check signs and directions)
 
               index = 2*(direction-1) + 2
               if(vof_flag(i,j,k).eq.1.and.vof_flag(i-si,j-sj,k-sk).eq.0) then
@@ -155,22 +191,33 @@ contains
                else if(vof_flag(i,j,k).eq.0.and.vof_flag(i+si,j+sj,k+sk).eq.1) then
                  height(i,j,k,index) = 0.5d0
                  height_flag(i,j,k,index) = 1
+               else
+                 height_flag(i,j,k,index) = 2
                endif
-!
-!  end empty/full case
-!
-!  second case: cell is fractional
-!
+               !
+               !  end empty/full case
+               !
+               !  second case: cell is fractional
+               !
               if(vof_flag(i,j,k).eq.2) then
-                 i0 = i; j0 = j; k0 = k
-                 height_p = c(i0,j0,k0) - 0.5d0
-                 height_n = c(i0,j0,k0) - 0.5d0
-                 i0 = i0 - si; j0 = j0 -sj; k0 = k0 - sk
+                 
+                 height_p = cvof(i,j,k) - 0.5d0
+                 height_n = - height_p
+
+                 bottom_p_found=.false.
+                 bottom_n_found=.false.
+                 top_p_found=.false.
+                 top_n_found=.false.
+                 
+                 ! going down
+                 ! First pass of "p-heights"
+
+                 i0 = i - si; j0 = j - sj; k0 = k - sk
                  base_not_found = .true.
                  nd = 1
                  do while ( base_not_found ) 
-                    height_p = height_p + c(i0,j0,k0) - 1.d0
-                    i0 = i0 - si; j0 = j0 -sj; k0 = k0 - sk
+                    height_p = height_p + cvof(i0,j0,k0) - 1.d0
+                    i0 = i0 - si; j0 = j0 - sj; k0 = k0 - sk
                     nd = nd + 1
                     if(vof_flag(i0,j0,k0).eq.1) then
                        bottom_p_found = .true.
@@ -179,11 +226,13 @@ contains
                     if(nd .eq. NDEPTH) base_not_found = .false.
                  end do
 
-                 i0 = i - si; j0 = j -sj; k0 = k - sk
-                 nd = 1
+                 ! First pass of "n-heights"
+
+                 i0 = i - si; j0 = j - sj; k0 = k - sk
                  base_not_found = .true.
+                 nd = 1
                  do while ( base_not_found ) 
-                    height_n = height_n + c(i0,j0,k0) - 1.d0
+                    height_n = height_n - cvof(i0,j0,k0) 
                     i0 = i0 - si; j0 = j0 -sj; k0 = k0 - sk
                     nd = nd + 1
                     if(vof_flag(i0,j0,k0).eq.0) then
@@ -194,12 +243,13 @@ contains
                  end do
 
                  ! same thing going up
+                 ! Second pass of "p-heights"
 
                  i0 = i + si; j0 = j + sj; k0 = k + sk
                  nd = 1
                  base_not_found = .true.
                  do while ( base_not_found ) 
-                    height_p = height_p + c(i0,j0,k0) - 1.d0
+                    height_p = height_p + cvof(i0,j0,k0) 
                     i0 = i0 + si; j0 = j0 + sj; k0 = k0 + sk
                     nd = nd + 1
                     if(vof_flag(i0,j0,k0).eq.0) then
@@ -209,21 +259,26 @@ contains
                     if(nd .eq. NDEPTH) base_not_found = .false.
                  end do
 
+                 ! Second pass of "n-heights"
+
                  i0 = i + si; j0 = j + sj; k0 = k + sk
                  nd = 1
                  base_not_found = .true.
                  do while ( base_not_found ) 
-                    height_n = height_n + c(i0,j0,k0) - 1.d0
+                    height_n = height_n - cvof(i0,j0,k0) + 1.d0
                     i0 = i0 + si; j0 = j0 + sj; k0 = k0 + sk
                     nd = nd + 1
-                    if(vof_flag(i0,j0,k0).eq.0) then
+                    if(vof_flag(i0,j0,k0).eq.1) then
                        top_n_found = .true.
                        base_not_found = .false.
                     endif
                     if(nd .eq. NDEPTH) base_not_found = .false.
                  end do
 
-! put everything in the height array. 
+! put everything in the height array.
+
+! "p-heights" have indexes 1, 3, 5
+ 
                  index = 2*(direction-1) + 1
                  if (bottom_p_found.and.top_p_found) then 
                     height_flag(i,j,k,index) = 1
@@ -231,6 +286,8 @@ contains
                  else
                     height_flag(i,j,k,index) = 2
                  endif
+
+! "n-heights" have indexes 2, 4, 6
 
                  index = 2*(direction-1) + 2
                  if (bottom_n_found.and.top_n_found) then 
@@ -249,16 +306,121 @@ contains
 
    subroutine output_heights()
      implicit none
-     integer i,j,k
+     integer i,j,k,d,index
+     real(8) h, th
      OPEN(UNIT=89,FILE=TRIM(out_path)//'/height-'//TRIM(int2text(rank,padding))//'.txt')
-     k = nz/2
+     k = nz/2 + 2
      j = ny/2
-     do i=is,ie
-        if (height_flag(i,j,k,1).eq.1) then
-           write(89,100) x(i),height(i,j,k,5)
+
+     write(89,*) " "
+     write(89,*) " p heights at  z = L/2 as a function of x"
+     write(89,*) " "
+ 
+
+    do i=is,ie
+        th = (- z(k) + zlength/2.d0)/dx(i) + 3.*cos(2.*3.14159*x(i)/xlength)
+        if (height_flag(i,j,k,5).eq.1) then
+           h = height(i,j,k,5)
         else
-           write(89,100) x(i),'-'
+! search for height
+           d=0
+           do while(d.lt.3)
+              d = d + 1
+              if (height_flag(i,j,k+d,5).eq.1) then
+                 height_flag(i,j,k,5) = 1
+                 h = height(i,j,k+d,5) + d
+                 height(i,j,k,5) = h 
+              else if (height_flag(i,j,k-d,5).eq.1) then
+                 height_flag(i,j,k,5) = 1
+                 h = height(i,j,k-d,5) - d
+                 height(i,j,k,5) = h 
+              endif
+           enddo
+           if(height_flag(i,j,k,5).ne.1) then
+              write(89,101) x(i),' -', th
+           else
+              write(89,100) x(i), h , th
+           endif
         endif
      enddo
+
+     write(89,*) " "
+     write(89,*) " n heights at  z = L/2 as a function of x, not searched"
+     write(89,*) " "
+ 
+     index=6
+    do i=is,ie
+        th = (- z(k) + zlength/2.d0)/dx(i) + 3.*cos(2.*3.14159*x(i)/xlength)
+        if (height_flag(i,j,k,index).eq.1) then
+           h = height(i,j,k,index)
+        else
+! search for height
+           d=0
+           do while(d.lt.3)
+              d = d + 1
+              if (height_flag(i,j,k+d,index).eq.1) then
+                 height_flag(i,j,k,index) = 1
+                 h = height(i,j,k+d,index) + d
+                 height(i,j,k,index) = h 
+              else if (height_flag(i,j,k-d,index).eq.1) then
+                 height_flag(i,j,k,index) = 1
+                 h = height(i,j,k-d,index) - d
+                 height(i,j,k,index) = h
+              endif
+           enddo
+           if(height_flag(i,j,k,index).ne.1) then
+              write(89,101) x(i),' -', th
+           else
+              write(89,100) x(i), h , th
+           endif
+        endif
+     enddo
+
+ 
+    do i=is,ie
+            write(89,103) x(i),height(i,j,k,1:6),height_flag(i,j,k,1:6)
+      enddo
+    do k=ks,ke
+       write(*,104) cvof(is:ie,ny/2,k)
+    enddo
+    print *, " "
+    do k=ks,ke
+       write(*,105) vof_flag(is:ie,ny/2,k)
+    enddo
+
+    write(89,*) " "
+    write(89,*) " n heights in z"
+    write(89,*) " "
+    do k=ke,ks,-1
+       write(89,1041) k, height(is:ie,ny/2,k,6)
+    enddo
+
+    write(89,*) " "
+    do k=ke,ks,-1
+       write(89,1051) k, height_flag(is:ie,ny/2,k,6)
+    enddo
+
+
+    write(89,*) " "
+    write(89,*) " p heights in z"
+    write(89,*) " "
+    do k=ke,ks,-1
+       write(89,1041) k, height(is:ie,ny/2,k,5)
+    enddo
+
+    write(89,*) " "
+    do k=ke,ks,-1
+       write(89,1051) k, height_flag(is:ie,ny/2,k,5)
+    enddo
+
+
+100  format(3(f16.8))
+101  format(f16.8,A2,f16.8)
+103  format(7(f16.8),6(I2))
+104  format(16(f5.1,' '))
+1041  format(I3,16(f5.1,' '))
+105  format(16(I2,' '))
+1051  format(I3,16(I2,' '))
+
    end subroutine output_heights
-        
+ end module module_surface_tension

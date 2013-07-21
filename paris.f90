@@ -54,6 +54,7 @@ Program paris
   use module_vof
   use module_output_vof
   use module_hello
+  use module_surface_tension
 
   implicit none
   include 'mpif.h'
@@ -65,7 +66,6 @@ Program paris
   integer :: switch=1
   real(8) :: residual
   real(8) :: sphere
-  logical :: test_heights = .true. ! fix this
 !---------------------------------------INITIALIZATION--------------------------------------------
   ! Initialize MPI
   call MPI_INIT(ierr)
@@ -183,9 +183,12 @@ Program paris
            !               call uzawa(u,v,w,rho,mu,du,dv,dw,p,umask,vmask,wmask,A,dt,beta,maxit,rho1,rho2,dpdx,dpdy,dpdz,BuoyancyCase,fx,fy,fz,gx,gy,gz,rho_ave)
            !           else  ! not Uzawa
 
-           call get_heights()
-           if(call output_heights()
-           if(test_heights) stop "done"
+           call get_flags()
+           call get_all_heights()
+           if(test_heights) then
+              call output_heights()
+              stop "done"
+           endif
 
               if(Implicit) then
                  if(Twophase) then 
@@ -963,11 +966,12 @@ subroutine InitCondition
   use module_poisson
   use module_IO
   use module_vof
+  use module_surface_tension
   implicit none
   include 'mpif.h'
-  logical test_heights = .true.  ! fix this, should be somewhere else; 
   integer :: i,j,k,ib, ierr, irank, req(12),sta(MPI_STATUS_SIZE,12)
   real(8) :: my_ave
+  integer :: ngh=2
   !---------------------------------------------Domain----------------------------------------------
   if(rank<nPdomain)then
      if(restart)then
@@ -985,7 +989,7 @@ subroutine InitCondition
         ! when set by Front-Tracking.
         color = 0.; u = U_init;  v = 0;  w = 0.
         if(DoVOF) then
-           if(numbubble > 0) then 
+           if(numbubble > 0.and..not.test_heights) then 
               do ib=1,numBubble
                  do i=imin,imax
                     do j=jmin,jmax
@@ -999,11 +1003,14 @@ subroutine InitCondition
               j = jmax-jmin+1
               k = kmax-kmin+1
               call levelset2vof(du,cvof,i,j,k)
+              call ghost_x(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+              call ghost_y(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+              call ghost_z(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
            else if(test_heights) then
               do i=imin,imax
                  do j=jmin,jmax
                     do k=kmin,kmax 
-                       du(i,j,k) =  z(k) - zlength/2.d0  - 3.*dx(nx/2)*cos(2.*3.14159*x(i)/xlength) 
+                       du(i,j,k) =   z(k) - zlength/2.d0  - 3.*dx(nx/2)*cos(2.*3.14159*x(i)/xlength) 
                     enddo
                  enddo
               enddo
@@ -1011,6 +1018,9 @@ subroutine InitCondition
               j = jmax-jmin+1
               k = kmax-kmin+1
               call levelset2vof(du,cvof,i,j,k)
+              call ghost_x(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+              call ghost_y(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+              call ghost_z(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
            else
               cvof=0.d0
               if(rank==0) print *, "Warning: no VOF field."

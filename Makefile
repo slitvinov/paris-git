@@ -7,7 +7,7 @@ FC = mpif90
 
 # remove funny cflags from my environment
 
-FFLAGS = -O3 # -g -gstabs
+FFLAGS =  -g -gstabs # -O3 #
 CFLAGS = -O # -g -gstabs
 BINDIR = $(HOME)/bin
 
@@ -25,12 +25,12 @@ HYPRE_LIBS =  -L$(HYPRE_DIR)/lib -lHYPRE
 #------------------------No changes needed beyond this line----------------------------------------------
 
 
-OBJ = paris.o solids.o modules.o vofmodules.o front.o # uzawa.o
+OBJ = paris.o solids.o modules.o vofmodules.o front.o surface_tension.o # uzawa.o
 SRC = $(wildcard  *.f90) 
 
 install: $(OBJ)
 #	@echo compiler is FC = $(FC), mpi override is OMPI_FC = $(OMPI_FC)
-	$(FC) -o paris $(FOPTS) $(OBJ) $(FOBJ) $(HYPRE_LIBS) 
+	$(FC) -g -o paris $(FOPTS) $(OBJ) $(FOBJ) $(HYPRE_LIBS) 
 	@if [ ! -d $(BINDIR) ] ; then echo "directory bin does not exist creating it" ; mkdir $(BINDIR) ; fi 
 	mv paris $(BINDIR)/paris
 	@find .  -name "*.sh" -exec chmod +x  {} \; 
@@ -60,10 +60,14 @@ tags:	$(SRC)
 # @SZ On MacOS tags and TAGS are identical ! 
 # @SZ	ctags paris.f90 
 
-paris.o:  paris.f90 solids.o modules.o vofmodules.o front.o
+paris.o:  paris.f90 solids.o modules.o vofmodules.o front.o surface_tension.o
 	$(FC) -c  $(FFLAGS) $<
 
 vofmodules.o: vofmodules.f90 modules.o
+	$(FC) -c  $(FFLAGS) $<
+
+
+surface_tension.o: surface_tension.f90 vofmodules.o modules.o
 	$(FC) -c  $(FFLAGS) $<
 
 solids.o:  solids.f90 modules.o
