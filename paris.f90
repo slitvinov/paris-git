@@ -187,7 +187,9 @@ Program paris
            call get_all_heights()
            if(test_heights) then
               call output_heights()
-              stop "done"
+              call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+              call MPI_finalize(ierr)
+              stop
            endif
 
               if(Implicit) then
@@ -1006,11 +1008,12 @@ subroutine InitCondition
               call ghost_x(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
               call ghost_y(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
               call ghost_z(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+              call setVOFBC(cvof)
            else if(test_heights) then
               do i=imin,imax
                  do j=jmin,jmax
                     do k=kmin,kmax 
-                       du(i,j,k) =   z(k) - zlength/2.d0  - 3.*dx(nx/2)*cos(2.*3.14159*x(i)/xlength) 
+                       du(i,j,k) =   - z(k) + zlength/2.d0  + A_h*dx(nx/2)*cos(2.*3.14159*x(i)/xlength) 
                     enddo
                  enddo
               enddo
@@ -1021,6 +1024,7 @@ subroutine InitCondition
               call ghost_x(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
               call ghost_y(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
               call ghost_z(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+              call setVOFBC(cvof)
            else
               cvof=0.d0
               if(rank==0) print *, "Warning: no VOF field."

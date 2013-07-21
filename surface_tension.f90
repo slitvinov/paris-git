@@ -33,6 +33,7 @@ module module_surface_tension
   use module_tmpvar
   use module_VOF
   implicit none
+  real(8) :: A_h = 2d0
   real(8), dimension(:,:,:), allocatable :: n1,n2,n3 ! normals
   real(8), dimension(:,:,:,:), allocatable :: height ! normals
 
@@ -42,7 +43,7 @@ module module_surface_tension
   !   0 empty
   !   1 full
   !   2 fractional
-  integer, dimension(:,:,:,:), allocatable :: height_flag ! 
+!  integer, dimension(:,:,:,:), allocatable :: height_flag ! 
   !   0 undecided (not fully tested yet)
   !   1 height found
   !   2 no height found
@@ -55,7 +56,8 @@ contains
   subroutine initialize_surface_tension()
     allocate(  n1(imin:imax,jmin:jmax,kmin:kmax), n2(imin:imax,jmin:jmax,kmin:kmax),  &
                n3(imin:imax,jmin:jmax,kmin:kmax), vof_flag(imin:imax,jmin:jmax,kmin:kmax), &
-               height_flag(imin:imax,jmin:jmax,kmin:kmax,6), height(imin:imax,jmin:jmax,kmin:kmax,6))
+!               height_flag(imin:imax,jmin:jmax,kmin:kmax,6), height(imin:imax,jmin:jmax,kmin:kmax,6))
+               height(imin:imax,jmin:jmax,kmin:kmax,6))
   end subroutine initialize_surface_tension
 
   subroutine get_normals()
@@ -86,9 +88,9 @@ contains
      if(.not.st_initialized) call initialize_surface_tension()
      st_initialized=.true.
      if(ng.lt.2) stop "wrong ng"
-     do k=ks,ke
-        do j=js,je
-           do i=is,ie
+     do k=kmin,kmax
+        do j=jmin,jmax
+           do i=imin,imax
               if(cvof(i,j,k).le.0.d0) then
                  vof_flag(i,j,k) = 0
               else if(cvof(i,j,k).ge.1.d0) then
@@ -134,7 +136,7 @@ contains
      call ghost_z(height(:,:,:,5),2,req(17:20));
      call ghost_z(height(:,:,:,6),2,req(21:24));
      call MPI_WAITALL(24,req(1:24),sta(:,1:24),ierr)
-
+ 
    end subroutine get_all_heights
 
    subroutine get_heights(direction)
@@ -174,12 +176,10 @@ contains
               index = 2*(direction-1) + 1
               if(vof_flag(i,j,k).eq.0.and.vof_flag(i-si,j-sj,k-sk).eq.1) then
                  height(i,j,k,index) =  - 0.5d0
-                 height_flag(i,j,k,index) = 1
               else if(vof_flag(i,j,k).eq.1.and.vof_flag(i+si,j+sj,k+sk).eq.0) then
                  height(i,j,k,index) = 0.5d0
-                 height_flag(i,j,k,index) = 1
               else
-                 height_flag(i,j,k,index) = 2
+                 height(i,j,k,index) = 2d6
               endif
 
 !  even index: normal pointing down (check signs and directions)
@@ -187,12 +187,10 @@ contains
               index = 2*(direction-1) + 2
               if(vof_flag(i,j,k).eq.1.and.vof_flag(i-si,j-sj,k-sk).eq.0) then
                  height(i,j,k,index) =  - 0.5d0
-                 height_flag(i,j,k,index) = 1
                else if(vof_flag(i,j,k).eq.0.and.vof_flag(i+si,j+sj,k+sk).eq.1) then
                  height(i,j,k,index) = 0.5d0
-                 height_flag(i,j,k,index) = 1
                else
-                 height_flag(i,j,k,index) = 2
+                 height(i,j,k,index) = 2d6
                endif
                !
                !  end empty/full case
@@ -281,20 +279,18 @@ contains
  
                  index = 2*(direction-1) + 1
                  if (bottom_p_found.and.top_p_found) then 
-                    height_flag(i,j,k,index) = 1
                     height(i,j,k,index) = height_p
                  else
-                    height_flag(i,j,k,index) = 2
+                    height(i,j,k,index) = 2d6
                  endif
 
 ! "n-heights" have indexes 2, 4, 6
 
                  index = 2*(direction-1) + 2
                  if (bottom_n_found.and.top_n_found) then 
-                    height_flag(i,j,k,index) = 1
                     height(i,j,k,index) = height_n
                  else
-                    height_flag(i,j,k,index) = 2
+                    height(i,j,k,index) = 2d6
                  endif
               endif
 ! end of fractional cell case
@@ -308,119 +304,97 @@ contains
      implicit none
      integer i,j,k,d,index
      real(8) h, th
-     OPEN(UNIT=89,FILE=TRIM(out_path)//'/height-'//TRIM(int2text(rank,padding))//'.txt')
      k = nz/2 + 2
      j = ny/2
 
-     write(89,*) " "
-     write(89,*) " p heights at  z = L/2 as a function of x"
-     write(89,*) " "
- 
+     if(k<ks.or.k>ke) return
+     if(j<js.or.j>je) return
 
-    do i=is,ie
-        th = (- z(k) + zlength/2.d0)/dx(i) + 3.*cos(2.*3.14159*x(i)/xlength)
-        if (height_flag(i,j,k,5).eq.1) then
-           h = height(i,j,k,5)
-        else
-! search for height
-           d=0
-           do while(d.lt.3)
-              d = d + 1
-              if (height_flag(i,j,k+d,5).eq.1) then
-                 height_flag(i,j,k,5) = 1
-                 h = height(i,j,k+d,5) + d
-                 height(i,j,k,5) = h 
-              else if (height_flag(i,j,k-d,5).eq.1) then
-                 height_flag(i,j,k,5) = 1
-                 h = height(i,j,k-d,5) - d
-                 height(i,j,k,5) = h 
-              endif
-           enddo
-           if(height_flag(i,j,k,5).ne.1) then
-              write(89,101) x(i),' -', th
-           else
-              write(89,100) x(i), h , th
-           endif
-        endif
-     enddo
+     OPEN(UNIT=89,FILE=TRIM(out_path)//'/height-'//TRIM(int2text(rank,padding))//'.txt')
+     OPEN(UNIT=90,FILE=TRIM(out_path)//'/reference-'//TRIM(int2text(rank,padding))//'.txt')
 
-     write(89,*) " "
-     write(89,*) " n heights at  z = L/2 as a function of x, not searched"
-     write(89,*) " "
+!     write(89,*) " "
+!     write(89,*) " p heights at  z = L/2 as a function of x"
+!     write(89,*) " "
  
-     index=6
-    do i=is,ie
-        th = (- z(k) + zlength/2.d0)/dx(i) + 3.*cos(2.*3.14159*x(i)/xlength)
-        if (height_flag(i,j,k,index).eq.1) then
+     index=5
+     do i=is,ie
+        th = (- z(k) + zlength/2.d0)/dx(i) + A_h*cos(2.*3.14159*x(i)/xlength)
+        write(90,100) x(i),th
+        if (height(i,j,k,index).lt.1d6) then
            h = height(i,j,k,index)
         else
-! search for height
+           ! search for height
            d=0
            do while(d.lt.3)
               d = d + 1
-              if (height_flag(i,j,k+d,index).eq.1) then
-                 height_flag(i,j,k,index) = 1
+              if (height(i,j,k+d,index).lt.1d6) then
                  h = height(i,j,k+d,index) + d
                  height(i,j,k,index) = h 
-              else if (height_flag(i,j,k-d,index).eq.1) then
-                 height_flag(i,j,k,index) = 1
+              else if (height(i,j,k-d,index).lt.1d6) then
                  h = height(i,j,k-d,index) - d
-                 height(i,j,k,index) = h
+                 height(i,j,k,index) = h 
               endif
            enddo
-           if(height_flag(i,j,k,index).ne.1) then
-              write(89,101) x(i),' -', th
-           else
-              write(89,100) x(i), h , th
-           endif
+        endif
+        if(height(i,j,k,index).gt.1d6) then
+           write(89,101) x(i),' -'
+        else
+           write(89,100) x(i), h 
         endif
      enddo
 
- 
-    do i=is,ie
-            write(89,103) x(i),height(i,j,k,1:6),height_flag(i,j,k,1:6)
-      enddo
-    do k=ks,ke
-       write(*,104) cvof(is:ie,ny/2,k)
-    enddo
-    print *, " "
-    do k=ks,ke
-       write(*,105) vof_flag(is:ie,ny/2,k)
-    enddo
+     !     write(89,*) " "
+     !     write(89,*) " n heights at  z = L/2 as a function of x, not searched"
+     !     write(89,*) " "
 
-    write(89,*) " "
-    write(89,*) " n heights in z"
-    write(89,*) " "
-    do k=ke,ks,-1
-       write(89,1041) k, height(is:ie,ny/2,k,6)
-    enddo
+     if(1==0) then
+        do i=is,ie
+           write(89,103) x(i),height(i,j,k,1:6),height(i,j,k,1:6)
+        enddo
+        do k=ks,ke
+           write(*,104) cvof(is:ie,ny/2,k)
+        enddo
+        print *, " "
+        do k=ks,ke
+           write(*,105) cvof(is:ie,ny/2,k)
+        enddo
 
-    write(89,*) " "
-    do k=ke,ks,-1
-       write(89,1051) k, height_flag(is:ie,ny/2,k,6)
-    enddo
+        write(89,*) " "
+        write(89,*) " n heights in z"
+        write(89,*) " "
+        do k=ke,ks,-1
+           write(89,1041) k, height(is:ie,ny/2,k,6)
+        enddo
 
+        write(89,*) " "
+        do k=ke,ks,-1
+           write(89,1051) k, height(is:ie,ny/2,k,6)
+        enddo
 
-    write(89,*) " "
-    write(89,*) " p heights in z"
-    write(89,*) " "
-    do k=ke,ks,-1
-       write(89,1041) k, height(is:ie,ny/2,k,5)
-    enddo
+        write(89,*) " "
+        write(89,*) " p heights in z"
+        write(89,*) " "
+        do k=ke,ks,-1
+           write(89,1041) k, height(is:ie,ny/2,k,5)
+        enddo
 
-    write(89,*) " "
-    do k=ke,ks,-1
-       write(89,1051) k, height_flag(is:ie,ny/2,k,5)
-    enddo
+        write(89,*) " "
+        do k=ke,ks,-1
+           write(89,1051) k, height(is:ie,ny/2,k,5)
+        enddo
+     endif  ! 1==0
 
-
-100  format(3(f16.8))
-101  format(f16.8,A2,f16.8)
+100  format(2(f24.16))
+101  format(f24.16,A2)
 103  format(7(f16.8),6(I2))
 104  format(16(f5.1,' '))
-1041  format(I3,16(f5.1,' '))
+1041 format(I3,16(f5.1,' '))
 105  format(16(I2,' '))
-1051  format(I3,16(I2,' '))
+1051 format(I3,16(I2,' '))
+
+     close(89)
+     close(90)
 
    end subroutine output_heights
  end module module_surface_tension

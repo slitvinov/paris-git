@@ -165,7 +165,7 @@ contains
     endif
   end subroutine vofsweeps
 !=================================================================================================
-! subroutine SetVelocityBC: Sets the velocity boundary condition
+! subroutine SetVOFBC: Sets the VOF fraction boundary condition
 !-------------------------------------------------------------------------------------------------
   subroutine SetVOFBC(c)
     use module_grid
