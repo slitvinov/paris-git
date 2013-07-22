@@ -183,9 +183,9 @@ Program paris
            !               call uzawa(u,v,w,rho,mu,du,dv,dw,p,umask,vmask,wmask,A,dt,beta,maxit,rho1,rho2,dpdx,dpdy,dpdz,BuoyancyCase,fx,fy,fz,gx,gy,gz,rho_ave)
            !           else  ! not Uzawa
 
-           call get_flags()
-           call get_all_heights()
            if(test_heights) then
+              call get_flags()
+              call get_all_heights()
               call output_heights()
               call MPI_BARRIER(MPI_COMM_WORLD, ierr)
               call MPI_finalize(ierr)

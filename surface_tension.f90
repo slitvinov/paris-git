@@ -56,7 +56,6 @@ contains
   subroutine initialize_surface_tension()
     allocate(  n1(imin:imax,jmin:jmax,kmin:kmax), n2(imin:imax,jmin:jmax,kmin:kmax),  &
                n3(imin:imax,jmin:jmax,kmin:kmax), vof_flag(imin:imax,jmin:jmax,kmin:kmax), &
-!               height_flag(imin:imax,jmin:jmax,kmin:kmax,6), height(imin:imax,jmin:jmax,kmin:kmax,6))
                height(imin:imax,jmin:jmax,kmin:kmax,6))
   end subroutine initialize_surface_tension
 
