@@ -43,13 +43,7 @@ module module_surface_tension
   !   0 empty
   !   1 full
   !   2 fractional
-!  integer, dimension(:,:,:,:), allocatable :: height_flag ! 
-  !   0 undecided (not fully tested yet)
-  !   1 height found
-  !   2 no height found
-  !   3 other cases (for instance empty cell)
-  ! 4th index: 1 for positive height in x, 2 for negative height in x, etc... 
-  !            3 for positive height in y, 4 for negative height in y, etc... 
+
   logical :: st_initialized = .false.
 contains
 !=================================================================================================
@@ -57,6 +51,9 @@ contains
     allocate(  n1(imin:imax,jmin:jmax,kmin:kmax), n2(imin:imax,jmin:jmax,kmin:kmax),  &
                n3(imin:imax,jmin:jmax,kmin:kmax), vof_flag(imin:imax,jmin:jmax,kmin:kmax), &
                height(imin:imax,jmin:jmax,kmin:kmax,6))
+    if(nx.ge.500000.or.ny.gt.500000.or.nz.gt.500000) then
+       stop 'nx too large'
+    endif
   end subroutine initialize_surface_tension
 
   subroutine get_normals()
@@ -170,7 +167,7 @@ contains
            do i=is,ie
 !
 !  first case: cell is either full or empty
-!  odd index: normal pointing up
+!  odd index: reference fluid (C=1) is below. p-height.
 !
               index = 2*(direction-1) + 1
               if(vof_flag(i,j,k).eq.0.and.vof_flag(i-si,j-sj,k-sk).eq.1) then
@@ -181,7 +178,7 @@ contains
                  height(i,j,k,index) = 2d6
               endif
 
-!  even index: normal pointing down (check signs and directions)
+!  even index: reference fluid (C=1) is above. n-height.
 
               index = 2*(direction-1) + 2
               if(vof_flag(i,j,k).eq.1.and.vof_flag(i-si,j-sj,k-sk).eq.0) then
@@ -230,7 +227,7 @@ contains
                  nd = 1
                  do while ( base_not_found ) 
                     height_n = height_n - cvof(i0,j0,k0) 
-                    i0 = i0 - si; j0 = j0 -sj; k0 = k0 - sk
+                    i0 = i0 - si; j0 = j0 - sj; k0 = k0 - sk
                     nd = nd + 1
                     if(vof_flag(i0,j0,k0).eq.0) then
                        bottom_n_found = .true.
@@ -303,7 +300,7 @@ contains
      implicit none
      integer i,j,k,d,index
      real(8) h, th
-     k = nz/2 + 2
+     k = nz/2 + 2  ! +2 because of ghost layers
      j = ny/2
 
      if(k<ks.or.k>ke) return
