@@ -974,6 +974,7 @@ subroutine InitCondition
   integer :: i,j,k,ib, ierr, irank, req(12),sta(MPI_STATUS_SIZE,12)
   real(8) :: my_ave
   integer :: ngh=2
+  real(8) :: ls
   !---------------------------------------------Domain----------------------------------------------
   if(rank<nPdomain)then
      if(restart)then
@@ -991,12 +992,15 @@ subroutine InitCondition
         ! when set by Front-Tracking.
         color = 0.; u = U_init;  v = 0;  w = 0.
         if(DoVOF) then
+           du = 2.d6  ! Initial du with a large value
            if(numbubble > 0.and..not.test_heights) then 
               do ib=1,numBubble
                  do i=imin,imax
                     do j=jmin,jmax
                        do k=kmin,kmax 
-                          du(i,j,k) =  rad(ib)**2 - ((x(i)-xc(ib))**2+(y(j)-yc(ib))**2+(z(k)-zc(ib))**2) 
+                          ls =  rad(ib)**2 - ((x(i)-xc(ib))**2+(y(j)-yc(ib))**2+(z(k)-zc(ib))**2)
+                          ! update level-set function when it's the first time or the new value is larger  
+                          if ( du(i,j,k) == 2.d6 .or. ls > du(i,j,k) ) du(i,j,k) = ls 
                        enddo
                     enddo
                  enddo
