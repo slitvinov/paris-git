@@ -610,6 +610,94 @@ module module_BC
   end subroutine ghost_z
 !=================================================================================================
 !=================================================================================================
+  subroutine ighost_x(F,ngh,req)
+    use module_grid
+    use module_hello
+    implicit none
+    include 'mpif.h'
+    integer, intent(in) :: ngh ! number of ghost cell layers to fill
+    integer, intent(out) :: req(4)
+    integer, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: F
+    integer :: jlen, klen, ierr !,sta(MPI_STATUS_SIZE,4)
+    integer, save :: srcL, srcR, destL, destR, face(2)
+    logical, save :: first_time=.true.
+
+    if(ngh>Ng) stop 'ghost error: not enough ghost layers to fill'
+    if(first_time) then
+      first_time=.false.
+      jlen=jmax-jmin+1; klen=kmax-kmin+1; !ilen=ngh
+      call para_type_block3a(imin, imax, jmin, jmax, 1, jlen, klen, MPI_INTEGER2, face(1))
+      call para_type_block3a(imin, imax, jmin, jmax, 2, jlen, klen, MPI_INTEGER2, face(2))
+      call MPI_CART_SHIFT(MPI_COMM_CART, 0, 1, srcR, destR, ierr)
+      call MPI_CART_SHIFT(MPI_COMM_CART, 0,-1, srcL, destL, ierr)
+    endif
+
+    call MPI_IRECV(F(is-ngh  ,jmin,kmin),1,face(ngh),srcR ,0,MPI_COMM_Cart,req(1),ierr)
+    call MPI_ISEND(F(ie-ngh+1,jmin,kmin),1,face(ngh),destR,0,MPI_COMM_Cart,req(2),ierr)
+    call MPI_IRECV(F(ie+1    ,jmin,kmin),1,face(ngh),srcL ,0,MPI_COMM_Cart,req(3),ierr)
+    call MPI_ISEND(F(is      ,jmin,kmin),1,face(ngh),destL,0,MPI_COMM_Cart,req(4),ierr)
+!    call MPI_WAITALL(4,req,sta,ierr)
+  end subroutine ighost_x
+!-------------------------------------------------------------------------------------------------
+  subroutine ighost_y(F,ngh,req)
+    use module_grid
+    use module_hello
+    implicit none
+    include 'mpif.h'
+    integer, intent(in) :: ngh
+    integer, intent(out) :: req(4)
+    integer, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: F
+    integer :: ilen, klen, ierr !,sta(MPI_STATUS_SIZE,4)
+    integer, save :: srcL, srcR, destL, destR, face(2)
+    logical, save :: first_time=.true.
+
+    if(ngh>Ng) stop 'ghost error: not enough ghost layers to fill'
+    if(first_time)then
+      first_time=.false.
+      klen=kmax-kmin+1; ilen=imax-imin+1; !jlen=ngh
+      call para_type_block3a(imin, imax, jmin, jmax, ilen, 1, klen, MPI_INTEGER2, face(1))
+      call para_type_block3a(imin, imax, jmin, jmax, ilen, 2, klen, MPI_INTEGER2, face(2))
+      call MPI_CART_SHIFT(MPI_COMM_CART, 1, 1, srcR, destR, ierr)
+      call MPI_CART_SHIFT(MPI_COMM_CART, 1,-1, srcL, destL, ierr)
+    endif
+
+    call MPI_IRECV(F(imin,js-ngh  ,kmin),1,face(ngh),srcR ,0,MPI_COMM_Cart,req(1),ierr)
+    call MPI_ISEND(F(imin,je-ngh+1,kmin),1,face(ngh),destR,0,MPI_COMM_Cart,req(2),ierr)
+    call MPI_IRECV(F(imin,je+1    ,kmin),1,face(ngh),srcL ,0,MPI_COMM_Cart,req(3),ierr)
+    call MPI_ISEND(F(imin,js      ,kmin),1,face(ngh),destL,0,MPI_COMM_Cart,req(4),ierr)
+!    call MPI_WAITALL(4,req,sta,ierr)
+  end subroutine ighost_y
+!-------------------------------------------------------------------------------------------------
+  subroutine ighost_z(F,ngh,req)
+    use module_grid
+    use module_hello
+    implicit none
+    include 'mpif.h'
+    integer, intent(in) :: ngh
+    integer, intent(out) :: req(4)
+    integer, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: F
+    integer :: ilen, jlen, ierr !,sta(MPI_STATUS_SIZE,4)
+    integer, save :: srcL, srcR, destL, destR, face(2)
+    logical, save :: first_time=.true.
+
+    if(ngh>Ng) stop 'ghost error: not enough ghost layers to fill'
+    if(first_time)then
+      first_time=.false.
+      ilen=imax-imin+1; jlen=jmax-jmin+1; !klen=ngh
+      call para_type_block3a(imin, imax, jmin, jmax, ilen, jlen, 1, MPI_INTEGER2, face(1))
+      call para_type_block3a(imin, imax, jmin, jmax, ilen, jlen, 2, MPI_INTEGER2, face(2))
+      call MPI_CART_SHIFT(MPI_COMM_CART, 2, 1, srcR, destR, ierr)
+      call MPI_CART_SHIFT(MPI_COMM_CART, 2,-1, srcL, destL, ierr)
+    endif
+
+    call MPI_IRECV(F(imin,jmin,ks-ngh  ),1,face(ngh),srcR ,0,MPI_COMM_Cart,req(1),ierr)
+    call MPI_ISEND(F(imin,jmin,ke-ngh+1),1,face(ngh),destR,0,MPI_COMM_Cart,req(2),ierr)
+    call MPI_IRECV(F(imin,jmin,ke+1    ),1,face(ngh),srcL ,0,MPI_COMM_Cart,req(3),ierr)
+    call MPI_ISEND(F(imin,jmin,ks      ),1,face(ngh),destL,0,MPI_COMM_Cart,req(4),ierr)
+!    call MPI_WAITALL(4,req,sta,ierr)
+  end subroutine ighost_z
+!=================================================================================================
+!=================================================================================================
 !-------------------------------------------------------------------------------------------------
   subroutine ghost_xAdd(F,ir1,is1,iwork,req)
     use module_grid

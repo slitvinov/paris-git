@@ -43,8 +43,8 @@ end=`grep -i EndTime input |  awk 'BEGIN {FS = "="}{print $2}' | awk '{print $1}
 phi=`cat out/porosity.txt | awk '{print $1}'`
 # echo phi = $phi
 
-awk '{print $1 " " $3}' < stats > deriv
-parisdeconv deriv > toplot.txt
+awk '{print $1 " " $3}' < stats > deriv.tmp
+parisdeconv deriv.tmp > toplot.txt
 
 gnuplot <<EOF > tmp 2>&1
 f(x) = a*x + b

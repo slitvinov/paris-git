@@ -393,4 +393,61 @@ contains
      close(90)
 
    end subroutine output_heights
+!=================================================================================================
+!   Check if we find heights in the neighboring cells
+!=================================================================================================
+   subroutine get_local_heights(i0,j0,k0,nfound,hloc)
+     implicit none
+     integer, intent(in) :: i0,j0,k0
+     integer, intent(out) :: nfound(6)
+     real(8), intent(out) :: hloc(3,3,6)  ! last element is direction
+     integer :: d
+     integer :: i,j,k,mu,nu
+     integer :: i1(3,3,3), j1(3,3,3), k1(3,3,3)
+!
+! mapping
+!
+       do mu=-1,1
+          do nu=-1,1
+            !  d=1
+             i1(mu,nu,1) = 0
+             j1(mu,nu,1) = mu
+             k1(mu,nu,1) = nu
+             ! d=2
+             i1(mu,nu,2) = mu
+             j1(mu,nu,2) = 0
+             k1(mu,nu,2) = nu
+             ! d=3
+             i1(mu,nu,3) = mu
+             j1(mu,nu,3) = nu
+             k1(mu,nu,3) = 0 
+          enddo
+       enddo
+!
+!  Loop over directions
+! 
+     do d=1,3
+ ! Looking for orientation of surface
+       index0=-1
+! if index0 = -1 no height in this direction at local point. 
+
+       do index = 2*(d-1)+1,2*(d-1)+2
+          do mu=-1,1 
+             do nu=-1,1
+                   if(height(i1(mu,nu,d),j1(mu,nu,d),k1(mu,nu,d),index).lt.1d6) then
+                      ! height found
+                      hloc(mu,nu,index) = height(i1(mu,nu,d),j1(mu,nu,d),k1(mu,nu,d),index)
+                   else
+                      ! look for it above or below. 
+
+                      hloc(mu,nu,index) = 2d6
+                   endif
+             end do
+          end do
+       end do
+       
+
+
+
  end module module_surface_tension
+

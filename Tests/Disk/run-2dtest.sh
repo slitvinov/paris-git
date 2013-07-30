@@ -40,8 +40,8 @@ end=`grep -i EndTime input |  awk 'BEGIN {FS = "="}{print $2}' | awk '{print $1}
 phi=`cat out/porosity.txt | awk '{print $1}'`
 # echo phi = $phi
 
-awk '{print $1 " " $3}' < stats > deriv
-parisdeconv deriv > toplot.txt
+awk '{print $1 " " $3}' < stats > deriv.tmp
+parisdeconv deriv.tmp > toplot.txt
 
 gnuplot <<EOF > tmp 2>&1  &
 f(x) = a*x + b
@@ -52,9 +52,9 @@ print "permeability = ",-1/a
 # pause 10
 EOF
 
-grep permeability tmp | awk -v phi=$phi '{print $3*phi}' > perm.txt
+grep permeability tmp | awk -v phi=$phi '{print $3*phi}' > perm.tmp
 
-awk '{print $2}' < out/flowrate.txt >> perm.txt
+awk '{print $2}' < out/flowrate.txt >> perm.tmp
  
 if [ -d out ]; then
     cd out
