@@ -51,32 +51,35 @@ contains
     allocate(  n1(imin:imax,jmin:jmax,kmin:kmax), n2(imin:imax,jmin:jmax,kmin:kmax),  &
                n3(imin:imax,jmin:jmax,kmin:kmax), vof_flag(imin:imax,jmin:jmax,kmin:kmax), &
                height(imin:imax,jmin:jmax,kmin:kmax,6))
-    if(nx.ge.500000.or.ny.gt.500000.or.nz.gt.500000) then
-       stop 'nx too large'
-    endif
-  end subroutine initialize_surface_tension
+      if(nx.ge.500000.or.ny.gt.500000.or.nz.gt.500000) then
+         stop 'nx too large'
+      endif
+! TEMPORARY - Stanley
+      height = 2.d6
+! END TEMPORARY
+   end subroutine initialize_surface_tension
 
-  subroutine get_normals()
-    real(8) :: stencil3x3(-1:1,-1:1,-1:1)
-    integer :: i,j,k
-    integer :: i0,j0,k0
-    real(8) :: mxyz(3)
-    if(.not.st_initialized) call initialize_surface_tension()
-    st_initialized=.true.
-    if(ng.lt.2) stop "wrong ng"
-    do k=ks-1,ke+1
-       do j=js-1,je+1
-          do i=is-1,ie+1
-             do i0=-1,1; do j0=-1,1; do k0=-1,1
-                 stencil3x3(i0,j0,k0) = cvof(i+i0,j+j0,k+k0)
-              enddo;enddo;enddo
-              call mycs(stencil3x3,mxyz)
-              n1(i,j,k) = mxyz(1)
-              n2(i,j,k) = mxyz(2)
-              n3(i,j,k) = mxyz(3)
-           enddo
-        enddo
-     enddo
+   subroutine get_normals()
+      real(8) :: stencil3x3(-1:1,-1:1,-1:1)
+      integer :: i,j,k
+      integer :: i0,j0,k0
+      real(8) :: mxyz(3)
+      if(.not.st_initialized) call initialize_surface_tension()
+      st_initialized=.true.
+      if(ng.lt.2) stop "wrong ng"
+      do k=ks-1,ke+1
+         do j=js-1,je+1
+            do i=is-1,ie+1
+               do i0=-1,1; do j0=-1,1; do k0=-1,1
+                  stencil3x3(i0,j0,k0) = cvof(i+i0,j+j0,k+k0)
+               enddo;enddo;enddo
+               call mycs(stencil3x3,mxyz)
+               n1(i,j,k) = mxyz(1)
+               n2(i,j,k) = mxyz(2)
+               n3(i,j,k) = mxyz(3)
+            enddo
+         enddo
+      enddo
    end subroutine get_normals
 
   subroutine get_flags()
@@ -140,7 +143,8 @@ contains
      integer :: index
      logical :: base_not_found, bottom_n_found, bottom_p_found, top_n_found, top_p_found
      real(8) :: height_p, height_n
-     integer :: NDEPTH=3
+     integer :: NDEPTH
+     parameter (ndepth=3)
      integer :: si,sj,sk
      integer :: i,j,k
      integer :: i0,j0,k0
@@ -396,58 +400,115 @@ contains
 !=================================================================================================
 !   Check if we find heights in the neighboring cells
 !=================================================================================================
-   subroutine get_local_heights(i0,j0,k0,nfound,hloc)
-     implicit none
-     integer, intent(in) :: i0,j0,k0
-     integer, intent(out) :: nfound(6)
-     real(8), intent(out) :: hloc(3,3,6)  ! last element is direction
-     integer :: d
-     integer :: i,j,k,mu,nu
-     integer :: i1(3,3,3), j1(3,3,3), k1(3,3,3)
+   subroutine get_local_heights(i0,j0,k0,nfound,indexfound,hloc)
+      implicit none
+      integer :: NDEPTH
+      parameter (NDEPTH=3)
+      integer, intent(in) :: i0,j0,k0
+      integer, intent(out) :: nfound, indexfound
+      real(8), intent(out) :: hloc(3,3)  ! last element is index 
+      integer :: d,s
+      integer :: i,j,k,m,n
+      integer :: i1(3,3,3), j1(3,3,3), k1(3,3,3)
+      integer :: index
 !
 ! mapping
 !
-       do mu=-1,1
-          do nu=-1,1
+      do m=-1,1
+         do n=-1,1
             !  d=1
-             i1(mu,nu,1) = 0
-             j1(mu,nu,1) = mu
-             k1(mu,nu,1) = nu
-             ! d=2
-             i1(mu,nu,2) = mu
-             j1(mu,nu,2) = 0
-             k1(mu,nu,2) = nu
-             ! d=3
-             i1(mu,nu,3) = mu
-             j1(mu,nu,3) = nu
-             k1(mu,nu,3) = 0 
-          enddo
-       enddo
+            i1(m,n,1) = i0
+            j1(m,n,1) = m + j0
+            k1(m,n,1) = n + k0
+            ! d=2
+            i1(m,n,2) = m + i0
+            j1(m,n,2) = j0
+            k1(m,n,2) = n + k0
+            ! d=3
+            i1(m,n,3) = m + i0
+            j1(m,n,3) = n + j0
+            k1(m,n,3) = k0 
+         enddo
+      enddo
 !
 !  Loop over directions
 ! 
-     do d=1,3
- ! Looking for orientation of surface
-       index0=-1
-! if index0 = -1 no height in this direction at local point. 
+      d=0
+      notfound=.true.
+      do while (d.lt.3.and.notfound)
+         d = d+1
+         if(d.eq.1) then
+            si=1; sj=0; sk=0;
+         else if (d.eq.2) then
+            si=0; sj=1; sk=0;
+         else if (d.eq.3) then
+            si=0; sj=0; sk=1
+         else
+            stop "bad direction"
+         endif
+         index = 2*(d-1)
+         do while (index.lt.2*(d-1)+2).and.notfound)
+            index = index + 1
+            hloc = 2d6
+            nfound = 0
+            do m=-1,1 
+               do n=-1,1
+                  if(height(i1(m,n,d),j1(m,n,d),k1(m,n,d),index).lt.1d6) then
+                     ! one height found
+                     hloc(m,n) = height(i1(m,n,d),j1(m,n,d),k1(m,n,d),index)
+                     nfound = nfound + 1
+                  else
+                     do while(s.lt.NDEPTH)
+                        s = s + 1
+                        if (height(i+si*s,j+sj*s,k+sk*s,index).lt.1d6) then
+                           hloc(m,n) = height(i+si*s,j+sj*s,k+sk*s,index) + s
+                           nfound = nfound + 1
+                           s = NDEPTH  ! to exit loop
+                        else if  (height(i-si*s,j-sj*s,k-sk*s,index).lt.1d6) then
+                          hloc(m,n) = height(i-si*s,j-sj*s,k-sk*s,index) - s
+                          nfound = nfound + 1
+                          s = NDEPTH  ! to exit loop
+                        endif
+                     end do
+                  end if ! found at same level
+               end do ! n
+            end do ! m 
+            if(nfound.ge.6) then
+               notfound = .false.
+               indexfound = index
+            endif
+         end do ! index
+      end do ! d
+   end subroutine get_local_heights
 
-       do index = 2*(d-1)+1,2*(d-1)+2
-          do mu=-1,1 
-             do nu=-1,1
-                   if(height(i1(mu,nu,d),j1(mu,nu,d),k1(mu,nu,d),index).lt.1d6) then
-                      ! height found
-                      hloc(mu,nu,index) = height(i1(mu,nu,d),j1(mu,nu,d),k1(mu,nu,d),index)
-                   else
-                      ! look for it above or below. 
+   subroutine get_curvature(i0,j0,k0,kappa)
+      implicit none
+      integer, intent(in) :: i0,j0,k0
+      real(8), intent(out) :: kappa  
+      integer, intent(out) :: indexCurv
 
-                      hloc(mu,nu,index) = 2d6
-                   endif
-             end do
-          end do
-       end do
-       
+      integer :: nfound,d,indexfound
+      real(8) :: h(3,3),hm,hn,hmm,hnn,hmn
+      integer :: nCentroids
+
+      call get_local_heights(i0,j0,k0,nfound,indexfound,h)
+      d=(index-1)/2+1
 
 
+   end subroutine get_curvature
 
- end module module_surface_tension
+   subroutine output_curvature()
+      implicit none
+      
+      integer :: i,j,k
+      real(8) :: kappa, kappa_exact
+
+      do i = is,ie; do j=js,je; do k=ks,ke
+         call get_curvature(i,j,k,kappa)
+         kappa_exact = 1.0d0/
+         kappa_norm2 =   
+      end do; end do; end do
+   end subroutine output_curvature
+ 
+end module module_surface_tension
 
