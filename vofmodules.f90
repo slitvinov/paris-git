@@ -34,6 +34,7 @@ module module_VOF
   character(20) :: vofbdry_cond(3),test_type,vof_advect
   integer :: parameters_read=0
   logical :: test_heights = .false.  
+  logical :: test_curvature = .false.  
 contains
 !=================================================================================================
 !=================================================================================================
@@ -90,6 +91,8 @@ contains
        test_heights = .false.
     else if(test_type=='height_test') then
        test_heights = .true.
+    else if(test_type=='curvature_test') then
+       test_curvature = .true.
     else
        stop 'unknown initialization'
     endif
