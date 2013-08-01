@@ -494,6 +494,23 @@ contains
       call get_local_heights(i0,j0,k0,nfound,indexfound,h)
       d=(index-1)/2+1
 
+      kappa = 0.d0
+      if ( nfound == 9 ) then
+         hm  = (h(1,0)-h(-1,0))/2.d0
+         hn  = (h(0,1)-h(0,-1))/2.d0
+         hmm =  h(1,0)-2.d0*h(0,0)+h(-1,0)
+         hnn =  h(0,1)-2.d0*h(0,0)+h(0,-1)
+         hmn = (h(1,1)-h(-1,1)-h(1,-1)+h(-1,-1))/4.d0
+         kappa = (hmm + hnn + hmm*hn*hn + hnn*hm*hm - 2.d0*hmn*hm*hn) &
+                /(1.d0+hm*hm+hn*hn)**(1.5d0)
+         indexCurv = indexfound
+      else if ( nfound >= 6 ) then 
+         ! least square fit
+      else if ( nfound <6 ) then 
+         nCentroids = 6 - nfound
+         ! find centroid
+         ! least squre fit
+      end if ! nfound
 
    end subroutine get_curvature
 
