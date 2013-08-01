@@ -488,7 +488,7 @@ contains
       integer, intent(out) :: indexCurv
 
       integer :: nfound,d,indexfound
-      real(8) :: h(3,3),hm,hn,hmm,hnn,hmn
+      real(8) :: h(-1:1,-1:1),hm,hn,hmm,hnn,hmn
       integer :: nCentroids
 
       call get_local_heights(i0,j0,k0,nfound,indexfound,h)
