@@ -33,7 +33,6 @@ module module_surface_tension
   use module_tmpvar
   use module_VOF
   implicit none
-  real(8) :: A_h = 2d0
   real(8), dimension(:,:,:), allocatable :: n1,n2,n3 ! normals
   real(8), dimension(:,:,:,:), allocatable :: height ! normals
 
@@ -411,6 +410,8 @@ contains
       integer :: i,j,k,m,n
       integer :: i1(3,3,3), j1(3,3,3), k1(3,3,3)
       integer :: index
+      logical :: notfound
+      integer :: si,sj,sk
 !
 ! mapping
 !
@@ -447,7 +448,7 @@ contains
             stop "bad direction"
          endif
          index = 2*(d-1)
-         do while (index.lt.2*(d-1)+2).and.notfound)
+         do while (index.lt.2*(d-1)+2.and.notfound)
             index = index + 1
             hloc = 2d6
             nfound = 0
@@ -481,7 +482,7 @@ contains
       end do ! d
    end subroutine get_local_heights
 
-   subroutine get_curvature(i0,j0,k0,kappa)
+   subroutine get_curvature(i0,j0,k0,kappa,indexCurv)
       implicit none
       integer, intent(in) :: i0,j0,k0
       real(8), intent(out) :: kappa  
@@ -490,9 +491,10 @@ contains
       integer :: nfound,d,indexfound
       real(8) :: h(-1:1,-1:1),hm,hn,hmm,hnn,hmn
       integer :: nCentroids
+      integer :: si,sj,sk
 
       call get_local_heights(i0,j0,k0,nfound,indexfound,h)
-      d=(index-1)/2+1
+      d=(indexfound-1)/2+1
 
       kappa = 0.d0
       if ( nfound == 9 ) then
@@ -517,13 +519,13 @@ contains
    subroutine output_curvature()
       implicit none
       
-      integer :: i,j,k
-      real(8) :: kappa, kappa_exact
+      integer :: i,j,k,indexCurv
+      real(8) :: kappa, kappa_exact, radius
 
       do i = is,ie; do j=js,je; do k=ks,ke
-         call get_curvature(i,j,k,kappa)
-         kappa_exact = 1.0d0/
-         kappa_norm2 =   
+         call get_curvature(i,j,k,kappa,indexCurv)
+         kappa_exact = 1.0d0/radius
+!         kappa_norm2 
       end do; end do; end do
    end subroutine output_curvature
  

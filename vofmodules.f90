@@ -31,6 +31,7 @@ module module_VOF
   use module_tmpvar
   implicit none
   real(8), dimension(:,:,:), allocatable :: cvof ! VOF tracer variable
+  real(8) :: A_h = 2d0  ! For initialisation 
   character(20) :: vofbdry_cond(3),test_type,vof_advect
   integer :: parameters_read=0
   logical :: test_heights = .false.  
@@ -97,6 +98,65 @@ contains
        stop 'unknown initialization'
     endif
    end subroutine initialize_VOF
+!=================================================================================================
+   subroutine initconditions_VOF(rad,NumBubble)
+     use module_hello
+     use module_flow
+     use module_BC
+!      use module_surface_tension
+     implicit none
+     include 'mpif.h'
+     integer :: i,j,k,ib, ierr, irank, req(12),sta(MPI_STATUS_SIZE,12)
+     integer, intent(in) :: NumBubble
+     real(8), intent(in) :: rad(Numbubble)
+     real(8) :: my_ave
+     integer :: ngh=2
+     real(8) :: ls,kappa
+     integer :: IndexCurv
+     logical :: test=.false.
+     
+
+     test = test_heights.or.test_curvature  ! add other tests ...
+      if(numbubble > 0.and..not.test) then 
+         du = - 2.d6  ! Initialize du with a large negative value
+         do ib=1,numBubble
+            do i=imin,imax
+               do j=jmin,jmax
+                  do k=kmin,kmax 
+                     ls = rad(ib)**2 - ((x(i)-xc(ib))**2+(y(j)-yc(ib))**2+(z(k)-zc(ib))**2)
+                     ! update level-set function when the new value is larger 
+                     ! final geometry is the union of indivdual bubbles. 
+                     du(i,j,k) = MAX(ls,du(i,j,k))
+                  enddo
+               enddo
+            enddo
+         enddo
+         i = imax-imin+1
+         j = jmax-jmin+1
+         k = kmax-kmin+1
+         call levelset2vof(du,cvof,i,j,k)
+         call ghost_x(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+         call ghost_y(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+         call ghost_z(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+         call setVOFBC(cvof)
+      else if(test_heights) then
+         do i=imin,imax
+            do j=jmin,jmax
+               do k=kmin,kmax 
+                  du(i,j,k) =   - z(k) + zlength/2.d0  + A_h*dx(nx/2)*cos(2.*3.14159*x(i)/xlength) 
+               enddo
+            enddo
+         enddo
+         i = imax-imin+1
+         j = jmax-jmin+1
+         k = kmax-kmin+1
+         call levelset2vof(du,cvof,i,j,k)
+         call ghost_x(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+         call ghost_y(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+         call ghost_z(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+         call setVOFBC(cvof)
+      end if
+    end subroutine initconditions_VOF
 !=================================================================================================
   subroutine c_mask(cbinary)
     implicit none
@@ -229,7 +289,7 @@ module module_output_vof
   implicit none
   integer :: vof_opened=0;
 contains
-  SUBROUTINE append_VOF_visit_file(rootname)
+  subroutine append_VOF_visit_file(rootname)
     implicit none
     character(*) :: rootname
     integer prank

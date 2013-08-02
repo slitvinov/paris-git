@@ -66,6 +66,12 @@ Program paris
   integer :: switch=1
   real(8) :: residual
   real(8) :: sphere
+!
+! for curvature testing
+
+  real(8) kappamin=1d20
+  real(8) kappamax=-1d20
+
 !---------------------------------------INITIALIZATION--------------------------------------------
   ! Initialize MPI
   call MPI_INIT(ierr)
@@ -190,6 +196,16 @@ Program paris
               call MPI_BARRIER(MPI_COMM_WORLD, ierr)
               call MPI_finalize(ierr)
               stop
+           else if(test_curvature) then
+              call get_all_heights
+              do i=imin,imax; do j=jmin,jmax; do k=kmin,kmax
+                 ! find curvature only for cut cells
+                 if (cvof(i,j,k) >0.d0 .and. cvof(i,j,k)<1.d0) then 
+                    call get_curvature(i,j,k,kappa,indexCurv)
+                    kappamax = min(kappa,kappamax)
+                    kappamin = max(kappa,kappamin)
+                 end if ! cvof(i,j,k)
+              end do; end do; end do
            endif
 
               if(Implicit) then
@@ -975,6 +991,7 @@ subroutine InitCondition
   real(8) :: my_ave
   integer :: ngh=2
   real(8) :: ls,kappa
+  integer :: IndexCurv
   !---------------------------------------------Domain----------------------------------------------
   if(rank<nPdomain)then
      if(restart)then
@@ -992,79 +1009,10 @@ subroutine InitCondition
         ! when set by Front-Tracking.
         color = 0.; u = U_init;  v = 0;  w = 0.
         if(DoVOF) then
-           du = - 2.d6  ! Initialize du with a large negative value
-           if(numbubble > 0.and..not.test_heights) then 
-              do ib=1,numBubble
-                 do i=imin,imax
-                    do j=jmin,jmax
-                       do k=kmin,kmax 
-                          ls =  rad(ib)**2 - ((x(i)-xc(ib))**2+(y(j)-yc(ib))**2+(z(k)-zc(ib))**2)
-                          ! update level-set function when the new value is larger 
-                          ! final geometry is the union of indivdual bubbles. 
-                          du(i,j,k) = MAX(ls,du(i,j,k))
-                       enddo
-                    enddo
-                 enddo
-              enddo
-              i = imax-imin+1
-              j = jmax-jmin+1
-              k = kmax-kmin+1
-              call levelset2vof(du,cvof,i,j,k)
-              call ghost_x(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
-              call ghost_y(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
-              call ghost_z(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
-              call setVOFBC(cvof)
-           else if(test_heights) then
-              do i=imin,imax
-                 do j=jmin,jmax
-                    do k=kmin,kmax 
-                       du(i,j,k) =   - z(k) + zlength/2.d0  + A_h*dx(nx/2)*cos(2.*3.14159*x(i)/xlength) 
-                    enddo
-                 enddo
-              enddo
-              i = imax-imin+1
-              j = jmax-jmin+1
-              k = kmax-kmin+1
-              call levelset2vof(du,cvof,i,j,k)
-              call ghost_x(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
-              call ghost_y(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
-              call ghost_z(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
-              call setVOFBC(cvof)
-           else if (test_curvature) then 
-              do ib=1,numBubble
-                 rad(ib) = 0.22d0 
-                 xc(ib) = rand()*0.5d0+0.25d0
-                 yc(ib) = rand()*0.5d0+0.25d0
-                 zc(ib) = rand()*0.5d0+0.25d0
-                 cvof = 0.0d0
-                 do i=imin,imax; do j=jmin,jmax; do k=kmin,kmax
-                     du(i,j,k) = rad(ib)**2 - ((x(i)-xc(ib))**2+(y(j)-yc(ib))**2+(z(k)-zc(ib))**2)   
-                 end do; end do; end do
-                 i = imax-imin+1
-                 j = jmax-jmin+1
-                 k = kmax-kmin+1
-                 call levelset2vof(du,cvof,i,j,k)
-                 call ghost_x(cvof,ngh,req(1:4));call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
-                 call ghost_y(cvof,ngh,req(1:4));call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
-                 call ghost_z(cvof,ngh,req(1:4));call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
-                 call setVOFBC(cvof)
-
-                 call get_all_heights
-!                 call ghost_x(height,ngh,req(1:4));call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
-!                 call ghost_y(height,ngh,req(1:4));call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
-!                 call ghost_z(height,ngh,req(1:4));call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
-                
-                 do i=imin,imax; do j=jmin,jmax; do k=kmin,kmax
-                     ! find curvature only for cut cells
-                     if (cvof(i,j,k) >0.d0 .and. cvof(i,j,k)<1.d0) then 
-                        call get_curvature(i,j,k,kappa)
-                     end if ! cvof(i,j,k)
-                 end do; end do; end do
-              end do ! ib
-           else
-              cvof=0.d0
-              if(rank==0) print *, "Warning: no VOF field."
-           endif
+           call initconditions_VOF(rad,NumBubble)
+        else
+           cvof=0.d0  ! Check that
+           if(rank==0) print *, "Warning: no VOF field."
         endif
         du = 0d0
      endif
