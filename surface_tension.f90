@@ -525,7 +525,6 @@ contains
       do i = is,ie; do j=js,je; do k=ks,ke
          call get_curvature(i,j,k,kappa,indexCurv)
          kappa_exact = 1.0d0/radius
-!         kappa_norm2 
       end do; end do; end do
    end subroutine output_curvature
  

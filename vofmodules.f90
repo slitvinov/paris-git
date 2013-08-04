@@ -114,7 +114,6 @@ contains
      real(8) :: ls,kappa
      integer :: IndexCurv
      logical :: test=.false.
-     
 
      test = test_heights.or.test_curvature  ! add other tests ...
       if(numbubble > 0.and..not.test) then 
@@ -155,6 +154,9 @@ contains
          call ghost_y(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
          call ghost_z(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
          call setVOFBC(cvof)
+      else
+         cvof=0.d0
+         if(rank==0) print *, "Warning: trivial VOF field."
       end if
     end subroutine initconditions_VOF
 !=================================================================================================

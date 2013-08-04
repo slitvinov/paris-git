@@ -68,9 +68,10 @@ Program paris
   real(8) :: sphere
 !
 ! for curvature testing
-
-  real(8) kappamin=1d20
-  real(8) kappamax=-1d20
+  real(8) :: kappa
+  integer :: IndexCurv
+  real(8) :: kappamin=1d20
+  real(8) :: kappamax=-1d20
 
 !---------------------------------------INITIALIZATION--------------------------------------------
   ! Initialize MPI
@@ -197,7 +198,7 @@ Program paris
               call MPI_finalize(ierr)
               stop
            else if(test_curvature) then
-              call get_all_heights
+              call get_all_heights()
               do i=imin,imax; do j=jmin,jmax; do k=kmin,kmax
                  ! find curvature only for cut cells
                  if (cvof(i,j,k) >0.d0 .and. cvof(i,j,k)<1.d0) then 
@@ -990,8 +991,7 @@ subroutine InitCondition
   integer :: i,j,k,ib, ierr, irank, req(12),sta(MPI_STATUS_SIZE,12)
   real(8) :: my_ave
   integer :: ngh=2
-  real(8) :: ls,kappa
-  integer :: IndexCurv
+  real(8) :: ls, kappa
   !---------------------------------------------Domain----------------------------------------------
   if(rank<nPdomain)then
      if(restart)then
@@ -1010,9 +1010,6 @@ subroutine InitCondition
         color = 0.; u = U_init;  v = 0;  w = 0.
         if(DoVOF) then
            call initconditions_VOF(rad,NumBubble)
-        else
-           cvof=0.d0  ! Check that
-           if(rank==0) print *, "Warning: no VOF field."
         endif
         du = 0d0
      endif
