@@ -116,8 +116,9 @@ contains
      real(8) :: ls,kappa
      integer :: IndexCurv
      logical :: test=.false.
+     
 
-     test = test_heights.or.test_curvature  ! add other tests ...
+     test = test_heights !.or.test_curvature  ! add other tests ...
       if(numbubble > 0.and..not.test) then 
          du = - 2.d6  ! Initialize du with a large negative value
          do ib=1,numBubble

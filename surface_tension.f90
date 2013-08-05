@@ -32,6 +32,7 @@ module module_surface_tension
   use module_IO
   use module_tmpvar
   use module_VOF
+  use module_flow ! for curvature test only
   implicit none
   real(8), dimension(:,:,:), allocatable :: n1,n2,n3 ! normals
   real(8), dimension(:,:,:,:), allocatable :: height ! normals
@@ -62,9 +63,7 @@ contains
       if(nx.ge.500000.or.ny.gt.500000.or.nz.gt.500000) then
          stop 'nx too large'
       endif
-! TEMPORARY - Stanley
       height = 2.d6
-! END TEMPORARY
    end subroutine initialize_surface_tension
 
    subroutine get_normals()
@@ -303,9 +302,9 @@ contains
               endif
 ! end of fractional cell case
 ! note: we could check that height orientation and normal orientation agree. 
-           enddo
-        enddo
-     enddo
+           enddo ! k
+        enddo ! j
+     enddo ! i
    end subroutine get_heights    
 
    subroutine output_heights()
@@ -408,17 +407,18 @@ contains
 !=================================================================================================
 !   Check if we find heights in the neighboring cells
 !=================================================================================================
-   subroutine get_local_heights(i0,j0,k0,nfound,indexfound,hloc)
+   subroutine get_local_heights(i0,j0,k0,nfoundmax,indexfound,hlocmax)
       implicit none
       integer :: NDEPTH
       parameter (NDEPTH=3)
       integer, intent(in) :: i0,j0,k0
-      integer, intent(out) :: nfound, indexfound
-      real(8), intent(out) :: hloc(3,3)  ! last element is index 
+      integer, intent(out) :: nfoundmax, indexfound
+      real(8), intent(out) :: hlocmax(-1:1,-1:1)   
+      real(8) :: hloc(-1:1,-1:1)   
       integer :: d,s
       integer :: i,j,k,m,n
-      integer :: i1(3,3,3), j1(3,3,3), k1(3,3,3)
-      integer :: index
+      integer :: i1(-1:1,-1:1,3), j1(-1:1,-1:1,3), k1(-1:1,-1:1,3)
+      integer :: index,nfound
       logical :: notfound
       integer :: si,sj,sk
 !
@@ -443,6 +443,8 @@ contains
 !
 !  Loop over directions
 ! 
+      hloc = 2d6
+      nfoundmax = 0 
       d=0
       notfound=.true.
       do while (d.lt.3.and.notfound)
@@ -468,25 +470,32 @@ contains
                      hloc(m,n) = height(i1(m,n,d),j1(m,n,d),k1(m,n,d),index)
                      nfound = nfound + 1
                   else
+                     s = 0 
                      do while(s.lt.NDEPTH)
                         s = s + 1
-                        if (height(i+si*s,j+sj*s,k+sk*s,index).lt.1d6) then
-                           hloc(m,n) = height(i+si*s,j+sj*s,k+sk*s,index) + s
+                        if (height(i1(m,n,d)+si*s,j1(m,n,d)+sj*s,k1(m,n,d)+sk*s,index).lt.1d6) then
+                           hloc(m,n) = height(i1(m,n,d)+si*s,j1(m,n,d)+sj*s,k1(m,n,d)+sk*s,index) + s
                            nfound = nfound + 1
                            s = NDEPTH  ! to exit loop
-                        else if  (height(i-si*s,j-sj*s,k-sk*s,index).lt.1d6) then
-                          hloc(m,n) = height(i-si*s,j-sj*s,k-sk*s,index) - s
-                          nfound = nfound + 1
-                          s = NDEPTH  ! to exit loop
+                        else if  (height(i1(m,n,d)-si*s,j1(m,n,d)-sj*s,k1(m,n,d)-sk*s,index).lt.1d6) then
+                           hloc(m,n) = height(i1(m,n,d)-si*s,j1(m,n,d)-sj*s,k1(m,n,d)-sk*s,index) - s
+                           nfound = nfound + 1
+                           s = NDEPTH  ! to exit loop
                         endif
                      end do
                   end if ! found at same level
                end do ! n
             end do ! m 
-            if(nfound.ge.6) then
+            if(nfound.ge.9) then
                notfound = .false.
+               hlocmax = hloc
+               nfoundmax = nfound
                indexfound = index
-            endif
+            else if (nfound > nfoundmax) then ! return maximum number of heights 
+               hlocmax = hloc
+               nfoundmax = nfound
+               indexfound = index
+            end if ! nfound
          end do ! index
       end do ! d
    end subroutine get_local_heights
@@ -522,19 +531,35 @@ contains
          ! find centroid
          ! least squre fit
       end if ! nfound
-
    end subroutine get_curvature
 
    subroutine output_curvature()
       implicit none
       
       integer :: i,j,k,indexCurv
-      real(8) :: kappa, kappa_exact, radius
+      integer :: ib
+      real(8) :: kappa,kappamax,kappamin
+      real(8) :: rc, radius
 
-      do i = is,ie; do j=js,je; do k=ks,ke
-         call get_curvature(i,j,k,kappa,indexCurv)
-         kappa_exact = 1.0d0/radius
+      OPEN(UNIT=89,FILE=TRIM(out_path)//'/curvature-'//TRIM(int2text(rank,padding))//'.txt')
+      OPEN(UNIT=90,FILE=TRIM(out_path)//'/reference-'//TRIM(int2text(rank,padding))//'.txt')
+      ib = 1
+      radius = 0.25d0*DBLE(Nx)
+      do i=is,ie; do j=js,je; do k=ks,ke
+         ! find curvature only for cut cells
+         if (vof_flag(i,j,k) == 2 ) then 
+            call get_curvature(i,j,k,kappa,indexCurv)
+            kappamax = max(ABS(kappa),kappamax)
+            kappamin = min(ABS(kappa),kappamin)
+            rc = sqrt((x(i)-xc(ib))**2+(y(j)-yc(ib))**2+(z(k)-zc(ib))**2)
+            write(89,*) rc,ABS(kappa)
+            write(90,*) rc,2.d0/radius
+         end if ! cvof(i,j,k)
       end do; end do; end do
+      write(*,*) 'max, min, and exact ABS(kappa)', kappamax, kappamin,2.d0/radius
+      CLOSE(89)
+      CLOSE(90)
+
    end subroutine output_curvature
 !=========================================================================================================
 !
@@ -557,15 +582,8 @@ contains
      if(test_heights) then
         call output_heights()
      else if(test_curvature) then
-        do i=imin,imax; do j=jmin,jmax; do k=kmin,kmax
-           ! find curvature only for cut cells
-           if (cvof(i,j,k) >0.d0 .and. cvof(i,j,k)<1.d0) then 
-              call get_curvature(i,j,k,kappa,indexCurv)
-              kappamax = min(kappa,kappamax)
-              kappamin = max(kappa,kappamin)
-           end if ! cvof(i,j,k)
-        end do; end do; end do
-     endif
+        call output_curvature()
+     end if
 
 ! Exit MPI gracefully
 
