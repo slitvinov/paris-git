@@ -190,25 +190,6 @@ Program paris
            !               call uzawa(u,v,w,rho,mu,du,dv,dw,p,umask,vmask,wmask,A,dt,beta,maxit,rho1,rho2,dpdx,dpdy,dpdz,BuoyancyCase,fx,fy,fz,gx,gy,gz,rho_ave)
            !           else  ! not Uzawa
 
-           if(test_heights) then
-              call get_flags()
-              call get_all_heights()
-              call output_heights()
-              call MPI_BARRIER(MPI_COMM_WORLD, ierr)
-              call MPI_finalize(ierr)
-              stop
-           else if(test_curvature) then
-              call get_all_heights()
-              do i=imin,imax; do j=jmin,jmax; do k=kmin,kmax
-                 ! find curvature only for cut cells
-                 if (cvof(i,j,k) >0.d0 .and. cvof(i,j,k)<1.d0) then 
-                    call get_curvature(i,j,k,kappa,indexCurv)
-                    kappamax = min(kappa,kappamax)
-                    kappamin = max(kappa,kappamin)
-                 end if ! cvof(i,j,k)
-              end do; end do; end do
-           endif
-
               if(Implicit) then
                  if(Twophase) then 
                     call momentumDiffusion(u,v,w,rho,mu,du,dv,dw)  
@@ -1012,6 +993,10 @@ subroutine InitCondition
            call initconditions_VOF(rad,NumBubble)
         endif
         du = 0d0
+     endif
+     
+     if(test_HF) then
+        call test_VOF_HF()
      endif
 
      if(DoFront) then

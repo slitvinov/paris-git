@@ -36,6 +36,7 @@ module module_VOF
   integer :: parameters_read=0
   logical :: test_heights = .false.  
   logical :: test_curvature = .false.  
+  logical :: test_HF = .false.
 contains
 !=================================================================================================
 !=================================================================================================
@@ -97,6 +98,7 @@ contains
     else
        stop 'unknown initialization'
     endif
+    test_HF = test_heights.or.test_curvature
    end subroutine initialize_VOF
 !=================================================================================================
    subroutine initconditions_VOF(rad,NumBubble)

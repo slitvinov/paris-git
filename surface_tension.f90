@@ -42,7 +42,16 @@ module module_surface_tension
   !   0 empty
   !   1 full
   !   2 fractional
+  integer, dimension(:,:,:,:), allocatable :: ixheight ! HF flags
 
+
+!  integer, dimension(:,:,:,:), allocatable :: height_flag ! 
+  !   0 undecided (not fully tested yet)
+  !   1 height found
+  !   2 no height found
+  !   3 other cases (for instance empty cell)
+  ! 4th index: 1 for positive height in x, 2 for negative height in x, etc... 
+  !            3 for positive height in y, 4 for negative height in y, etc... 
   logical :: st_initialized = .false.
 contains
 !=================================================================================================
@@ -527,6 +536,681 @@ contains
          kappa_exact = 1.0d0/radius
       end do; end do; end do
    end subroutine output_curvature
+!=========================================================================================================
+!
+!  Testing section
+! 
+!=========================================================================================================
+
+   subroutine test_VOF_HF()
+     implicit none
+     include 'mpif.h'
+     integer :: i,j,k,ierr
+     real(8) :: kappa
+     integer :: IndexCurv
+     real(8) :: kappamin=1d20
+     real(8) :: kappamax=-1d20
+
+     call get_flags()
+     call get_all_heights()
+
+     if(test_heights) then
+        call output_heights()
+     else if(test_curvature) then
+        do i=imin,imax; do j=jmin,jmax; do k=kmin,kmax
+           ! find curvature only for cut cells
+           if (cvof(i,j,k) >0.d0 .and. cvof(i,j,k)<1.d0) then 
+              call get_curvature(i,j,k,kappa,indexCurv)
+              kappamax = min(kappa,kappamax)
+              kappamin = max(kappa,kappamin)
+           end if ! cvof(i,j,k)
+        end do; end do; end do
+     endif
+
+! Exit MPI gracefully
+
+     call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+     call MPI_finalize(ierr)
+     stop
+ 
+  end subroutine test_VOF_HF
+
+
+!=========================================================================================================
+!
+!  Begin Ruben + Phil routines
+! 
+!=========================================================================================================
+
+  subroutine get_flags_rph()
+     integer :: i,j,k,q
+     if(.not.st_initialized) call initialize_surface_tension()
+     st_initialized=.true.
+     if(ng.lt.2) stop "wrong ng"
+     do k=kmin,kmax
+        do j=jmin,jmax
+           do i=imin,imax
+              if(cvof(i,j,k).le.0.d0) then
+                 vof_flag(i,j,k) = 0
+              else if(cvof(i,j,k).ge.1.d0) then
+                 vof_flag(i,j,k) = 1
+              else
+                 vof_flag(i,j,k) = 2
+              endif
+
+              do q=1,3
+                 ixheight(i,j,k,q)=0
+                 height(i,j,k,q)=0.d0
+              enddo
+
+           enddo
+        enddo
+     enddo
+
+!!$     call ghost_x(height(:,:,:,1),2,req( 1: 4));  
+!!$     call ghost_x(height(:,:,:,2),2,req( 5: 8)); 
+!!$     call ghost_x(height(:,:,:,3),2,req( 9:12));
+!!$     call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
+!!$
+!!$     call ghost_y(height(:,:,:,1),2,req( 1: 4));  
+!!$     call ghost_y(height(:,:,:,2),2,req( 5: 8)); 
+!!$     call ghost_y(height(:,:,:,3),2,req( 9:12));
+!!$     call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
+!!$
+!!$     call ghost_z(height(:,:,:,1),2,req( 1: 4));  
+!!$     call ghost_z(height(:,:,:,2),2,req( 5: 8)); 
+!!$     call ghost_z(height(:,:,:,3),2,req( 9:12));
+!!$     call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
+!!$
+!!$     call ighost_x(ixheight(:,:,:,1),2,req( 1: 4));  
+!!$     call ighost_x(ixheight(:,:,:,2),2,req( 5: 8)); 
+!!$     call ighost_x(ixheight(:,:,:,3),2,req( 9:12));
+!!$     call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
+!!$
+!!$     call ighost_y(ixheight(:,:,:,1),2,req( 1: 4));  
+!!$     call ighost_y(ixheight(:,:,:,2),2,req( 5: 8)); 
+!!$     call ighost_y(ixheight(:,:,:,3),2,req( 9:12));
+!!$     call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
+!!$
+!!$     call ighost_z(ixheight(:,:,:,1),2,req( 1: 4));  
+!!$     call ighost_z(ixheight(:,:,:,2),2,req( 5: 8)); 
+!!$     call ighost_z(ixheight(:,:,:,3),2,req( 9:12));
+!!$     call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
+
+   end subroutine get_flags_rph
+
+
+   subroutine get_all_heights_rph()
+     include 'mpif.h'
+     integer :: direction, ierr
+     integer :: req(48),sta(MPI_STATUS_SIZE,48)
+     if(.not.st_initialized) call initialize_surface_tension()
+     st_initialized=.true.
+
+!!$     call ghost_x(height(:,:,:,1),2,req( 1: 4));  
+!!$     call ghost_x(height(:,:,:,2),2,req( 5: 8)); 
+!!$     call ghost_x(height(:,:,:,3),2,req( 9:12));
+!!$     call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
+!!$
+!!$     call ghost_y(height(:,:,:,1),2,req( 1: 4));  
+!!$     call ghost_y(height(:,:,:,2),2,req( 5: 8)); 
+!!$     call ghost_y(height(:,:,:,3),2,req( 9:12));
+!!$     call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
+!!$
+!!$     call ghost_z(height(:,:,:,1),2,req( 1: 4));  
+!!$     call ghost_z(height(:,:,:,2),2,req( 5: 8)); 
+!!$     call ghost_z(height(:,:,:,3),2,req( 9:12));
+!!$     call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
+!!$
+!!$     call ighost_x(ixheight(:,:,:,1),2,req( 1: 4));  
+!!$     call ighost_x(ixheight(:,:,:,2),2,req( 5: 8)); 
+!!$     call ighost_x(ixheight(:,:,:,3),2,req( 9:12));
+!!$     call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
+!!$
+!!$     call ighost_y(ixheight(:,:,:,1),2,req( 1: 4));  
+!!$     call ighost_y(ixheight(:,:,:,2),2,req( 5: 8)); 
+!!$     call ighost_y(ixheight(:,:,:,3),2,req( 9:12));
+!!$     call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
+!!$
+!!$     call ighost_z(ixheight(:,:,:,1),2,req( 1: 4));  
+!!$     call ighost_z(ixheight(:,:,:,2),2,req( 5: 8)); 
+!!$     call ighost_z(ixheight(:,:,:,3),2,req( 9:12));
+!!$     call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
+
+     do direction=1,3
+        call get_heights_rph(direction)
+     enddo
+
+     call ghost_x(height(:,:,:,1),2,req(1: 4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr) 
+     call ghost_x(height(:,:,:,2),2,req(1: 4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)  
+     call ghost_x(height(:,:,:,3),2,req(1: 4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr) 
+
+
+     call ghost_y(height(:,:,:,1),2,req(1: 4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)   
+     call ghost_y(height(:,:,:,2),2,req(1: 4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)  
+     call ghost_y(height(:,:,:,3),2,req(1: 4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr) 
+
+
+     call ghost_z(height(:,:,:,1),2,req(1: 4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)  
+     call ghost_z(height(:,:,:,2),2,req(1: 4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr) 
+     call ghost_z(height(:,:,:,3),2,req(1: 4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+
+
+     call ighost_x(ixheight(:,:,:,1),2,req(1: 4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)  
+     call ighost_x(ixheight(:,:,:,2),2,req(1: 4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr) 
+     call ighost_x(ixheight(:,:,:,3),2,req(1: 4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+
+
+     call ighost_y(ixheight(:,:,:,1),2,req(1: 4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)  
+     call ighost_y(ixheight(:,:,:,2),2,req(1: 4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr) 
+     call ighost_y(ixheight(:,:,:,3),2,req(1: 4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+
+     call ighost_z(ixheight(:,:,:,1),2,req(1: 4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)  
+     call ighost_z(ixheight(:,:,:,2),2,req(1: 4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr) 
+     call ighost_z(ixheight(:,:,:,3),2,req(1: 4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+ 
+   end subroutine get_all_heights_rph
+
+
+
+   subroutine get_heights_rph(direction)
+     integer, intent(in) :: direction
+     integer :: index
+     logical :: base_not_found, bottom_n_found, bottom_p_found, top_n_found, top_p_found
+     real(8) :: height_p, height_n
+     integer :: NDEPTH=2
+     integer :: si,sj,sk
+     integer :: i,j,k
+     integer :: i0,j0,k0
+     integer :: nd, ierr
+     ! NDEPTH is the depth of layers tested above or below the reference cell. 
+     ! including the central layer
+     ! NDEPTH*2 + 1 = 5 means a 5 x 3 stencil. 
+     !
+     !  height_p : height for a normal pointing up (reference phase under the other phase)
+     !  height_n : height for a normal pointing down (reference phase above the other phase)
+    
+     real(8) :: cc, cp, cm, cpm, dc, res, sumcc
+     !     real(8) :: 
+
+     integer :: icell, np, nm, q, qs, npmax, nmmax
+
+     logical :: inp, inm, inpm, icpm
+
+   
+     dc = 1.d-8 ! tolerance for a full or empty cell
+     npmax = 2
+     nmmax = 2
+
+     if (direction .eq. 1) then
+     do k=ks,ke
+        do j=js,je
+           do i=is,ie
+
+                 if(vof_flag(i,j,k).eq.2) then
+                    res = mod(ixheight(i,j,k,1),10)
+                 endif
+                 
+                 if (res.eq.0) then
+
+                       np = 0
+                       sumcc = 0.d0
+                       inp = .true.
+                       cp = 0.d0 ; cm = 0.d0
+!                       npmax = min(NDEPTH, ie-i)
+!                       nmmax = min(NDEPTH, i-1)
+                       
+                       do while (inp.and.(np.lt.npmax) ) 
+                          cc =  cvof(i+np+1,j,k)
+                          sumcc = sumcc + cc
+                          if ( (cc .le. dc).or.(cc.ge.(1.-dc) )) then
+                             inp = .false.
+                             cp = cc
+                          end if
+                          np = np+1
+                       end do
+                       
+                       inpm = .not.inp
+                       nm = 0
+                       inm = .true.
+                       
+                       do while (inpm.and.(nm.lt.nmmax) ) 
+                          cc =  cvof(i-nm-1,j,k)
+                          sumcc = sumcc + cc
+                          if ( (cc .le. dc).or.(cc.ge.(1.-dc) )) then
+                             inpm = .false.
+                             inm = .false.
+                             cm = cc
+                          endif
+                          nm = nm+1
+                       end do
+                    
+                       cpm = cp + cm
+                    
+                       icpm = .false.
+                       if ( (cpm.gt. 0.9).and.(cpm.lt.1.1)) then
+                          icpm = .true.
+                       endif
+
+                       inpm = .not.(inp.and.inm)
+                    
+                       if ( inpm.and.icpm ) then
+                          sumcc = sumcc + cvof(i,j,k)
+                          icell = int(sumcc)
+                          
+                          if ( cm.gt.cp ) then
+                             ixheight(i-nm+icell,j,k,1) = 1
+                             qs = icell - 1
+                             do q=1,qs
+                                if ( ixheight(i-nm+q,j,k,1).eq.0 ) then
+                                   ixheight(i-nm+q,j,k,1)=-1
+                                endif
+                             enddo
+                          
+                             qs = np+nm-1-icell
+                             
+                             do q=1,qs
+                                if ( ixheight(i-nm+icell+q,j,k,1).eq.0 ) then
+                                   ixheight(i-nm+icell+q,j,k,1)=-1
+                                endif
+                             enddo
+                             
+                             height(i-nm+icell,j,k,1) = sumcc - icell - 0.5d0
+
+!!$	      xx[1] = (i-nl-1.)*h;
+!!$	      yy[1] = (j-0.5)*h;
+!!$	      xx[2] = (i-nl-1.+sumcc)*h;
+!!$	      yy[2] = (j-0.5)*h;
+!!$	      segments(fp,xx,yy,1,2,1,4,1,0,0);
+!!$	      }
+                             
+                          else
+                          
+                             ixheight(i+np-icell,j,k,1) = 11
+                             qs = icell -1
+                             
+                             do q=1,qs
+                                if ( ixheight(i+np-q,j,k,1).eq.0 ) then
+                                   ixheight(i+np-q,j,k,1) = -1
+                                endif
+                             enddo
+                             qs = np+nm-1-icell
+                           
+                             do q=1,qs
+                                if (ixheight(i+np-icell-q,j,k,1).eq.0 ) then
+                                   ixheight(i+np-icell-q,j,k,1) = -1
+                                endif
+                             enddo
+                           
+                             height(i+np-icell,j,k,1) = 0.5d0 - (sumcc-icell)
+
+!!$ 
+!!$	      {                       /* next 5 lines: red lines in the graph */
+!!$	      xx[1] = (i+nr)*h;
+!!$	      yy[1] = (j-0.5)*h;
+!!$	      xx[2] = (i+nr-sumcc)*h;
+!!$	      yy[2] = (j-0.5)*h;
+!!$	      segments(fp,xx,yy,1,2,1,4,1,0,0);
+!!$	      }
+
+                          endif
+                       endif
+                    endif
+
+                 enddo
+              enddo
+           enddo
+
+        end if
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! end of x - direction 1
+
+     if (direction .eq. 2) then
+
+     do k=ks,ke
+        do j=js,je
+           do i=is,ie
+
+                 if(vof_flag(i,j,k).eq.2) then
+                    res = mod(ixheight(i,j,k,2),10)
+                 endif
+                 
+                 if (res.eq.0) then
+
+                       np = 0
+                       sumcc = 0.d0
+                       inp = .true.
+                       cp = 0.d0 ; cm = 0.d0
+!                       npmax = min(NDEPTH, je-j)
+!                       nmmax = min(NDEPTH, j-1)
+                       
+                       do while (inp.and.(np.lt.npmax) ) 
+                          cc =  cvof(i,j+np+1,k)
+                          sumcc = sumcc + cc
+                          if ( (cc .le. dc).or.(cc.ge.(1.-dc) )) then
+                             inp = .false.
+                             cp = cc
+                          end if
+                          np = np+1
+                       end do
+                       
+                       inpm = .not.inp
+                       nm = 0
+                       inm = .true.
+                       
+                       do while (inpm.and.(nm.lt.nmmax) ) 
+                          cc =  cvof(i,j-nm-1,k)
+                          sumcc = sumcc + cc
+                          if ( (cc .le. dc).or.(cc.ge.(1.-dc) )) then
+                             inpm = .false.
+                             inm = .false.
+                             cm = cc
+                          endif
+                          nm = nm+1
+                       end do
+                    
+                       cpm = cp + cm
+                    
+                       icpm = .false.
+                       if ( (cpm.gt. 0.9).and.(cpm.lt.1.1)) then
+                          icpm = .true.
+                       endif
+
+                       inpm = .not.(inp.and.inm)
+                    
+                       if ( inpm.and.icpm ) then
+                          sumcc = sumcc + cvof(i,j,k)
+                          icell = int(sumcc)
+                          
+                          if ( cm.gt.cp ) then
+                             ixheight(i,j-nm+icell,k,2) = 2
+                             qs = icell - 1
+                             do q=1,qs
+                                if ( ixheight(i,j-nm+q,k,2).eq.0 ) then
+                                   ixheight(i,j-nm+q,k,2)=-2
+                                endif
+                             enddo
+                          
+                             qs = np+nm-1-icell
+                             
+                             do q=1,qs
+                                if ( ixheight(i,j-nm+icell+q,k,2).eq.0 ) then
+                                   ixheight(i,j-nm+icell+q,k,2)=-2
+                                endif
+                             enddo
+                             
+                             height(i,j-nm+icell,k,2) = sumcc - icell - 0.5d0
+
+!!$	      xx[1] = (i-nl-1.)*h;
+!!$	      yy[1] = (j-0.5)*h;
+!!$	      xx[2] = (i-nl-1.+sumcc)*h;
+!!$	      yy[2] = (j-0.5)*h;
+!!$	      segments(fp,xx,yy,1,2,1,4,1,0,0);
+!!$	      }
+                             
+                          else
+                          
+                             ixheight(i,j+np-icell,k,2) = 22
+                             qs = icell -1
+                             
+                             do q=1,qs
+                                if ( ixheight(i,j+np-q,k,2).eq.0 ) then
+                                   ixheight(i,j+np-q,k,2) = -2
+                                endif
+                             enddo
+                             qs = np+nm-1-icell
+                           
+                             do q=1,qs
+                                if (ixheight(i,j+np-icell-q,k,2).eq.0 ) then
+                                   ixheight(i,j+np-icell-q,k,2) = -2
+                                endif
+                             enddo
+                           
+                             height(i,j+np-icell,k,2) = 0.5d0 - (sumcc-icell)
+
+!!$ 
+!!$	      {                       /* next 5 lines: red lines in the graph */
+!!$	      xx[1] = (i+nr)*h;
+!!$	      yy[1] = (j-0.5)*h;
+!!$	      xx[2] = (i+nr-sumcc)*h;
+!!$	      yy[2] = (j-0.5)*h;
+!!$	      segments(fp,xx,yy,1,2,1,4,1,0,0);
+!!$	      }
+
+                          endif
+                       endif
+                    endif
+
+                 enddo
+              enddo
+           enddo
+           
+           end if
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!  end of y - direction 2
+
+     if (direction .eq. 3) then 
+       if (rank==2) then
+           write(*,*) 'pippa:'
+        endif
+     do k=ks,ke
+        do j=js,je
+           do i=is,ie
+
+                 if(vof_flag(i,j,k).eq.2) then
+                    res = mod(ixheight(i,j,k,3),10)
+                 endif
+                 
+                 if (res.eq.0) then
+
+                       np = 0
+                       sumcc = 0.d0
+                       inp = .true.
+                       cp = 0.d0 ; cm = 0.d0
+!                       npmax = min(NDEPTH, ke-k)
+!                       nmmax = min(NDEPTH, k-1)
+                       
+                       do while (inp.and.(np.lt.npmax) ) 
+                          cc =  cvof(i,j,k+np+1)
+                          sumcc = sumcc + cc
+                          if ( (cc .le. dc).or.(cc.ge.(1.-dc) )) then
+                             inp = .false.
+                             cp = cc
+                          end if
+                          np = np+1
+                       end do
+                       
+                       inpm = .not.inp
+                       nm = 0
+                       inm = .true.
+                       
+                       do while (inpm.and.(nm.lt.nmmax) ) 
+                          cc =  cvof(i,j,k-nm-1)
+                          sumcc = sumcc + cc
+                          if ( (cc .le. dc).or.(cc.ge.(1.-dc) )) then
+                             inpm = .false.
+                             inm = .false.
+                             cm = cc
+                          endif
+                          nm = nm+1
+                       end do
+                    
+                       cpm = cp + cm
+                    
+                       icpm = .false.
+                       if ( (cpm.gt. 0.9).and.(cpm.lt.1.1)) then
+                          icpm = .true.
+                       endif
+
+                       inpm = .not.(inp.and.inm)
+                    
+                       if ( inpm.and.icpm ) then
+                          sumcc = sumcc + cvof(i,j,k)
+                          icell = int(sumcc)
+                          
+                          if ( cm.gt.cp ) then
+                             ixheight(i,j,k-nm+icell,3) = 3
+                             qs = icell - 1
+                             do q=1,qs
+                                if ( ixheight(i,j,k-nm+q,3).eq.0 ) then
+                                   ixheight(i,j,k-nm+q,3)=-3
+                                endif
+                             enddo
+                          
+                             qs = np+nm-1-icell
+                             
+                             do q=1,qs
+                                if ( ixheight(i,j,k-nm+icell+q,3).eq.0 ) then
+                                   ixheight(i,j,k-nm+icell+q,3)=-3
+                                endif
+                             enddo
+                             
+                             height(i,j,k-nm+icell,3) = sumcc - icell - 0.5d0
+
+!!$	      xx[1] = (i-nl-1.)*h;
+!!$	      yy[1] = (j-0.5)*h;
+!!$	      xx[2] = (i-nl-1.+sumcc)*h;
+!!$	      yy[2] = (j-0.5)*h;
+!!$	      segments(fp,xx,yy,1,2,1,4,1,0,0);
+!!$	      }
+                             
+                          else
+                          
+                             ixheight(i,j,k+np-icell,3) = 33
+                             qs = icell -1
+                             
+                             do q=1,qs
+                                if ( ixheight(i,j,k+np-q,3).eq.0 ) then
+                                   ixheight(i,j,k+np-q,3) = -3
+                                endif
+                             enddo
+                             qs = np+nm-1-icell
+                           
+                             do q=1,qs
+                                if (ixheight(i,j,k+np-icell-q,3).eq.0 ) then
+                                   ixheight(i,j,k+np-icell-q,3) = -3
+                                endif
+                             enddo
+                           
+                             height(i,j,k+np-icell,3) = 0.5d0 - (sumcc-icell)
+
+!!$ 
+!!$	      {                       /* next 5 lines: red lines in the graph */
+!!$	      xx[1] = (i+nr)*h;
+!!$	      yy[1] = (j-0.5)*h;
+!!$	      xx[2] = (i+nr-sumcc)*h;
+!!$	      yy[2] = (j-0.5)*h;
+!!$	      segments(fp,xx,yy,1,2,1,4,1,0,0);
+!!$	      }
+
+                          endif
+                       endif
+                    endif
+
+                 enddo
+              enddo
+           enddo
+
+
+        if (rank==0) then
+           i=8
+           k=6
+           j = ny/2          
+           write(*,*)  'pipc',i,k,cvof(i,j,k-2),cvof(i,j,k-1),cvof(i,j,k),cvof(i,j,k+1),cvof(i,j,k+2)
+           write(*,*)  'pipf',i,k,vof_flag(i,j,k-2),vof_flag(i,j,k-1),vof_flag(i,j,k),vof_flag(i,j,k+1),vof_flag(i,j,k+2)
+           write(*,*)  'piph',i,k,height(i,j,k,1),height(i,j,k,3)
+!           write(*,*)  'pip',i,k,ixheight(i,j,k-2,3),ixheight(i,j,k-1,3),ixheight(i,j,k,3),ixheight(i,j,k+1,3),ixheight(i,j,k+2,3)
+        endif
+        endif
+
+        index =3
+        k = (ke-ks)/2+3
+        j = (je-js)/2
+        do i=is,ie
+           print *, x(i), height(i,j,k-3,index),height(i,j,k-2,index),height(i,j,k-1,index) &
+                ,height(i,j,k,index),height(i,j,k+1,index),height(i,j,k+2,index),height(i,j,k+3,index)
+           print *, x(i), ixheight(i,j,k-3,index),ixheight(i,j,k-2,index),ixheight(i,j,k-1,index) &
+                ,ixheight(i,j,k,index),ixheight(i,j,k+1,index),ixheight(i,j,k+2,index),ixheight(i,j,k+3,index)
+        enddo
+      end subroutine get_heights_rph
+
+   ! at fixed j,k look at heights (index, p:5, n:6)
+   subroutine output_heights_rph()
+     implicit none
+     integer i,j,k,d,index
+     real(8) h, th
+
+     j = ny/2
+
+     OPEN(UNIT=89,FILE=TRIM(out_path)//'/height-'//TRIM(int2text(rank,padding))//'.txt')
+     OPEN(UNIT=90,FILE=TRIM(out_path)//'/reference-'//TRIM(int2text(rank,padding))//'.txt')
+
+     !     write(89,*) " "
+     !     write(89,*) " p heights at  z = L/2 as a function of x"
+     !     write(89,*) " "
+ 
+       do k=kmin,kmax
+         do i=imin,imax
+           th = (- z(k) + zlength/2.d0)/dx(i) + A_h*cos(2.*3.14159*x(i)/xlength)
+!           write(90,100) x(i),th
+           write(89,100) i,k,height(i,j,k,1),height(i,j,k,3),ixheight(i,j,k,1),ixheight(i,j,k,3)
+      enddo
+    enddo
+     !     write(89,*) " "
+     !     write(89,*) " n heights at  z = L/2 as a function of x, not searched"
+     !     write(89,*) " "
+
+     if(1==0) then
+        do i=is,ie
+           write(89,103) x(i),height(i,j,k,1:6),height(i,j,k,1:6)
+        enddo
+        do k=ks,ke
+           write(*,104) cvof(is:ie,ny/2,k)
+        enddo
+        print *, " "
+        do k=ks,ke
+           write(*,105) cvof(is:ie,ny/2,k)
+        enddo
+
+        write(89,*) " "
+        write(89,*) " n heights in z"
+        write(89,*) " "
+        do k=ke,ks,-1
+           write(89,1041) k, height(is:ie,ny/2,k,6)
+        enddo
+
+        write(89,*) " "
+        do k=ke,ks,-1
+           write(89,1051) k, height(is:ie,ny/2,k,6)
+        enddo
+
+        write(89,*) " "
+        write(89,*) " p heights in z"
+        write(89,*) " "
+        do k=ke,ks,-1
+           write(89,1041) k, height(is:ie,ny/2,k,5)
+        enddo
+
+        write(89,*) " "
+        do k=ke,ks,-1
+           write(89,1051) k, height(is:ie,ny/2,k,5)
+        enddo
+     endif  ! 1==0
+
+100  format(2(I3),2(f17.12),2(I3))
+101  format(f24.16,A2)
+103  format(7(f16.8),6(I2))
+104  format(16(f5.1,' '))
+1041 format(I3,16(f5.1,' '))
+105  format(16(I2,' '))
+1051 format(I3,16(I2,' '))
+
+     close(89)
+     close(90)
+
+   end subroutine output_heights_rph
  
 end module module_surface_tension
 
