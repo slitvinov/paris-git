@@ -507,30 +507,48 @@ contains
       integer, intent(out) :: indexCurv
 
       integer :: nfound,d,indexfound
-      real(8) :: h(-1:1,-1:1),hm,hn,hmm,hnn,hmn
+      real(8) :: h(-1:1,-1:1),a(6)
       integer :: nCentroids
       integer :: si,sj,sk
 
+      real(8) :: xfit(9),yfit(9),hfit(9)
+      logical :: fit_success = .false.
+
       call get_local_heights(i0,j0,k0,nfound,indexfound,h)
+! TEMPORARY 
+      if ( nfound < 9 ) then
+            WRITE(*,*) ' WARNING: nfound < 9:',i0,j0,k0,nfound
+      end if ! nfound
+! END TEMPORARY
       d=(indexfound-1)/2+1
 
       kappa = 0.d0
       if ( nfound == 9 ) then
-         hm  = (h(1,0)-h(-1,0))/2.d0
-         hn  = (h(0,1)-h(0,-1))/2.d0
-         hmm =  h(1,0)-2.d0*h(0,0)+h(-1,0)
-         hnn =  h(0,1)-2.d0*h(0,0)+h(0,-1)
-         hmn = (h(1,1)-h(-1,1)-h(1,-1)+h(-1,-1))/4.d0
-         kappa = (hmm + hnn + hmm*hn*hn + hnn*hm*hm - 2.d0*hmn*hm*hn) &
-                /(1.d0+hm*hm+hn*hn)**(1.5d0)
-         indexCurv = indexfound
-      else if ( nfound >= 6 ) then 
-         ! least square fit
-      else if ( nfound <6 ) then 
-         nCentroids = 6 - nfound
-         ! find centroid
-         ! least squre fit
+         a(1) = (h(1,0)-2.d0*h(0,0)+h(-1,0))/2.d0
+         a(2) = (h(0,1)-2.d0*h(0,0)+h(0,-1))/2.d0
+         a(3) = (h(1,1)-h(-1,1)-h(1,-1)+h(-1,-1))/4.d0
+         a(4) = (h(1,0)-h(-1,0))/2.d0
+         a(5) = (h(0,1)-h(0,-1))/2.d0
+      else 
+         if ( nfound >= 6 ) then 
+            xfit(1:9) = [-1.d0,-1.d0,-1.d0, 0.d0, 0.d0, 0.d0, 1.d0, 1.d0, 1.d0]
+            yfit(1:9) = [-1.d0, 0.d0, 1.d0,-1.d0, 0.d0, 1.d0,-1.d0, 0.d0, 1.d0]
+            hfit(1:9) = [h(-1,-1),h(-1, 0),h(-1, 1), &
+                         h( 0,-1),h( 0, 0),h( 0, 1), &
+                         h( 1,-1),h( 1, 0),h( 1, 1)]
+         else  
+            nCentroids = 6 - nfound
+            ! find centroid
+            ! least squre fit
+         end if ! nfound 
+         call parabola_fit(xfit,yfit,hfit,a,fit_success)
       end if ! nfound
+!      kappa = (hmm + hnn + hmm*hn*hn + hnn*hm*hm - 2.d0*hmn*hm*hn) &
+!             /(1.d0+hm*hm+hn*hn)**(1.5d0)
+      kappa = 2.d0*(a(1)*(1.d0+a(5)*a(5)) + a(2)*(1.d0+a(4)*a(4)) - a(3)*a(4)*a(5)) &
+             /(1.d0+a(4)*a(4)+a(5)*a(5))**(1.5d0)
+      indexCurv = indexfound
+
    end subroutine get_curvature
 
    subroutine output_curvature()
@@ -538,8 +556,10 @@ contains
       
       integer :: i,j,k,indexCurv
       integer :: ib
-      real(8) :: kappa,kappamax,kappamin
+      real(8) :: kappa
       real(8) :: rc, radius
+      real(8) :: kappamin=1d20
+      real(8) :: kappamax=-1d20
 
       OPEN(UNIT=89,FILE=TRIM(out_path)//'/curvature-'//TRIM(int2text(rank,padding))//'.txt')
       OPEN(UNIT=90,FILE=TRIM(out_path)//'/reference-'//TRIM(int2text(rank,padding))//'.txt')
@@ -552,7 +572,7 @@ contains
             kappamax = max(ABS(kappa),kappamax)
             kappamin = min(ABS(kappa),kappamin)
             rc = sqrt((x(i)-xc(ib))**2+(y(j)-yc(ib))**2+(z(k)-zc(ib))**2)
-            write(89,*) rc,ABS(kappa)
+            write(89,'(2(E26.15,1X),3(I5,1X))') rc,ABS(kappa),i,j,k
             write(90,*) rc,2.d0/radius
          end if ! cvof(i,j,k)
       end do; end do; end do
@@ -561,6 +581,189 @@ contains
       CLOSE(90)
 
    end subroutine output_curvature
+
+   subroutine parabola_fit(xfit,yfit,hfit,a,fit_success)
+      implicit none
+
+      real(8), intent(in)  :: xfit(9),yfit(9),hfit(9)
+      real(8), intent(out) :: a(6)
+      logical, intent(out) :: fit_success
+
+      logical :: independ_flag(9)  
+      real(8) :: m(6,6), invm(6,6)
+      real(8) :: rhs(6)
+      integer :: ifit, im,jm
+      logical :: inv_success
+      real(8) :: x1,x2,x3,x4,y1,y2,y3,y4
+
+      a = 0.d0
+
+      ! check indepent points
+      do ifit = 1,9
+         if ( hfit(ifit) < 2.d6 ) then
+            independ_flag(ifit) = .true.
+         end if ! hfit(ifit)
+      end do !ifit
+
+      ! evaluate the linear system for least-square fit
+      m   = 0.d0
+      rhs = 0.d0
+      do ifit = 1, 9
+         ! sum over independent points with height
+         if ( independ_flag(ifit) ) then
+            x1 =    xfit(ifit)
+            x2 = x1*xfit(ifit)
+            x3 = x2*xfit(ifit)
+            x4 = x3*xfit(ifit)
+            y1 =    yfit(ifit)
+            y2 = y1*yfit(ifit)
+            y3 = y2*yfit(ifit)
+            y4 = y3*yfit(ifit)
+            
+            m(1,1) = m(1,1) + x4
+            m(2,2) = m(2,2) + y4
+            m(3,3) = m(3,3) + x2*y2
+            m(4,4) = m(4,4) + x2
+            m(5,5) = m(5,5) + y2
+            m(6,6) = m(6,6) + 1.d0
+
+            m(1,3) = m(1,3) + x3*y1
+            m(1,4) = m(1,4) + x3
+            m(1,5) = m(1,5) + x2*y1
+            m(2,3) = m(2,3) + x1*y3
+            m(2,4) = m(2,4) + x1*y2
+            m(2,5) = m(2,5) + y3
+            m(3,6) = m(3,6) + x1*y1
+            m(4,6) = m(4,6) + x1
+            m(5,6) = m(5,6) + y1
+
+            rhs(1) = rhs(1) + x2   *hfit(ifit)
+            rhs(2) = rhs(2) + y2   *hfit(ifit)
+            rhs(3) = rhs(3) + x1*y1*hfit(ifit)
+            rhs(4) = rhs(4) + x1   *hfit(ifit)
+            rhs(5) = rhs(5) + y1   *hfit(ifit)
+            rhs(6) = rhs(6) +       hfit(ifit)
+         end if ! hfit
+      end do ! ifit
+      m(1,2) = m(3,3)
+      m(1,6) = m(4,4)
+      m(2,6) = m(5,5)
+      m(3,4) = m(1,5)
+      m(3,5) = m(2,4)
+      m(4,5) = m(3,6)
+
+      do im = 1,6; do jm = 1,6
+         if ( im > jm ) m(im,jm) = m(jm,im)
+      end do; end do 
+
+      ! Solve linear system
+      call FindInverseMatrix(m,invm,6,inv_success)
+      if ( inv_success ) then 
+         do im=1,6
+            do jm=1,6
+               a(im) = a(im) + invm(im,jm)*rhs(jm)
+            end do
+         end do 
+         fit_success = .true.
+      else
+         fit_success = .false.
+      end if ! inv_success
+   end subroutine parabola_fit
+!
+!  Subroutine to find the inverse of a square matrix
+!  From Stanley's previous code
+!
+   SUBROUTINE FindInverseMatrix(matrix,inverse,n,inverse_success)
+      implicit none
+
+         !---Declarations
+        INTEGER, INTENT(IN ) :: n
+        real(8), INTENT(IN ), DIMENSION(n,n) :: matrix  !Input A matrix
+        real(8), INTENT(OUT), DIMENSION(n,n) :: inverse !Inverted matrix
+        logical, INTENT(OUT) :: inverse_success 
+
+        integer :: i, j, k, l
+        real(8) :: m
+        real(8), DIMENSION(n,2*n) :: augmatrix !augmented matrix
+
+
+        !Augment input matrix with an identity matrix
+        DO i = 1,n
+          DO j = 1,2*n
+            IF (j <= n ) THEN
+              augmatrix(i,j) = matrix(i,j)
+            ELSE IF ((i+n) == j) THEN
+              augmatrix(i,j) = 1.0d0
+            Else
+              augmatrix(i,j) = 0.0d0
+            ENDIF
+          END DO
+        END DO
+                
+        !Ensure diagonal elements are non-zero
+        DO k = 1,n-1
+          DO j = k+1,n
+            IF (augmatrix(k,k) == 0) THEN
+               DO i = k+1, n
+                 IF (augmatrix(i,k) /= 0) THEN
+                   DO  l = 1, 2*n
+                     augmatrix(k,l) = augmatrix(k,l)+augmatrix(i,l)
+                   END DO
+                 ENDIF
+               END DO
+            ENDIF
+          END DO
+        END DO
+                
+        !Reduce augmented matrix to upper traingular form
+        DO k =1, n-1
+          DO j = k+1, n
+            m = augmatrix(j,k)/augmatrix(k,k)
+            DO i = k, 2*n
+              augmatrix(j,i) = augmatrix(j,i) - m*augmatrix(k,i)
+            END DO
+          END DO
+        END DO
+
+        !Test for invertibility
+        DO i = 1, n
+          IF (augmatrix(i,i) == 0) THEN
+            write(*,*) "ERROR-Matrix is non-invertible"
+            inverse = 0.d0
+            inverse_success = .false.
+            return
+          ENDIF
+        END DO
+                
+        !Make diagonal elements as 1
+        DO i = 1 , n
+          m = augmatrix(i,i)
+          DO j = i , (2 * n)
+            augmatrix(i,j) = (augmatrix(i,j) / m)
+          END DO
+        END DO
+                
+        !Reduced right side half of augmented matrix to identity matrix
+        DO k = n-1, 1, -1
+          DO i =1, k
+            m = augmatrix(i,k+1)
+            DO j = k, (2*n)
+              augmatrix(i,j) = augmatrix(i,j) -augmatrix(k+1,j) * m
+            END DO
+          END DO
+        END DO
+                
+        !store answer
+        DO i =1, n
+          DO j = 1, n
+            inverse(i,j) = augmatrix(i,j+n)
+          END DO
+        END DO
+        inverse_success = .true.
+                
+   END SUBROUTINE FindInverseMatrix
+
+
 !=========================================================================================================
 !
 !  Testing section
@@ -573,8 +776,6 @@ contains
      integer :: i,j,k,ierr
      real(8) :: kappa
      integer :: IndexCurv
-     real(8) :: kappamin=1d20
-     real(8) :: kappamax=-1d20
 
      call get_flags()
      call get_all_heights()
