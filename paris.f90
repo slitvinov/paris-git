@@ -46,6 +46,7 @@ Program paris
   use module_grid
   use module_BC
   use module_tmpvar
+  use module_2phase
   use module_front
 
   use module_poisson
@@ -990,7 +991,7 @@ subroutine InitCondition
         ! when set by Front-Tracking.
         color = 0.; u = U_init;  v = 0;  w = 0.
         if(DoVOF) then
-           call initconditions_VOF(rad,NumBubble)
+           call initconditions_VOF()
         endif
         du = 0d0
      endif
@@ -1111,6 +1112,7 @@ end function
 subroutine ReadParameters
   use module_grid
   use module_flow
+  use module_2phase
   use module_BC
   use module_IO
   use module_front

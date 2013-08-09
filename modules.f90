@@ -89,7 +89,6 @@ module module_flow
   logical :: dosolids = .false.
   real(8) :: rho1, rho2, s
   real(8) :: U_init
-  real(8), dimension(:), allocatable :: xc, yc, zc
   real(8) :: dpdx, dpdy, dpdz, W_ave  !pressure gradients in case of pressure driven channel flow
   real(8) :: dpdx_stat, dpdy_stat, dpdz_stat
   real(8) :: beta, MaxError
@@ -106,6 +105,16 @@ module module_tmpvar
   real(8), dimension(:,:,:), allocatable :: tmp
   real(8) :: tcpu(100),t0
 end module module_tmpvar
+
+!=================================================================================================
+!=================================================================================================
+! module_2phase: Contains variables for two-phase flow
+!-------------------------------------------------------------------------------------------------
+module module_2phase
+  real(8), dimension( : ), allocatable :: rad, xc, yc, zc, vol
+  real(8) :: sigma
+  integer :: NumBubble
+end module module_2phase
 !=================================================================================================
 !=================================================================================================
 ! module_IO: Contains input/output variables and procedures

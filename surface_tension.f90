@@ -31,6 +31,7 @@ module module_surface_tension
   use module_BC
   use module_IO
   use module_tmpvar
+  use module_2phase
   use module_VOF
   use module_flow ! for curvature test only
   implicit none

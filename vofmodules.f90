@@ -101,16 +101,15 @@ contains
     test_HF = test_heights.or.test_curvature
    end subroutine initialize_VOF
 !=================================================================================================
-   subroutine initconditions_VOF(rad,NumBubble)
+   subroutine initconditions_VOF()
      use module_hello
      use module_flow
      use module_BC
-!      use module_surface_tension
+     use module_2phase
+
      implicit none
      include 'mpif.h'
      integer :: i,j,k,ib, ierr, irank, req(12),sta(MPI_STATUS_SIZE,12)
-     integer, intent(in) :: NumBubble
-     real(8), intent(in) :: rad(Numbubble)
      real(8) :: my_ave
      integer :: ngh=2
      real(8) :: ls,kappa

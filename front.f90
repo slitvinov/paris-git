@@ -5,6 +5,7 @@
 ! deleting from the list.
 !-------------------------------------------------------------------------------------------------
 module module_front
+  use module_2phase
   implicit none
   save
   private
@@ -12,29 +13,30 @@ module module_front
             CalcSurfaceTension, Front2GridVector, AdvanceFront2, GetFront, DistributeFront, &
             InitConditionFront, StoreOldFront, AverageFront, RegridFront, SmoothFront, &
             CorrectVolume, &
-            amin, amax, aspmax, sigma, smooth, nsmooth, MaxPoint, MaxElem, MaxFront, NumBubble, &
-            rad, maxErrorVol, FrontProps, nregrid
+            amin, amax, aspmax, sigma, smooth, nsmooth, MaxPoint, MaxElem, MaxFront, &
+            maxErrorVol, FrontProps, nregrid
 
   integer :: MaxPoint, MaxElem, MaxFront, FirstEmptyPoint, FirstEmptyElem, FirstEmptyFront, &
-             FrontLength, FrontFirst, NumEmptyPoint, NumEmptyElem, NumEmptyFront, NumLocPoint, &
-             NumBubble
+             FrontLength, FrontFirst, NumEmptyPoint, NumEmptyElem, NumEmptyFront, NumLocPoint
+
   integer, dimension( : ), allocatable :: PointLength,  PointFirst,     ElemLength, ElemFirst, &
                                           LocalPointIndex, LocalElemIndex
   integer, dimension(:,:), allocatable :: FrontConnect, ElemConnect,    ElemNgbr, &
                                           PointConnect, ElemCorner
   real(8), dimension(:,:), allocatable :: PointCoords,  PointCoordsOld, FrontForce, gradIFront, &
                                           PointCoordsBuff,  PointCoordsBuffo, FrontProps
-  real(8), dimension( : ), allocatable :: SurfaceTension !, rad, xc, yc, zc, vol
+  real(8), dimension( : ), allocatable :: SurfaceTension ! , rad, xc, yc, zc, vol
+! Two-phase properties now defined in Two-Phase module
+
   integer, dimension( : ), allocatable :: GlobPointIndex,   GlobElemIndex
   integer, dimension(:,:), allocatable :: ElemNgbrBuff,     ElemCornerBuff
-  real(8) :: amin, amax, aspmax, sigma, maxErrorVol
+  real(8) :: amin, amax, aspmax, maxErrorVol
   real(8), dimension(:,:), allocatable :: smin, smax
   real(8), dimension( 3 ) :: mysmin, mysmax
   logical :: smooth
   integer :: nsmooth, nregrid
   integer, allocatable, dimension(:,:) :: request
   integer, allocatable, dimension(:,:,:) :: status
-  real(8), dimension(:), allocatable :: rad
   contains
 !=================================================================================================
 !=================================================================================================
