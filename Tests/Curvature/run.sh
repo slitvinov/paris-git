@@ -27,6 +27,7 @@ if [ -d out ]; then
 # assume that curvature.txt was written by paris
       cat curvature-0000?.txt > curvature.txt
       cat reference-0000?.txt > reference.txt
+      cat bigerror-0000?.txt > bigerror.txt
       compare curvature.txt reference.txt $precision
 else
     RED="\\033[1;31m"

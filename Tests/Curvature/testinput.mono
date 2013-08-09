@@ -65,9 +65,9 @@ npy      = 1
 npz      = 1
                    ! number of processors in x,y,z direction
 
-Nx      = 64 
-Ny      = 64
-Nz      = 64
+Nx      = 16 
+Ny      = 16
+Nz      = 16
 Ng      = 2
                    ! grid size in x,y,z direction and number of ghost cells
 
@@ -118,9 +118,9 @@ SIGMA    = 0.0
 NumBubble =  1
                    ! number of bubbles
 
-xyzrad(1, 1)  = 0.477343 
-xyzrad(2, 1)  = 0.53234
-xyzrad(3, 1)  = 0.69043333
+xyzrad(1, 1)  = 0.5 
+xyzrad(2, 1)  = 0.5
+xyzrad(3, 1)  = 0.5
 xyzrad(4, 1)  = 0.25
 
                    ! Initial bubble size and location : x,y,z,radius
