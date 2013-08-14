@@ -653,31 +653,52 @@ contains
       integer :: i,j,k,indexCurv
       integer :: ib
       real(8) :: kappa
-      real(8) :: rc, radius
+      real(8) :: rc
       real(8) :: kappamin=1d20
       real(8) :: kappamax=-1d20
-      real(8) :: kappa_exact 
+      real(8) :: kappa_exact,kappa_err
+      real(8) :: hex,hex_p1,hex_m1,kappa_hex,cvofex 
 
       OPEN(UNIT=89,FILE=TRIM(out_path)//'/curvature-'//TRIM(int2text(rank,padding))//'.txt')
       OPEN(UNIT=90,FILE=TRIM(out_path)//'/reference-'//TRIM(int2text(rank,padding))//'.txt')
       OPEN(UNIT=91,FILE=TRIM(out_path)//'/bigerror-'//TRIM(int2text(rank,padding))//'.txt')
       ib = 1
-      radius = 0.25d0*DBLE(Nx)
-      kappa_exact = 2.d0/radius
-      do i=is,ie; do j=js,je; do k=ks,ke
-         ! find curvature only for cut cells
-         if (vof_flag(i,j,k) == 2 ) then 
-            call get_curvature(i,j,k,kappa,indexCurv)
-            kappamax = max(ABS(kappa),kappamax)
-            kappamin = min(ABS(kappa),kappamin)
-            rc = sqrt((x(i)-xc(ib))**2+(y(j)-yc(ib))**2+(z(k)-zc(ib))**2)
-            write(89,*) rc,ABS(kappa)
-            write(90,*) rc,kappa_exact
-            if ( ABS(ABS(kappa)-kappa_exact)/kappa_exact > 0.1d0 ) &
-               write(91,'(4(I3,1X),2(E15.8,1X))') i,j,k,indexCurv,kappa,kappa_exact
-         end if ! cvof(i,j,k)
-      end do; end do; end do
+      if ( test_curvature ) then 
+         kappa_exact = 2.d0/(rad(ib)*DBLE(Nx))
+         do i=is,ie; do j=js,je; do k=ks,ke
+            ! find curvature only for cut cells
+            if (vof_flag(i,j,k) == 2 ) then 
+               call get_curvature(i,j,k,kappa,indexCurv)
+               kappamax = max(ABS(kappa),kappamax)
+               kappamin = min(ABS(kappa),kappamin)
+               rc = sqrt((x(i)-xc(ib))**2+(y(j)-yc(ib))**2+(z(k)-zc(ib))**2)
+               write(89,*) rc,ABS(kappa)
+               write(90,*) rc,kappa_exact
+               kappa_err = ABS(ABS(kappa)-kappa_exact)/kappa_exact
+               if ( kappa_err > 0.1d0 ) &
+                  write(91,'(4(I3,1X),2(E15.8,1X))') i,j,k,indexCurv,kappa,kappa_exact
+            end if ! cvof(i,j,k)
+         end do; end do; end do
+      else if ( test_curvature_2D) then 
+         kappa_exact = 1.d0/rad(ib)
+         do i=is,ie; do j=js,je; do k=ks,ke
+            if (vof_flag(i,j,k) == 2 .and. k==(Nz+4)/2) then 
+               call get_curvature(i,j,k,kappa,indexCurv)
+               kappa = kappa*dble(Nx)
+               kappamax = max(ABS(kappa),kappamax)
+               kappamin = min(ABS(kappa),kappamin)
+               rc = sqrt((x(i)-xc(ib))**2+(y(j)-yc(ib))**2) !+(z(k)-zc(ib))**2)
+               write(89,*) rc,ABS(kappa)
+               write(90,*) rc,kappa_exact
+               kappa_err = ABS(ABS(kappa)-kappa_exact)/kappa_exact
+               write(91,'(4(I3,1X),4(E15.8,1X))') i,j,k,indexCurv, & 
+                  sqrt((y(j)-yc(ib))**2+(x(i)-xc(ib))**2),cvof(i,j,k), &
+                  ATAN((y(j)-yc(ib))/(x(i)-xc(ib))),kappa_err
+            end if ! cvof(i,j,k)
+         end do; end do; end do
+     end if ! test_curvature
       write(*,*) 'max, min, and exact ABS(kappa)', kappamax, kappamin,kappa_exact
+      write(*,*) 'max error', MAX(ABS(kappamax-kappa_exact), ABS(kappamin-kappa_exact))/kappa_exact
       CLOSE(89)
       CLOSE(90)
       CLOSE(91)
@@ -991,7 +1012,7 @@ contains
 
      if(test_heights) then
         call output_heights()
-     else if(test_curvature) then
+     else if(test_curvature .or. test_curvature_2D) then
         call output_curvature()
      end if
 

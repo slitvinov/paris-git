@@ -67,12 +67,6 @@ Program paris
   integer :: switch=1
   real(8) :: residual
   real(8) :: sphere
-!
-! for curvature testing
-  real(8) :: kappa
-  integer :: IndexCurv
-  real(8) :: kappamin=1d20
-  real(8) :: kappamax=-1d20
 
 !---------------------------------------INITIALIZATION--------------------------------------------
   ! Initialize MPI

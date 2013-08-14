@@ -36,6 +36,7 @@ module module_VOF
   integer :: parameters_read=0
   logical :: test_heights = .false.  
   logical :: test_curvature = .false.  
+  logical :: test_curvature_2D = .false.  
   logical :: test_HF = .false.
 contains
 !=================================================================================================
@@ -95,10 +96,12 @@ contains
        test_heights = .true.
     else if(test_type=='curvature_test') then
        test_curvature = .true.
+    else if(test_type=='curvature_test2D') then
+       test_curvature_2D = .true.
     else
        stop 'unknown initialization'
     endif
-    test_HF = test_heights.or.test_curvature
+    test_HF = test_heights .or. test_curvature .or. test_curvature_2D
    end subroutine initialize_VOF
 !=================================================================================================
    subroutine initconditions_VOF()
@@ -115,9 +118,9 @@ contains
      real(8) :: ls,kappa
      integer :: IndexCurv
      logical :: test=.false.
-     
+     real(8) :: shift 
 
-     test = test_heights !.or.test_curvature  ! add other tests ...
+     test = test_heights .or.test_curvature_2D  ! add other tests ...
       if(numbubble > 0.and..not.test) then 
          du = - 2.d6  ! Initialize du with a large negative value
          do ib=1,numBubble
@@ -136,6 +139,17 @@ contains
          j = jmax-jmin+1
          k = kmax-kmin+1
          call levelset2vof(du,cvof,i,j,k)
+! TEMPORARY
+!         ib = 1
+!         do i=is,ie
+!            do j=js,je
+!               do k=ks,ke
+!                  if ( cvof(i,j,k) > 0.d0 .and. cvof(i,j,k) < 1.d0 )      &
+!                  call cal_cvof(x(i),y(j),z(k),xc(ib),yc(ib),zc(ib),1.d0/dble(Nx),1.d0/dble(Ny),1.d0/dble(Nz),rad(ib),3,cvof(i,j,k))
+!               end do
+!            end do
+!         end do
+! END TEMPORARY
          call ghost_x(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
          call ghost_y(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
          call ghost_z(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
@@ -156,10 +170,88 @@ contains
          call ghost_y(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
          call ghost_z(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
          call setVOFBC(cvof)
+      else if(test_curvature_2D) then
+         du = - 2.d6  ! Initialize du with a large negative value
+         shift = 0.2d0
+         ib=1
+         do i=imin,imax
+            do j=jmin,jmax
+               do k=kmin,kmax
+                  if ( z(k) <= zc(ib)-shift ) then
+                     ls = rad(ib)**2 - ((x(i)-xc(ib))**2+(y(j)-yc(ib))**2+(z(k)-(zc(ib)-shift))**2) 
+                  else if ( z(k) >= zc(ib)+shift ) then 
+                     ls = rad(ib)**2 - ((x(i)-xc(ib))**2+(y(j)-yc(ib))**2+(z(k)-(zc(ib)+shift))**2) 
+                  else 
+                     ls = rad(ib)**2 - ((x(i)-xc(ib))**2+(y(j)-yc(ib))**2) !+(z(k)-zc(ib))**2)
+                  end if ! x(i)
+!                  ls = rad(ib)**2 - ((x(i)-xc(ib))**2+(y(j)-yc(ib))**2+(z(k)-zc(ib))**2)
+                  du(i,j,k) = MAX(ls,du(i,j,k))
+               enddo
+            enddo
+         enddo
+         i = imax-imin+1
+         j = jmax-jmin+1
+         k = kmax-kmin+1
+         call levelset2vof(du,cvof,i,j,k)
+! TEMPORARY
+         do i=imin,imax
+            do j=jmin,jmax
+               do k=kmin,kmax
+                  if ( cvof(i,j,k) > 0.d0 .and. cvof(i,j,k) < 1.d0      &
+                  .and.z(k) > zc(ib)-shift.and. z(k) < zc(ib)+shift )   &
+                  call cal_cvof(x(i),y(j),z(k),xc(ib),yc(ib),zc(ib),1.d0/dble(Nx),1.d0/dble(Ny),1.d0/dble(Nz),rad(ib),2,cvof(i,j,k))
+               end do
+            end do
+         end do
+! END TEMPORARY
+         call ghost_x(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+         call ghost_y(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+         call ghost_z(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+         call setVOFBC(cvof)
       else
          cvof=0.d0
          if(rank==0) print *, "Warning: trivial VOF field."
       end if
+! TEMPORARY
+      contains
+   subroutine cal_cvof(x1,y1,z1,x0,y0,z0,xw,yw,zw,r,dimflag,c)
+      implicit none
+
+      real(8), intent(in)  :: x1,y1,z1,x0,y0,z0,xw,yw,zw,r
+      integer, intent(in)  :: dimflag 
+      real(8), intent(out) :: c
+
+      integer :: i,j,k,ni,nj,nk,n
+      real(8) :: dx,dy,dz,dv,xi,yi,zi,rad,cf,csum
+
+      n = 50
+      ni=n;nj=n;nk=n
+      if (dimflag == 2) nk=1
+      dx=xw/dble(ni)
+      dy=yw/dble(nj)
+      dz=zw/dble(nk)
+      dv=dx*dy*dz
+
+      csum = 0.d0
+      do i=1,ni; do j=1,nj; do k=1,nk
+         xi = x1-xw/2.d0+(dble(i)-0.5d0)*dx
+         yi = y1-yw/2.d0+(dble(j)-0.5d0)*dy
+         zi = z1-zw/2.d0+(dble(k)-0.5d0)*dz
+
+         cf = 0.d0
+         if ( dimflag ==  2 ) then
+            rad = sqrt((xi-x0)**2 + (yi-y0)**2)
+            if ( rad < r ) cf = 1.d0
+         else if ( dimflag == 3 ) then
+            rad = sqrt((xi-x0)**2 + (yi-y0)**2 + (zi-z0)**2)
+            if ( rad < r ) cf = 1.d0
+         end if ! dimflag
+         csum = csum + dv*cf 
+      end do; end do; end do
+      c = csum/(xw*yw*zw)
+   end subroutine cal_cvof
+! END TEMPORARY
+
     end subroutine initconditions_VOF
 !=================================================================================================
   subroutine c_mask(cbinary)
