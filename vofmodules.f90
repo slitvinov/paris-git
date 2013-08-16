@@ -224,7 +224,7 @@ contains
       integer :: i,j,k,ni,nj,nk,n
       real(8) :: dx,dy,dz,dv,xi,yi,zi,rad,cf,csum
 
-      n = 50
+      n = 100
       ni=n;nj=n;nk=n
       if (dimflag == 2) nk=1
       dx=xw/dble(ni)

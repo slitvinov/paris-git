@@ -653,56 +653,180 @@ contains
       integer :: i,j,k,indexCurv
       integer :: ib
       real(8) :: kappa
-      real(8) :: rc
+      real(8) :: angle 
       real(8) :: kappamin=1d20
       real(8) :: kappamax=-1d20
-      real(8) :: kappa_exact,kappa_err
-      real(8) :: hex,hex_p1,hex_m1,kappa_hex,cvofex 
+      real(8) :: kappa_exact
+      real(8) :: hex,hpex,hmex,dhex,d2hex,kappa_hex
+      real(8) :: hnum,hpnum,hmnum,dhnum,d2hnum,hloc(-1:1,-1:1)
+      real(8) :: err_h,err_hp,err_hm,err_dh,err_d2h,err_K
+      real(8) :: L2_err_h,L2_err_hp,L2_err_hm,L2_err_dh,L2_err_d2h,L2_err_K
+      real(8) :: S2_err_h,S2_err_hp,S2_err_hm,S2_err_dh,S2_err_d2h,S2_err_K
+      real(8) :: Lm_err_h,Lm_err_hp,Lm_err_hm,Lm_err_dh,Lm_err_d2h,Lm_err_K
+      integer :: sumCount,nfound,indexfound
+      real(8) :: PI= 3.14159265359d0
 
       OPEN(UNIT=89,FILE=TRIM(out_path)//'/curvature-'//TRIM(int2text(rank,padding))//'.txt')
       OPEN(UNIT=90,FILE=TRIM(out_path)//'/reference-'//TRIM(int2text(rank,padding))//'.txt')
       OPEN(UNIT=91,FILE=TRIM(out_path)//'/bigerror-'//TRIM(int2text(rank,padding))//'.txt')
       ib = 1
       if ( test_curvature ) then 
-         kappa_exact = 2.d0/(rad(ib)*DBLE(Nx))
+         kappa_exact = 2.d0/rad(ib)
          do i=is,ie; do j=js,je; do k=ks,ke
             ! find curvature only for cut cells
             if (vof_flag(i,j,k) == 2 ) then 
                call get_curvature(i,j,k,kappa,indexCurv)
+               kappa = kappa*dble(Nx)
                kappamax = max(ABS(kappa),kappamax)
                kappamin = min(ABS(kappa),kappamin)
-               rc = sqrt((x(i)-xc(ib))**2+(y(j)-yc(ib))**2+(z(k)-zc(ib))**2)
-               write(89,*) rc,ABS(kappa)
-               write(90,*) rc,kappa_exact
-               kappa_err = ABS(ABS(kappa)-kappa_exact)/kappa_exact
-               if ( kappa_err > 0.1d0 ) &
+               angle = atan2(y(j)-yc(ib),x(i)-xc(ib))/PI*180.d0
+               write(89,*) angle,ABS(kappa)
+               write(90,*) angle,kappa_exact
+               err_K = ABS(ABS(kappa)-kappa_exact)/kappa_exact
+               if ( err_K > 0.1d0 ) &
                   write(91,'(4(I3,1X),2(E15.8,1X))') i,j,k,indexCurv,kappa,kappa_exact
             end if ! cvof(i,j,k)
          end do; end do; end do
       else if ( test_curvature_2D) then 
          kappa_exact = 1.d0/rad(ib)
+         sumCount = 0
+         S2_err_h=0.d0;S2_err_hp=0.d0;S2_err_hm=0.d0;S2_err_dh=0.d0;S2_err_d2h=0.d0;S2_err_K=0.d0
+         Lm_err_h=0.d0;Lm_err_hp=0.d0;Lm_err_hm=0.d0;Lm_err_dh=0.d0;Lm_err_d2h=0.d0;Lm_err_K=0.d0
          do i=is,ie; do j=js,je; do k=ks,ke
             if (vof_flag(i,j,k) == 2 .and. k==(Nz+4)/2) then 
                call get_curvature(i,j,k,kappa,indexCurv)
                kappa = kappa*dble(Nx)
                kappamax = max(ABS(kappa),kappamax)
                kappamin = min(ABS(kappa),kappamin)
-               rc = sqrt((x(i)-xc(ib))**2+(y(j)-yc(ib))**2) !+(z(k)-zc(ib))**2)
-               write(89,*) rc,ABS(kappa)
-               write(90,*) rc,kappa_exact
-               kappa_err = ABS(ABS(kappa)-kappa_exact)/kappa_exact
-               write(91,'(4(I3,1X),4(E15.8,1X))') i,j,k,indexCurv, & 
-                  sqrt((y(j)-yc(ib))**2+(x(i)-xc(ib))**2),cvof(i,j,k), &
-                  ATAN((y(j)-yc(ib))/(x(i)-xc(ib))),kappa_err
+               angle = atan2(y(j)-yc(ib),x(i)-xc(ib))/PI*180.d0
+               write(89,*) angle,ABS(kappa)
+               write(90,*) angle,kappa_exact
+               call CalExactHeight_Circle(x(i),y(j),1.d0/dble(Nx),1.d0/dble(Ny),&
+                  xc(ib),yc(ib),rad(ib),indexCurv,hex,hpex,hmex,dhex,d2hex)
+               call get_local_heights(i,j,k,nfound,indexfound,hloc)
+               hnum  = hloc( 0,0)/dble(Nx)
+               hpnum = hloc( 1,0)/dble(Nx)
+               hmnum = hloc(-1,0)/dble(Nx)
+               dhnum = (hpnum-hmnum)/(2.d0/dble(Nx))
+               d2hnum = (hpnum-2.d0*hnum+hmnum)/(1.d0/dble(Nx))**2.d0
+               err_h    = ABS(hnum   - hex )
+               err_hp   = ABS(hpnum  - hpex)
+               err_hm   = ABS(hmnum  - hmex)
+               err_dh   = ABS(dhnum  - dhex)
+               err_d2h  = ABS(d2hnum - d2hex)/ABS(d2hex)
+               err_K    = ABS(ABS(kappa)-kappa_exact)/kappa_exact
+               write(91,'(7(E15.8,1X),3(I5,1X))') angle,err_h,err_hp,err_hm,& 
+                                         err_dh,err_d2h,err_K,indexCurv,i,j
+               sumCount = sumCount + 1
+               S2_err_h    = S2_err_h  + err_h  **2.d0
+               S2_err_hp   = S2_err_hp + err_hp **2.d0
+               S2_err_hm   = S2_err_hm + err_hm **2.d0
+               S2_err_dh   = S2_err_dh + err_dh **2.d0
+               S2_err_d2h  = S2_err_d2h+ err_d2h**2.d0
+               S2_err_K    = S2_err_K  + err_K  **2.d0
+
+               Lm_err_h    = MAX(Lm_err_h,   err_h ) 
+               Lm_err_hp   = MAX(Lm_err_hp,  err_hp) 
+               Lm_err_hm   = MAX(Lm_err_hm,  err_hm) 
+               Lm_err_dh   = MAX(Lm_err_dh,  err_dh) 
+               Lm_err_d2h  = MAX(Lm_err_d2h, err_d2h) 
+               Lm_err_K    = MAX(Lm_err_K,   err_K) 
             end if ! cvof(i,j,k)
          end do; end do; end do
-     end if ! test_curvature
+         L2_err_h    = sqrt(S2_err_h)  /dble(sumCount)
+         L2_err_hp   = sqrt(S2_err_hp) /dble(sumCount)
+         L2_err_hm   = sqrt(S2_err_hm) /dble(sumCount)
+         L2_err_dh   = sqrt(S2_err_dh) /dble(sumCount)
+         L2_err_d2h  = sqrt(S2_err_d2h)/dble(sumCount)
+         L2_err_K    = sqrt(S2_err_K)  /dble(sumCount)
+         write(*,*) 'L2 Norm:'
+         write(*,'(I5,1X,6(E15.8,1X))') Nx,L2_err_h,L2_err_hp,L2_err_hm,L2_err_dh,L2_err_d2h,L2_err_K
+         write(*,*) 'Linfty Norm:'
+         write(*,'(I5,1X,6(E15.8,1X))') Nx,Lm_err_h,Lm_err_hp,Lm_err_hm,Lm_err_dh,Lm_err_d2h,Lm_err_K
+      end if ! test_curvature
       write(*,*) 'max, min, and exact ABS(kappa)', kappamax, kappamin,kappa_exact
       write(*,*) 'max error', MAX(ABS(kappamax-kappa_exact), ABS(kappamin-kappa_exact))/kappa_exact
       CLOSE(89)
       CLOSE(90)
       CLOSE(91)
 
+      contains
+! TEMPORARY
+   subroutine cal_cvof(x1,y1,z1,x0,y0,z0,xw,yw,zw,r,dimflag,c)
+      implicit none
+
+      real(8), intent(in)  :: x1,y1,z1,x0,y0,z0,xw,yw,zw,r
+      integer, intent(in)  :: dimflag 
+      real(8), intent(out) :: c
+
+      integer :: i,j,k,ni,nj,nk,n
+      real(8) :: dx,dy,dz,dv,xi,yi,zi,rad,cf,csum
+
+      n = 100
+      ni=n;nj=n;nk=n
+      if (dimflag == 2) nk=1
+      dx=xw/dble(ni)
+      dy=yw/dble(nj)
+      dz=zw/dble(nk)
+      dv=dx*dy*dz
+
+      csum = 0.d0
+      do i=1,ni; do j=1,nj; do k=1,nk
+         xi = x1-xw/2.d0+(dble(i)-0.5d0)*dx
+         yi = y1-yw/2.d0+(dble(j)-0.5d0)*dy
+         zi = z1-zw/2.d0+(dble(k)-0.5d0)*dz
+
+         cf = 0.d0
+         if ( dimflag ==  2 ) then
+            rad = sqrt((xi-x0)**2 + (yi-y0)**2)
+            if ( rad < r ) cf = 1.d0
+         else if ( dimflag == 3 ) then
+            rad = sqrt((xi-x0)**2 + (yi-y0)**2 + (zi-z0)**2)
+            if ( rad < r ) cf = 1.d0
+         end if ! dimflag
+         csum = csum + dv*cf 
+      end do; end do; end do
+      c = csum/(xw*yw*zw)
+
+   end subroutine cal_cvof
+
+   subroutine CalExactHeight_Circle(x1,y1,dx,dy,xc,yc,R,ih,h,hp,hm,dh,d2h)
+
+      implicit none
+
+      real(8), intent(in)  :: x1,y1,dx,dy,xc,yc,R
+      integer, intent(in)  :: ih
+      real(8), intent(out) :: h,hp,hm,dh,d2h
+
+      integer :: s,d
+      real(8) :: xm,ym,xp,yp
+
+      s = -2*mod(ih,2)+1
+      d = (ih+1)/2
+
+      xm = x1-dx
+      xp = x1+dx
+      ym = y1-dy
+      yp = y1+dy
+
+      if ( d == 1 ) then 
+         h  = s*(ABS(x1-xc)-sqrt(R**2.d0-(y1-yc)**2.d0))
+         hp = s*(ABS(x1-xc)-sqrt(R**2.d0-(yp-yc)**2.d0))
+         hm = s*(ABS(x1-xc)-sqrt(R**2.d0-(ym-yc)**2.d0))
+         dh = s*(y1-yc)/sqrt(R**2.d0-(y1-yc)**2.d0)
+         d2h= s*(  1.d0/sqrt(R**2.d0-(y1-yc)**2.d0) &
+            + (y1-yc)**2.d0/(R**2.d0-(y1-yc)**2.d0)**1.5d0)
+      else if ( d == 2 ) then 
+         h  = s*(ABS(y1-yc)-sqrt(R**2.d0-(x1-xc)**2.d0))
+         hp = s*(ABS(y1-yc)-sqrt(R**2.d0-(xp-xc)**2.d0))
+         hm = s*(ABS(y1-yc)-sqrt(R**2.d0-(xm-xc)**2.d0))
+         dh = s*(x1-xc)/sqrt(R**2.d0-(x1-xc)**2.d0)
+         d2h= s*(  1.d0/sqrt(R**2.d0-(x1-xc)**2.d0) &
+            + (x1-xc)**2.d0/(R**2.d0-(x1-xc)**2.d0)**1.5d0)
+      end if ! d
+
+   end subroutine CalExactHeight_Circle
+! END TEMPORARY
    end subroutine output_curvature
 
    subroutine parabola_fit(xfit,yfit,hfit,independ_flag,a,fit_success)
