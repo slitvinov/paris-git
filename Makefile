@@ -25,7 +25,7 @@ HYPRE_LIBS =  -L$(HYPRE_DIR)/lib -lHYPRE
 #------------------------No changes needed beyond this line----------------------------------------------
 
 
-OBJ = paris.o solids.o modules.o vofmodules.o front.o surface_tension.o # uzawa.o
+OBJ = paris.o solids.o modules.o vofmodules.o front.o surface_tension.o lag_particle.o # uzawa.o
 SRC = $(wildcard  *.f90) 
 
 install: $(OBJ)
@@ -60,12 +60,14 @@ tags:	$(SRC)
 # @SZ On MacOS tags and TAGS are identical ! 
 # @SZ	ctags paris.f90 
 
-paris.o:  paris.f90 solids.o modules.o vofmodules.o front.o surface_tension.o
+paris.o:  paris.f90 solids.o modules.o vofmodules.o front.o surface_tension.o lag_particle.o
 	$(FC) -c  $(FFLAGS) $<
 
 vofmodules.o: vofmodules.f90 modules.o
 	$(FC) -c  $(FFLAGS) $<
 
+lag_particle.o: lag_particle.f90 vofmodules.o modules.o
+	$(FC) -c  $(FFLAGS) $<
 
 surface_tension.o: surface_tension.f90 vofmodules.o modules.o
 	$(FC) -c  $(FFLAGS) $<

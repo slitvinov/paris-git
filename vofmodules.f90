@@ -38,6 +38,9 @@ module module_VOF
   logical :: test_curvature = .false.  
   logical :: test_curvature_2D = .false.  
   logical :: test_HF = .false.
+
+  logical :: test_LP = .false.
+  logical :: test_tag = .false.
 contains
 !=================================================================================================
 !=================================================================================================
@@ -98,10 +101,14 @@ contains
        test_curvature = .true.
     else if(test_type=='curvature_test2D') then
        test_curvature_2D = .true.
+    else if(test_type=='tag_test') then
+       test_tag = .true.
     else
        stop 'unknown initialization'
     endif
     test_HF = test_heights .or. test_curvature .or. test_curvature_2D
+    test_LP = test_tag
+
    end subroutine initialize_VOF
 !=================================================================================================
    subroutine initconditions_VOF()
@@ -139,17 +146,6 @@ contains
          j = jmax-jmin+1
          k = kmax-kmin+1
          call levelset2vof(du,cvof,i,j,k)
-! TEMPORARY
-!         ib = 1
-!         do i=is,ie
-!            do j=js,je
-!               do k=ks,ke
-!                  if ( cvof(i,j,k) > 0.d0 .and. cvof(i,j,k) < 1.d0 )      &
-!                  call cal_cvof(x(i),y(j),z(k),xc(ib),yc(ib),zc(ib),1.d0/dble(Nx),1.d0/dble(Ny),1.d0/dble(Nz),rad(ib),3,cvof(i,j,k))
-!               end do
-!            end do
-!         end do
-! END TEMPORARY
          call ghost_x(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
          call ghost_y(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
          call ghost_z(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)

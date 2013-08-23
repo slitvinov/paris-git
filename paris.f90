@@ -56,6 +56,7 @@ Program paris
   use module_output_vof
   use module_hello
   use module_surface_tension
+  use module_lag_part
 
   implicit none
   include 'mpif.h'
@@ -962,6 +963,7 @@ subroutine InitCondition
   use module_IO
   use module_vof
   use module_surface_tension
+  use module_lag_part
   implicit none
   include 'mpif.h'
   integer :: i,j,k,ib, ierr, irank, req(12),sta(MPI_STATUS_SIZE,12)
@@ -992,6 +994,8 @@ subroutine InitCondition
      
      if(test_HF) then
         call test_VOF_HF()
+     else if ( test_LP) then 
+        call test_Lag_part()
      endif
 
      if(DoFront) then
