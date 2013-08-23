@@ -62,12 +62,12 @@ nstats   = 20       ! number of time steps between flow statistics calculations
 
 npx      = 2
 npy      = 2
-npz      = 2
+npz      = 1
                    ! number of processors in x,y,z direction
 
-Nx      = 128 
-Ny      = 128
-Nz      = 128
+Nx      = 64
+Ny      = 64
+Nz      = 2
 Ng      = 2
                    ! grid size in x,y,z direction and number of ghost cells
 

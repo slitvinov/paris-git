@@ -752,43 +752,6 @@ contains
 
       contains
 ! TEMPORARY
-   subroutine cal_cvof(x1,y1,z1,x0,y0,z0,xw,yw,zw,r,dimflag,c)
-      implicit none
-
-      real(8), intent(in)  :: x1,y1,z1,x0,y0,z0,xw,yw,zw,r
-      integer, intent(in)  :: dimflag 
-      real(8), intent(out) :: c
-
-      integer :: i,j,k,ni,nj,nk,n
-      real(8) :: dx,dy,dz,dv,xi,yi,zi,rad,cf,csum
-
-      n = 100
-      ni=n;nj=n;nk=n
-      if (dimflag == 2) nk=1
-      dx=xw/dble(ni)
-      dy=yw/dble(nj)
-      dz=zw/dble(nk)
-      dv=dx*dy*dz
-
-      csum = 0.d0
-      do i=1,ni; do j=1,nj; do k=1,nk
-         xi = x1-xw/2.d0+(dble(i)-0.5d0)*dx
-         yi = y1-yw/2.d0+(dble(j)-0.5d0)*dy
-         zi = z1-zw/2.d0+(dble(k)-0.5d0)*dz
-
-         cf = 0.d0
-         if ( dimflag ==  2 ) then
-            rad = sqrt((xi-x0)**2 + (yi-y0)**2)
-            if ( rad < r ) cf = 1.d0
-         else if ( dimflag == 3 ) then
-            rad = sqrt((xi-x0)**2 + (yi-y0)**2 + (zi-z0)**2)
-            if ( rad < r ) cf = 1.d0
-         end if ! dimflag
-         csum = csum + dv*cf 
-      end do; end do; end do
-      c = csum/(xw*yw*zw)
-
-   end subroutine cal_cvof
 
    subroutine CalExactHeight_Circle(x1,y1,dx,dy,xc,yc,R,ih,h,hp,hm,dh,d2h)
 
@@ -1139,13 +1102,6 @@ contains
      else if(test_curvature .or. test_curvature_2D) then
         call output_curvature()
      end if
-
-! Exit MPI gracefully
-
-     call MPI_BARRIER(MPI_COMM_WORLD, ierr)
-     call MPI_finalize(ierr)
-     stop
- 
   end subroutine test_VOF_HF
 
 

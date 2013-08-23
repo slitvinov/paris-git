@@ -38,7 +38,6 @@ module module_VOF
   logical :: test_curvature = .false.  
   logical :: test_curvature_2D = .false.  
   logical :: test_HF = .false.
-
   logical :: test_LP = .false.
   logical :: test_tag = .false.
 contains
@@ -119,138 +118,75 @@ contains
 
      implicit none
      include 'mpif.h'
-     integer :: i,j,k,ib, ierr, irank, req(12),sta(MPI_STATUS_SIZE,12)
-     real(8) :: my_ave
+     integer :: ierr, irank, req(12),sta(MPI_STATUS_SIZE,12)
      integer :: ngh=2
-     real(8) :: ls,kappa
-     integer :: IndexCurv
-     logical :: test=.false.
-     real(8) :: shift 
+     integer :: ipar=0
 
-     test = test_heights .or.test_curvature_2D  ! add other tests ...
-      if(numbubble > 0.and..not.test) then 
-         du = - 2.d6  ! Initialize du with a large negative value
-         do ib=1,numBubble
-            do i=imin,imax
-               do j=jmin,jmax
-                  do k=kmin,kmax 
-                     ls = rad(ib)**2 - ((x(i)-xc(ib))**2+(y(j)-yc(ib))**2+(z(k)-zc(ib))**2)
-                     ! update level-set function when the new value is larger 
-                     ! final geometry is the union of indivdual bubbles. 
-                     du(i,j,k) = MAX(ls,du(i,j,k))
-                  enddo
-               enddo
-            enddo
-         enddo
-         i = imax-imin+1
-         j = jmax-jmin+1
-         k = kmax-kmin+1
-         call levelset2vof(du,cvof,i,j,k)
-         call ghost_x(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
-         call ghost_y(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
-         call ghost_z(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
-         call setVOFBC(cvof)
-      else if(test_heights) then
-         do i=imin,imax
-            do j=jmin,jmax
-               do k=kmin,kmax 
-                  du(i,j,k) =   - z(k) + zlength/2.d0  + A_h*dx(nx/2)*cos(2.*3.14159*x(i)/xlength) 
-               enddo
-            enddo
-         enddo
-         i = imax-imin+1
-         j = jmax-jmin+1
-         k = kmax-kmin+1
-         call levelset2vof(du,cvof,i,j,k)
-         call ghost_x(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
-         call ghost_y(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
-         call ghost_z(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
-         call setVOFBC(cvof)
-      else if(test_curvature_2D) then
-         du = - 2.d6  ! Initialize du with a large negative value
-         shift = 0.2d0
-         ib=1
-         do i=imin,imax
-            do j=jmin,jmax
-               do k=kmin,kmax
-                  if ( z(k) <= zc(ib)-shift ) then
-                     ls = rad(ib)**2 - ((x(i)-xc(ib))**2+(y(j)-yc(ib))**2+(z(k)-(zc(ib)-shift))**2) 
-                  else if ( z(k) >= zc(ib)+shift ) then 
-                     ls = rad(ib)**2 - ((x(i)-xc(ib))**2+(y(j)-yc(ib))**2+(z(k)-(zc(ib)+shift))**2) 
-                  else 
-                     ls = rad(ib)**2 - ((x(i)-xc(ib))**2+(y(j)-yc(ib))**2) !+(z(k)-zc(ib))**2)
-                  end if ! x(i)
-!                  ls = rad(ib)**2 - ((x(i)-xc(ib))**2+(y(j)-yc(ib))**2+(z(k)-zc(ib))**2)
-                  du(i,j,k) = MAX(ls,du(i,j,k))
-               enddo
-            enddo
-         enddo
-         i = imax-imin+1
-         j = jmax-jmin+1
-         k = kmax-kmin+1
-         call levelset2vof(du,cvof,i,j,k)
-! TEMPORARY
-         do i=imin,imax
-            do j=jmin,jmax
-               do k=kmin,kmax
-                  if ( cvof(i,j,k) > 0.d0 .and. cvof(i,j,k) < 1.d0      &
-                  .and.z(k) > zc(ib)-shift.and. z(k) < zc(ib)+shift )   &
-                  call cal_cvof(x(i),y(j),z(k),xc(ib),yc(ib),zc(ib),1.d0/dble(Nx),1.d0/dble(Ny),1.d0/dble(Nz),rad(ib),2,cvof(i,j,k))
-               end do
-            end do
-         end do
-! END TEMPORARY
-         call ghost_x(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
-         call ghost_y(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
-         call ghost_z(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
-         call setVOFBC(cvof)
-      else
-         cvof=0.d0
-         if(rank==0) print *, "Warning: trivial VOF field."
-      end if
-! TEMPORARY
-      contains
-   subroutine cal_cvof(x1,y1,z1,x0,y0,z0,xw,yw,zw,r,dimflag,c)
-      implicit none
-
-      real(8), intent(in)  :: x1,y1,z1,x0,y0,z0,xw,yw,zw,r
-      integer, intent(in)  :: dimflag 
-      real(8), intent(out) :: c
-
-      integer :: i,j,k,ni,nj,nk,n
-      real(8) :: dx,dy,dz,dv,xi,yi,zi,rad,cf,csum
-
-      n = 100
-      ni=n;nj=n;nk=n
-      if (dimflag == 2) nk=1
-      dx=xw/dble(ni)
-      dy=yw/dble(nj)
-      dz=zw/dble(nk)
-      dv=dx*dy*dz
-
-      csum = 0.d0
-      do i=1,ni; do j=1,nj; do k=1,nk
-         xi = x1-xw/2.d0+(dble(i)-0.5d0)*dx
-         yi = y1-yw/2.d0+(dble(j)-0.5d0)*dy
-         zi = z1-zw/2.d0+(dble(k)-0.5d0)*dz
-
-         cf = 0.d0
-         if ( dimflag ==  2 ) then
-            rad = sqrt((xi-x0)**2 + (yi-y0)**2)
-            if ( rad < r ) cf = 1.d0
-         else if ( dimflag == 3 ) then
-            rad = sqrt((xi-x0)**2 + (yi-y0)**2 + (zi-z0)**2)
-            if ( rad < r ) cf = 1.d0
-         end if ! dimflag
-         csum = csum + dv*cf 
-      end do; end do; end do
-      c = csum/(xw*yw*zw)
-   end subroutine cal_cvof
-! END TEMPORARY
-
+     if(test_heights) then
+         call levelset2vof(wave2ls,ipar)
+      else 
+         if(test_curvature_2D) ipar=-3  ! cylinder in -ipar direction otherwise spheres
+         call levelset2vof(shapes2ls,ipar)
+      endif
+      call ghost_x(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+      call ghost_y(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+      call ghost_z(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+      call setVOFBC(cvof)
+      return
     end subroutine initconditions_VOF
-!=================================================================================================
-  subroutine c_mask(cbinary)
+    !=================================================================================================
+    !   Spheres and cylinders
+    !=================================================================================================
+    function shapes2ls(xx,yy,zz,ipar)
+      use module_2phase
+      implicit none
+      real(8), intent(in) :: xx,zz,yy
+      integer, intent(in) :: ipar
+      real(8) :: a, cdir(0:3), shapes2ls
+      integer ib
+ 
+      if(.not.(-3<=ipar.and.ipar<=1)) call pariserror("invalid ipar")
+      cdir = 1.d0
+      cdir(-ipar) = 0.d0
+      shapes2ls = -2.d6
+      if(ipar < 0.and.NumBubble/=1) call pariserror("invalid NumBubbles")
+      do ib=1,NumBubble
+         a = rad(ib)**2 - (cdir(ib)*(xx-xc(1))**2+cdir(2)*(yy-yc(ib))**2+cdir(3)*(zz-zc(ib))**2)
+         shapes2ls = MAX(shapes2ls,a)
+      end do
+    end function shapes2ls
+    !=================================================================================================
+    !  sine-wave interface
+    !=================================================================================================
+    function wave2ls(xx,yy,zz,ipar)
+      use module_2phase
+      implicit none
+      real(8) wave2ls
+      real(8), intent(in) :: xx,zz,yy
+      integer, intent(in) :: ipar
+      wave2ls = - zz + zlength/2.d0  + A_h*dx(nx/2)*cos(2.*3.14159*xx/xlength) 
+    end function wave2ls
+         
+    !=================================================================================================
+    !   Converts a level-set field into a VOF field
+    !=================================================================================================
+    subroutine levelset2vof(lsfunction,ipar)
+      implicit none
+      real(8), external :: lsfunction
+      integer :: ipar
+      real(8) :: stencil3x3(-1:1,-1:1,-1:1)
+      integer :: i,j,k,i0,j0,k0
+      
+      do k=ks,ke; do j=js,je; do i=is,ie
+         do i0=-1,1; do j0=-1,1; do k0=-1,1
+            stencil3x3(i0,j0,k0) = lsfunction(x(i+i0),y(j+j0),z(k+k0),ipar)
+         enddo; enddo; enddo
+         call local_ls2vof(stencil3x3,cvof(i,j,k))
+      enddo; enddo; enddo
+      return
+    end subroutine levelset2vof
+    !=================================================================================================
+    subroutine c_mask(cbinary)
     implicit none
     real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(out) :: cbinary
 
@@ -338,7 +274,7 @@ contains
           c(ie+2,:,:)=1.0
        endif
     elseif (vofbdry_cond(1)=='90deg') then
-       stop '90deg not implemented'
+       call pariserror('90deg not implemented')
     endif
 
     if(vofbdry_cond(2)=='wet') then
@@ -351,7 +287,7 @@ contains
           c(:,je+2,:)=1.0
        endif
     elseif (vofbdry_cond(2)=='90deg') then
-       stop '90deg not implemented'
+       call pariserror('90deg not implemented')
     endif
 
     if(vofbdry_cond(3)=='wet')then
@@ -364,7 +300,7 @@ contains
           c(:,:,ke+2)=1.0
        endif
     elseif (vofbdry_cond(2)=='90deg') then
-       stop '90deg not implemented'
+       call pariserror('90deg not implemented')
     endif
 
   end subroutine SetVOFBC
@@ -385,7 +321,7 @@ contains
     implicit none
     character(*) :: rootname
     integer prank
-    if(rank.ne.0) stop 'rank.ne.0 in append_VOF'
+    if(rank.ne.0) call pariserror('rank.ne.0 in append_VOF')
     if(vof_opened==0) then
        OPEN(UNIT=88,FILE='vof.visit')
        write(88,10) nPdomain
@@ -458,7 +394,7 @@ subroutine swp(us,c,vof1,vof2,vof3,d)
   elseif (VOF_advect=='CIAM') then
      call swpz(us,c,vof1,vof2,vof3,d)
   else
-     STOP "*** unknown vof scheme"
+     CALL PARISERROR("*** unknown vof scheme")
   endif
 end subroutine swp
 
@@ -484,7 +420,7 @@ subroutine swpz(us,c,vof1,vof2,vof3,d)
   integer i0,j0,k0
   intrinsic dmax1,dmin1
   !***
-  if(ng.lt.2) stop "wrong ng"
+  if(ng.lt.2) call pariserror("wrong ng")
   do k=ks-1,ke+1
      do j=js-1,je+1
         do i=is-1,ie+1
@@ -580,7 +516,7 @@ subroutine swpz(us,c,vof1,vof2,vof3,d)
                  vof2(i,j,k) = fl3d(dmz,dmx,dmy,alpha,mm1,mm2)
               endif
               !           elseif (c(i,j,k).ne.0.d0) then
-              !              stop "case not allowed"
+              !              call pariserror("case not allowed")
            endif
         enddo
      enddo
@@ -639,7 +575,7 @@ SUBROUTINE swpr(us,c,vof1,cg,vof3,dir)
     real(8) :: mxyz(3),stencil3x3(-1:1,-1:1,-1:1)
     INTRINSIC DMAX1,DMIN1
 !
-  if(ng < 2) stop "wrong ng"
+  if(ng < 2) call pariserror("wrong ng")
   ii=0; jj=0; kk=0
   if (dir == 1) then
      ii=1; dm1 => dmx;  dm2 => dmy;  dm3 => dmz 
@@ -650,7 +586,7 @@ SUBROUTINE swpr(us,c,vof1,cg,vof3,dir)
   endif
   EPSC = 1.d-12
   dxyz = dxh(is)
-  if(dyh(js).ne.dxyz.or.dzh(ks).ne.dxyz) stop "non-cubic cells"
+  if(dyh(js).ne.dxyz.or.dzh(ks).ne.dxyz) call pariserror("non-cubic cells")
 
   do k=ks-1,ke+1
      do j=js-1,je+1
@@ -858,27 +794,6 @@ function fl3d(m1,m2,m3,alpha,r0,dr0)
   !***  
   return
 end function fl3d
-! ****** 1 ******* 2 ******* 3 ******* 4 ******* 5 ******* 6 ******* 7 *
-!   Converts a level-set field into a VOF field
-!   On entry:  cc: an allocated array, ls: the level-set function.
-!   On output: cc: becomes the volume fraction, ls: untouched.
-! ****** 1 ******* 2 ******* 3 ******* 4 ******* 5 ******* 6 ******* 7 *
-subroutine levelset2vof(ls,cc,nx,ny,nz)
-  implicit none
-  integer, intent(in) :: nx,ny,nz
-  real(8), intent(inout):: cc(nx,ny,nz)
-  real(8), intent(inout) :: ls(nx,ny,nz)
-  real(8) :: stencil3x3(-1:1,-1:1,-1:1)
-  integer :: i,j,k,i0,j0,k0
-
-  do k=2,nz-1; do j=2,ny-1; do i=2,nx-1
-     do i0=-1,1; do j0=-1,1; do k0=-1,1
-        stencil3x3(i0,j0,k0) = ls(i+i0,j+j0,k+k0)
-     enddo; enddo; enddo
-     call local_ls2vof(stencil3x3,cc(i,j,k))
-  enddo; enddo; enddo
-  return
-end subroutine levelset2vof
 
 subroutine local_ls2vof(stencil3x3,c)
   implicit none

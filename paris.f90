@@ -127,6 +127,7 @@ Program paris
   if(HYPRE .and. rank==0) write(*  ,*)'hypre initialized'
   
   call InitCondition
+  call hello_coucou()
   if(U_init == 0.) stop "missing U_init"
   if(rank<nPdomain) then
 !-------------------------------------------------------------------------------------------------
@@ -134,7 +135,7 @@ Program paris
 !-------------------------------------------------------------------------------------------------
 
      ! output initial condition
-     if(rank==0) start_time = MPI_WTIME()
+     ! if(rank==0) start_time = MPI_WTIME()
      if(ICOut .and. rank<nPdomain) then
         call output(0,is,ie+1,js,je+1,ks,ke+1)
 !        call output_VOF(0,imin,imax,jmin,jmax,kmin,kmax)
@@ -142,12 +143,26 @@ Program paris
         call write_vec_gnuplot(u,v,w,itimestep)
         call calcstats
         if(rank==0) then
+           call hello_coucou()
            end_time =  MPI_WTIME()
            open(unit=121,file='stats',access='append')
            write(121,'(20es14.6e2)')time,stats(1:12),dpdx,(stats(8)-stats(9))/dt,end_time-start_time
            close(121)
+           write(out,'("Step:",I9," Iterations:",I9," cpu(s):",f10.2)')-1,0,end_time-start_time
+           write(*,'("Step:",I6," dt=",es16.5e2," time=",es16.5e2," cpu(s):",f11.3)')   &
+                0,0.d0,0.d0,end_time-start_time
         endif
      endif
+
+     if(test_HF.or.test_LP) then
+        ! Exit MPI gracefully
+        close(out)
+        call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+        call MPI_finalize(ierr)
+        stop
+     endif
+ 
+
 !-----------------------------------------MAIN TIME LOOP------------------------------------------
      do while(time<EndTime .and. itimestep<nstep)
         if(dtFlag==2)call TimeStepSize(dt)
@@ -994,7 +1009,7 @@ subroutine InitCondition
      
      if(test_HF) then
         call test_VOF_HF()
-     else if ( test_LP) then 
+     else if (test_LP) then 
         call test_Lag_part()
      endif
 
