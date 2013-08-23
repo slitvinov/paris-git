@@ -864,85 +864,67 @@ end function fl3d
 !   On output: cc: becomes the volume fraction, ls: untouched.
 ! ****** 1 ******* 2 ******* 3 ******* 4 ******* 5 ******* 6 ******* 7 *
 subroutine levelset2vof(ls,cc,nx,ny,nz)
-!  use module_BC
   implicit none
-  include 'mpif.h'
-  integer nx,ny,nz
-  real(8) cc(nx,ny,nz),ls(nx,ny,nz)
-  real(8) zero, one, norml1
-  real(8) mm1,mm2,mm3,mx,my,mz,alpha
-  real(8) fl3d
-  integer i,j,k
-  integer :: req(48),sta(MPI_STATUS_SIZE,48)
-  integer :: ngh=2, ierr
+  integer, intent(in) :: nx,ny,nz
+  real(8), intent(inout):: cc(nx,ny,nz)
+  real(8), intent(inout) :: ls(nx,ny,nz)
+  real(8) :: stencil3x3(-1:1,-1:1,-1:1)
+  integer :: i,j,k,i0,j0,k0
 
+  do k=2,nz-1; do j=2,ny-1; do i=2,nx-1
+     do i0=-1,1; do j0=-1,1; do k0=-1,1
+        stencil3x3(i0,j0,k0) = ls(i+i0,j+j0,k+k0)
+     enddo; enddo; enddo
+     call local_ls2vof(stencil3x3,cc(i,j,k))
+  enddo; enddo; enddo
+  return
+end subroutine levelset2vof
+
+subroutine local_ls2vof(stencil3x3,c)
+  implicit none
+  real(8), intent(out):: c
+  real(8) :: zero, one, norml1
+  real(8) :: mx,my,mz,alpha
+  real(8) :: fl3d
+  real(8) :: mxyz(3),stencil3x3(-1:1,-1:1,-1:1)
 
   zero=0.d0
   one=1.d0
-  do k=2,nz-1
-     do j=2,ny-1
-        do i=2,nx-1
-           !***
-           !     (1) normal vector: mx,my,mz; (2) mx,my,mz>0. and mx+my+mz = 1.;
-           !     (3) shift alpha to origin;   (4) get volume from alpha.  
-           !***
-
-           mm1 = ls(i-1,j-1,k-1)+ls(i-1,j-1,k+1)+ls(i-1,j+1,k-1) &
-                +ls(i-1,j+1,k+1)+2.0d0*(ls(i-1,j-1,k)+ls(i-1,j+1,k) &
-                +ls(i-1,j,k-1)+ls(i-1,j,k+1))+4.0d0*ls(i-1,j,k)
-           mm2 = ls(i+1,j-1,k-1)+ls(i+1,j-1,k+1)+ls(i+1,j+1,k-1) &
-                +ls(i+1,j+1,k+1)+2.0d0*(ls(i+1,j-1,k)+ls(i+1,j+1,k) &
-                +ls(i+1,j,k-1)+ls(i+1,j,k+1))+4.0d0*ls(i+1,j,k)
-           mx = (mm1 - mm2)/32.d0
-
-           mm1 = ls(i-1,j-1,k-1)+ls(i-1,j-1,k+1)+ls(i+1,j-1,k-1) &
-                +ls(i+1,j-1,k+1)+2.0d0*(ls(i-1,j-1,k)+ls(i+1,j-1,k) &
-                +ls(i,j-1,k-1)+ls(i,j-1,k+1))+4.0d0*ls(i,j-1,k)
-           mm2 = ls(i-1,j+1,k-1)+ls(i-1,j+1,k+1)+ls(i+1,j+1,k-1) &
-                +ls(i+1,j+1,k+1)+2.0d0*(ls(i-1,j+1,k)+ls(i+1,j+1,k) &
-                +ls(i,j+1,k-1)+ls(i,j+1,k+1))+4.0d0*ls(i,j+1,k)
-           my = (mm1 - mm2)/32.d0
-
-           mm1 = ls(i-1,j-1,k-1)+ls(i-1,j+1,k-1)+ls(i+1,j-1,k-1) &
-                +ls(i+1,j+1,k-1)+2.0d0*(ls(i-1,j,k-1)+ls(i+1,j,k-1) &
-                +ls(i,j-1,k-1)+ls(i,j+1,k-1))+4.0d0*ls(i,j,k-1)
-           mm2 = ls(i-1,j-1,k+1)+ls(i-1,j+1,k+1)+ls(i+1,j-1,k+1) &
-                +ls(i+1,j+1,k+1)+2.0d0*(ls(i-1,j,k+1)+ls(i+1,j,k+1) &
-                +ls(i,j-1,k+1)+ls(i,j+1,k+1))+4.0d0*ls(i,j,k+1)
-           mz = (mm1 - mm2)/32.d0
-           !***
-           !     *(2)*  
-           !***
-           mx = dabs(mx)
-           my = dabs(my)
-           mz = dabs(mz)
-           norml1 = mx+my+mz
-           mx = mx/norml1
-           my = my/norml1
-           mz = mz/norml1
-
-           alpha = ls(i,j,k)/norml1
-           !***
-           !     *(3)*  
-           !***
-           alpha = alpha + 0.5d0
-           !***
-           !     *(4)*  
-           !***
-           if(alpha.ge.1.d0) then 
-              cc(i,j,k) = 1.d0
-           else if (alpha.le.0.d0) then
-              cc(i,j,k) = 0.d0
-           else 
-              cc(i,j,k) = fl3d(mx,my,mz,alpha,zero,one)
-           end if
-        enddo
-     enddo
-  enddo
+  !***
+  !     (1) gradient*32: mx,my,mz; (2) mx,my,mz>0. and mx+my+mz = 1.;
+  !     (3) normalize alpha = level set at center. Cell units. 
+  !     (4) shift alpha to origin=vertex;   (5) get volume from alpha.  
+  !
+  !     *(1)*  
+  !***
+  call fd32(stencil3x3,mxyz)
+  !***
+  !     *(2)*  
+  !***
+  mx = dabs(mxyz(1)); my = dabs(mxyz(2)); mz = dabs(mxyz(3))
+  norml1 = mx+my+mz
+  mx = mx/norml1;     my = my/norml1;     mz = mz/norml1
+  !***
+  !     *(3)*  
+  !***
+  ! the factor is 32 because grad ls=(1,0,0) gives mx=32.
+  alpha = 32.d0*stencil3x3(0,0,0)/norml1   
+  !***
+  !     *(4)*  
+  !***
+  alpha = alpha + 0.5d0
+  !***
+  !     *(5)*  
+  !***
+  if(alpha.ge.1.d0) then 
+     c = 1.d0
+  else if (alpha.le.0.d0) then
+     c = 0.d0
+  else 
+     c = fl3d(mx,my,mz,alpha,zero,one)
+  end if
   return
-end subroutine levelset2vof
-!
-!
+end subroutine local_ls2vof
 !
 ! *-----------------------------------------------------* 
 ! *  MYC - Mixed Youngs and Central Scheme              *
@@ -1067,30 +1049,8 @@ subroutine mycs(c,mxyz)
   if (t2 > t0) cn = 2
 
   ! Youngs-CIAM scheme */  
-
-  m1 = c(0,0,0) + c(0,2,0) + c(0,0,2) + c(0,2,2) +&
-       2.*(c(0,0,1) + c(0,2,1) + c(0,1,0) + c(0,1,2)) +&
-       4.*c(0,1,1)
-  m2 = c(2,0,0) + c(2,2,0) + c(2,0,2) + c(2,2,2) +&
-       2.*(c(2,0,1) + c(2,2,1) + c(2,1,0) + c(2,1,2)) +&
-       4.*c(2,1,1)
-  m(3,0) = m1-m2
-
-  m1 = c(0,0,0) + c(0,0,2) + c(2,0,0) + c(2,0,2) +&
-       2.*( c(0,0,1) + c(2,0,1) + c(1,0,0) + c(1,0,2)) +&
-       4.*c(1,0,1)
-  m2 = c(0,2,0) + c(0,2,2) + c(2,2,0) + c(2,2,2) +&
-       2.*(c(0,2,1) + c(2,2,1) + c(1,2,0) + c(1,2,2)) +&
-       4.*c(1,2,1)
-  m(3,1) = m1-m2
-
-  m1 = c(0,0,0) + c(0,2,0) + c(2,0,0) + c(2,2,0) +&
-       2.*(c(0,1,0) + c(2,1,0) + c(1,0,0) + c(1,2,0)) +&
-       4.*c(1,1,0)
-  m2 = c(0,0,2) + c(0,2,2) + c(2,0,2) + c(2,2,2) +&
-       2.*(c(0,1,2) + c(2,1,2) + c(1,0,2) + c(1,2,2)) +&
-       4.*c(1,1,2)
-  m(3,2) = m1-m2
+  
+  call fd32(c,m(3,0:2))
 
   ! normalize the set (mx,my,mz): |mx|+|my|+|mz| = 1 
 
@@ -1115,3 +1075,52 @@ subroutine mycs(c,mxyz)
 
   return 
   end subroutine mycs
+!
+! *----------------------------------------------------------------* 
+! *  FD32 - Youngs Finite Difference Gradient Scheme scaled by 32  *
+! *----------------------------------------------------------------*
+! 
+!
+!Known problems: the index (1,1,1), i.e. the central cell
+!in the block, never occurs:
+!Therefore an isolated droplet will have
+!a normal with all components to zero. 
+!
+!Ruben
+!
+!
+! Translated into f90 by Stephane Z.
+!
+subroutine fd32(c,mm)
+  !***
+  implicit none
+  real(8), intent(inout) :: c(0:2,0:2,0:2)
+  real(8), intent(inout) :: mm(0:2)
+  real(8) :: m1,m2
+
+  m1 = c(0,0,0) + c(0,2,0) + c(0,0,2) + c(0,2,2) +&
+       2.d0*(c(0,0,1) + c(0,2,1) + c(0,1,0) + c(0,1,2)) +&
+       4.d0*c(0,1,1)
+  m2 = c(2,0,0) + c(2,2,0) + c(2,0,2) + c(2,2,2) +&
+       2.d0*(c(2,0,1) + c(2,2,1) + c(2,1,0) + c(2,1,2)) +&
+       4.d0*c(2,1,1)
+  mm(0) = m1-m2
+
+  m1 = c(0,0,0) + c(0,0,2) + c(2,0,0) + c(2,0,2) +&
+       2.d0*(c(0,0,1) + c(2,0,1) + c(1,0,0) + c(1,0,2)) +&
+       4.d0*c(1,0,1)
+  m2 = c(0,2,0) + c(0,2,2) + c(2,2,0) + c(2,2,2) +&
+       2.d0*(c(0,2,1) + c(2,2,1) + c(1,2,0) + c(1,2,2)) +&
+       4.d0*c(1,2,1)
+  mm(1) = m1-m2
+
+  m1 = c(0,0,0) + c(0,2,0) + c(2,0,0) + c(2,2,0) +&
+       2.d0*(c(0,1,0) + c(2,1,0) + c(1,0,0) + c(1,2,0)) +&
+       4.d0*c(1,1,0)
+  m2 = c(0,0,2) + c(0,2,2) + c(2,0,2) + c(2,2,2) +&
+       2.d0*(c(0,1,2) + c(2,1,2) + c(1,0,2) + c(1,2,2)) +&
+       4.d0*c(1,1,2)
+  mm(2) = m1-m2
+
+  return 
+  end subroutine fd32
