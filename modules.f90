@@ -635,8 +635,8 @@ module module_BC
     if(first_time) then
       first_time=.false.
       jlen=jmax-jmin+1; klen=kmax-kmin+1; !ilen=ngh
-      call para_type_block3a(imin, imax, jmin, jmax, 1, jlen, klen, MPI_INTEGER2, face(1))
-      call para_type_block3a(imin, imax, jmin, jmax, 2, jlen, klen, MPI_INTEGER2, face(2))
+      call para_type_block3a(imin, imax, jmin, jmax, 1, jlen, klen, MPI_INTEGER, face(1))
+      call para_type_block3a(imin, imax, jmin, jmax, 2, jlen, klen, MPI_INTEGER, face(2))
       call MPI_CART_SHIFT(MPI_COMM_CART, 0, 1, srcR, destR, ierr)
       call MPI_CART_SHIFT(MPI_COMM_CART, 0,-1, srcL, destL, ierr)
     endif
@@ -664,8 +664,8 @@ module module_BC
     if(first_time)then
       first_time=.false.
       klen=kmax-kmin+1; ilen=imax-imin+1; !jlen=ngh
-      call para_type_block3a(imin, imax, jmin, jmax, ilen, 1, klen, MPI_INTEGER2, face(1))
-      call para_type_block3a(imin, imax, jmin, jmax, ilen, 2, klen, MPI_INTEGER2, face(2))
+      call para_type_block3a(imin, imax, jmin, jmax, ilen, 1, klen, MPI_INTEGER, face(1))
+      call para_type_block3a(imin, imax, jmin, jmax, ilen, 2, klen, MPI_INTEGER, face(2))
       call MPI_CART_SHIFT(MPI_COMM_CART, 1, 1, srcR, destR, ierr)
       call MPI_CART_SHIFT(MPI_COMM_CART, 1,-1, srcL, destL, ierr)
     endif
@@ -693,8 +693,8 @@ module module_BC
     if(first_time)then
       first_time=.false.
       ilen=imax-imin+1; jlen=jmax-jmin+1; !klen=ngh
-      call para_type_block3a(imin, imax, jmin, jmax, ilen, jlen, 1, MPI_INTEGER2, face(1))
-      call para_type_block3a(imin, imax, jmin, jmax, ilen, jlen, 2, MPI_INTEGER2, face(2))
+      call para_type_block3a(imin, imax, jmin, jmax, ilen, jlen, 1, MPI_INTEGER, face(1))
+      call para_type_block3a(imin, imax, jmin, jmax, ilen, jlen, 2, MPI_INTEGER, face(2))
       call MPI_CART_SHIFT(MPI_COMM_CART, 2, 1, srcR, destR, ierr)
       call MPI_CART_SHIFT(MPI_COMM_CART, 2,-1, srcL, destL, ierr)
     endif
@@ -1530,4 +1530,20 @@ subroutine calcsum_shift(p,porosity,sx,sy,sz)
   endif
   310 format(F17.11)
 end subroutine calcsum_shift
+!-------------------------------------------------------------------------------------------------
 
+function calc_imax(f)
+  use module_grid
+  integer calc_imax
+  integer, dimension(imin:imax,jmin:jmax,kmin:kmax),  intent(in) :: f
+  integer :: i,j,k
+  calc_imax=-2147483647
+  do k=kmin,kmax
+     do j=jmin,jmax
+        do i=imin,imax
+           calc_imax = max(calc_imax,f(i,j,k))
+        enddo
+     enddo
+  enddo
+  end function calc_imax
+ 
