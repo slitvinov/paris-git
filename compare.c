@@ -41,9 +41,20 @@ int main (int argc, char * argv[])
   while((returnscan1 = fscanf(fd1,"%g %g",x1,y1)) != EOF && nlines < MAXLINES && (returnscan2 = fscanf(fd2,"%g %g",x2,y2)) )
     { 
       nlines++;
-      if(returnscan1 < 2 || returnscan2 < 2) 
+      if(returnscan1 < 2 ) 
 	{ 
-	  fprintf(stderr,"%s: error on line %d counted %d %d items\n",argv[0],nlines,returnscan1,returnscan2);
+	  fprintf(stderr,"In directory "); system("pwd");
+	  fprintf(stderr,"%s: error on line %d \n"
+		  "counted only %d item instead of at least 2 in file %s\n", 
+		  argv[0],nlines,returnscan1,argv[1]);
+	  exit(2); 
+	}
+      if(returnscan2 < 2) 
+	{ 
+	  fprintf(stderr,"In directory "); system("pwd");
+	  fprintf(stderr,"%s: error on line %d \n"
+		  "counted only %d item instead of at least 2 in file %s\n", 
+		  argv[0],nlines,returnscan2,argv[2]);
 	  exit(2); 
 	}
       //      printf("%g %g %g %g\n",*x1,*y1,*x2,*y2);

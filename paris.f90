@@ -127,7 +127,6 @@ Program paris
   if(HYPRE .and. rank==0) write(*  ,*)'hypre initialized'
   
   call InitCondition
-  call hello_coucou()
   if(U_init == 0.) stop "missing U_init"
   if(rank<nPdomain) then
 !-------------------------------------------------------------------------------------------------
@@ -143,7 +142,6 @@ Program paris
         call write_vec_gnuplot(u,v,w,itimestep)
         call calcstats
         if(rank==0) then
-           call hello_coucou()
            end_time =  MPI_WTIME()
            open(unit=121,file='stats',access='append')
            write(121,'(20es14.6e2)')time,stats(1:12),dpdx,(stats(8)-stats(9))/dt,end_time-start_time

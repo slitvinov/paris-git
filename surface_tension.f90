@@ -3,11 +3,12 @@
 ! Paris-0.1
 ! Extended from Code: FTC3D2011 (Front Tracking Code for 3D simulations)
 ! and Surfer. 
-! 
-! Authors: Sadegh Dabiri, Gretar Tryggvason
-! author for VOF extenstions Stephane Zaleski (zaleski@dalembert.upmc.fr) 
-! Contact: sdabiri@gmail.com
 !
+! Authors:
+! 
+!   Sadegh Dabiri (sdabiri@gmail.com), Gretar Tryggvason
+!   Stephane Zaleski (zaleski@dalembert.upmc.fr) and Yue Ling (ling.stanley@gmail.com)
+! 
 ! This program is free software; you can redistribute it and/or
 ! modify it under the terms of the GNU General Public License as
 ! published by the Free Software Foundation; either version 2 of the
@@ -40,10 +41,6 @@ module module_surface_tension
 
    ! 4th index: 1 for positive height in x, 2 for negative height in x
    !            3 for positive height in y, 4 for negative height in y, etc... 
- integer, dimension(:,:,:), allocatable :: vof_flag ! 
-  !   0 empty
-  !   1 full
-  !   2 fractional
   integer, dimension(:,:,:,:), allocatable :: ixheight ! HF flags
 
 
@@ -59,7 +56,7 @@ contains
 !=================================================================================================
   subroutine initialize_surface_tension()
     allocate(  n1(imin:imax,jmin:jmax,kmin:kmax), n2(imin:imax,jmin:jmax,kmin:kmax),  &
-               n3(imin:imax,jmin:jmax,kmin:kmax), vof_flag(imin:imax,jmin:jmax,kmin:kmax), &
+               n3(imin:imax,jmin:jmax,kmin:kmax), &
                height(imin:imax,jmin:jmax,kmin:kmax,6))
       if(nx.ge.500000.or.ny.gt.500000.or.nz.gt.500000) then
          stop 'nx too large'
@@ -89,26 +86,6 @@ contains
          enddo
       enddo
    end subroutine get_normals
-
-  subroutine get_flags()
-     integer :: i,j,k
-     if(.not.st_initialized) call initialize_surface_tension()
-     st_initialized=.true.
-     if(ng.lt.2) stop "wrong ng"
-     do k=kmin,kmax
-        do j=jmin,jmax
-           do i=imin,imax
-              if(cvof(i,j,k).le.0.d0) then
-                 vof_flag(i,j,k) = 0
-              else if(cvof(i,j,k).ge.1.d0) then
-                 vof_flag(i,j,k) = 1
-              else
-                 vof_flag(i,j,k) = 2
-              endif
-           enddo
-        enddo
-     enddo
-   end subroutine get_flags
 
    subroutine get_all_heights
      include 'mpif.h'
@@ -1089,21 +1066,15 @@ contains
 
    subroutine test_VOF_HF()
      implicit none
-     include 'mpif.h'
-     integer :: i,j,k,ierr
-     real(8) :: kappa
-     integer :: IndexCurv
+     integer :: calc_imax
 
-     call get_flags()
      call get_all_heights()
-
      if(test_heights) then
         call output_heights()
      else if(test_curvature .or. test_curvature_2D) then
         call output_curvature()
      end if
   end subroutine test_VOF_HF
-
 
 !=========================================================================================================
 !

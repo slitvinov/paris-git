@@ -31,6 +31,12 @@ module module_VOF
   use module_tmpvar
   implicit none
   real(8), dimension(:,:,:), allocatable :: cvof ! VOF tracer variable
+  integer, dimension(:,:,:), allocatable :: vof_flag ! 
+  !   0 empty
+  !   1 full
+  !   2 fractional
+  !   3 unknown
+
   real(8) :: A_h = 2d0  ! For initialisation 
   character(20) :: vofbdry_cond(3),test_type,vof_advect
   integer :: parameters_read=0
@@ -90,8 +96,9 @@ contains
           stop
        endif
     endif
-    allocate(cvof(imin:imax,jmin:jmax,kmin:kmax))
+    allocate(cvof(imin:imax,jmin:jmax,kmin:kmax),vof_flag(imin:imax,jmin:jmax,kmin:kmax))
     cvof = 0.D0
+    vof_flag = 3
     if(test_type=='uniform_advection') then
        test_heights = .false.
     else if(test_type=='height_test') then
@@ -107,86 +114,145 @@ contains
     endif
     test_HF = test_heights .or. test_curvature .or. test_curvature_2D
     test_LP = test_tag
-
-   end subroutine initialize_VOF
+  end subroutine initialize_VOF
 !=================================================================================================
-   subroutine initconditions_VOF()
-     use module_hello
-     use module_flow
-     use module_BC
-     use module_2phase
+!   a hack to get the flags quickly (temporary)
+!=================================================================================================
+  subroutine get_flags()
+    integer :: i,j,k
+    if(ng.lt.2) stop "wrong ng"
+    do k=kmin,kmax
+       do j=jmin,jmax
+          do i=imin,imax
+             if(cvof(i,j,k).le.0.d0) then
+                vof_flag(i,j,k) = 0
+             else if(cvof(i,j,k).ge.1.d0) then
+                vof_flag(i,j,k) = 1
+             else
+                vof_flag(i,j,k) = 2
+             endif
+          enddo
+       enddo
+    enddo
+  end subroutine get_flags
+  !=================================================================================================
+  !  Initialize vof field and flags
+  !=================================================================================================
+  subroutine initconditions_VOF()
+    use module_hello
+    use module_flow
+    use module_BC
+    use module_2phase
 
-     implicit none
-     include 'mpif.h'
-     integer :: ierr, irank, req(12),sta(MPI_STATUS_SIZE,12)
-     integer :: ngh=2
-     integer :: ipar=0
+    implicit none
+    include 'mpif.h'
+    integer :: ierr, irank, req(12),sta(MPI_STATUS_SIZE,12)
+    integer :: ngh=2
+    integer :: ipar=0
+    integer calc_imax
 
-     if(test_heights) then
-         call levelset2vof(wave2ls,ipar)
-      else 
-         if(test_curvature_2D) ipar=-3  ! cylinder in -ipar direction otherwise spheres
-         call levelset2vof(shapes2ls,ipar)
-      endif
-      call ghost_x(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
-      call ghost_y(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
-      call ghost_z(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
-      call setVOFBC(cvof)
-      return
-    end subroutine initconditions_VOF
-    !=================================================================================================
-    !   Spheres and cylinders
-    !=================================================================================================
-    function shapes2ls(xx,yy,zz,ipar)
-      use module_2phase
-      implicit none
-      real(8), intent(in) :: xx,zz,yy
-      integer, intent(in) :: ipar
-      real(8) :: a, cdir(0:3), shapes2ls
-      integer ib
- 
-      if(.not.(-3<=ipar.and.ipar<=1)) call pariserror("invalid ipar")
-      cdir = 1.d0
-      cdir(-ipar) = 0.d0
-      shapes2ls = -2.d6
-      if(ipar < 0.and.NumBubble/=1) call pariserror("invalid NumBubbles")
-      do ib=1,NumBubble
-         a = rad(ib)**2 - (cdir(ib)*(xx-xc(1))**2+cdir(2)*(yy-yc(ib))**2+cdir(3)*(zz-zc(ib))**2)
-         shapes2ls = MAX(shapes2ls,a)
-      end do
-    end function shapes2ls
-    !=================================================================================================
-    !  sine-wave interface
-    !=================================================================================================
-    function wave2ls(xx,yy,zz,ipar)
-      use module_2phase
-      implicit none
-      real(8) wave2ls
-      real(8), intent(in) :: xx,zz,yy
-      integer, intent(in) :: ipar
-      wave2ls = - zz + zlength/2.d0  + A_h*dx(nx/2)*cos(2.*3.14159*xx/xlength) 
-    end function wave2ls
-         
-    !=================================================================================================
-    !   Converts a level-set field into a VOF field
-    !=================================================================================================
-    subroutine levelset2vof(lsfunction,ipar)
-      implicit none
-      real(8), external :: lsfunction
-      integer :: ipar
-      real(8) :: stencil3x3(-1:1,-1:1,-1:1)
-      integer :: i,j,k,i0,j0,k0
-      
-      do k=ks,ke; do j=js,je; do i=is,ie
-         do i0=-1,1; do j0=-1,1; do k0=-1,1
-            stencil3x3(i0,j0,k0) = lsfunction(x(i+i0),y(j+j0),z(k+k0),ipar)
-         enddo; enddo; enddo
-         call local_ls2vof(stencil3x3,cvof(i,j,k))
-      enddo; enddo; enddo
-      return
-    end subroutine levelset2vof
-    !=================================================================================================
-    subroutine c_mask(cbinary)
+    if(test_heights) then
+       call levelset2vof(wave2ls,ipar)
+    else 
+       if(test_curvature_2D) ipar=-3  ! cylinder in -ipar direction otherwise spheres
+       call levelset2vof(shapes2ls,ipar)
+    endif
+    call ghost_x(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+    call ghost_y(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+    call ghost_z(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+    call setVOFBC(cvof,vof_flag)
+    return
+  end subroutine initconditions_VOF
+  !=================================================================================================
+  !   Spheres and cylinders
+  !=================================================================================================
+  function shapes2ls(xx,yy,zz,ipar)
+    use module_2phase
+    implicit none
+    real(8), intent(in) :: xx,zz,yy
+    integer, intent(in) :: ipar
+    real(8) :: a, cdir(0:3), shapes2ls
+    integer ib
+
+    if(.not.(-3<=ipar.and.ipar<=1)) call pariserror("invalid ipar")
+    cdir = 1.d0
+    cdir(-ipar) = 0.d0
+    shapes2ls = -2.d6
+    if(ipar < 0.and.NumBubble/=1) call pariserror("invalid NumBubbles")
+    do ib=1,NumBubble
+       a = rad(ib)**2 - (cdir(ib)*(xx-xc(1))**2+cdir(2)*(yy-yc(ib))**2+cdir(3)*(zz-zc(ib))**2)
+       shapes2ls = MAX(shapes2ls,a)
+    end do
+  end function shapes2ls
+  !=================================================================================================
+  !  sine-wave interface
+  !=================================================================================================
+  function wave2ls(xx,yy,zz,ipar)
+    use module_2phase
+    implicit none
+    real(8) wave2ls
+    real(8), intent(in) :: xx,zz,yy
+    integer, intent(in) :: ipar
+    wave2ls = - zz + zlength/2.d0  + A_h*dx(nx/2)*cos(2.*3.14159*xx/xlength) 
+  end function wave2ls
+
+  !=================================================================================================
+  !   Converts a level-set field into a VOF field
+  !=================================================================================================
+  subroutine levelset2vof(lsfunction,ipar)
+    implicit none
+    real(8), external :: lsfunction
+    integer, intent(in) :: ipar
+    integer :: one=1
+    call ls2vof_refined(lsfunction,ipar,one)
+  end subroutine levelset2vof
+
+  subroutine ls2vof_refined(lsfunction,ipar,n1)
+    implicit none
+    real(8), external :: lsfunction
+    integer, intent(in) :: ipar,n1
+    real(8) :: stencil3x3(-1:1,-1:1,-1:1),dx1,dy1,dz1,x0,y0,z0,x1,y1,z1,a,b
+    integer :: i,j,k,i0,j0,k0,l,m,n,s
+    integer :: nfrac,nflag,nfull
+    do k=kmin,kmax; do j=jmin,jmax; do i=imin,imax
+       dx1 = dx(i)/n1; dy1 = dy(j)/n1; dz1 = dz(k)/n1
+       nfrac=0; nfull=0
+       b=0.d0
+       s=n1/2
+       do l=-s,s; do m=-s,s; do n=-s,s
+          x0 = x(i) + dx1*l
+          y0 = y(j) + dy1*m
+          z0 = z(k) + dz1*n
+          do i0=-1,1; do j0=-1,1; do k0=-1,1
+             x1 = x0 + i0*dx1; y1 = y0 + j0*dy1; z1 = z0 + k0*dz1 
+             stencil3x3(i0,j0,k0) = lsfunction(x1,y1,z1,ipar)
+          enddo; enddo; enddo
+          call ls2vof_in_cell(stencil3x3,a,nflag)
+          if(nflag==2) then 
+             nfrac = nfrac+1
+          else if(nflag==1) then
+             nfull = nfull + 1
+          endif
+          b=b+a   ! *(1)*
+       enddo; enddo; enddo
+       cvof(i,j,k) = b/(n1**3)
+       if(nfrac > 0) then
+          vof_flag(i,j,k) = 2
+          ! now either all full, all empty, or mix full/empty : 
+       else if(nfull==n1**3) then ! all full
+          vof_flag(i,j,k) = 1
+          cvof(i,j,k) = 1.d0  ! because arithmetic at (1) may cause round off errors
+       else if(nfull==0) then  ! all empty
+          vof_flag(i,j,k) = 0
+          cvof(i,j,k) = 0.d0  ! paranoid programming.
+       else ! mix of full and empty
+          vof_flag(i,j,k) = 2
+       end if
+    enddo; enddo; enddo
+    return
+  end subroutine ls2vof_refined
+  !=================================================================================================
+  subroutine c_mask(cbinary)
     implicit none
     real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(out) :: cbinary
 
@@ -196,7 +262,7 @@ contains
        cbinary = 0.d0
     end where
   end subroutine c_mask
-!=================================================================================================
+  !=================================================================================================
   subroutine vofsweeps(tswap)
     use module_BC
     use module_flow
@@ -209,69 +275,102 @@ contains
 
     if (VOF_advect=='Dick_Yue') call c_mask(work(:,:,:,2))
     if (MOD(tswap,3) .eq. 0) then
-       call swp(w,cvof,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3),3)
+       call swp(w,cvof,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3),vof_flag,3)
        call ghost_x(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
        call ghost_y(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
        call ghost_z(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+       call ighost_x(vof_flag,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+       call ighost_y(vof_flag,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+       call ighost_z(vof_flag,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
 
-       call swp(u,cvof,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3),1)
+       call swp(u,cvof,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3),vof_flag,1)
        call ghost_x(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
        call ghost_y(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
        call ghost_z(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+       call ighost_x(vof_flag,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+       call ighost_y(vof_flag,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+       call ighost_z(vof_flag,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
 
-       call swp(v,cvof,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3),2)
+       call swp(v,cvof,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3),vof_flag,2)
        call ghost_x(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
        call ghost_y(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
        call ghost_z(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+       call ighost_x(vof_flag,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+       call ighost_y(vof_flag,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+       call ighost_z(vof_flag,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+
     elseif (MOD(tswap,2) .eq. 0) then
-       call swp(v,cvof,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3),2)
+       call swp(v,cvof,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3),vof_flag,2)
        call ghost_x(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
        call ghost_y(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
        call ghost_z(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+       call ighost_x(vof_flag,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+       call ighost_y(vof_flag,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+       call ighost_z(vof_flag,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
 
-       call swp(w,cvof,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3),3)
+       call swp(w,cvof,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3),vof_flag,3)
        call ghost_x(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
        call ghost_y(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
        call ghost_z(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+       call ighost_x(vof_flag,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+       call ighost_y(vof_flag,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+       call ighost_z(vof_flag,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
 
-       call swp(u,cvof,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3),1)
+       call swp(u,cvof,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3),vof_flag,1)
        call ghost_x(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
        call ghost_y(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
        call ghost_z(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+       call ighost_x(vof_flag,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+       call ighost_y(vof_flag,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+       call ighost_z(vof_flag,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
     else 
-       call swp(u,cvof,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3),1)
+       call swp(u,cvof,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3),vof_flag,1)
        call ghost_x(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
        call ghost_y(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
        call ghost_z(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+       call ighost_x(vof_flag,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+       call ighost_y(vof_flag,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+       call ighost_z(vof_flag,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
 
-       call swp(v,cvof,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3),2)
+       call swp(v,cvof,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3),vof_flag,2)
        call ghost_x(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
        call ghost_y(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
        call ghost_z(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+       call ighost_x(vof_flag,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+       call ighost_y(vof_flag,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+       call ighost_z(vof_flag,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
 
-       call swp(w,cvof,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3),3)
+       call swp(w,cvof,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3),vof_flag,3)
        call ghost_x(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
        call ghost_y(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
        call ghost_z(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+       call ighost_x(vof_flag,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+       call ighost_y(vof_flag,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+       call ighost_z(vof_flag,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
     endif
   end subroutine vofsweeps
 !=================================================================================================
 ! subroutine SetVOFBC: Sets the VOF fraction boundary condition
 !-------------------------------------------------------------------------------------------------
-  subroutine SetVOFBC(c)
+  subroutine SetVOFBC(c,f)
     use module_grid
     implicit none
     include 'mpif.h'
     real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: c
+    integer, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: f
 
     if(vofbdry_cond(1)=='wet') then
        if(coords(1)==0    ) then
           c(is-1,:,:)=1.0
           c(is-2,:,:)=1.0
+          f(is-1,:,:)=1
+          f(is-2,:,:)=1
        endif
        if(coords(1)==nPx-1) then
           c(ie+1,:,:)=1.0
           c(ie+2,:,:)=1.0
+          f(ie+1,:,:)=1
+          f(ie+2,:,:)=1
        endif
     elseif (vofbdry_cond(1)=='90deg') then
        call pariserror('90deg not implemented')
@@ -281,10 +380,14 @@ contains
        if(coords(2)==0    ) then
           c(:,js-1,:)=1.0
           c(:,js-2,:)=1.0
+          f(:,js-1,:)=1
+          f(:,js-2,:)=1
        endif
        if(coords(2)==nPy-1) then
           c(:,je+1,:)=1.0
           c(:,je+2,:)=1.0
+          f(:,je+1,:)=1
+          f(:,je+2,:)=1
        endif
     elseif (vofbdry_cond(2)=='90deg') then
        call pariserror('90deg not implemented')
@@ -294,10 +397,14 @@ contains
        if(coords(3)==0    ) then
           c(:,:,ks-1)=1.0
           c(:,:,ks-2)=1.0
+          f(:,:,ks-1)=1
+          f(:,:,ks-2)=1
        endif
        if(coords(3)==nPz-1) then
           c(:,:,ke+1)=1.0
           c(:,:,ke+2)=1.0
+          f(:,:,ke+1)=1
+          f(:,:,ke+2)=1
        endif
     elseif (vofbdry_cond(2)=='90deg') then
        call pariserror('90deg not implemented')
@@ -306,7 +413,7 @@ contains
   end subroutine SetVOFBC
 !=================================================================================================
 end module module_vof
-
+!=================================================================================================
 !-------------------------------------------------------------------------------------------------
 module module_output_vof
   use module_IO
@@ -334,11 +441,11 @@ contains
  11 format(A)
     enddo
   end subroutine  append_VOF_visit_file
-
+!=================================================================================================
   subroutine close_VOF_visit_file()
     close(88)
   end subroutine close_VOF_visit_file
-
+!=================================================================================================
   subroutine output_VOF(nf,i1,i2,j1,j2,k1,k2)
     implicit none
     integer ::nf,i1,i2,j1,j2,k1,k2,i,j,k
@@ -379,32 +486,36 @@ contains
 310 format(e14.5,e14.5,e14.5)
     close(8)
 end subroutine output_VOF
-!-------------------------------------------------------------------------------------------------
 !=================================================================================================
+!-------------------------------------------------------------------------------------------------
 end module module_output_vof
-!
-subroutine swp(us,c,vof1,vof2,vof3,d)
+!-------------------------------------------------------------------------------------------------
+! 
+!-------------------------------------------------------------------------------------------------
+subroutine swp(us,c,vof1,vof2,vof3,f,d)
   use module_vof
   implicit none
   real (8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: us
   integer, intent(in) :: d
   real (8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: c,vof1,vof2,vof3
+  integer, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: f
   if (VOF_advect=='Dick_Yue') then
-     call swpr(us,c,vof1,vof2,vof3,d)
+     call swpr(us,c,vof1,vof2,vof3,f,d)
   elseif (VOF_advect=='CIAM') then
-     call swpz(us,c,vof1,vof2,vof3,d)
+     call swpz(us,c,vof1,vof2,vof3,f,d)
   else
-     CALL PARISERROR("*** unknown vof scheme")
+     call pariserror("*** unknown vof scheme")
   endif
 end subroutine swp
-
-!  Implements the CIAM advection method of Jie Li. 
+!
+!  Implements the CIAM (Lagrangian Explicit, onto square)
+!  advection method of Jie Li. 
 ! 
 ! ****** 1 ******* 2 ******* 3 ******* 4 ******* 5 ******* 6 ******* 7 *
 ! split advection of the interface along the x (d=1), y (d=2) and z (d=3)
-! direction
+! directions
 ! ****** 1 ******* 2 ******* 3 ******* 4 ******* 5 ******* 6 ******* 7 *
-subroutine swpz(us,c,vof1,vof2,vof3,d)
+subroutine swpz(us,c,vof1,vof2,vof3,f,d)
   !***
   use module_grid
   use module_flow
@@ -412,8 +523,9 @@ subroutine swpz(us,c,vof1,vof2,vof3,d)
   implicit none
   integer i,j,k,invx,invy,invz
   real (8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: us
+  integer, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: f
   integer, intent(in) :: d
-  real (8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: c,vof1,vof2,vof3
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: c,vof1,vof2,vof3
   real(8) dmx,dmy,dmz,mm1,mm2
   real(8) a1,a2,alpha,al3d,fl3d
   real(8) mxyz(3),stencil3x3(-1:1,-1:1,-1:1)
@@ -545,7 +657,7 @@ subroutine swpz(us,c,vof1,vof2,vof3,d)
      enddo
   enddo
   !*(2)*
-  call setvofbc(c)
+  call setvofbc(c,f)
   !***
 end subroutine swpz
 !
@@ -557,7 +669,7 @@ end subroutine swpz
 ! Journal of Computational Physics 229, no. 8 (April 2010): 2853-2865. doi:10.1016/j.jcp.2009.12.018.
 !=================================================================================================
 !=================================================================================================
-SUBROUTINE swpr(us,c,vof1,cg,vof3,dir)
+SUBROUTINE swpr(us,c,vof1,cg,vof3,f,dir)
 !***
     USE module_grid
     USE module_flow
@@ -569,6 +681,7 @@ SUBROUTINE swpr(us,c,vof1,cg,vof3,dir)
     INTEGER, INTENT(IN) :: dir
     REAL (8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), INTENT(IN) :: us,cg
     REAL (8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), INTENT(INOUT) :: c,vof1,vof3
+    integer, dimension(imin:imax,jmin:jmax,kmin:kmax),  intent(inout) :: f
     REAL(8), TARGET :: dmx,dmy,dmz,dxyz
     REAL(8), POINTER :: dm1,dm2,dm3
     REAL(8) :: EPSC,a1,a2,alpha,AL3D,FL3D
@@ -655,7 +768,7 @@ SUBROUTINE swpr(us,c,vof1,cg,vof3,dir)
      enddo
   enddo
   ! apply proper boundary conditions to c
-  call setvofbc(c)
+  call setvofbc(c,f)
 end subroutine swpr
 !=================================================================================================
 !=================================================================================================
@@ -795,9 +908,10 @@ function fl3d(m1,m2,m3,alpha,r0,dr0)
   return
 end function fl3d
 
-subroutine local_ls2vof(stencil3x3,c)
+subroutine ls2vof_in_cell(stencil3x3,c,nflag)
   implicit none
   real(8), intent(out):: c
+  integer, intent(out):: nflag
   real(8) :: zero, one, norml1
   real(8) :: mx,my,mz,alpha
   real(8) :: fl3d
@@ -833,13 +947,16 @@ subroutine local_ls2vof(stencil3x3,c)
   !***
   if(alpha.ge.1.d0) then 
      c = 1.d0
+     nflag = 1
   else if (alpha.le.0.d0) then
      c = 0.d0
+     nflag = 0 
   else 
      c = fl3d(mx,my,mz,alpha,zero,one)
+     nflag = 2
   end if
   return
-end subroutine local_ls2vof
+end subroutine ls2vof_in_cell
 !
 ! *-----------------------------------------------------* 
 ! *  MYC - Mixed Youngs and Central Scheme              *
