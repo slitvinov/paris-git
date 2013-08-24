@@ -4,10 +4,11 @@
 ! Extended from Code: FTC3D2011 (Front Tracking Code for 3D simulations)
 ! and Surfer. 
 ! 
-! Authors: Sadegh Dabiri, Gretar Tryggvason
-! author for VOF extenstions Stephane Zaleski (zaleski@dalembert.upmc.fr) 
-! Contact: sdabiri@gmail.com
-!
+! Authors:
+! 
+!   Sadegh Dabiri (sdabiri@gmail.com), Gretar Tryggvason
+!   Stephane Zaleski (zaleski@dalembert.upmc.fr) and Yue Ling (ling.stanley@gmail.com)
+! 
 ! This program is free software; you can redistribute it and/or
 ! modify it under the terms of the GNU General Public License as
 ! published by the Free Software Foundation; either version 2 of the
