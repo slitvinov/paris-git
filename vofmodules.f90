@@ -476,58 +476,62 @@ contains
     include 'mpif.h'
     real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: c
     integer, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: f
+    integer :: fb(3),i
+    
+    do i=1,3
+       if(vofbdry_cond(i)=='wet') then
+          fb(i)=1
+       else if(vofbdry_cond(i)=='dry') then
+          fb(i)=0
+       else if(vofbdry_cond(i)=='periodic') then
+          fb(i) = 3 ! ghostxxx will take care of this, skip this case
+       else
+          call pariserror("this vofbc not implemented")
+       endif
+    enddo
 
-    if(vofbdry_cond(1)=='wet') then
+    if(fb(1)/=3) then
        if(coords(1)==0    ) then
-          c(is-1,:,:)=1.0
-          c(is-2,:,:)=1.0
-          f(is-1,:,:)=1
-          f(is-2,:,:)=1
+          c(is-1,:,:)=real(fb(1))
+          c(is-2,:,:)=real(fb(1))
+          f(is-1,:,:)=fb(1)
+          f(is-2,:,:)=fb(1)
        endif
        if(coords(1)==nPx-1) then
-          c(ie+1,:,:)=1.0
-          c(ie+2,:,:)=1.0
-          f(ie+1,:,:)=1
-          f(ie+2,:,:)=1
+          c(ie+1,:,:)=real(fb(1))
+          c(ie+2,:,:)=real(fb(1))
+          f(ie+1,:,:)=fb(1)
+          f(ie+2,:,:)=fb(1)
        endif
-    elseif (vofbdry_cond(1)=='90deg') then
-       call pariserror('90deg not implemented')
     endif
-
-    if(vofbdry_cond(2)=='wet') then
+    if(fb(2)/=3) then
        if(coords(2)==0    ) then
-          c(:,js-1,:)=1.0
-          c(:,js-2,:)=1.0
-          f(:,js-1,:)=1
-          f(:,js-2,:)=1
+          c(:,js-1,:)=real(fb(2))
+          c(:,js-2,:)=real(fb(2))
+          f(:,js-1,:)=fb(2)
+          f(:,js-2,:)=fb(2)
        endif
        if(coords(2)==nPy-1) then
-          c(:,je+1,:)=1.0
-          c(:,je+2,:)=1.0
-          f(:,je+1,:)=1
-          f(:,je+2,:)=1
+          c(:,je+1,:)=real(fb(2))
+          c(:,je+2,:)=real(fb(2))
+          f(:,je+1,:)=fb(2)
+          f(:,je+2,:)=fb(2)
        endif
-    elseif (vofbdry_cond(2)=='90deg') then
-       call pariserror('90deg not implemented')
     endif
-
-    if(vofbdry_cond(3)=='wet')then
+    if(fb(3)/=3) then
        if(coords(3)==0    ) then
-          c(:,:,ks-1)=1.0
-          c(:,:,ks-2)=1.0
-          f(:,:,ks-1)=1
-          f(:,:,ks-2)=1
+          c(:,:,ks-1)=real(fb(3))
+          c(:,:,ks-2)=real(fb(3))
+          f(:,:,ks-1)=fb(3)
+          f(:,:,ks-2)=fb(3)
        endif
        if(coords(3)==nPz-1) then
-          c(:,:,ke+1)=1.0
-          c(:,:,ke+2)=1.0
-          f(:,:,ke+1)=1
-          f(:,:,ke+2)=1
+          c(:,:,ke+1)=real(fb(3))
+          c(:,:,ke+2)=real(fb(3))
+          f(:,:,ke+1)=fb(3)
+          f(:,:,ke+2)=fb(3)
        endif
-    elseif (vofbdry_cond(2)=='90deg') then
-       call pariserror('90deg not implemented')
     endif
-
   end subroutine SetVOFBC
 !=================================================================================================
 end module module_vof

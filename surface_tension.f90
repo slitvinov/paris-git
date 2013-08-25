@@ -478,13 +478,13 @@ contains
       end do ! d
    end subroutine get_local_heights
 
-   subroutine get_curvature(i0,j0,k0,kappa,indexCurv)
+   subroutine get_curvature(i0,j0,k0,kappa,indexCurv,nfound)
       implicit none
       integer, intent(in) :: i0,j0,k0
       real(8), intent(out) :: kappa  
-      integer, intent(out) :: indexCurv
+      integer, intent(out) :: indexCurv, nfound
 
-      integer :: nfound,d,indexfound
+      integer :: d,indexfound
       real(8) :: h(-1:1,-1:1),a(6)
       integer :: nCentroids
 
@@ -654,7 +654,7 @@ contains
          do i=is,ie; do j=js,je; do k=ks,ke
             ! find curvature only for cut cells
             if (vof_flag(i,j,k) == 2 ) then 
-               call get_curvature(i,j,k,kappa,indexCurv)
+               call get_curvature(i,j,k,kappa,indexCurv,nfound)
                kappa = kappa*dble(Nx)
                kappamax = max(ABS(kappa),kappamax)
                kappamin = min(ABS(kappa),kappamin)
@@ -663,7 +663,7 @@ contains
                write(90,*) angle,kappa_exact
                err_K = ABS(ABS(kappa)-kappa_exact)/kappa_exact
                if ( err_K > 0.1d0 ) &
-                  write(91,'(4(I3,1X),2(E15.8,1X))') i,j,k,indexCurv,kappa,kappa_exact
+                  write(91,'(4(I3,1X),2(E15.8,1X),I2)') i,j,k,indexCurv,kappa,kappa_exact,nfound
             end if ! cvof(i,j,k)
          end do; end do; end do
       else if ( test_curvature_2D) then 
@@ -673,7 +673,7 @@ contains
          Lm_err_h=0.d0;Lm_err_hp=0.d0;Lm_err_hm=0.d0;Lm_err_dh=0.d0;Lm_err_d2h=0.d0;Lm_err_K=0.d0
          do i=is,ie; do j=js,je; do k=ks,ke
             if (vof_flag(i,j,k) == 2 .and. k==(Nz+4)/2) then 
-               call get_curvature(i,j,k,kappa,indexCurv)
+               call get_curvature(i,j,k,kappa,indexCurv,nfound)
                kappa = kappa*dble(Nx)
                kappamax = max(ABS(kappa),kappamax)
                kappamin = min(ABS(kappa),kappamin)

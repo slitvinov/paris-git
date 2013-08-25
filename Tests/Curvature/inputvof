@@ -1,11 +1,11 @@
 &VOFPARAMETERS
 
-VOFBDRY_COND = 'periodic' 'periodic' 'periodic' 
+VOFBDRY_COND = 'dry' 'dry' 'dry' 
                    ! Type of VOF boundary condition in x,y,z direction: 'wet', '90deg','periodic'
 
 TEST_TYPE = 'curvature_test'
 VOF_ADVECT = 'Dick_Yue'
-REFINEMENT = 8
+REFINEMENT = 4
 !=================================================================================================
 
 &end
