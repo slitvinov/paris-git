@@ -61,7 +61,7 @@ module module_hello
   contains
 subroutine hello_coucou
   use module_grid
-  integer :: debug=1
+  integer, parameter  :: debug=1
   if(debug == 1) then 
   if(rank==0) write(6,*) 'coucou ',hello_count, "Process0"
   if(rank==nPdomain) write(6,*) 'coucou ',hello_count, "Front"

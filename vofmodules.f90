@@ -37,9 +37,9 @@ module module_VOF
   !   2 fractional
   !   3 unknown
 
-  real(8) :: A_h = 2d0  ! For initialisation 
+  real(8), parameter  :: A_h = 2d0  ! For initialisation of height test
   character(20) :: vofbdry_cond(3),test_type,vof_advect
-  integer :: parameters_read=0
+  integer :: parameters_read=0, refinement=-1
   logical :: test_heights = .false.  
   logical :: test_curvature = .false.  
   logical :: test_curvature_2D = .false.  
@@ -65,8 +65,9 @@ contains
     include 'mpif.h'
     integer ierr,in
     logical file_is_there
-    namelist /vofparameters/ vofbdry_cond,test_type,VOF_advect
+    namelist /vofparameters/ vofbdry_cond,test_type,VOF_advect,refinement
     in=31
+
     call MPI_COMM_RANK(MPI_COMM_WORLD, rank, ierr)
     inquire(file='inputvof',exist=file_is_there)
     open(unit=in, file='inputvof', status='old', action='read', iostat=ierr)
@@ -81,6 +82,10 @@ contains
        if (rank == 0) STOP "ReadVOFParameters: no 'inputvof' file."
     endif
     close(in)
+    if(refinement==-1) then
+       refinement=8
+       if(rank==0) write(*,*) "using default value for refinement"
+    endif
   end subroutine ReadVOFParameters
 !
   subroutine initialize_VOF
@@ -147,19 +152,27 @@ contains
     implicit none
     include 'mpif.h'
     integer :: ierr, irank, req(12),sta(MPI_STATUS_SIZE,12)
-    integer :: ngh=2
-    integer :: ipar=0
+    integer , parameter :: ngh=2
+    integer :: ipar
     integer calc_imax
 
     if(test_heights) then
+       ipar=2  ! interface invariant in y direction
        call levelset2vof(wave2ls,ipar)
-    else 
+    else if(NumBubble>0) then
+       ipar=0 ! spheres: default
        if(test_curvature_2D) ipar=-3  ! cylinder in -ipar direction otherwise spheres
        call levelset2vof(shapes2ls,ipar)
+    else
+       cvof=0.d0
+       vof_flag=0
     endif
     call ghost_x(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
     call ghost_y(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
     call ghost_z(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+    call ighost_x(vof_flag,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+    call ighost_y(vof_flag,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+    call ighost_z(vof_flag,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
     call setVOFBC(cvof,vof_flag)
     return
   end subroutine initconditions_VOF
@@ -195,17 +208,74 @@ contains
     integer, intent(in) :: ipar
     wave2ls = - zz + zlength/2.d0  + A_h*dx(nx/2)*cos(2.*3.14159*xx/xlength) 
   end function wave2ls
-
   !=================================================================================================
   !   Converts a level-set field into a VOF field
   !=================================================================================================
   subroutine levelset2vof(lsfunction,ipar)
+    use module_BC
     implicit none
     real(8), external :: lsfunction
     integer, intent(in) :: ipar
-    integer :: one=1
-    call ls2vof_refined(lsfunction,ipar,one)
+    include 'mpif.h'
+    integer :: ierr, irank, req(12),sta(MPI_STATUS_SIZE,12)
+    integer , parameter :: ngh=2
+    call ls2vof_refined(lsfunction,ipar,1)
+    call ighost_x(vof_flag,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+    call ighost_y(vof_flag,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+    call ighost_z(vof_flag,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+    call setVOFBC(cvof,vof_flag)
+    call ls2vof_refined(lsfunction,ipar,refinement)
   end subroutine levelset2vof
+  !=================================================================================================
+  !   Finds cells surrounded by all empty or all full cells
+  !=================================================================================================
+  function notisolated(istencil3x3,is2D)
+    implicit none
+    logical :: notisolated
+    integer, intent(in) :: is2D
+    integer :: istencil3x3(-1:1,-1:1,-1:1)
+    integer :: nfrac
+    integer :: nfull
+    integer :: i0,j0,k0
+    integer :: isnot2D, ncells
+
+    nfrac=0; nfull=0; ncells=0
+    isnot2D = 1 - is2D
+!     write(*,*) "isnot2D = ", isnot2D
+!     if(is2D==1) write(*,'(9I1)',advance='no') istencil3x3(:,:,0)
+    do i0=-1,1; 
+       do j0=-1,1; 
+          do k0=-isnot2D,isnot2D
+             nfrac = nfrac + istencil3x3(i0,j0,k0)/2
+             nfull = nfull + mod(istencil3x3(i0,j0,k0),2)
+             ncells = ncells + 1
+          enddo; enddo; enddo
+    notisolated = .not.(nfrac==0.and.(nfull==0.or.nfull==ncells))
+    ! write (*,*) " nfrac,nfull,ncells ",  nfrac,nfull,ncells
+  end function notisolated
+  
+  subroutine map3x3in2x2(i1,j1,k1,i0,j0,k0)
+    implicit none
+    integer, intent(in) :: i0,j0,k0
+    integer, intent(out) :: i1(-1:1,-1:1,3), j1(-1:1,-1:1,3), k1(-1:1,-1:1,3)
+    integer m,n
+    do m=-1,1
+       do n=-1,1
+          !  d=1
+          i1(m,n,1) = i0
+          j1(m,n,1) = m + j0
+          k1(m,n,1) = n + k0
+          ! d=2
+          i1(m,n,2) = m + i0
+          j1(m,n,2) = j0
+          k1(m,n,2) = n + k0
+          ! d=3
+          i1(m,n,3) = m + i0
+          j1(m,n,3) = n + j0
+          k1(m,n,3) = k0 
+       enddo
+    enddo
+  end subroutine map3x3in2x2
 
   subroutine ls2vof_refined(lsfunction,ipar,n1)
     implicit none
@@ -214,41 +284,88 @@ contains
     real(8) :: stencil3x3(-1:1,-1:1,-1:1),dx1,dy1,dz1,x0,y0,z0,x1,y1,z1,a,b
     integer :: i,j,k,i0,j0,k0,l,m,n,s
     integer :: nfrac,nflag,nfull
-    do k=kmin,kmax; do j=jmin,jmax; do i=imin,imax
-       dx1 = dx(i)/n1; dy1 = dy(j)/n1; dz1 = dz(k)/n1
-       nfrac=0; nfull=0
-       b=0.d0
-       s=n1/2
-       do l=-s,s; do m=-s,s; do n=-s,s
-          x0 = x(i) + dx1*l
-          y0 = y(j) + dy1*m
-          z0 = z(k) + dz1*n
-          do i0=-1,1; do j0=-1,1; do k0=-1,1
-             x1 = x0 + i0*dx1; y1 = y0 + j0*dy1; z1 = z0 + k0*dz1 
-             stencil3x3(i0,j0,k0) = lsfunction(x1,y1,z1,ipar)
-          enddo; enddo; enddo
-          call ls2vof_in_cell(stencil3x3,a,nflag)
-          if(nflag==2) then 
-             nfrac = nfrac+1
-          else if(nflag==1) then
-             nfull = nfull + 1
+    integer :: istencil3x3(-1:1,-1:1,-1:1), istencil2x2(-1:1,-1:1)
+    integer :: i1(-1:1,-1:1,3), j1(-1:1,-1:1,3), k1(-1:1,-1:1,3)
+    logical :: refinethis 
+    real(8) :: count
+    integer :: calc_imax
+    integer :: dirselect(0:3), d, is2D
+ 
+!    Some error checking
+    if(d>3.and.rank==0) call pariserror("wrong ipar")
+    if(n1>1.and.calc_imax(vof_flag)/=2.and.A_h>1d-16) then
+       if(min(min(nx,ny),nz)<2) call pariserror("minimum dimension nx ny nz too small")
+       write(*,*) "ls2vof_refined: maximum vof_flag = ", calc_imax(vof_flag), "but expecting maximum flag = 2"
+       call pariserror("bad flag")
+    endif
+
+! initialization
+    count=0.d0
+    refinethis = .false.
+
+! Initialize 2D/3D switch
+    dirselect = 1  ! spheres: all directions selected: default. 
+    d = max(ipar,-ipar)
+    dirselect(d)=0
+ 
+! main loop
+    do k=ks,ke; do j=js,je; do i=is,ie
+       if(n1>1) then  ! refinement on second pass only
+          if(d==0) then ! check for isolated cells
+             do i0=-1,1; do j0=-1,1; do k0=-1,1
+                istencil3x3(i0,j0,k0) = vof_flag(i+i0,j+j0,k+k0)
+             enddo; enddo; enddo
+             is2D=0
+          else if(d>0) then 
+             call map3x3in2x2(i1,j1,k1,i,j,k)
+             do m=-1,1; do n=-1,1
+                istencil3x3(m,n,0) = vof_flag(i1(m,n,d),j1(m,n,d),k1(m,n,d))
+             enddo; enddo
+             is2D=1
+          else
+             call pariserror("bad d")
           endif
-          b=b+a   ! *(1)*
-       enddo; enddo; enddo
-       cvof(i,j,k) = b/(n1**3)
-       if(nfrac > 0) then
-          vof_flag(i,j,k) = 2
-          ! now either all full, all empty, or mix full/empty : 
-       else if(nfull==n1**3) then ! all full
-          vof_flag(i,j,k) = 1
-          cvof(i,j,k) = 1.d0  ! because arithmetic at (1) may cause round off errors
-       else if(nfull==0) then  ! all empty
-          vof_flag(i,j,k) = 0
-          cvof(i,j,k) = 0.d0  ! paranoid programming.
-       else ! mix of full and empty
-          vof_flag(i,j,k) = 2
-       end if
+          refinethis = notisolated(istencil3x3,is2D)
+          if(refinethis) count = count + 1.
+       endif
+! refine and initialize subcells
+       if(n1==1.or.refinethis) then  ! if n1>1 and no refine leave cell as is. 
+          dx1 = dx(i)/n1; dy1 = dy(j)/n1; dz1 = dz(k)/n1
+          nfrac=0; nfull=0
+          b=0.d0
+          s=n1/2
+          do l=0,n1-1; do m=0,n1-1; do n=0,n1-1
+             x0 = x(i) - 0.5d0*dx(i) + 0.5d0*dx1 + dx1*l
+             y0 = y(j) - 0.5d0*dy(j) + 0.5d0*dy1 + dy1*m
+             z0 = z(k) - 0.5d0*dz(k) + 0.5d0*dz1 + dz1*n
+             do i0=-1,1; do j0=-1,1; do k0=-1,1
+                x1 = x0 + i0*dx1; y1 = y0 + j0*dy1; z1 = z0 + k0*dz1 
+                stencil3x3(i0,j0,k0) = lsfunction(x1,y1,z1,ipar)
+             enddo; enddo; enddo
+             call ls2vof_in_cell(stencil3x3,a,nflag)
+             if(nflag==2) then 
+                nfrac = nfrac + 1
+             else if(nflag==1) then
+                nfull = nfull + 1
+             endif
+             b=b+a   ! *(1)*
+          enddo; enddo; enddo
+          cvof(i,j,k) = b/(n1**3)
+          if(nfrac > 0) then
+             vof_flag(i,j,k) = 2
+             ! now either all full, all empty, or mix full/empty : 
+          else if(nfull==n1**3) then ! all full
+             vof_flag(i,j,k) = 1
+             cvof(i,j,k) = 1.d0  ! because arithmetic at (1) may cause round off errors
+          else if(nfull==0) then ! all empty
+             vof_flag(i,j,k) = 0
+             cvof(i,j,k) = 0.d0  ! paranoid programming.
+          else ! mix of full and empty
+             vof_flag(i,j,k) = 2
+          end if
+       endif
     enddo; enddo; enddo
+    IF(N1>1) write(*,*) "proportion refined ",100.*count/(nx*ny*nz),"%"
     return
   end subroutine ls2vof_refined
   !=================================================================================================
@@ -271,7 +388,8 @@ contains
     include 'mpif.h'
     integer, intent(in) :: tswap
     integer :: req(48),sta(MPI_STATUS_SIZE,48)
-    integer :: ngh=2, ierr
+    integer, parameter :: ngh=2
+    integer :: ierr
 
     if (VOF_advect=='Dick_Yue') call c_mask(work(:,:,:,2))
     if (MOD(tswap,3) .eq. 0) then
@@ -981,7 +1099,7 @@ subroutine mycs(c,mxyz)
   real(8) mxyz(0:2)
   real(8) m1,m2,m(0:3,0:2),t0,t1,t2
   integer cn
-  real(8) :: NOT_ZERO=1.e-30
+  real(8), parameter  :: NOT_ZERO=1.e-30
 
   ! write the plane as: sgn(mx) X =  my Y +  mz Z + alpha 
   !                           m00 X = m01 Y + m02 Z + alpha 

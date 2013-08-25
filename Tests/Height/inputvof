@@ -5,6 +5,7 @@ VOFBDRY_COND = 'periodic' 'periodic' 'periodic'
 
 TEST_TYPE = 'height_test'
 VOF_ADVECT = 'Dick_Yue'
+REFINEMENT = 1   ! means no refinement
 !=================================================================================================
 
 &end

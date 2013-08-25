@@ -65,9 +65,9 @@ npy      = 2
 npz      = 2
                    ! number of processors in x,y,z direction
 
-Nx      = 128 
-Ny      = 128
-Nz      = 128
+Nx      = 64
+Ny      = 64
+Nz      = 64
 Ng      = 2
                    ! grid size in x,y,z direction and number of ghost cells
 

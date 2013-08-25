@@ -5,6 +5,7 @@ VOFBDRY_COND = 'periodic' 'periodic' 'periodic'
 
 TEST_TYPE = 'curvature_test'
 VOF_ADVECT = 'Dick_Yue'
+REFINEMENT = 8
 !=================================================================================================
 
 &end

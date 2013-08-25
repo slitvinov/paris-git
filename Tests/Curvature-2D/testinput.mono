@@ -14,7 +14,7 @@
 !=================================================================================================
 ! General parameters
 
-TWOPHASE = T         ! TwoPhase: Is the flow two-phase?
+TWOPHASE  = T         ! TwoPhase: Is the flow two-phase?
 DoVOF 	  = T
 DoFront   = F
 GetPropertiesFromFront = F ! T: uses Front-Tracking data to compute mu, rho and Surface Tension. 
@@ -65,9 +65,9 @@ npy      = 1
 npz      = 1
                    ! number of processors in x,y,z direction
 
-Nx      = 32 
-Ny      = 32
-Nz      = 32 
+Nx      = 64
+Ny      = 64
+Nz      = 2
 Ng      = 2
                    ! grid size in x,y,z direction and number of ghost cells
 
@@ -118,8 +118,8 @@ SIGMA    = 0.0
 NumBubble =  1
                    ! number of bubbles
 
-xyzrad(1, 1)  = 0.504 !0.5  !0.50078125   
-xyzrad(2, 1)  = 0.493 !0.5
+xyzrad(1, 1)  = 0.5  !0.50078125   
+xyzrad(2, 1)  = 0.5
 xyzrad(3, 1)  = 0.5
 xyzrad(4, 1)  = 0.25
 

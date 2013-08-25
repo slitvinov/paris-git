@@ -290,7 +290,7 @@ contains
      integer i,j,k,d,index
      real(8) h, th
      k = nz/2 + 2  ! +2 because of ghost layers
-     j = ny/2
+     j = ny/2 + 2  ! +2 because of ghost layers
 
      if(k<ks.or.k>ke) return
      if(j<js.or.j>je) return
@@ -631,8 +631,8 @@ contains
       integer :: ib
       real(8) :: kappa
       real(8) :: angle 
-      real(8) :: kappamin=1d20
-      real(8) :: kappamax=-1d20
+      real(8) :: kappamin
+      real(8) :: kappamax
       real(8) :: kappa_exact
       real(8) :: hex,hpex,hmex,dhex,d2hex,kappa_hex
       real(8) :: hnum,hpnum,hmnum,dhnum,d2hnum,hloc(-1:1,-1:1)
@@ -641,12 +641,14 @@ contains
       real(8) :: S2_err_h,S2_err_hp,S2_err_hm,S2_err_dh,S2_err_d2h,S2_err_K
       real(8) :: Lm_err_h,Lm_err_hp,Lm_err_hm,Lm_err_dh,Lm_err_d2h,Lm_err_K
       integer :: sumCount,nfound,indexfound
-      real(8) :: PI= 3.14159265359d0
+      real(8), parameter :: PI= 3.14159265359d0
 
       OPEN(UNIT=89,FILE=TRIM(out_path)//'/curvature-'//TRIM(int2text(rank,padding))//'.txt')
       OPEN(UNIT=90,FILE=TRIM(out_path)//'/reference-'//TRIM(int2text(rank,padding))//'.txt')
       OPEN(UNIT=91,FILE=TRIM(out_path)//'/bigerror-'//TRIM(int2text(rank,padding))//'.txt')
       ib = 1
+      kappamin = 1d20
+      kappamax = -1d20
       if ( test_curvature ) then 
          kappa_exact = 2.d0/rad(ib)
          do i=is,ie; do j=js,je; do k=ks,ke
@@ -1068,6 +1070,10 @@ contains
      implicit none
      integer :: calc_imax
 
+     if(calc_imax(vof_flag)/=2) then
+        write(*,*) calc_imax(vof_flag), "expecting maximum flag = 2"
+        call pariserror("bad flags")
+     endif
      call get_all_heights()
      if(test_heights) then
         call output_heights()
@@ -1218,7 +1224,7 @@ contains
      integer :: index
      logical :: base_not_found, bottom_n_found, bottom_p_found, top_n_found, top_p_found
      real(8) :: height_p, height_n
-     integer :: NDEPTH=2
+     integer, parameter  :: NDEPTH=2
      integer :: si,sj,sk
      integer :: i,j,k
      integer :: i0,j0,k0

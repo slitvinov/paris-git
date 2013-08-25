@@ -10,14 +10,20 @@ int main (int argc, char * argv[])
   if(argc < 4) 
     {
       printf("compare: error: not enough command line arguments.\n\n"
-             "Usage: compare FILE1 FILE2 TOLERANCE\n"
+             "Usage: compare FILE1 FILE2 TOLERANCE [RELATIVE=0] [OUTPUT=0]\n"
              "FILE1 and FILE2 should contain two columns each.\n"
              "The norm of the difference of the second columns is computed.\n"
+	     "If RELATIVE=1 the relative error is computed.\n"
+	     "If OUTPUT=1 the relative error is printed even if the test passes.\n"
 	     "\n");
       exit(1);
     }
   float tolerance;
   sscanf(argv[3],"%g",&tolerance);
+  int relative=0;
+  if(argc >= 5)  sscanf(argv[4],"%d",&relative);
+  int output=0;
+  if(argc >= 6)  sscanf(argv[4],"%d",&output);
 
   FILE * fd1;FILE * fd2;
   float * x1 = ( float *) malloc(MAXLINES*sizeof(float));
@@ -38,6 +44,7 @@ int main (int argc, char * argv[])
   int returnscan1=0;
   int returnscan2=0;
   double diff=0.;
+  double scaling;
   while((returnscan1 = fscanf(fd1,"%g %g",x1,y1)) != EOF && nlines < MAXLINES && (returnscan2 = fscanf(fd2,"%g %g",x2,y2)) )
     { 
       nlines++;
@@ -58,7 +65,8 @@ int main (int argc, char * argv[])
 	  exit(2); 
 	}
       //      printf("%g %g %g %g\n",*x1,*y1,*x2,*y2);
-      diff += (*y1-*y2)*(*y1-*y2);
+      scaling = (1. - relative) + relative * *y2 * *y2;
+      diff += (*y1-*y2)*(*y1-*y2)/scaling;
       x1++;
       y1++;
       x2++;
@@ -67,7 +75,9 @@ int main (int argc, char * argv[])
   diff = sqrt(diff/nlines);
   if(diff < (double) tolerance) 
     {
-      printf("\033[32;1m PASS\033[0m\n");
+      printf("\033[32;1m PASS\033[0m");
+      if(output) printf(" L2 relative error norm = %g",diff);
+      printf("\n");
     }
   else
     {

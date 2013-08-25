@@ -3,7 +3,7 @@
 
 
 /bin/rm -fr out input
-let npstart=8
+let npstart=4
 if [ $# -gt 0 ]; then
     if [ $1 == mono ]; then
 	echo "mono"
@@ -24,8 +24,8 @@ echo `awk ' /Step:/ { cpu = $8 } END { print "cpu = " cpu } ' < tmpout`
 
 if [ -d out ]; then
     cd out
-	cat height-0000?.txt > output1
-	cat reference-0000?.txt > reference.txt
+	cat height-0000?.txt >> output1
+	cat reference-0000?.txt >> reference.txt
 	compare output1 reference.txt $precision
     cd ..
 else

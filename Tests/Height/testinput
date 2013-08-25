@@ -61,13 +61,13 @@ nstats   = 20       ! number of time steps between flow statistics calculations
 ! Grid parameters
 
 npx      = 2
-npy      = 2
+npy      = 1
 npz      = 2
                    ! number of processors in x,y,z direction
 
-Nx      = 16
-Ny      = 16
-Nz      = 16
+Nx      = 32
+Ny      = 2
+Nz      = 32
 Ng      = 2
                    ! grid size in x,y,z direction and number of ghost cells
 

@@ -65,7 +65,6 @@ Program paris
   real(8) :: start_time, end_time
   integer :: req(48),sta(MPI_STATUS_SIZE,48)
   INTEGER :: irank, ii, i, j, k
-  integer :: switch=1
   real(8) :: residual
   real(8) :: sphere
 
@@ -1203,9 +1202,19 @@ end subroutine ReadParameters
 !=================================================================================================
 !=================================================================================================
 subroutine pariserror(message) 
-    character(*) :: message
-    if(rank==0) write(6,*) message
-    stop "*** Paris error exit"
+  use module_IO
+  use module_grid
+  implicit none
+  include 'mpif.h'
+  integer ierr
+  character(*) :: message
+  if(rank==0) write(*,*) "Step: last message . . . . ParisExecutionError"
+  if(rank==0) write(*,*) "Error ** ",message
+  ! Exit MPI gracefully
+  close(out)
+  call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+  call MPI_finalize(ierr)
+  stop " *** Paris error exit, see message in stdout (typically in file tmpout)"
 end subroutine pariserror
 
 !=================================================================================================
