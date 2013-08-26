@@ -23,7 +23,7 @@ int main (int argc, char * argv[])
   int relative=0;
   if(argc >= 5)  sscanf(argv[4],"%d",&relative);
   int output=0;
-  if(argc >= 6)  sscanf(argv[4],"%d",&output);
+  if(argc >= 6)  sscanf(argv[5],"%d",&output);
 
   FILE * fd1;FILE * fd2;
   float * x1 = ( float *) malloc(MAXLINES*sizeof(float));
@@ -75,9 +75,14 @@ int main (int argc, char * argv[])
   diff = sqrt(diff/nlines);
   if(diff < (double) tolerance) 
     {
-      printf("\033[32;1m PASS\033[0m");
-      if(output) printf(" L2 relative error norm = %g",diff);
-      printf("\n");
+      if(output < 2) 
+	{
+	  printf("\033[32;1m PASS\033[0m");
+	  if(output) printf(" L2 relative error norm = %g",diff);
+	  printf("\n");
+	}
+      else
+	printf("second: %g\n",diff);
     }
   else
     {

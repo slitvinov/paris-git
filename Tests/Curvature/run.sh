@@ -9,14 +9,14 @@ if [ $# -gt 0 ]; then
 	echo "mono"
 	let npstart=1
 	ln -s testinput.mono input
-	precision=1e-2
+	precision=6e-2
     else
 	echo "unknown option" $1
 	exit 1
     fi
 else
     ln -s testinput input
-    precision=1e-2
+    precision=6e-2
 fi
 
 mpirun -np $npstart paris > tmpout 2>&1

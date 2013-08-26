@@ -478,11 +478,12 @@ contains
       end do ! d
    end subroutine get_local_heights
 
-   subroutine get_curvature(i0,j0,k0,kappa,indexCurv,nfound)
+   subroutine get_curvature(i0,j0,k0,kappa,indexCurv,nfound,nindepend)
       implicit none
       integer, intent(in) :: i0,j0,k0
       real(8), intent(out) :: kappa  
       integer, intent(out) :: indexCurv, nfound
+      integer, intent(out) :: nindepend
 
       integer :: d,indexfound
       real(8) :: h(-1:1,-1:1),a(6)
@@ -492,7 +493,6 @@ contains
       real(8) :: xfit(9),yfit(9),hfit(9)
       logical :: fit_success = .false.
 
-      integer :: nindepend
       logical :: independ_flag(9)
       integer :: i1(-1:1,-1:1,3), j1(-1:1,-1:1,3), k1(-1:1,-1:1,3)
       integer :: si,sj,sk,hsign,s
@@ -533,7 +533,7 @@ contains
          indexCurv = indexfound
       ! if less than six heights found
       else
-         ! check indepent interface points
+         ! check independent interface points
          do ifit = 1,9
             m = (ifit-1)/3-1
             n = mod((ifit-1),3)-1
@@ -604,7 +604,7 @@ contains
             end if ! hfit(ifit)
          end do !ifit
 
-         ! check if there are six indenpendent positions
+         ! check if there are six independent positions
          if ( nindepend < 6 ) then 
             kappa = 0.d0
             indexCurv = 0
@@ -640,7 +640,7 @@ contains
       real(8) :: L2_err_h,L2_err_hp,L2_err_hm,L2_err_dh,L2_err_d2h,L2_err_K
       real(8) :: S2_err_h,S2_err_hp,S2_err_hm,S2_err_dh,S2_err_d2h,S2_err_K
       real(8) :: Lm_err_h,Lm_err_hp,Lm_err_hm,Lm_err_dh,Lm_err_d2h,Lm_err_K
-      integer :: sumCount,nfound,indexfound
+      integer :: sumCount,nfound,indexfound,nindepend
       real(8), parameter :: PI= 3.14159265359d0
 
       OPEN(UNIT=89,FILE=TRIM(out_path)//'/curvature-'//TRIM(int2text(rank,padding))//'.txt')
@@ -654,7 +654,7 @@ contains
          do i=is,ie; do j=js,je; do k=ks,ke
             ! find curvature only for cut cells
             if (vof_flag(i,j,k) == 2 ) then 
-               call get_curvature(i,j,k,kappa,indexCurv,nfound)
+               call get_curvature(i,j,k,kappa,indexCurv,nfound,nindepend)
                kappa = kappa*dble(Nx)
                kappamax = max(ABS(kappa),kappamax)
                kappamin = min(ABS(kappa),kappamin)
@@ -673,7 +673,7 @@ contains
          Lm_err_h=0.d0;Lm_err_hp=0.d0;Lm_err_hm=0.d0;Lm_err_dh=0.d0;Lm_err_d2h=0.d0;Lm_err_K=0.d0
          do i=is,ie; do j=js,je; do k=ks,ke
             if (vof_flag(i,j,k) == 2 .and. k==(Nz+4)/2) then 
-               call get_curvature(i,j,k,kappa,indexCurv,nfound)
+               call get_curvature(i,j,k,kappa,indexCurv,nfound,nindepend)
                kappa = kappa*dble(Nx)
                kappamax = max(ABS(kappa),kappamax)
                kappamin = min(ABS(kappa),kappamin)
@@ -694,8 +694,8 @@ contains
                err_dh   = ABS(dhnum  - dhex)
                err_d2h  = ABS(d2hnum - d2hex)/ABS(d2hex)
                err_K    = ABS(ABS(kappa)-kappa_exact)/kappa_exact
-               write(91,'(7(E15.8,1X),3(I5,1X))') angle,err_h,err_hp,err_hm,& 
-                                         err_dh,err_d2h,err_K,indexCurv,i,j
+               write(91,'(7(E15.8,1X),6(I5,1X))') angle,err_h,err_hp,err_hm,& 
+                                         err_dh,err_d2h,err_K,indexCurv,i,j,nfound,nindepend
                sumCount = sumCount + 1
                S2_err_h    = S2_err_h  + err_h  **2.d0
                S2_err_hp   = S2_err_hp + err_hp **2.d0
