@@ -206,7 +206,7 @@ contains
     real(8) wave2ls
     real(8), intent(in) :: xx,zz,yy
     integer, intent(in) :: ipar
-    wave2ls = - zz + zlength/2.d0  + A_h*dx(nx/2)*cos(2.*3.14159*xx/xlength) 
+    wave2ls = - zz + zlength/2.d0  + A_h*dx(nx/2+2)*cos(2.*3.14159*xx/xlength) 
   end function wave2ls
   !=================================================================================================
   !   Converts a level-set field into a VOF field
@@ -253,7 +253,11 @@ contains
     notisolated = .not.(nfrac==0.and.(nfull==0.or.nfull==ncells))
     ! write (*,*) " nfrac,nfull,ncells ",  nfrac,nfull,ncells
   end function notisolated
-  
+!=================================================================================================
+!
+! mapping
+!
+!=================================================================================================
   subroutine map3x3in2x2(i1,j1,k1,i0,j0,k0)
     implicit none
     integer, intent(in) :: i0,j0,k0

@@ -63,7 +63,11 @@ contains
       endif
       height = 2.d6
    end subroutine initialize_surface_tension
-
+!=================================================================================================
+! 
+!  Put normals in a common array. Absolutely not sure this is efficient
+!
+!=================================================================================================
    subroutine get_normals()
       real(8) :: stencil3x3(-1:1,-1:1,-1:1)
       integer :: i,j,k
@@ -86,7 +90,11 @@ contains
          enddo
       enddo
    end subroutine get_normals
-
+!=================================================================================================
+!
+! the core of HF computation
+!
+!=================================================================================================
    subroutine get_all_heights
      include 'mpif.h'
      integer :: direction, ierr
@@ -120,9 +128,12 @@ contains
      call ghost_z(height(:,:,:,5),2,req(17:20));
      call ghost_z(height(:,:,:,6),2,req(21:24));
      call MPI_WAITALL(24,req(1:24),sta(:,1:24),ierr)
- 
    end subroutine get_all_heights
-
+!=================================================================================================
+! 
+!   the actual HF
+! 
+!=================================================================================================
    subroutine get_heights(direction)
      integer, intent(in) :: direction
      integer :: index
@@ -289,6 +300,7 @@ contains
      implicit none
      integer i,j,k,d,index
      real(8) h, th
+     integer :: direction=2
      k = nz/2 + 2  ! +2 because of ghost layers
      j = ny/2 + 2  ! +2 because of ghost layers
 
@@ -298,13 +310,9 @@ contains
      OPEN(UNIT=89,FILE=TRIM(out_path)//'/height-'//TRIM(int2text(rank,padding))//'.txt')
      OPEN(UNIT=90,FILE=TRIM(out_path)//'/reference-'//TRIM(int2text(rank,padding))//'.txt')
 
-!     write(89,*) " "
-!     write(89,*) " p heights at  z = L/2 as a function of x"
-!     write(89,*) " "
- 
      index=5
      do i=is,ie
-        th = (- z(k) + zlength/2.d0)/dx(i) + A_h*cos(2.*3.14159*x(i)/xlength)
+        th = wave2ls(x(i),y(j),z(k),direction)/dx(nx/2+2)
         write(90,100) x(i),th
         if (height(i,j,k,index).lt.1d6) then
            h = height(i,j,k,index)
@@ -328,98 +336,30 @@ contains
            write(89,100) x(i), h 
         endif
      enddo
-
-     !     write(89,*) " "
-     !     write(89,*) " n heights at  z = L/2 as a function of x, not searched"
-     !     write(89,*) " "
-
-     if(1==0) then
-        do i=is,ie
-           write(89,103) x(i),height(i,j,k,1:6),height(i,j,k,1:6)
-        enddo
-        do k=ks,ke
-           write(*,104) cvof(is:ie,ny/2,k)
-        enddo
-        print *, " "
-        do k=ks,ke
-           write(*,105) cvof(is:ie,ny/2,k)
-        enddo
-
-        write(89,*) " "
-        write(89,*) " n heights in z"
-        write(89,*) " "
-        do k=ke,ks,-1
-           write(89,1041) k, height(is:ie,ny/2,k,6)
-        enddo
-
-        write(89,*) " "
-        do k=ke,ks,-1
-           write(89,1051) k, height(is:ie,ny/2,k,6)
-        enddo
-
-        write(89,*) " "
-        write(89,*) " p heights in z"
-        write(89,*) " "
-        do k=ke,ks,-1
-           write(89,1041) k, height(is:ie,ny/2,k,5)
-        enddo
-
-        write(89,*) " "
-        do k=ke,ks,-1
-           write(89,1051) k, height(is:ie,ny/2,k,5)
-        enddo
-     endif  ! 1==0
-
 100  format(2(f24.16))
 101  format(f24.16,A2)
-103  format(7(f16.8),6(I2))
-104  format(16(f5.1,' '))
-1041 format(I3,16(f5.1,' '))
-105  format(16(I2,' '))
-1051 format(I3,16(I2,' '))
-
      close(89)
      close(90)
-
    end subroutine output_heights
 !=================================================================================================
 !   Check if we find heights in the neighboring cells
 !=================================================================================================
-   subroutine get_local_heights(i0,j0,k0,nfoundmax,indexfound,hlocmax)
+   subroutine get_local_heights(i1,j1,k1,nfoundmax,indexfound,hlocmax)
       implicit none
       integer :: NDEPTH
       parameter (NDEPTH=3)
-      integer, intent(in) :: i0,j0,k0
+      integer, intent(in) :: i1(-1:1,-1:1,3), j1(-1:1,-1:1,3), k1(-1:1,-1:1,3)
       integer, intent(out) :: nfoundmax, indexfound
       real(8), intent(out) :: hlocmax(-1:1,-1:1)   
       real(8) :: hloc(-1:1,-1:1)   
       integer :: d,s
       integer :: i,j,k,m,n
-      integer :: i1(-1:1,-1:1,3), j1(-1:1,-1:1,3), k1(-1:1,-1:1,3)
       integer :: index,nfound
       logical :: notfound
       integer :: si,sj,sk
+
 !
-! mapping
-!
-      do m=-1,1
-         do n=-1,1
-            !  d=1
-            i1(m,n,1) = i0
-            j1(m,n,1) = m + j0
-            k1(m,n,1) = n + k0
-            ! d=2
-            i1(m,n,2) = m + i0
-            j1(m,n,2) = j0
-            k1(m,n,2) = n + k0
-            ! d=3
-            i1(m,n,3) = m + i0
-            j1(m,n,3) = n + j0
-            k1(m,n,3) = k0 
-         enddo
-      enddo
-!
-!  Loop over directions
+!  Loop over directions until a direction with 9 heights is found. 
 ! 
       hloc = 2d6
       nfoundmax = 0 
@@ -477,7 +417,7 @@ contains
          end do ! index
       end do ! d
    end subroutine get_local_heights
-
+!
    subroutine get_curvature(i0,j0,k0,kappa,indexCurv,nfound,nindepend)
       implicit none
       integer, intent(in) :: i0,j0,k0
@@ -501,9 +441,8 @@ contains
       parameter (ndepth=3)
       real(8) :: centroid(3)
 
-      call get_local_heights(i0,j0,k0,nfound,indexfound,h)
-
-      d=(indexfound-1)/2+1
+      call map3x3in2x2(i1,j1,k1,i0,j0,k0)
+      call get_local_heights(i1,j1,k1,nfound,indexfound,h)
 
       kappa = 0.d0
       nindepend = 0 
@@ -518,7 +457,7 @@ contains
                /(1.d0+a(4)*a(4)+a(5)*a(5))**(1.5d0)
          indexCurv = indexfound
       ! if more than six heights found 
-      else if ( nfound > 6 ) then 
+      else if ( nfound > 5 ) then 
          do ifit = 1,9
             m = (ifit-1)/3-1
             n = mod((ifit-1),3)-1
@@ -528,11 +467,11 @@ contains
             if( hfit(ifit) < 2.d6 ) independ_flag(ifit) = .true.
          end do ! ifit
          call parabola_fit(xfit,yfit,hfit,independ_flag,a,fit_success)
+         if(.not.fit_success) call pariserror("no fit success")
          kappa = 2.d0*(a(1)*(1.d0+a(5)*a(5)) + a(2)*(1.d0+a(4)*a(4)) - a(3)*a(4)*a(5)) &
                /(1.d0+a(4)*a(4)+a(5)*a(5))**(1.5d0)
          indexCurv = indexfound
-      ! if less than six heights found
-      else
+      else  ! nfound < 6
          ! check independent interface points
          do ifit = 1,9
             m = (ifit-1)/3-1
@@ -558,20 +497,6 @@ contains
                else
                   stop "bad direction"
                end if
-
-               ! create mapping for i1,j1,k1
-               ! d=1
-               i1(m,n,1) = i0
-               j1(m,n,1) = m + j0
-               k1(m,n,1) = n + k0
-               ! d=2
-               i1(m,n,2) = m + i0
-               j1(m,n,2) = j0
-               k1(m,n,2) = n + k0
-               ! d=3
-               i1(m,n,3) = m + i0
-               j1(m,n,3) = n + j0
-               k1(m,n,3) = k0 
 
                ! search cut cell in stencil
                !  first search at the same layer
@@ -641,6 +566,7 @@ contains
       real(8) :: S2_err_h,S2_err_hp,S2_err_hm,S2_err_dh,S2_err_d2h,S2_err_K
       real(8) :: Lm_err_h,Lm_err_hp,Lm_err_hm,Lm_err_dh,Lm_err_d2h,Lm_err_K
       integer :: sumCount,nfound,indexfound,nindepend
+      integer :: i1(-1:1,-1:1,3), j1(-1:1,-1:1,3), k1(-1:1,-1:1,3)
       real(8), parameter :: PI= 3.14159265359d0
 
       OPEN(UNIT=89,FILE=TRIM(out_path)//'/curvature-'//TRIM(int2text(rank,padding))//'.txt')
@@ -674,6 +600,8 @@ contains
          do i=is,ie; do j=js,je; do k=ks,ke
             if (vof_flag(i,j,k) == 2 .and. k==(Nz+4)/2) then 
                call get_curvature(i,j,k,kappa,indexCurv,nfound,nindepend)
+               ! This stops the code in case kappa becomes NaN.
+               if(kappa.ne.kappa) call pariserror("Invalid Curvature")               
                kappa = kappa*dble(Nx)
                kappamax = max(ABS(kappa),kappamax)
                kappamin = min(ABS(kappa),kappamin)
@@ -682,7 +610,8 @@ contains
                write(90,*) angle,kappa_exact
                call CalExactHeight_Circle(x(i),y(j),1.d0/dble(Nx),1.d0/dble(Ny),&
                   xc(ib),yc(ib),rad(ib),indexCurv,hex,hpex,hmex,dhex,d2hex)
-               call get_local_heights(i,j,k,nfound,indexfound,hloc)
+               call map3x3in2x2(i1,j1,k1,i,j,k)
+               call get_local_heights(i1,j1,k1,nfound,indexCurv,hloc)
                hnum  = hloc( 0,0)/dble(Nx)
                hpnum = hloc( 1,0)/dble(Nx)
                hmnum = hloc(-1,0)/dble(Nx)
