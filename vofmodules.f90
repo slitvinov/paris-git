@@ -294,14 +294,6 @@ contains
     real(8) :: count
     integer :: calc_imax
     integer :: dirselect(0:3), d, is2D
- 
-!    Some error checking
-    if(d>3.and.rank==0) call pariserror("wrong ipar")
-    if(n1>1.and.calc_imax(vof_flag)/=2.and.A_h>1d-16) then
-       if(min(min(nx,ny),nz)<2) call pariserror("minimum dimension nx ny nz too small")
-       write(*,*) "ls2vof_refined: maximum vof_flag = ", calc_imax(vof_flag), "but expecting maximum flag = 2"
-       call pariserror("bad flag")
-    endif
 
 ! initialization
     count=0.d0
@@ -311,6 +303,14 @@ contains
     dirselect = 1  ! spheres: all directions selected: default. 
     d = max(ipar,-ipar)
     dirselect(d)=0
+
+!    Some error checking
+    if(d>3.and.rank==0) call pariserror("wrong ipar")
+    if(n1>1.and.calc_imax(vof_flag)/=2.and.A_h>1d-16) then
+       if(min(min(nx,ny),nz)<2) call pariserror("minimum dimension nx ny nz too small")
+       write(*,*) "ls2vof_refined: maximum vof_flag = ", calc_imax(vof_flag), "but expecting maximum flag = 2"
+       call pariserror("bad flag")
+    endif
  
 ! main loop
     do k=ks,ke; do j=js,je; do i=is,ie
