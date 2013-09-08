@@ -1086,6 +1086,7 @@ end subroutine ls2vof_in_cell
 !
 ! *-----------------------------------------------------* 
 ! *  MYC - Mixed Youngs and Central Scheme              *
+! * returns normal normalized so that |mx|+|my|+|mz| = 1* 
 ! *-----------------------------------------------------*
 ! 
 !
@@ -1235,10 +1236,11 @@ subroutine mycs(c,mxyz)
   end subroutine mycs
 !
 ! *----------------------------------------------------------------* 
-! *  FD32 - Youngs Finite Difference Gradient Scheme scaled by 32  *
+! *  FD32 - Youngs Finite Difference Gradient Scheme               *
+! *  the gradient is computed with a multuiplacitve factor of  32: *
+! *  mm = 32 * grad (c)                                            *
 ! *----------------------------------------------------------------*
 ! 
-!
 !Known problems: the index (1,1,1), i.e. the central cell
 !in the block, never occurs:
 !Therefore an isolated droplet will have

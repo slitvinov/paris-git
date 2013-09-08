@@ -42,8 +42,6 @@ module module_surface_tension
    ! 4th index: 1 for positive height in x, 2 for negative height in x
    !            3 for positive height in y, 4 for negative height in y, etc... 
   integer, dimension(:,:,:,:), allocatable :: ixheight ! HF flags
-
-
 !  integer, dimension(:,:,:,:), allocatable :: height_flag ! 
   !   0 undecided (not fully tested yet)
   !   1 height found
@@ -55,6 +53,7 @@ module module_surface_tension
 contains
 !=================================================================================================
   subroutine initialize_surface_tension()
+    implicit none
     allocate(  n1(imin:imax,jmin:jmax,kmin:kmax), n2(imin:imax,jmin:jmax,kmin:kmax),  &
                n3(imin:imax,jmin:jmax,kmin:kmax), &
                height(imin:imax,jmin:jmax,kmin:kmax,6))
@@ -69,13 +68,14 @@ contains
 !
 !=================================================================================================
    subroutine get_normals()
-      real(8) :: stencil3x3(-1:1,-1:1,-1:1)
-      integer :: i,j,k
-      integer :: i0,j0,k0
-      real(8) :: mxyz(3)
-      if(.not.st_initialized) call initialize_surface_tension()
-      st_initialized=.true.
-      if(ng.lt.2) stop "wrong ng"
+     implicit none
+     real(8) :: stencil3x3(-1:1,-1:1,-1:1)
+     integer :: i,j,k
+     integer :: i0,j0,k0
+     real(8) :: mxyz(3)
+     if(.not.st_initialized) call initialize_surface_tension()
+     st_initialized=.true.
+     if(ng.lt.2) stop "wrong ng"
       do k=ks-1,ke+1
          do j=js-1,je+1
             do i=is-1,ie+1
@@ -96,6 +96,7 @@ contains
 !
 !=================================================================================================
    subroutine get_all_heights
+     implicit none
      include 'mpif.h'
      integer :: direction, ierr
      integer :: req(24),sta(MPI_STATUS_SIZE,24)
@@ -135,6 +136,7 @@ contains
 ! 
 !=================================================================================================
    subroutine get_heights(direction)
+     implicit none
      integer, intent(in) :: direction
      integer :: index
      logical :: base_not_found, bottom_n_found, bottom_p_found, top_n_found, top_p_found
@@ -456,7 +458,10 @@ contains
          kappa = 2.d0*(a(1)*(1.d0+a(5)*a(5)) + a(2)*(1.d0+a(4)*a(4)) - a(3)*a(4)*a(5)) &
                /(1.d0+a(4)*a(4)+a(5)*a(5))**(1.5d0)
          indexCurv = indexfound
-      ! if more than six heights found 
+         nindepend = 9
+         ! This stops the code in case kappa becomes NaN.
+         if(kappa.ne.kappa) call pariserror("HF9: Invalid Curvature")               
+         ! if more than six heights found 
       else if ( nfound > 5 ) then 
          do ifit = 1,9
             m = (ifit-1)/3-1
@@ -464,13 +469,18 @@ contains
             xfit(ifit) = real(m)
             yfit(ifit) = real(n)
             hfit(ifit) = h(m,n)
-            if( hfit(ifit) < 2.d6 ) independ_flag(ifit) = .true.
+            if( hfit(ifit) < 2.d6 ) then 
+               independ_flag(ifit) = .true.
+               nindepend = nindepend + 1
+            endif
          end do ! ifit
          call parabola_fit(xfit,yfit,hfit,independ_flag,a,fit_success)
          if(.not.fit_success) call pariserror("no fit success")
          kappa = 2.d0*(a(1)*(1.d0+a(5)*a(5)) + a(2)*(1.d0+a(4)*a(4)) - a(3)*a(4)*a(5)) &
                /(1.d0+a(4)*a(4)+a(5)*a(5))**(1.5d0)
          indexCurv = indexfound
+         ! This stops the code in case kappa becomes NaN.
+         if(kappa.ne.kappa) call pariserror("HF6: Invalid Curvature")               
       else  ! nfound < 6
          ! check independent interface points
          do ifit = 1,9
@@ -533,27 +543,33 @@ contains
          if ( nindepend < 6 ) then 
             kappa = 0.d0
             indexCurv = 0
+            nfound = - 1
+            WRITE(*,*) ' centroids not found: i0,j0,k0,nfound,nindepend :',i0,j0,k0,nfound,nindepend
             return
          else 
             call parabola_fit(xfit,yfit,hfit,independ_flag,a,fit_success)
             kappa = 2.d0*(a(1)*(1.d0+a(5)*a(5)) + a(2)*(1.d0+a(4)*a(4)) - a(3)*a(4)*a(5)) &
                   /(1.d0+a(4)*a(4)+a(5)*a(5))**(1.5d0)
             indexCurv = indexfound
-         end if ! nindepend
+            ! This stops the code in case kappa becomes NaN.
+            if(kappa.ne.kappa) then
+               call pariserror("PF6: Invalid Curvature")  
+            endif
+        end if ! nindepend
       end if ! nfound 
 ! TEMPORARY 
-      if ( nfound < 9 ) then
-            WRITE(*,*) ' WARNING: nfound < 9:',i0,j0,k0,nfound,nindepend
-      end if ! nfound
+!      if ( nfound < 9 ) then
+!            WRITE(*,*) ' WARNING: nfound < 9:',i0,j0,k0,nfound,nindepend
+            WRITE(*,*) 'centroids found: i0,j0,k0,nfound,nindepend ',i0,j0,k0,nfound,nindepend
+!      end if ! nfound
 ! END TEMPORARY
-
+  
    end subroutine get_curvature
 
    subroutine output_curvature()
-      implicit none
-      
+      implicit none      
       integer :: i,j,k,indexCurv
-      integer :: ib
+      integer :: ib,n,dir
       real(8) :: kappa
       real(8) :: angle 
       real(8) :: kappamin
@@ -595,65 +611,94 @@ contains
       else if ( test_curvature_2D) then 
          kappa_exact = 1.d0/rad(ib)
          sumCount = 0
-         S2_err_h=0.d0;S2_err_hp=0.d0;S2_err_hm=0.d0;S2_err_dh=0.d0;S2_err_d2h=0.d0;S2_err_K=0.d0
-         Lm_err_h=0.d0;Lm_err_hp=0.d0;Lm_err_hm=0.d0;Lm_err_dh=0.d0;Lm_err_d2h=0.d0;Lm_err_K=0.d0
-         do i=is,ie; do j=js,je; do k=ks,ke
-            if (vof_flag(i,j,k) == 2 .and. k==(Nz+4)/2) then 
+         S2_err_K=0.d0
+         Lm_err_K=0.d0
+
+         if(1==0) then ! begin remove h to h_exact comparison
+            S2_err_h=0.d0;S2_err_hp=0.d0;S2_err_hm=0.d0;S2_err_dh=0.d0;S2_err_d2h=0.d0;
+            Lm_err_h=0.d0;Lm_err_hp=0.d0;Lm_err_hm=0.d0;Lm_err_dh=0.d0;Lm_err_d2h=0.d0;
+         endif
+
+         do i=is,ie; do j=js,je
+            k = (Nz+4)/2
+            if (vof_flag(i,j,k) == 2) then 
                call get_curvature(i,j,k,kappa,indexCurv,nfound,nindepend)
                ! This stops the code in case kappa becomes NaN.
-               if(kappa.ne.kappa) call pariserror("Invalid Curvature")               
-               kappa = kappa*dble(Nx)
-               kappamax = max(ABS(kappa),kappamax)
-               kappamin = min(ABS(kappa),kappamin)
-               angle = atan2(y(j)-yc(ib),x(i)-xc(ib))/PI*180.d0
-               write(89,*) angle,ABS(kappa)
-               write(90,*) angle,kappa_exact
-               call CalExactHeight_Circle(x(i),y(j),1.d0/dble(Nx),1.d0/dble(Ny),&
-                  xc(ib),yc(ib),rad(ib),indexCurv,hex,hpex,hmex,dhex,d2hex)
-               call map3x3in2x2(i1,j1,k1,i,j,k)
-               call get_local_heights(i1,j1,k1,nfound,indexCurv,hloc)
-               hnum  = hloc( 0,0)/dble(Nx)
-               hpnum = hloc( 1,0)/dble(Nx)
-               hmnum = hloc(-1,0)/dble(Nx)
-               dhnum = (hpnum-hmnum)/(2.d0/dble(Nx))
-               d2hnum = (hpnum-2.d0*hnum+hmnum)/(1.d0/dble(Nx))**2.d0
-               err_h    = ABS(hnum   - hex )
-               err_hp   = ABS(hpnum  - hpex)
-               err_hm   = ABS(hmnum  - hmex)
-               err_dh   = ABS(dhnum  - dhex)
-               err_d2h  = ABS(d2hnum - d2hex)/ABS(d2hex)
-               err_K    = ABS(ABS(kappa)-kappa_exact)/kappa_exact
-               write(91,'(7(E15.8,1X),6(I5,1X))') angle,err_h,err_hp,err_hm,& 
-                                         err_dh,err_d2h,err_K,indexCurv,i,j,nfound,nindepend
-               sumCount = sumCount + 1
-               S2_err_h    = S2_err_h  + err_h  **2.d0
-               S2_err_hp   = S2_err_hp + err_hp **2.d0
-               S2_err_hm   = S2_err_hm + err_hm **2.d0
-               S2_err_dh   = S2_err_dh + err_dh **2.d0
-               S2_err_d2h  = S2_err_d2h+ err_d2h**2.d0
-               S2_err_K    = S2_err_K  + err_K  **2.d0
+               if(kappa.ne.kappa) call pariserror("Invalid Curvature")  
+               if(nfound==-1.or.nindepend<6.or.abs(kappa)<1d-4) then
+                  write(6,*) "i,j,k,nfound,nindepend,kappa ",i,j,k,nfound,nindepend,kappa
+                  call pariserror("OC: curvature not found")
+               else
+                  kappa = kappa*dble(Nx)
+                  kappamax = max(ABS(kappa),kappamax)
+                  kappamin = min(ABS(kappa),kappamin)
+                  angle = atan2(y(j)-yc(ib),x(i)-xc(ib))/PI*180.d0
+                  write(89,*) angle,ABS(kappa)
+                  write(90,*) angle,kappa_exact
+                  
+                  err_K    = ABS(ABS(kappa)-kappa_exact)/kappa_exact
+                  S2_err_K    = S2_err_K  + err_K  **2.d0
+                  Lm_err_K    = MAX(Lm_err_K,   err_K) 
+                  sumCount = sumCount + 1
 
-               Lm_err_h    = MAX(Lm_err_h,   err_h ) 
-               Lm_err_hp   = MAX(Lm_err_hp,  err_hp) 
-               Lm_err_hm   = MAX(Lm_err_hm,  err_hm) 
-               Lm_err_dh   = MAX(Lm_err_dh,  err_dh) 
-               Lm_err_d2h  = MAX(Lm_err_d2h, err_d2h) 
-               Lm_err_K    = MAX(Lm_err_K,   err_K) 
+                  if(1==0) then ! remove h to h_exact comparison
+                     call CalExactHeight_Circle(x(i),y(j),1.d0/dble(Nx),1.d0/dble(Ny),&
+                          xc(ib),yc(ib),rad(ib),indexCurv,hex,hpex,hmex,dhex,d2hex)
+                     call map3x3in2x2(i1,j1,k1,i,j,k)
+                     call get_local_heights(i1,j1,k1,nfound,indexCurv,hloc)
+                     hnum  = hloc( 0,0)/dble(Nx)
+                     hpnum = hloc( 1,0)/dble(Nx)
+                     hmnum = hloc(-1,0)/dble(Nx)
+                     if(hnum+hpnum+hmnum<1d6) then 
+                        dhnum = (hpnum-hmnum)/(2.d0/dble(Nx))
+                        d2hnum = (hpnum-2.d0*hnum+hmnum)/(1.d0/dble(Nx))**2.d0
+                        err_h    = ABS(hnum   - hex )
+                        err_hp   = ABS(hpnum  - hpex)
+                        err_hm   = ABS(hmnum  - hmex)
+                        err_dh   = ABS(dhnum  - dhex)
+                        err_d2h  = ABS(d2hnum - d2hex)/ABS(d2hex)
+                        write(91,'(7(E15.8,1X),6(I5,1X))') angle,err_h,err_hp,err_hm,& 
+                             err_dh,err_d2h,err_K,indexCurv,i,j,nfound,nindepend
+                        !@@                     sumCount = sumCount + 1
+                        S2_err_h    = S2_err_h  + err_h  **2.d0
+                        S2_err_hp   = S2_err_hp + err_hp **2.d0
+                        S2_err_hm   = S2_err_hm + err_hm **2.d0
+                        S2_err_dh   = S2_err_dh + err_dh **2.d0
+                        S2_err_d2h  = S2_err_d2h+ err_d2h**2.d0
+                        
+                        Lm_err_h    = MAX(Lm_err_h,   err_h ) 
+                        Lm_err_hp   = MAX(Lm_err_hp,  err_hp) 
+                        Lm_err_hm   = MAX(Lm_err_hm,  err_hm) 
+                        Lm_err_dh   = MAX(Lm_err_dh,  err_dh) 
+                        Lm_err_d2h  = MAX(Lm_err_d2h, err_d2h) 
+                     endif ! h < 1d6
+                  end if ! end remove h to hexact
+               endif ! valid curvature
             end if ! cvof(i,j,k)
-         end do; end do; end do
-         L2_err_h    = sqrt(S2_err_h)  /dble(sumCount)
-         L2_err_hp   = sqrt(S2_err_hp) /dble(sumCount)
-         L2_err_hm   = sqrt(S2_err_hm) /dble(sumCount)
-         L2_err_dh   = sqrt(S2_err_dh) /dble(sumCount)
-         L2_err_d2h  = sqrt(S2_err_d2h)/dble(sumCount)
+         end do; end do
+         
+         if(1==0) then
+            if(SumCount>0) then
+               L2_err_h    = sqrt(S2_err_h)  /dble(sumCount)
+               L2_err_hp   = sqrt(S2_err_hp) /dble(sumCount)
+               L2_err_hm   = sqrt(S2_err_hm) /dble(sumCount)
+               L2_err_dh   = sqrt(S2_err_dh) /dble(sumCount)
+               L2_err_d2h  = sqrt(S2_err_d2h)/dble(sumCount)
+               L2_err_K    = sqrt(S2_err_K)  /dble(sumCount)
+               write(*,*) 'L2 Norm:'
+               write(*,'(I5,1X,6(E15.8,1X))') Nx,L2_err_h,L2_err_hp,L2_err_hm,L2_err_dh,L2_err_d2h,L2_err_K
+               write(*,*) 'Linfty Norm:'
+               write(*,'(I5,1X,6(E15.8,1X))') Nx,Lm_err_h,Lm_err_hp,Lm_err_hm,Lm_err_dh,Lm_err_d2h,Lm_err_K
+            endif
+         endif
          L2_err_K    = sqrt(S2_err_K)  /dble(sumCount)
          write(*,*) 'L2 Norm:'
-         write(*,'(I5,1X,6(E15.8,1X))') Nx,L2_err_h,L2_err_hp,L2_err_hm,L2_err_dh,L2_err_d2h,L2_err_K
+         write(*,'(I5,I5,1X,(E15.8,1X))') Nx,rank,L2_err_K
          write(*,*) 'Linfty Norm:'
-         write(*,'(I5,1X,6(E15.8,1X))') Nx,Lm_err_h,Lm_err_hp,Lm_err_hm,Lm_err_dh,Lm_err_d2h,Lm_err_K
+         write(*,'(I5,I5,1X,(E15.8,1X))') Nx,rank,Lm_err_K
       end if ! test_curvature
       write(*,*) 'max, min, and exact ABS(kappa)', kappamax, kappamin,kappa_exact
-      write(*,*) 'max error', MAX(ABS(kappamax-kappa_exact), ABS(kappamin-kappa_exact))/kappa_exact
+      write(*,*) 'max relative error', MAX(ABS(kappamax-kappa_exact), ABS(kappamin-kappa_exact))/kappa_exact
       CLOSE(89)
       CLOSE(90)
       CLOSE(91)
@@ -881,9 +926,9 @@ contains
       real(8), intent(out) :: centroid(3)
 
       integer :: i0,j0,k0
-      real(8) :: dmx,dmy,dmz, mxyz(3)
+      real(8) :: dmx,dmy,dmz, mxyz(3),px,py,pz
       real(8) :: invx,invy,invz
-      real(8) :: alpha, alphamax,al3d
+      real(8) :: alpha, alphamax,al3d, minnormcomp
       real(8) :: stencil3x3(-1:1,-1:1,-1:1)
 
       ! find cut area centroid 
@@ -920,12 +965,17 @@ contains
       !*(3)*  
       alpha = al3d(dmx,dmy,dmz,cvof(i,j,k))
       !*(4)*  
-      call ComputeCentroid(dmx,dmy,dmz,alpha,centroid)
+      call PlaneAreaCenter(dmx,dmy,dmz,alpha,px,py,pz)
       !*(5)*
+      ! trap NaNs
+      if(px.ne.px) call pariserror("FCAC:invalid px")
+      if(py.ne.py) call pariserror("FCAC:invalid py")
+      if(pz.ne.pz) call pariserror("FCAC:invalid pz")
+
       ! rotate
-      centroid(1) = centroid(1)*invx
-      centroid(2) = centroid(2)*invy
-      centroid(3) = centroid(3)*invz
+      centroid(1) = px*invx
+      centroid(2) = py*invy
+      centroid(3) = pz*invz
       ! shift
       centroid(1) = centroid(1) - invx*0.5d0
       centroid(2) = centroid(2) - invy*0.5d0
@@ -936,59 +986,158 @@ contains
 !      dmz = invz*dmz
 
    end subroutine FindCutAreaCentroid
+! 
+!   Computes the centroid as in gerris
+! 
+! * Fills p with the position of the center of mass of the polygon
+! * obtained by interseectiing the plane  (m,alpha).
+! * with the reference cell.
+!
+!  assumptions: mx,my,mz > 0 and |mx| + |my| + |mz| = 1
+!
+   subroutine PlaneAreaCenter (mx,my,mz, alpha, px,py,pz)
+     implicit none
+     real(8), intent(in) :: mx,my,mz,alpha
+     real(8), intent(out) :: px,py,pz
+     real(8) :: nx,ny,qx,qy
+     real(8) :: area,b,amax
 
-   subroutine ComputeCentroid(m1,m2,m3,alpha,centroid)
-      implicit none
+     if(mx<0.d0.or.my<0.d0.or.mz<0.d0) call pariserror("invalid mx-my-mz")
+     if(abs(mx+my+mz-1d0)>1d-4) call pariserror("invalid mx+my+mz")
 
-      real(8), intent(in)  :: m1,m2,m3,alpha
-      real(8), intent(out) :: centroid(3)
+     if (mx < 1d-4) then
+        nx = my
+        ny = mz
+        call LineCenter (nx,ny, alpha, qx,qy)
+        px = 0.5d0
+        py = qx
+        pz = qy
+        return
+     endif
+     if (my < 1d-4) then
+        nx = mz
+        ny = mx
+        call LineCenter (nx,ny, alpha, qx,qy)
+        px = qy
+        py = 0.5d0
+        pz = qx
+        return
+     endif
+     if (mz < 1d-4) then
+        call LineCenter (mx,my, alpha, px,py)
+        pz = 0.5
+        return
+     endif
+
+     if (alpha < 0.d0 .or. alpha > 1.d0) call pariserror("PAC: invalid alpha")
+
+     area = alpha*alpha
+     pz = area*alpha
+     py = area*alpha
+     pz = area*alpha
+     b = alpha - mx
+     if (b > 0.) then
+        area = area - b*b
+        px = px - b*b*(2.*mx + alpha)
+        py = py - b*b*b
+        pz = pz - b*b*b
+     endif
+     b = alpha - my
+     if (b > 0.) then
+        area = area - b*b
+        py = py - b*b*(2.*my + alpha)
+        px = px - b*b*b
+        pz = pz - b*b*b
+     endif
+     b = alpha - mz
+     if (b > 0.) then
+        area = area - b*b
+        pz = pz - b*b*(2.*mz + alpha)
+        px = px - b*b*b
+        py = py - b*b*b
+     endif
+
+     amax = alpha - 1.d0
+     b = amax + mx
+     if (b > 0.) then
+        area = area + b*b
+        py = py + b*b*(2.*my + alpha - mz)
+        pz = pz + b*b*(2.*mz + alpha - my)
+        px = px + b*b*b
+     endif
+     b = amax + my
+     if (b > 0.) then
+        area = area + b*b
+        px = px + b*b*(2.*mx + alpha - mz)
+        pz = pz + b*b*(2.*mz + alpha - mx)
+        py = py + b*b*b
+     endif
+     b = amax + mz
+     if (b > 0.) then
+        area = area + b*b
+        px = px + b*b*(2.*mx + alpha - my)
+        py = py + b*b*(2.*my + alpha - mx)
+        pz = pz + b*b*b
+     endif
+
+     area  = 3.d0*area
+     px = px/(area*mx)
+     py = py/(area*my)
+     pz = pz/(area*mz)
+
+     call THRESHOLD (px)
+     call THRESHOLD (py)
+     call THRESHOLD (pz)
+
+   end subroutine PlaneAreaCenter
+
+!-------------------------------------------------------------------------------------------------------
+   subroutine LineCenter (mx,my, alpha, px,py)
+     implicit none
+     real(8), intent(in) :: mx,my,alpha
+     real(8), intent(out) :: px,py
       
-      real(8) :: m123,alphamax,Area
-      real(8) :: x0(3),x1(3),x2(3),x3(3),x4(3),x5(3),x6(3)
+     if (alpha <= 0.d0 .or. alpha >= 1.d0) call pariserror("LC: invalid alpha")
 
-      alphamax = m1+m2+m3
+     if (mx < 1d-4) then
+        px = 0.5
+        py = alpha;
+        return
+     endif
 
-      m123 = sqrt(m1*m1+m2*m2+m3*m3)/2.d0/m1/m2/m3
-      Area   = m123*( alpha*alpha &
-                  - func(2.d0,(alpha-m1)) &
-                  - func(2.d0,(alpha-m2)) &
-                  - func(2.d0,(alpha-m3)) &
-                  + func(2.d0,(alpha-alphamax+m1)) &
-                  + func(2.d0,(alpha-alphamax+m2)) &
-                  + func(2.d0,(alpha-alphamax+m3)) )
+     if (my < 1d-4) then
+        py = 0.5;
+        px = alpha
+        return
+     endif
 
-      x0(:) = [alpha/m1/3.d0,alpha/m2/3.d0,alpha/m3/3.d0]
-      x1(:) = [(alpha/m1+2.d0)/3.d0,(alpha-m1)/m2/3.d0,(alpha-m1)/m3/3.d0]
-      x2(:) = [(alpha-m2)/m1/3.d0,(alpha/m2+2.d0)/3.d0,(alpha-m2)/m3/3.d0]
-      x3(:) = [(alpha-m3)/m1/3.d0,(alpha-m3)/m2/3.d0,(alpha/m3+2.d0)/3.d0]
-      x4(:) = [(alpha-alphamax+m1)/m1/3.d0,((alpha-m3)/m2+2.d0)/3.d0,((alpha-m2)/m3+2.d0)/3.d0]
-      x5(:) = [((alpha-m3)/m1+2.d0)/3.d0,(alpha-alphamax+m2)/m2/3.d0,((alpha-m1)/m3+2.d0)/3.d0]
-      x6(:) = [((alpha-m2)/m1+2.d0)/3.d0,((alpha-m1)/m2+2.d0)/3.d0,(alpha-alphamax+m3)/m3/3.d0]
+     px = 0.; py = 0.
 
-      centroid(:) = m123/Area*( alpha*alpha*x0(:) &
-                              - func(2.d0,(alpha-m1))*x1(:) &
-                              - func(2.d0,(alpha-m2))*x2(:) &
-                              - func(2.d0,(alpha-m3))*x3(:) &
-                              + func(2.d0,(alpha-alphamax+m1))*x4(:) &
-                              + func(2.d0,(alpha-alphamax+m2))*x5(:) &
-                              + func(2.d0,(alpha-alphamax+m3))*x6(:) )
+     if (alpha >= mx) then
+        px = px +  1.
+        py = py +  (alpha - mx)/my
+     else
+        px = px +  alpha/mx
+     endif
 
-! -------------------------------------------------------------------------------------------------------
-      contains
-         function func(n,z)
-            implicit none
-   
-            real(8) :: n,z
-            real(8) :: func
-   
-            if ( z > 0.d0 ) then
-               func = z**n
-            else
-               func = 0.d0
-            end if !z
-         end function func
+     if (alpha >= my) then
+        py = py +  1.
+        px = px +  (alpha - my)/mx
+     else
+        py = py +  alpha/my
+     endif
 
-   end subroutine ComputeCentroid
+     px = px/2.
+     py = py/2.
+
+     call THRESHOLD (px)
+     call THRESHOLD (py)
+
+     if(px.ne.px) call pariserror("LAC:invalid px")
+     if(py.ne.py) call pariserror("LAC:invalid px")
+
+   end subroutine
+
 !=========================================================================================================
 !
 !  Testing section
@@ -1042,34 +1191,34 @@ contains
         enddo
      enddo
 
-!!$     call ghost_x(height(:,:,:,1),2,req( 1: 4));  
-!!$     call ghost_x(height(:,:,:,2),2,req( 5: 8)); 
-!!$     call ghost_x(height(:,:,:,3),2,req( 9:12));
+!!$     call ghost_x(height(:,:,:,1),2,req( 1: 4))  
+!!$     call ghost_x(height(:,:,:,2),2,req( 5: 8)) 
+!!$     call ghost_x(height(:,:,:,3),2,req( 9:12))
 !!$     call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
 !!$
-!!$     call ghost_y(height(:,:,:,1),2,req( 1: 4));  
-!!$     call ghost_y(height(:,:,:,2),2,req( 5: 8)); 
-!!$     call ghost_y(height(:,:,:,3),2,req( 9:12));
+!!$     call ghost_y(height(:,:,:,1),2,req( 1: 4))  
+!!$     call ghost_y(height(:,:,:,2),2,req( 5: 8)) 
+!!$     call ghost_y(height(:,:,:,3),2,req( 9:12))
 !!$     call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
 !!$
-!!$     call ghost_z(height(:,:,:,1),2,req( 1: 4));  
-!!$     call ghost_z(height(:,:,:,2),2,req( 5: 8)); 
-!!$     call ghost_z(height(:,:,:,3),2,req( 9:12));
+!!$     call ghost_z(height(:,:,:,1),2,req( 1: 4))  
+!!$     call ghost_z(height(:,:,:,2),2,req( 5: 8)) 
+!!$     call ghost_z(height(:,:,:,3),2,req( 9:12))
 !!$     call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
 !!$
-!!$     call ighost_x(ixheight(:,:,:,1),2,req( 1: 4));  
-!!$     call ighost_x(ixheight(:,:,:,2),2,req( 5: 8)); 
-!!$     call ighost_x(ixheight(:,:,:,3),2,req( 9:12));
+!!$     call ighost_x(ixheight(:,:,:,1),2,req( 1: 4))  
+!!$     call ighost_x(ixheight(:,:,:,2),2,req( 5: 8)) 
+!!$     call ighost_x(ixheight(:,:,:,3),2,req( 9:12))
 !!$     call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
 !!$
-!!$     call ighost_y(ixheight(:,:,:,1),2,req( 1: 4));  
-!!$     call ighost_y(ixheight(:,:,:,2),2,req( 5: 8)); 
-!!$     call ighost_y(ixheight(:,:,:,3),2,req( 9:12));
+!!$     call ighost_y(ixheight(:,:,:,1),2,req( 1: 4))  
+!!$     call ighost_y(ixheight(:,:,:,2),2,req( 5: 8)) 
+!!$     call ighost_y(ixheight(:,:,:,3),2,req( 9:12))
 !!$     call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
 !!$
-!!$     call ighost_z(ixheight(:,:,:,1),2,req( 1: 4));  
-!!$     call ighost_z(ixheight(:,:,:,2),2,req( 5: 8)); 
-!!$     call ighost_z(ixheight(:,:,:,3),2,req( 9:12));
+!!$     call ighost_z(ixheight(:,:,:,1),2,req( 1: 4))  
+!!$     call ighost_z(ixheight(:,:,:,2),2,req( 5: 8)) 
+!!$     call ighost_z(ixheight(:,:,:,3),2,req( 9:12))
 !!$     call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
 
    end subroutine get_flags_rph
@@ -1082,34 +1231,34 @@ contains
      if(.not.st_initialized) call initialize_surface_tension()
      st_initialized=.true.
 
-!!$     call ghost_x(height(:,:,:,1),2,req( 1: 4));  
-!!$     call ghost_x(height(:,:,:,2),2,req( 5: 8)); 
-!!$     call ghost_x(height(:,:,:,3),2,req( 9:12));
+!!$     call ghost_x(height(:,:,:,1),2,req( 1: 4))  
+!!$     call ghost_x(height(:,:,:,2),2,req( 5: 8)) 
+!!$     call ghost_x(height(:,:,:,3),2,req( 9:12))
 !!$     call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
 !!$
-!!$     call ghost_y(height(:,:,:,1),2,req( 1: 4));  
-!!$     call ghost_y(height(:,:,:,2),2,req( 5: 8)); 
-!!$     call ghost_y(height(:,:,:,3),2,req( 9:12));
+!!$     call ghost_y(height(:,:,:,1),2,req( 1: 4))  
+!!$     call ghost_y(height(:,:,:,2),2,req( 5: 8)) 
+!!$     call ghost_y(height(:,:,:,3),2,req( 9:12))
 !!$     call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
 !!$
-!!$     call ghost_z(height(:,:,:,1),2,req( 1: 4));  
-!!$     call ghost_z(height(:,:,:,2),2,req( 5: 8)); 
-!!$     call ghost_z(height(:,:,:,3),2,req( 9:12));
+!!$     call ghost_z(height(:,:,:,1),2,req( 1: 4))  
+!!$     call ghost_z(height(:,:,:,2),2,req( 5: 8)) 
+!!$     call ghost_z(height(:,:,:,3),2,req( 9:12))
 !!$     call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
 !!$
-!!$     call ighost_x(ixheight(:,:,:,1),2,req( 1: 4));  
-!!$     call ighost_x(ixheight(:,:,:,2),2,req( 5: 8)); 
-!!$     call ighost_x(ixheight(:,:,:,3),2,req( 9:12));
+!!$     call ighost_x(ixheight(:,:,:,1),2,req( 1: 4))  
+!!$     call ighost_x(ixheight(:,:,:,2),2,req( 5: 8)) 
+!!$     call ighost_x(ixheight(:,:,:,3),2,req( 9:12))
 !!$     call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
 !!$
-!!$     call ighost_y(ixheight(:,:,:,1),2,req( 1: 4));  
-!!$     call ighost_y(ixheight(:,:,:,2),2,req( 5: 8)); 
-!!$     call ighost_y(ixheight(:,:,:,3),2,req( 9:12));
+!!$     call ighost_y(ixheight(:,:,:,1),2,req( 1: 4))  
+!!$     call ighost_y(ixheight(:,:,:,2),2,req( 5: 8)) 
+!!$     call ighost_y(ixheight(:,:,:,3),2,req( 9:12))
 !!$     call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
 !!$
-!!$     call ighost_z(ixheight(:,:,:,1),2,req( 1: 4));  
-!!$     call ighost_z(ixheight(:,:,:,2),2,req( 5: 8)); 
-!!$     call ighost_z(ixheight(:,:,:,3),2,req( 9:12));
+!!$     call ighost_z(ixheight(:,:,:,1),2,req( 1: 4))  
+!!$     call ighost_z(ixheight(:,:,:,2),2,req( 5: 8)) 
+!!$     call ighost_z(ixheight(:,:,:,3),2,req( 9:12))
 !!$     call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
 
      do direction=1,3
@@ -1257,7 +1406,7 @@ contains
 !!$	      xx[2] = (i-nl-1.+sumcc)*h;
 !!$	      yy[2] = (j-0.5)*h;
 !!$	      segments(fp,xx,yy,1,2,1,4,1,0,0);
-!!$	      }
+!!$	      endif}
                              
                           else
                           

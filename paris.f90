@@ -1209,12 +1209,13 @@ subroutine pariserror(message)
   integer ierr
   character(*) :: message
   if(rank==0) write(*,*) "Step: last message . . . . ParisExecutionError"
-  if(rank==0) write(*,*) "Error ** ",message
+!  if(rank==0) write(*,*) "ERROR *** ",message, " *** STOP "
+  write(*,*) "ERROR *** ",message, " *** STOP "
   ! Exit MPI gracefully
   close(out)
   call MPI_BARRIER(MPI_COMM_WORLD, ierr)
   call MPI_finalize(ierr)
-  stop " *** Paris error exit, see message in stdout (typically in file tmpout)"
+  stop 
 end subroutine pariserror
 
 !=================================================================================================

@@ -1547,3 +1547,12 @@ function calc_imax(f)
   enddo
   end function calc_imax
  
+  subroutine THRESHOLD(z)
+    implicit none
+    real(8),intent(inout) :: z
+    if ( z < 0.d0 ) then
+       z = 0.d0
+    else if ( z > 1.d0 ) then
+       z = 1.d0
+    end if
+  end subroutine THRESHOLD
