@@ -37,30 +37,28 @@ module module_surface_tension
   use module_flow ! for curvature test only
   implicit none
   real(8), dimension(:,:,:), allocatable :: n1,n2,n3 ! normals
-  real(8), dimension(:,:,:,:), allocatable :: height ! normals
+  real(8), dimension(:,:,:,:), allocatable :: height ! 
 
    ! 4th index: 1 for positive height in x, 2 for negative height in x
-   !            3 for positive height in y, 4 for negative height in y, etc... 
-  integer, dimension(:,:,:,:), allocatable :: ixheight ! HF flags
-!  integer, dimension(:,:,:,:), allocatable :: height_flag ! 
-  !   0 undecided (not fully tested yet)
-  !   1 height found
-  !   2 no height found
-  !   3 other cases (for instance empty cell)
-  ! 4th index: 1 for positive height in x, 2 for negative height in x, etc... 
-  !            3 for positive height in y, 4 for negative height in y, etc... 
+   !            3 for positive height in y, 4 for negative height in y, 
+   !              etc... 
+  integer, dimension(:,:,:,:), allocatable :: ixheight ! HF flags for rph (Ruben-Phil) routines
   logical :: st_initialized = .false.
+  logical :: recomputenormals = .true.
 contains
 !=================================================================================================
   subroutine initialize_surface_tension()
     implicit none
-    allocate(  n1(imin:imax,jmin:jmax,kmin:kmax), n2(imin:imax,jmin:jmax,kmin:kmax),  &
-               n3(imin:imax,jmin:jmax,kmin:kmax), &
-               height(imin:imax,jmin:jmax,kmin:kmax,6))
+    if(.not.recomputenormals) then
+       allocate(n1(imin:imax,jmin:jmax,kmin:kmax), n2(imin:imax,jmin:jmax,kmin:kmax),  &
+               n3(imin:imax,jmin:jmax,kmin:kmax))
+    endif
+    allocate(height(imin:imax,jmin:jmax,kmin:kmax,6))
       if(nx.ge.500000.or.ny.gt.500000.or.nz.gt.500000) then
          stop 'nx too large'
       endif
       height = 2.d6
+      st_initialized=.true.
    end subroutine initialize_surface_tension
 !=================================================================================================
 ! 
@@ -73,8 +71,9 @@ contains
      integer :: i,j,k
      integer :: i0,j0,k0
      real(8) :: mxyz(3)
+     if(recomputenormals) call pariserror("normals not allocated")
      if(.not.st_initialized) call initialize_surface_tension()
-     st_initialized=.true.
+
      if(ng.lt.2) stop "wrong ng"
       do k=ks-1,ke+1
          do j=js-1,je+1
@@ -101,7 +100,6 @@ contains
      integer :: direction, ierr
      integer :: req(24),sta(MPI_STATUS_SIZE,24)
      if(.not.st_initialized) call initialize_surface_tension()
-     st_initialized=.true.
 
      do direction=1,3
         call get_heights(direction)
@@ -343,34 +341,41 @@ contains
      close(89)
      close(90)
    end subroutine output_heights
-!=================================================================================================
-!   Check if we find heights in the neighboring cells
-!=================================================================================================
-   subroutine get_local_heights(i1,j1,k1,nfoundmax,indexfound,hlocmax)
+!=======================================================================================================
+!   Check if we find nine heights in the neighboring cells, if not collect all heights in all directions
+!=======================================================================================================
+   subroutine get_local_heights(i1,j1,k1,try,nfound,indexfound,hloc,points,nposit)
       implicit none
-      integer :: NDEPTH
-      parameter (NDEPTH=3)
+      integer :: NDEPTH,NPOS,NOR
+      parameter  (NOR=6) ! number of orientations
+      parameter (NDEPTH=3,NPOS=NOR*27)
       integer, intent(in) :: i1(-1:1,-1:1,3), j1(-1:1,-1:1,3), k1(-1:1,-1:1,3)
-      integer, intent(out) :: nfoundmax, indexfound
-      real(8), intent(out) :: hlocmax(-1:1,-1:1)   
-      real(8) :: hloc(-1:1,-1:1)   
+      integer, intent(out) :: nfound, indexfound
+      real(8), intent(out) :: hloc(-1:1,-1:1)   
+      real(8), intent(out) :: points(NPOS,3)
+      integer, intent(out) :: nposit
+      integer, intent(inout) :: try(3)
+      integer :: i0,j0,k0
+      real(8) :: deltax
       integer :: d,s
-      integer :: i,j,k,m,n
-      integer :: index,nfound
-      logical :: notfound
+      integer :: i,j,k,m,n,l
+      integer :: index
+      logical :: dirnotfound
       integer :: si,sj,sk
-
 !
-!  Loop over directions until a direction with 9 heights is found. 
+!  Loop over directions until an orientation with 9 heights is found. 
 ! 
       hloc = 2d6
-      nfoundmax = 0 
-      d=0
-      notfound=.true.
-      do while (d.lt.3.and.notfound)
-         d = d+1
+      indexfound = -1
+      nposit = 0 
+      l=0
+      dirnotfound=.true.
+      deltax=dx(nx/2)
+      do while (l.lt.3.and.dirnotfound)
+         l = l+1
+         d = try(l)    ! on entry, try(l) sorts the directions , closest to normal first. 
          if(d.eq.1) then
-            si=1; sj=0; sk=0;
+            si=1; sj=0; sk=0
          else if (d.eq.2) then
             si=0; sj=1; sk=0;
          else if (d.eq.3) then
@@ -379,75 +384,106 @@ contains
             stop "bad direction"
          endif
          index = 2*(d-1)
-         do while (index.lt.2*(d-1)+2.and.notfound)
+         do while (index.lt.2*(d-1)+2.and.dirnotfound)   ! try both orientations of direction d
+            ! fixme: change to try only orientation given by normal. 
             index = index + 1
             hloc = 2d6
             nfound = 0
             do m=-1,1 
                do n=-1,1
-                  if(height(i1(m,n,d),j1(m,n,d),k1(m,n,d),index).lt.1d6) then
+                  if(height(i1(m,n,d),j1(m,n,d),k1(m,n,d),index).lt.1d6) then  ! search at same level
                      ! one height found
                      hloc(m,n) = height(i1(m,n,d),j1(m,n,d),k1(m,n,d),index)
                      nfound = nfound + 1
+                     nposit = nposit + 1
+                     points(nposit,1) = x(i1(m,n,d))/deltax + hloc(m,n)*si
+                     points(nposit,2) = y(j1(m,n,d))/deltax + hloc(m,n)*sj
+                     points(nposit,3) = z(k1(m,n,d))/deltax + hloc(m,n)*sk
                   else
                      s = 0 
-                     do while(s.lt.NDEPTH)
+                     do while(s.lt.NDEPTH) ! search at other levels
                         s = s + 1
                         if (height(i1(m,n,d)+si*s,j1(m,n,d)+sj*s,k1(m,n,d)+sk*s,index).lt.1d6) then
                            hloc(m,n) = height(i1(m,n,d)+si*s,j1(m,n,d)+sj*s,k1(m,n,d)+sk*s,index) + s
                            nfound = nfound + 1
+                           nposit = nposit + 1
+                           points(nposit,1) = x(i1(m,n,d)+si*s)/deltax + hloc(m,n)*si
+                           points(nposit,2) = y(j1(m,n,d)+sj*s)/deltax + hloc(m,n)*sj
+                           points(nposit,3) = z(k1(m,n,d)+sk*s)/deltax + hloc(m,n)*sk
                            s = NDEPTH  ! to exit loop
                         else if  (height(i1(m,n,d)-si*s,j1(m,n,d)-sj*s,k1(m,n,d)-sk*s,index).lt.1d6) then
                            hloc(m,n) = height(i1(m,n,d)-si*s,j1(m,n,d)-sj*s,k1(m,n,d)-sk*s,index) - s
                            nfound = nfound + 1
+                           nposit = nposit + 1
+                           points(nposit,1) = x(i1(m,n,d)+si*s)/deltax + hloc(m,n)*si
+                           points(nposit,2) = y(j1(m,n,d)+sj*s)/deltax + hloc(m,n)*sj
+                           points(nposit,3) = z(k1(m,n,d)+sk*s)/deltax + hloc(m,n)*sk
                            s = NDEPTH  ! to exit loop
                         endif
-                     end do
-                  end if ! found at same level
+                     end do ! searcher at other levels
+                  end if ! search at same level
                end do ! n
             end do ! m 
-            if(nfound.ge.9) then
-               notfound = .false.
-               hlocmax = hloc
-               nfoundmax = nfound
+            if(nfound.eq.9) then
+               dirnotfound = .false.
                indexfound = index
-            else if (nfound > nfoundmax) then ! return maximum number of heights 
-               hlocmax = hloc
-               nfoundmax = nfound
-               indexfound = index
-            end if ! nfound
-         end do ! index
-      end do ! d
+               ! on exit, let try(3) be the h direction found
+               m=1
+               n=1
+               do while (m.le.3)
+                  if(m.ne.d) then
+                     try(n) = m
+                     n=n+1
+                  endif
+                  m=m+1
+               enddo
+               try(3)=d  ! then exit
+            end if ! nfound = 9
+         end do ! index and dirnotfound
+      end do ! d and dirnotfound
    end subroutine get_local_heights
 !
-   subroutine get_curvature(i0,j0,k0,kappa,indexCurv,nfound,nindepend)
+   subroutine get_curvature(i0,j0,k0,kappa,indexCurv,nfound,nposit)
       implicit none
       integer, intent(in) :: i0,j0,k0
       real(8), intent(out) :: kappa  
       integer, intent(out) :: indexCurv, nfound
-      integer, intent(out) :: nindepend
+      integer, intent(out) :: nposit
 
-      integer :: d,indexfound
+      integer :: d,index,indexfound
       real(8) :: h(-1:1,-1:1),a(6)
       integer :: nCentroids
 
-      integer :: m,n,ifit 
-      real(8) :: xfit(9),yfit(9),hfit(9)
+      integer :: m,n,l,i,j,k
       logical :: fit_success = .false.
-
-      logical :: independ_flag(9)
-      integer :: i1(-1:1,-1:1,3), j1(-1:1,-1:1,3), k1(-1:1,-1:1,3)
-      integer :: si,sj,sk,hsign,s
+      logical :: height_found
+      integer :: i1(-1:1,-1:1,3), j1(-1:1,-1:1,3), k1(-1:1,-1:1,3),try(3)
+      integer :: si,sj,sk,hsign,s,c(3)
       
-      integer :: NDEPTH
-      parameter (ndepth=3)
-      real(8) :: centroid(3)
+      integer :: NDEPTH,NOR,NPOS
+      parameter (NOR=6) ! number of orientations
+      parameter (NDEPTH=3,NPOS=NOR*27)
+      real(8) :: points(NPOS,3)
+      real(8) :: xfit(NPOS),yfit(NPOS),hfit(NPOS),fit(NPOS,3)
+      real(8) :: centroid(3),mx(3),stencil3x3(-1:1,-1:1,-1:1)
 
       call map3x3in2x2(i1,j1,k1,i0,j0,k0)
-      call get_local_heights(i1,j1,k1,nfound,indexfound,h)
-
+!   define in which order directions will be tried 
+!   direction closest to normal first
+      if(recomputenormals) then
+         do m=-1,1; do n=-1,1; do l=-1,1
+            stencil3x3(m,n,l) = cvof(i0+m,j0+n,k0+l)
+         enddo;enddo;enddo
+         call fd32(stencil3x3,mx)
+      else
+         mx(1) = n1(i0,j0,k0)      
+         mx(2) = n2(i0,j0,k0)      
+         mx(3) = n3(i0,j0,k0)
+      endif
+      call orientation(mx,try)
+      call get_local_heights(i1,j1,k1,try,nfound,indexfound,h,points,nposit)
       kappa = 0.d0
-      nindepend = 0 
+      
       ! if all nine heights found 
       if ( nfound == 9 ) then
          a(1) = (h(1,0)-2.d0*h(0,0)+h(-1,0))/2.d0
@@ -458,118 +494,84 @@ contains
          kappa = 2.d0*(a(1)*(1.d0+a(5)*a(5)) + a(2)*(1.d0+a(4)*a(4)) - a(3)*a(4)*a(5)) &
                /(1.d0+a(4)*a(4)+a(5)*a(5))**(1.5d0)
          indexCurv = indexfound
-         nindepend = 9
          ! This stops the code in case kappa becomes NaN.
          if(kappa.ne.kappa) call pariserror("HF9: Invalid Curvature")               
-         ! if more than six heights found 
-      else if ( nfound > 5 ) then 
-         do ifit = 1,9
-            m = (ifit-1)/3-1
-            n = mod((ifit-1),3)-1
-            xfit(ifit) = real(m)
-            yfit(ifit) = real(n)
-            hfit(ifit) = h(m,n)
-            if( hfit(ifit) < 2.d6 ) then 
-               independ_flag(ifit) = .true.
-               nindepend = nindepend + 1
-            endif
-         end do ! ifit
-         call parabola_fit(xfit,yfit,hfit,independ_flag,a,fit_success)
+         ! if more than six independent heights found in all directions 
+         return
+      else 
+         nfound = - ind_pos(points,nposit) 
+      endif ! nfound == 9
+      if ( (-nfound) > 6 )  then  ! 6 points to avoid special 2D degeneracy. 
+         xfit=points(:,try(2))
+         yfit=points(:,try(3))
+         hfit=points(:,try(1))
+         ! fit over all positions, not only independent ones. 
+         call parabola_fit(xfit,yfit,hfit,nposit,a,fit_success) 
          if(.not.fit_success) call pariserror("no fit success")
          kappa = 2.d0*(a(1)*(1.d0+a(5)*a(5)) + a(2)*(1.d0+a(4)*a(4)) - a(3)*a(4)*a(5)) &
                /(1.d0+a(4)*a(4)+a(5)*a(5))**(1.5d0)
          indexCurv = indexfound
          ! This stops the code in case kappa becomes NaN.
-         if(kappa.ne.kappa) call pariserror("HF6: Invalid Curvature")               
-      else  ! nfound < 6
-         ! check independent interface points
-         do ifit = 1,9
-            m = (ifit-1)/3-1
-            n = mod((ifit-1),3)-1
-            xfit(ifit) = real(m)
-            yfit(ifit) = real(n)
-            hfit(ifit) = h(m,n)
-            ! use height if exist
-            if ( hfit(ifit) < 2.d6 ) then
-               independ_flag(ifit) = .true.
-               nindepend = nindepend + 1
-            ! find centroid if no height
-            else 
-               d = (indexfound-1)/2 + 1
-               hsign = mod((indexfound-1),2)*2-1
- 
-               if(d.eq.1) then
-                  si=1; sj=0; sk=0;
-               else if (d.eq.2) then
-                  si=0; sj=1; sk=0;
-               else if (d.eq.3) then
-                  si=0; sj=0; sk=1
-               else
-                  stop "bad direction"
-               end if
-
-               ! search cut cell in stencil
-               !  first search at the same layer
-               if(vof_flag(i1(m,n,d),j1(m,n,d),k1(m,n,d)) == 2 ) then
-                  call FindCutAreaCentroid(i1(m,n,d),j1(m,n,d),k1(m,n,d),centroid)
-                  xfit(ifit) = centroid(1) + m
-                  yfit(ifit) = centroid(2) + n
-                  hfit(ifit) = centroid(3)
-                  independ_flag(ifit) = .true.
-                  nindepend = nindepend + 1
-               !  search the next two layers along indexfound direction
-               else 
-                  s = 0 
-                  do while(s.lt.NDEPTH)
-                     s = s + 1
-                     if ( vof_flag(i1(m,n,d)+si*hsign*s,j1(m,n,d)+sj*hsign*s,&
-                                   k1(m,n,d)+sk*hsign*s) == 2 ) then
-                        call FindCutAreaCentroid(i1(m,n,d)+si*hsign*s,  &
-                                                 j1(m,n,d)+sj*hsign*s,  &
-                                                 k1(m,n,d)+sk*hsign*s,centroid)
-                        xfit(ifit) = centroid(1) + m
-                        yfit(ifit) = centroid(2) + n
-                        hfit(ifit) = centroid(3) + s*hsign
-                        independ_flag(ifit) = .true.
-                        nindepend = nindepend + 1
-                        s = NDEPTH  ! to exit loop
-                     endif
+         if(kappa.ne.kappa) call pariserror("HF6: Invalid Curvature")
+         nposit=0
+         return
+      else  ! ind_pos <= 5
+         ! Find all centroids in 3**3
+         ! use direction closest to normal
+         nfound = -100 + nfound  ! encode number of independent positions into nfound
+         nposit=1
+         do m=-1,1; do n=-1,1; do l=-1,1
+            i=i0+m
+            j=j0+n
+            k=k0+l
+            c(1)=m
+            c(2)=n
+            c(3)=l
+            if(vof_flag(i,j,k) == 2) then
+               height_found=.false.
+               do index=1,6
+                  if(height(i,j,k,index) < 1d6) then   !  Use height if it exists
+                     height_found=.true.
+                     d = (index-1)/2 + 1
+                     do s=1,3  ! positions relative to center if i0,j0,k0 in cell units
+                        if(d==s) then
+                           fit(nposit,s) = c(s)
+                        else
+                           fit(nposit,s) = c(s) + height(i,j,k,index)
+                        endif
+                     enddo ! do s
+                     nposit = nposit + 1
+                  endif ! height exists
+               enddo ! do index
+               if(.not.height_found) then
+                  call FindCutAreaCentroid(i,j,k,centroid)
+                  do s=1,3 
+                     fit(nposit,s) = centroid(s) + c(s)
                   end do
-               end if ! found at same level
-            end if ! hfit(ifit)
-         end do !ifit
+                  nposit = nposit + 1
+               endif 
+            endif ! vof_flag
+         enddo; enddo; enddo ! do m
+         ! arrange coordinates so height direction is closest to normal
+         ! try(:) array contains direction closest to normal first
 
-         ! check if there are six independent positions
-         if ( nindepend < 6 ) then 
-            kappa = 0.d0
-            indexCurv = 0
-            nfound = - 1
-            WRITE(*,*) ' centroids not found: i0,j0,k0,nfound,nindepend :',i0,j0,k0,nfound,nindepend
-            return
-         else 
-            call parabola_fit(xfit,yfit,hfit,independ_flag,a,fit_success)
-            kappa = 2.d0*(a(1)*(1.d0+a(5)*a(5)) + a(2)*(1.d0+a(4)*a(4)) - a(3)*a(4)*a(5)) &
-                  /(1.d0+a(4)*a(4)+a(5)*a(5))**(1.5d0)
-            indexCurv = indexfound
-            ! This stops the code in case kappa becomes NaN.
-            if(kappa.ne.kappa) then
-               call pariserror("PF6: Invalid Curvature")  
-            endif
-        end if ! nindepend
-      end if ! nfound 
-! TEMPORARY 
-!      if ( nfound < 9 ) then
-!            WRITE(*,*) ' WARNING: nfound < 9:',i0,j0,k0,nfound,nindepend
-            WRITE(*,*) 'centroids found: i0,j0,k0,nfound,nindepend ',i0,j0,k0,nfound,nindepend
-!      end if ! nfound
-! END TEMPORARY
-  
+         xfit=fit(:,try(2))
+         yfit=fit(:,try(3))
+         hfit=fit(:,try(1))
+         call parabola_fit(xfit,yfit,hfit,nposit,a,fit_success)
+         kappa = 2.d0*(a(1)*(1.d0+a(5)*a(5)) + a(2)*(1.d0+a(4)*a(4)) - a(3)*a(4)*a(5)) &
+              /(1.d0+a(4)*a(4)+a(5)*a(5))**(1.5d0)
+         ! This stops the code in case kappa becomes NaN.
+         if(kappa.ne.kappa) then
+            call pariserror("PF6: Invalid Curvature")  
+         endif
+      end if ! -nfound > 5
    end subroutine get_curvature
 
    subroutine output_curvature()
       implicit none      
-      integer :: i,j,k,indexCurv
-      integer :: ib,n,dir
+      integer :: i,j,k,indexCurv,l,m,n
+      integer :: ib,dir,try(3)
       real(8) :: kappa
       real(8) :: angle 
       real(8) :: kappamin
@@ -583,11 +585,17 @@ contains
       real(8) :: Lm_err_h,Lm_err_hp,Lm_err_hm,Lm_err_dh,Lm_err_d2h,Lm_err_K
       integer :: sumCount,nfound,indexfound,nindepend
       integer :: i1(-1:1,-1:1,3), j1(-1:1,-1:1,3), k1(-1:1,-1:1,3)
+      real(8) :: stencil3x3(-1:1,-1:1,-1:1),mx(3)
+      integer :: NOR,NPOS,nposit
+      parameter  (NOR=6) ! number of orientations
+      parameter (NPOS=NOR*27)
+      real(8) :: points(NPOS,3)
       real(8), parameter :: PI= 3.14159265359d0
 
       OPEN(UNIT=89,FILE=TRIM(out_path)//'/curvature-'//TRIM(int2text(rank,padding))//'.txt')
       OPEN(UNIT=90,FILE=TRIM(out_path)//'/reference-'//TRIM(int2text(rank,padding))//'.txt')
       OPEN(UNIT=91,FILE=TRIM(out_path)//'/bigerror-'//TRIM(int2text(rank,padding))//'.txt')
+      OPEN(UNIT=92,FILE=TRIM(out_path)//'/debug-'//TRIM(int2text(rank,padding))//'.txt')
       ib = 1
       kappamin = 1d20
       kappamax = -1d20
@@ -596,7 +604,7 @@ contains
          do i=is,ie; do j=js,je; do k=ks,ke
             ! find curvature only for cut cells
             if (vof_flag(i,j,k) == 2 ) then 
-               call get_curvature(i,j,k,kappa,indexCurv,nfound,nindepend)
+               call get_curvature(i,j,k,kappa,indexCurv,nfound,nposit)
                kappa = kappa*dble(Nx)
                kappamax = max(ABS(kappa),kappamax)
                kappamin = min(ABS(kappa),kappamin)
@@ -618,14 +626,81 @@ contains
             S2_err_h=0.d0;S2_err_hp=0.d0;S2_err_hm=0.d0;S2_err_dh=0.d0;S2_err_d2h=0.d0;
             Lm_err_h=0.d0;Lm_err_hp=0.d0;Lm_err_hm=0.d0;Lm_err_dh=0.d0;Lm_err_d2h=0.d0;
          endif
+         
+         k = (Nz+4)/2
 
+         do j=js,je
+            write(92,'(I2)',advance='no') j
+            do i=is,ie
+               if (vof_flag(i,j,k) == 2) then 
+                  call get_curvature(i,j,k,kappa,indexCurv,nfound,nposit)
+                  write(92,'(1X,E10.2)',advance='no') kappa
+               else
+                  write(92,'(2X,"*",I1,"*",2X)',advance='no') vof_flag(i,j,k)
+               endif
+            enddo
+            write(92,*) "  "
+         enddo
+         write(92,*) "  "
+         
+         do j=js,je
+            write(92,'(I2)',advance='no') j
+            do i=is,ie
+               if (vof_flag(i,j,k) == 2) then 
+                  call get_curvature(i,j,k,kappa,indexCurv,nfound,nposit)
+!                  write(92,'(1X,"<",I1,"-",I1,">")',advance='no') nfound,nindepend
+                  write(92,'(I4,1X)',advance='no') nfound
+               else
+                  write(92,'(1X,"*",I1,"*",1X)',advance='no') vof_flag(i,j,k)
+               endif
+            enddo
+            write(92,*) "  "
+         enddo
+         write(92,*) "  "
+
+        do j=js,je
+            write(92,'(I2)',advance='no') j
+            do i=is,ie
+               if (vof_flag(i,j,k) == 2) then 
+                  call get_curvature(i,j,k,kappa,indexCurv,nfound,nposit)
+!                  write(92,'(1X,"<",I1,"-",I1,">")',advance='no') nfound,nindepend
+                  write(92,'(I4,1X)',advance='no') nposit
+               else
+                  write(92,'(1X,"*",I1,"*",1X)',advance='no') vof_flag(i,j,k)
+               endif
+            enddo
+            write(92,*) "  "
+         enddo
+         write(92,*) "  "
+
+         do n=1,6
+            write(92,*) " "
+            write(92,*) "orientation",n
+            write(92,*) " "
+            do i=is,ie
+               write(92,'(3X,I1,3X)',advance='no') i
+            enddo
+            write(92,*) " "
+            do j=je,js,-1
+               write(92,'(I2)',advance='no') j
+               do i=is,ie
+                  if(height(i,j,k,n)>1d6) then
+                     write(92,'(3X,".",3X)',advance='no')
+                  else
+                     write(92,'(1X,E10.2)',advance='no') height(i,j,k,n)
+                  endif
+               enddo
+               write(92,*) " "
+            enddo
+         enddo
+         write(92,*) " "
+ 
          do i=is,ie; do j=js,je
-            k = (Nz+4)/2
             if (vof_flag(i,j,k) == 2) then 
-               call get_curvature(i,j,k,kappa,indexCurv,nfound,nindepend)
+               call get_curvature(i,j,k,kappa,indexCurv,nfound,nposit)
                ! This stops the code in case kappa becomes NaN.
                if(kappa.ne.kappa) call pariserror("Invalid Curvature")  
-               if(nfound==-1.or.nindepend<6.or.abs(kappa)<1d-4) then
+               if(nfound==-1.or.abs(kappa)<1d-4) then
                   write(6,*) "i,j,k,nfound,nindepend,kappa ",i,j,k,nfound,nindepend,kappa
                   call pariserror("OC: curvature not found")
                else
@@ -645,7 +720,19 @@ contains
                      call CalExactHeight_Circle(x(i),y(j),1.d0/dble(Nx),1.d0/dble(Ny),&
                           xc(ib),yc(ib),rad(ib),indexCurv,hex,hpex,hmex,dhex,d2hex)
                      call map3x3in2x2(i1,j1,k1,i,j,k)
-                     call get_local_heights(i1,j1,k1,nfound,indexCurv,hloc)
+                     if(recomputenormals) then
+                        do m=-1,1; do n=-1,1; do l=-1,1
+                           stencil3x3(m,n,l) = cvof(i+m,j+n,k+l)
+                        enddo;enddo;enddo
+                        call fd32(stencil3x3,mx)
+                     else
+                        mx(1) = n1(i,j,k)      
+                        mx(2) = n2(i,j,k)      
+                        mx(3) = n3(i,j,k)
+                     endif
+                     call orientation(mx,try)
+
+                     call get_local_heights(i1,j1,k1,try,nfound,indexCurv,hloc,points,nposit)
                      hnum  = hloc( 0,0)/dble(Nx)
                      hpnum = hloc( 1,0)/dble(Nx)
                      hmnum = hloc(-1,0)/dble(Nx)
@@ -745,17 +832,16 @@ contains
 ! END TEMPORARY
    end subroutine output_curvature
 
-   subroutine parabola_fit(xfit,yfit,hfit,independ_flag,a,fit_success)
+   subroutine parabola_fit(xfit,yfit,hfit,nposit,a,fit_success)
       implicit none
 
-      real(8), intent(in)  :: xfit(9),yfit(9),hfit(9)
-      logical, intent(in)  :: independ_flag(9)  
+      real(8), intent(in)  :: xfit(nposit),yfit(nposit),hfit(nposit)
       real(8), intent(out) :: a(6)
       logical, intent(out) :: fit_success
 
       real(8) :: m(6,6), invm(6,6)
       real(8) :: rhs(6)
-      integer :: ifit, im,jm
+      integer :: ifit, im,jm, nposit
       logical :: inv_success
       real(8) :: x1,x2,x3,x4,y1,y2,y3,y4
 
@@ -764,9 +850,7 @@ contains
       ! evaluate the linear system for least-square fit
       m   = 0.d0
       rhs = 0.d0
-      do ifit = 1, 9
-         ! sum over independent points with height
-         if ( independ_flag(ifit) ) then
+      do ifit = 1, nposit
             x1 =    xfit(ifit)
             x2 = x1*xfit(ifit)
             x3 = x2*xfit(ifit)
@@ -799,7 +883,6 @@ contains
             rhs(4) = rhs(4) + x1   *hfit(ifit)
             rhs(5) = rhs(5) + y1   *hfit(ifit)
             rhs(6) = rhs(6) +       hfit(ifit)
-         end if ! hfit
       end do ! ifit
       m(1,2) = m(3,3)
       m(1,6) = m(4,4)
@@ -939,13 +1022,20 @@ contains
       !     (4) compute centroid with dmx,dmy,dmz and alpha;
       !     (5) transfer to local coordinate;
       !*(1)*
-      do i0=-1,1; do j0=-1,1; do k0=-1,1
-         stencil3x3(i0,j0,k0) = cvof(i+i0,j+j0,k+k0)
-      enddo;enddo;enddo
-      call mycs(stencil3x3,mxyz)
-      dmx = mxyz(1)
-      dmy = mxyz(2)
-      dmz = mxyz(3)
+
+      if(recomputenormals) then
+         do i0=-1,1; do j0=-1,1; do k0=-1,1
+            stencil3x3(i0,j0,k0) = cvof(i+i0,j+j0,k+k0)
+         enddo;enddo;enddo
+         call mycs(stencil3x3,mxyz)
+         dmx = mxyz(1)
+         dmy = mxyz(2)
+         dmz = mxyz(3)      
+      else
+         dmx = n1(i0,j0,k0)      
+         dmy = n2(i0,j0,k0)      
+         dmz = n3(i0,j0,k0)
+      endif
       !*(2)*  
       invx = 1.d0
       invy = 1.d0
@@ -1137,6 +1227,58 @@ contains
      if(py.ne.py) call pariserror("LAC:invalid px")
 
    end subroutine
+
+!   direction closest to normal first
+   subroutine orientation (m,c)
+     implicit none
+     real(8), intent(in) :: m(3)
+     integer, intent(inout) :: c(3)
+     integer :: i,j,tmp
+     do i = 1,3
+        c(i) = i 
+     enddo
+     do i = 1,2
+        do j=1,3-i
+           if(abs(m(c(j+1))) > abs(m(c(j)))) then
+              tmp = c(j)
+              c(j) = c(j+1)
+              c(j+1) = tmp
+           endif
+        enddo
+     enddo
+   end subroutine orientation
+
+   function ind_pos (points, n)
+     implicit none
+     integer :: ind_pos
+     integer, intent(in) :: n
+     real(8), intent(in) :: points(n,3)
+     integer :: i,j,ni,c
+     real(8) :: d2
+     logical :: depends
+
+     if (n < 2) then
+        ind_pos = n
+        return
+     endif
+
+     ni=1
+     
+     do j=2,n
+        depends = .false.
+        do i=1,j-1
+           if(.not.depends) then
+              d2 = 0d0
+              do c=1,3
+                 d2 = d2 + (points(i,c) - points(j,c))**2
+              enddo
+              depends = (d2 < 0.5**2)
+           endif
+        enddo
+        if(.not.depends) ni = ni + 1
+     enddo
+     ind_pos = ni
+   end function ind_pos
 
 !=========================================================================================================
 !
