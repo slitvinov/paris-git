@@ -629,7 +629,11 @@ contains
          
          k = (Nz+4)/2
 
-         do j=js,je
+         do i=is,ie
+            write(92,'(3X,I1,3X)',advance='no') i
+         enddo
+         write(92,*) " "
+         do j=je,js,-1
             write(92,'(I2)',advance='no') j
             do i=is,ie
                if (vof_flag(i,j,k) == 2) then 
@@ -643,7 +647,7 @@ contains
          enddo
          write(92,*) "  "
          
-         do j=js,je
+         do j=je,js,-1
             write(92,'(I2)',advance='no') j
             do i=is,ie
                if (vof_flag(i,j,k) == 2) then 
@@ -658,7 +662,7 @@ contains
          enddo
          write(92,*) "  "
 
-        do j=js,je
+         do j=je,js,-1
             write(92,'(I2)',advance='no') j
             do i=is,ie
                if (vof_flag(i,j,k) == 2) then 
