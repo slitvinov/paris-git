@@ -348,7 +348,7 @@ contains
       implicit none
       integer :: NDEPTH,NPOS,NOR
       parameter  (NOR=6) ! number of orientations
-      parameter (NDEPTH=3,NPOS=NOR*27)
+      parameter (NDEPTH=2,NPOS=NOR*27)
       integer, intent(in) :: i1(-1:1,-1:1,3), j1(-1:1,-1:1,3), k1(-1:1,-1:1,3)
       integer, intent(out) :: nfound, indexfound
       real(8), intent(out) :: hloc(-1:1,-1:1)   
@@ -360,7 +360,7 @@ contains
       integer :: d,s
       integer :: i,j,k,m,n,l
       integer :: index
-      logical :: dirnotfound
+      logical :: dirnotfound,heightnotfound
       integer :: si,sj,sk
 !
 !  Loop over directions until an orientation with 9 heights is found. 
@@ -383,10 +383,9 @@ contains
          else
             stop "bad direction"
          endif
-         index = 2*(d-1)
-         do while (index.lt.2*(d-1)+2.and.dirnotfound)   ! try both orientations of direction d
+         index = 2*(d-1)+1
+         do while (index.le.2*(d-1)+2.and.dirnotfound)   ! try both orientations of direction d
             ! fixme: change to try only orientation given by normal. 
-            index = index + 1
             hloc = 2d6
             nfound = 0
             do m=-1,1 
@@ -400,17 +399,17 @@ contains
                      points(nposit,2) = y(j1(m,n,d))/deltax + hloc(m,n)*sj
                      points(nposit,3) = z(k1(m,n,d))/deltax + hloc(m,n)*sk
                   else
-                     s = 0 
-                     do while(s.lt.NDEPTH) ! search at other levels
-                        s = s + 1
-                        if (height(i1(m,n,d)+si*s,j1(m,n,d)+sj*s,k1(m,n,d)+sk*s,index).lt.1d6) then
+                     s = 1 
+                     heightnotfound=.true.
+                     do while(s.le.NDEPTH.and.heightnotfound) ! search at other levels
+                         if (height(i1(m,n,d)+si*s,j1(m,n,d)+sj*s,k1(m,n,d)+sk*s,index).lt.1d6) then
                            hloc(m,n) = height(i1(m,n,d)+si*s,j1(m,n,d)+sj*s,k1(m,n,d)+sk*s,index) + s
                            nfound = nfound + 1
                            nposit = nposit + 1
                            points(nposit,1) = x(i1(m,n,d)+si*s)/deltax + hloc(m,n)*si
                            points(nposit,2) = y(j1(m,n,d)+sj*s)/deltax + hloc(m,n)*sj
                            points(nposit,3) = z(k1(m,n,d)+sk*s)/deltax + hloc(m,n)*sk
-                           s = NDEPTH  ! to exit loop
+                           heightnotfound=.false.  ! to exit loop
                         else if  (height(i1(m,n,d)-si*s,j1(m,n,d)-sj*s,k1(m,n,d)-sk*s,index).lt.1d6) then
                            hloc(m,n) = height(i1(m,n,d)-si*s,j1(m,n,d)-sj*s,k1(m,n,d)-sk*s,index) - s
                            nfound = nfound + 1
@@ -418,9 +417,10 @@ contains
                            points(nposit,1) = x(i1(m,n,d)+si*s)/deltax + hloc(m,n)*si
                            points(nposit,2) = y(j1(m,n,d)+sj*s)/deltax + hloc(m,n)*sj
                            points(nposit,3) = z(k1(m,n,d)+sk*s)/deltax + hloc(m,n)*sk
-                           s = NDEPTH  ! to exit loop
+                           heightnotfound=.false.  ! to exit loop
                         endif
-                     end do ! searcher at other levels
+                        s = s + 1
+                    end do ! while s lt ndepth 
                   end if ! search at same level
                end do ! n
             end do ! m 
@@ -438,12 +438,15 @@ contains
                   m=m+1
                enddo
                try(3)=d  ! then exit
+               return
             end if ! nfound = 9
+            index = index+1
          end do ! index and dirnotfound
       end do ! d and dirnotfound
    end subroutine get_local_heights
 !
    subroutine get_curvature(i0,j0,k0,kappa,indexCurv,nfound,nposit)
+!@ fixme: define sign of curvature
       implicit none
       integer, intent(in) :: i0,j0,k0
       real(8), intent(out) :: kappa  
@@ -460,9 +463,9 @@ contains
       integer :: i1(-1:1,-1:1,3), j1(-1:1,-1:1,3), k1(-1:1,-1:1,3),try(3)
       integer :: si,sj,sk,hsign,s,c(3)
       
-      integer :: NDEPTH,NOR,NPOS
+      integer :: NOR,NPOS
       parameter (NOR=6) ! number of orientations
-      parameter (NDEPTH=3,NPOS=NOR*27)
+      parameter (NPOS=NOR*27)
       real(8) :: points(NPOS,3)
       real(8) :: xfit(NPOS),yfit(NPOS),hfit(NPOS),fit(NPOS,3)
       real(8) :: centroid(3),mx(3),stencil3x3(-1:1,-1:1,-1:1)
@@ -519,6 +522,7 @@ contains
          ! Find all centroids in 3**3
          ! use direction closest to normal
          nfound = -100 + nfound  ! encode number of independent positions into nfound
+         indexcurv=2*(try(1)-1)+1
          nposit=1
          do m=-1,1; do n=-1,1; do l=-1,1
             i=i0+m
@@ -634,6 +638,7 @@ contains
          enddo
          write(92,*) " "
          do j=je,js,-1
+!         do j=js,je
             write(92,'(I2)',advance='no') j
             do i=is,ie
                if (vof_flag(i,j,k) == 2) then 
@@ -648,6 +653,7 @@ contains
          write(92,*) "  "
          
          do j=je,js,-1
+!         do j=js,je
             write(92,'(I2)',advance='no') j
             do i=is,ie
                if (vof_flag(i,j,k) == 2) then 
@@ -662,13 +668,30 @@ contains
          enddo
          write(92,*) "  "
 
-         do j=je,js,-1
+!         do j=je,js,-1
+         do j=js,je
             write(92,'(I2)',advance='no') j
             do i=is,ie
                if (vof_flag(i,j,k) == 2) then 
                   call get_curvature(i,j,k,kappa,indexCurv,nfound,nposit)
 !                  write(92,'(1X,"<",I1,"-",I1,">")',advance='no') nfound,nindepend
                   write(92,'(I4,1X)',advance='no') nposit
+               else
+                  write(92,'(1X,"*",I1,"*",1X)',advance='no') vof_flag(i,j,k)
+               endif
+            enddo
+            write(92,*) "  "
+         enddo
+         write(92,*) "  "
+
+!         do j=je,js,-1
+         do j=js,je
+            write(92,'(I2)',advance='no') j
+            do i=is,ie
+               if (vof_flag(i,j,k) == 2) then 
+                  call get_curvature(i,j,k,kappa,indexCurv,nfound,nposit)
+!                  write(92,'(1X,"<",I1,"-",I1,">")',advance='no') nfound,nindepend
+                  write(92,'(I4,1X)',advance='no') indexcurv
                else
                   write(92,'(1X,"*",I1,"*",1X)',advance='no') vof_flag(i,j,k)
                endif
