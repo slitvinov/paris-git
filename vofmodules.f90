@@ -1237,8 +1237,8 @@ subroutine mycs(c,mxyz)
 !
 ! *----------------------------------------------------------------* 
 ! *  FD32 - Youngs Finite Difference Gradient Scheme               *
-! *  the gradient is computed with a multuiplacitve factor of  32: *
-! *  mm = 32 * grad (c)                                            *
+! *  the gradient is computed with a multiplicative factor of -32: *
+! *  mm = - 32 * grad (c)                                          *
 ! *----------------------------------------------------------------*
 ! 
 !Known problems: the index (1,1,1), i.e. the central cell
@@ -1254,8 +1254,8 @@ subroutine mycs(c,mxyz)
 subroutine fd32(c,mm)
   !***
   implicit none
-  real(8), intent(inout) :: c(0:2,0:2,0:2)
-  real(8), intent(inout) :: mm(0:2)
+  real(8), intent(in) :: c(0:2,0:2,0:2)
+  real(8), intent(out) :: mm(0:2)
   real(8) :: m1,m2
 
   m1 = c(0,0,0) + c(0,2,0) + c(0,0,2) + c(0,2,2) +&

@@ -36,12 +36,16 @@ module module_surface_tension
   use module_VOF
   use module_flow ! for curvature test only
   implicit none
+  integer, parameter :: NDEPTH=2
+  integer, parameter :: NOR=6 ! number of orientations
+  integer, parameter :: NPOS=NOR*27
   real(8), dimension(:,:,:), allocatable :: n1,n2,n3 ! normals
   real(8), dimension(:,:,:,:), allocatable :: height ! 
 
-   ! 4th index: 1 for positive height in x, 2 for negative height in x
-   !            3 for positive height in y, 4 for negative height in y, 
-   !              etc... 
+  ! 4th index: 1 for normal vector pointing towards positive x "positive height", 
+  ! 2 for "negative" height in x
+  ! 3 for positive height in y, 4 for negative height in y, 
+  !  etc... 
   integer, dimension(:,:,:,:), allocatable :: ixheight ! HF flags for rph (Ruben-Phil) routines
   logical :: st_initialized = .false.
   logical :: recomputenormals = .true.
@@ -139,8 +143,6 @@ contains
      integer :: index
      logical :: base_not_found, bottom_n_found, bottom_p_found, top_n_found, top_p_found
      real(8) :: height_p, height_n
-     integer :: NDEPTH
-     parameter (ndepth=3)
      integer :: si,sj,sk
      integer :: i,j,k
      integer :: i0,j0,k0
@@ -344,13 +346,11 @@ contains
 !=======================================================================================================
 !   Check if we find nine heights in the neighboring cells, if not collect all heights in all directions
 !=======================================================================================================
-   subroutine get_local_heights(i1,j1,k1,try,nfound,indexfound,hloc,points,nposit)
+   subroutine get_local_heights(i1,j1,k1,mx,try,nfound,indexfound,hloc,points,nposit)
       implicit none
-      integer :: NDEPTH,NPOS,NOR
-      parameter  (NOR=6) ! number of orientations
-      parameter (NDEPTH=2,NPOS=NOR*27)
       integer, intent(in) :: i1(-1:1,-1:1,3), j1(-1:1,-1:1,3), k1(-1:1,-1:1,3)
       integer, intent(out) :: nfound, indexfound
+      real(8), intent(in)  :: mx(3)
       real(8), intent(out) :: hloc(-1:1,-1:1)   
       real(8), intent(out) :: points(NPOS,3)
       integer, intent(out) :: nposit
@@ -362,6 +362,10 @@ contains
       integer :: index
       logical :: dirnotfound,heightnotfound
       integer :: si,sj,sk
+
+      i = i1(0,0,1)
+      j = j1(0,0,1)
+      k = k1(0,0,1)
 !
 !  Loop over directions until an orientation with 9 heights is found. 
 ! 
@@ -383,9 +387,8 @@ contains
          else
             stop "bad direction"
          endif
-         index = 2*(d-1)+1
-         do while (index.le.2*(d-1)+2.and.dirnotfound)   ! try both orientations of direction d
-            ! fixme: change to try only orientation given by normal. 
+         index =  2*(d-1)+2
+         if(mx(d).gt.0) index = 2*(d-1)+1
             hloc = 2d6
             nfound = 0
             do m=-1,1 
@@ -424,12 +427,13 @@ contains
                   end if ! search at same level
                end do ! n
             end do ! m 
+            write(*,*) "GLH: end m,n: nposit,d,index,nfound ",nposit,d,index,nfound
             if(nfound.eq.9) then
                dirnotfound = .false.
                indexfound = index
-               ! on exit, let try(3) be the h direction found
+               ! on exit, let try(1) be the h direction found
                m=1
-               n=1
+               n=2
                do while (m.le.3)
                   if(m.ne.d) then
                      try(n) = m
@@ -437,16 +441,19 @@ contains
                   endif
                   m=m+1
                enddo
-               try(3)=d  ! then exit
+               try(1)=d  ! then exit
+               write(*,*) "GLH: 9F: i,j,k,try,nposit,nfound ",i,j,k,try,nposit,nfound
                return
             end if ! nfound = 9
-            index = index+1
-         end do ! index and dirnotfound
       end do ! d and dirnotfound
+      indexfound =  2*(try(1)-1)+2
+      if(mx(try(1)).gt.0) indexfound = 2*(try(1)-1)+1
+      if(nposit.gt.NPOS) call pariserror("GLH: nposit")
+      write(*,*) "GLH: not F:i,j,k, try,nposit,nfound ",i,j,k,try,nposit,nfound
+
    end subroutine get_local_heights
 !
    subroutine get_curvature(i0,j0,k0,kappa,indexCurv,nfound,nposit)
-!@ fixme: define sign of curvature
       implicit none
       integer, intent(in) :: i0,j0,k0
       real(8), intent(out) :: kappa  
@@ -484,7 +491,7 @@ contains
          mx(3) = n3(i0,j0,k0)
       endif
       call orientation(mx,try)
-      call get_local_heights(i1,j1,k1,try,nfound,indexfound,h,points,nposit)
+      call get_local_heights(i1,j1,k1,mx,try,nfound,indexfound,h,points,nposit)
       kappa = 0.d0
       
       ! if all nine heights found 
@@ -496,6 +503,7 @@ contains
          a(5) = (h(0,1)-h(0,-1))/2.d0
          kappa = 2.d0*(a(1)*(1.d0+a(5)*a(5)) + a(2)*(1.d0+a(4)*a(4)) - a(3)*a(4)*a(5)) &
                /(1.d0+a(4)*a(4)+a(5)*a(5))**(1.5d0)
+         kappa = sign(kappa,mx(try(1)))
          indexCurv = indexfound
          ! This stops the code in case kappa becomes NaN.
          if(kappa.ne.kappa) call pariserror("HF9: Invalid Curvature")               
@@ -514,6 +522,7 @@ contains
          kappa = 2.d0*(a(1)*(1.d0+a(5)*a(5)) + a(2)*(1.d0+a(4)*a(4)) - a(3)*a(4)*a(5)) &
                /(1.d0+a(4)*a(4)+a(5)*a(5))**(1.5d0)
          indexCurv = indexfound
+         kappa = sign(kappa,mx(try(1)))
          ! This stops the code in case kappa becomes NaN.
          if(kappa.ne.kappa) call pariserror("HF6: Invalid Curvature")
          nposit=0
@@ -522,7 +531,7 @@ contains
          ! Find all centroids in 3**3
          ! use direction closest to normal
          nfound = -100 + nfound  ! encode number of independent positions into nfound
-         indexcurv=2*(try(1)-1)+1
+         indexcurv=indexfound
          nposit=1
          do m=-1,1; do n=-1,1; do l=-1,1
             i=i0+m
@@ -533,20 +542,23 @@ contains
             c(3)=l
             if(vof_flag(i,j,k) == 2) then
                height_found=.false.
-               do index=1,6
-                  if(height(i,j,k,index) < 1d6) then   !  Use height if it exists
-                     height_found=.true.
-                     d = (index-1)/2 + 1
-                     do s=1,3  ! positions relative to center if i0,j0,k0 in cell units
-                        if(d==s) then
-                           fit(nposit,s) = c(s)
-                        else
-                           fit(nposit,s) = c(s) + height(i,j,k,index)
-                        endif
-                     enddo ! do s
-                     nposit = nposit + 1
-                  endif ! height exists
-               enddo ! do index
+!
+! comment the following as index not treated as it should (no reference to normal)
+!
+!               do index=1,6
+!                   if(height(i,j,k,index) < 1d6) then   !  Use height if it exists
+!                      height_found=.true.
+!                      d = (index-1)/2 + 1
+!                      do s=1,3  ! positions relative to center if i0,j0,k0 in cell units
+!                         if(d==s) then
+!                            fit(nposit,s) = c(s)
+!                         else
+!                            fit(nposit,s) = c(s) + height(i,j,k,index)
+!                         endif
+!                      enddo ! do s
+!                      nposit = nposit + 1
+!                   endif ! height exists
+!               enddo ! do index
                if(.not.height_found) then
                   call FindCutAreaCentroid(i,j,k,centroid)
                   do s=1,3 
@@ -562,13 +574,20 @@ contains
          xfit=fit(:,try(2))
          yfit=fit(:,try(3))
          hfit=fit(:,try(1))
+         if(nposit.gt.NPOS) call pariserror("GLH: nposit")
          call parabola_fit(xfit,yfit,hfit,nposit,a,fit_success)
+!         if(rank==0) write(*,*) "PF6: kappa,try,mx,nposit ",kappa,try,mx,nposit
+!         if(rank==0) write(*,*) "PF6: a, fit_success ", a,fit_success
+
          kappa = 2.d0*(a(1)*(1.d0+a(5)*a(5)) + a(2)*(1.d0+a(4)*a(4)) - a(3)*a(4)*a(5)) &
               /(1.d0+a(4)*a(4)+a(5)*a(5))**(1.5d0)
+         kappa = sign(kappa,mx(try(1)))
          ! This stops the code in case kappa becomes NaN.
-         if(kappa.ne.kappa) then
-            call pariserror("PF6: Invalid Curvature")  
-         endif
+!         WRITE(*,*) "KAPPA", KAPPA
+!         if(kappa.ne.kappa) then
+!           if(rank==0) write(*,*) "PF6: kappa,try,mx,nposit ",kappa,try,mx,nposit
+!            call pariserror("PF6: Invalid Curvature")  
+!         endif
       end if ! -nfound > 5
    end subroutine get_curvature
 
@@ -644,6 +663,76 @@ contains
                if (vof_flag(i,j,k) == 2) then 
                   call get_curvature(i,j,k,kappa,indexCurv,nfound,nposit)
                   write(92,'(1X,E10.2)',advance='no') kappa
+               else
+                  write(92,'(2X,"*",I1,"*",2X)',advance='no') vof_flag(i,j,k)
+               endif
+            enddo
+            write(92,*) "  "
+         enddo
+         write(92,*) "  "
+
+         do i=is,ie
+            write(92,'(3X,I1,3X)',advance='no') i
+         enddo
+         write(92,*) " "
+         do j=je,js,-1
+!         do j=js,je
+            write(92,'(I2)',advance='no') j
+            do i=is,ie
+               if (vof_flag(i,j,k) == 2) then 
+         do m=-1,1; do n=-1,1; do l=-1,1
+            stencil3x3(m,n,l) = cvof(i+m,j+n,k+l)
+         enddo;enddo;enddo
+         call fd32(stencil3x3,mx)
+
+                  call get_curvature(i,j,k,kappa,indexCurv,nfound,nposit)
+                  write(92,'(1X,E10.2)',advance='no') mx(1)
+               else
+                  write(92,'(2X,"*",I1,"*",2X)',advance='no') vof_flag(i,j,k)
+               endif
+            enddo
+            write(92,*) "  "
+         enddo
+         write(92,*) "  "
+         do i=is,ie
+            write(92,'(3X,I1,3X)',advance='no') i
+         enddo
+         write(92,*) " "
+         do j=je,js,-1
+!         do j=js,je
+            write(92,'(I2)',advance='no') j
+            do i=is,ie
+               if (vof_flag(i,j,k) == 2) then 
+         do m=-1,1; do n=-1,1; do l=-1,1
+            stencil3x3(m,n,l) = cvof(i+m,j+n,k+l)
+         enddo;enddo;enddo
+         call fd32(stencil3x3,mx)
+
+                  call get_curvature(i,j,k,kappa,indexCurv,nfound,nposit)
+                  write(92,'(1X,E10.2)',advance='no') mx(2)
+               else
+                  write(92,'(2X,"*",I1,"*",2X)',advance='no') vof_flag(i,j,k)
+               endif
+            enddo
+            write(92,*) "  "
+         enddo
+         write(92,*) "  "
+         do i=is,ie
+            write(92,'(3X,I1,3X)',advance='no') i
+         enddo
+         write(92,*) " "
+         do j=je,js,-1
+!         do j=js,je
+            write(92,'(I2)',advance='no') j
+            do i=is,ie
+               if (vof_flag(i,j,k) == 2) then 
+         do m=-1,1; do n=-1,1; do l=-1,1
+            stencil3x3(m,n,l) = cvof(i+m,j+n,k+l)
+         enddo;enddo;enddo
+         call fd32(stencil3x3,mx)
+
+                  call get_curvature(i,j,k,kappa,indexCurv,nfound,nposit)
+                  write(92,'(1X,E10.2)',advance='no') mx(3)
                else
                   write(92,'(2X,"*",I1,"*",2X)',advance='no') vof_flag(i,j,k)
                endif
@@ -759,7 +848,7 @@ contains
                      endif
                      call orientation(mx,try)
 
-                     call get_local_heights(i1,j1,k1,try,nfound,indexCurv,hloc,points,nposit)
+                     call get_local_heights(i1,j1,k1,mx,try,nfound,indexCurv,hloc,points,nposit)
                      hnum  = hloc( 0,0)/dble(Nx)
                      hpnum = hloc( 1,0)/dble(Nx)
                      hmnum = hloc(-1,0)/dble(Nx)
@@ -1259,7 +1348,7 @@ contains
    subroutine orientation (m,c)
      implicit none
      real(8), intent(in) :: m(3)
-     integer, intent(inout) :: c(3)
+     integer, intent(out) :: c(3)
      integer :: i,j,tmp
      do i = 1,3
         c(i) = i 
@@ -1471,7 +1560,6 @@ contains
      integer :: index
      logical :: base_not_found, bottom_n_found, bottom_p_found, top_n_found, top_p_found
      real(8) :: height_p, height_n
-     integer, parameter  :: NDEPTH=2
      integer :: si,sj,sk
      integer :: i,j,k
      integer :: i0,j0,k0
