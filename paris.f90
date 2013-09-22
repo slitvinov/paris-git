@@ -66,7 +66,7 @@ Program paris
   integer :: req(48),sta(MPI_STATUS_SIZE,48)
   INTEGER :: irank, ii, i, j, k
   real(8) :: residual
-  real(8) :: sphere
+
 
 !---------------------------------------INITIALIZATION--------------------------------------------
   ! Initialize MPI
@@ -554,7 +554,7 @@ subroutine momentumConvection(u,v,w,du,dv,dw)
   real(8), external :: minabs
   integer :: i,j,k
 !  real(8), external :: inter
-  real(8) :: y00,y11,y22
+!  real(8) :: y00,y11,y22
 !-----------------------------------QUICK interpolation u-velocity--------------------------------
   do k=ks,ke; do j=js,je; do i=is,ieu+1
     if (u(i-1,j,k)+u(i,j,k)>0.0) then
@@ -978,10 +978,8 @@ subroutine InitCondition
   use module_lag_part
   implicit none
   include 'mpif.h'
-  integer :: i,j,k,ib, ierr, irank, req(12),sta(MPI_STATUS_SIZE,12)
+  integer :: i,j,k, ierr, irank, req(12),sta(MPI_STATUS_SIZE,12)
   real(8) :: my_ave
-  integer :: ngh=2
-  real(8) :: ls, kappa
   !---------------------------------------------Domain----------------------------------------------
   if(rank<nPdomain)then
      if(restart)then
@@ -1228,10 +1226,12 @@ subroutine check_stability()
   use module_hello
   implicit none
   include 'mpif.h'
-  integer :: in, ierr
   real(8) von_neumann
 
-  von_neumann = dx(ng)**2*rho1/(dt*mu1)
-  if(rank==0) print *, "dx**2*rho/(dt*mu) = ", von_neumann
-  if(von_neumann < 6d0.and..not.Implicit) call pariserror("time step too large for viscous terms")
+  if(dt*mu1 /= 0) then 
+     von_neumann = dx(ng)**2*rho1/(dt*mu1)
+     if(rank==0) print *, "dx**2*rho/(dt*mu) = ", von_neumann
+     if(von_neumann < 6d0.and..not.Implicit) call pariserror("time step too large for viscous terms")
+  endif
+
 end subroutine check_stability

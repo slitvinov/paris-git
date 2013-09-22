@@ -7,7 +7,9 @@ FC = mpif90
 
 # remove funny cflags from my environment
 
-FFLAGS = -O3 # -g -gstabs # -O3 #
+#FFLAGS = -O3 -Wall -ffpe-trap=invalid,zero,overflow,underflow,precision,denormal # -g -gstabs # -O3 #
+FFLAGS = -O3 -Wall -ffpe-trap=invalid,zero,overflow,underflow,denormal # -g -gstabs # -O3 #
+
 CFLAGS = -O # -g -gstabs
 BINDIR = $(HOME)/bin
 

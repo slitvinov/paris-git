@@ -38,6 +38,7 @@ module module_VOF
   !   3 unknown
 
   real(8), parameter  :: A_h = 2d0  ! For initialisation of height test
+  real(8), parameter  :: TINY = 1d-50
   character(20) :: vofbdry_cond(3),test_type,vof_advect
   integer :: parameters_read=0, refinement=-1
   logical :: test_heights = .false.  
@@ -151,10 +152,9 @@ contains
 
     implicit none
     include 'mpif.h'
-    integer :: ierr, irank, req(12),sta(MPI_STATUS_SIZE,12)
+    integer :: ierr, req(12),sta(MPI_STATUS_SIZE,12)
     integer , parameter :: ngh=2
     integer :: ipar
-    integer calc_imax
 
     if(test_heights) then
        ipar=2  ! interface invariant in y direction
@@ -217,7 +217,7 @@ contains
     real(8), external :: lsfunction
     integer, intent(in) :: ipar
     include 'mpif.h'
-    integer :: ierr, irank, req(12),sta(MPI_STATUS_SIZE,12)
+    integer :: ierr, req(12),sta(MPI_STATUS_SIZE,12)
     integer , parameter :: ngh=2
     call ls2vof_refined(lsfunction,ipar,1)
     call ighost_x(vof_flag,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
@@ -288,7 +288,7 @@ contains
     real(8) :: stencil3x3(-1:1,-1:1,-1:1),dx1,dy1,dz1,x0,y0,z0,x1,y1,z1,a,b
     integer :: i,j,k,i0,j0,k0,l,m,n,s
     integer :: nfrac,nflag,nfull
-    integer :: istencil3x3(-1:1,-1:1,-1:1), istencil2x2(-1:1,-1:1)
+    integer :: istencil3x3(-1:1,-1:1,-1:1)
     integer :: i1(-1:1,-1:1,3), j1(-1:1,-1:1,3), k1(-1:1,-1:1,3)
     logical :: refinethis 
     real(8) :: count
@@ -314,12 +314,12 @@ contains
  
 ! main loop
     do k=ks,ke; do j=js,je; do i=is,ie
+       is2D=0  ! Default
        if(n1>1) then  ! refinement on second pass only
           if(d==0) then ! check for isolated cells
              do i0=-1,1; do j0=-1,1; do k0=-1,1
                 istencil3x3(i0,j0,k0) = vof_flag(i+i0,j+j0,k+k0)
              enddo; enddo; enddo
-             is2D=0
           else if(d>0) then 
              call map3x3in2x2(i1,j1,k1,i,j,k)
              do m=-1,1; do n=-1,1
@@ -552,7 +552,7 @@ module module_output_vof
 contains
   subroutine append_VOF_visit_file(rootname)
     implicit none
-    character(*) :: rootname
+    character(len=30) :: rootname
     integer prank
     if(rank.ne.0) call pariserror('rank.ne.0 in append_VOF')
     if(vof_opened==0) then
@@ -609,7 +609,7 @@ contains
       write(8,210) cvof(i,j,k)
     enddo; enddo; enddo
 210 format(e14.5)
-310 format(e14.5,e14.5,e14.5)
+! 310 format(e14.5,e14.5,e14.5)
     close(8)
 end subroutine output_VOF
 !=================================================================================================
@@ -1234,7 +1234,7 @@ subroutine mycs(c,mxyz)
 
   return 
   end subroutine mycs
-!
+
 ! *----------------------------------------------------------------* 
 ! *  FD32 - Youngs Finite Difference Gradient Scheme               *
 ! *  the gradient is computed with a multiplicative factor of -32: *
@@ -1284,3 +1284,32 @@ subroutine fd32(c,mm)
 
   return 
   end subroutine fd32
+
+!
+! *----------------------------------------------------------------* 
+! *  youngs - Youngs Finite Difference Gradient Scheme             *
+! *  the gradient is normed so that |mx|+|my|+|mz| = 1             *
+! *----------------------------------------------------------------*
+! 
+! Known problems: the index (1,1,1), i.e. the central cell
+! in the block, never occurs:
+! Therefore an isolated droplet will have
+! a normal with all components to zero. 
+!
+!
+subroutine youngs(c,mm)
+  !***
+  implicit none
+  real(8), intent(in) :: c(0:2,0:2,0:2)
+  real(8), intent(out) :: mm(0:2)
+  integer :: i
+  real(8) :: norm
+
+  call fd32(c,mm)
+  norm = abs(mm(0))+abs(mm(1))+abs(mm(2)) ! + TINY
+  do i=0,2
+     mm(i) = mm(i)/norm
+  enddo
+  return 
+  end subroutine youngs
+!

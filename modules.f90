@@ -152,7 +152,7 @@ subroutine write_vec_gnuplot(u,v,w,iout)
   enddo; enddo
   close(unit=89)
 310 format(e14.5,e14.5,e14.5,e14.5)
-311 format(I2,I2,I2,e14.5,e14.5)
+! 311 format(I2,I2,I2,e14.5,e14.5)
 end subroutine  write_vec_gnuplot
 !=================================================================================================
 ! append
@@ -242,8 +242,8 @@ subroutine backup_read
     !oldaverages=averages
   endif
   close(7)
-  1100 FORMAT(es25.16e3,7I10)
-  1200 FORMAT(5es25.16e3)
+!  1100 FORMAT(es25.16e3,7I10)
+!  1200 FORMAT(5es25.16e3)
 end subroutine backup_read
 !=================================================================================================
 !=================================================================================================
@@ -300,7 +300,7 @@ subroutine output1(nf,i1,i2,j1,j2,k1,k2)
     close(7)
     oldaverages=allaverages
   endif
-  1000 FORMAT('variables = "x","y","z","u","v","w","p","color"')
+!  1000 FORMAT('variables = "x","y","z","u","v","w","p","color"')
   1100 FORMAT('ZONE solutiontime=', 1PG15.7e2, ', I=',I4, 2X, ', J=',I4, 2X, ', K=',I4, 2X)
   1110 FORMAT('ZONE solutiontime=', 1PG15.7e2)
   1200 FORMAT(21es14.6e2)
