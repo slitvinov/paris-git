@@ -8,7 +8,9 @@ FC = mpif90
 # remove funny cflags from my environment
 
 #FFLAGS = -O3 -Wall -ffpe-trap=invalid,zero,overflow,underflow,precision,denormal # -g -gstabs # -O3 #
-FFLAGS = -O3 -Wall -ffpe-trap=invalid,zero,overflow,underflow,denormal # -g -gstabs # -O3 #
+#FFLAGS = -g -Wall -ffpe-trap=invalid,zero,overflow # -g -gstabs # -O3 #
+#FOPTS =  -g -Wall -ffpe-trap=invalid,zero,overflow # -g -gstabs # -O3 #
+FFLAGS = -O3 # -g -fimplicit-none -fbounds-check
 
 CFLAGS = -O # -g -gstabs
 BINDIR = $(HOME)/bin
@@ -32,7 +34,7 @@ SRC = $(wildcard  *.f90)
 
 install: $(OBJ)
 #	@echo compiler is FC = $(FC), mpi override is OMPI_FC = $(OMPI_FC)
-	$(FC) -g -o paris $(FOPTS) $(OBJ) $(FOBJ) $(HYPRE_LIBS) 
+	$(FC) -o paris $(FOPTS) $(OBJ) $(FOBJ) $(HYPRE_LIBS) 
 	@if [ ! -d $(BINDIR) ] ; then echo "directory bin does not exist creating it" ; mkdir $(BINDIR) ; fi 
 	mv paris $(BINDIR)/paris
 	@find .  -name "*.sh" -exec chmod +x  {} \; 

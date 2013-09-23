@@ -428,7 +428,7 @@ contains
                   end if ! search at same level
                end do ! n
             end do ! m 
-            write(*,*) "GLH: end m,n: nposit,d,index,nfound ",nposit,d,index,nfound
+!            write(*,*) "GLH: end m,n: nposit,d,index,nfound ",nposit,d,index,nfound
             if(nfound.eq.9) then
                dirnotfound = .false.
                indexfound = index
@@ -443,14 +443,14 @@ contains
                   m=m+1
                enddo
                try(1)=d  ! then exit
-               write(*,*) "GLH: 9F: i,j,k,try,nposit,nfound ",i,j,k,try,nposit,nfound
+!               write(*,*) "GLH: 9F: i,j,k,try,nposit,nfound ",i,j,k,try,nposit,nfound
                return
             end if ! nfound = 9
       end do ! d and dirnotfound
       indexfound =  2*(try(1)-1)+2
       if(mx(try(1)).gt.0) indexfound = 2*(try(1)-1)+1
       if(nposit.gt.NPOS) call pariserror("GLH: nposit")
-      write(*,*) "GLH: not F:i,j,k, try,nposit,nfound ",i,j,k,try,nposit,nfound
+!      write(*,*) "GLH: not F:i,j,k, try,nposit,nfound ",i,j,k,try,nposit,nfound
 
    end subroutine get_local_heights
 !
@@ -504,7 +504,7 @@ contains
          kappa = sign(kappa,mx(try(1)))
          indexCurv = indexfound
          ! This stops the code in case kappa becomes NaN.
-         if(kappa.ne.kappa) call pariserror("HF9: Invalid Curvature")               
+!--debug         if(kappa.ne.kappa) call pariserror("HF9: Invalid Curvature")               
          ! if more than six independent heights found in all directions 
          return
       else 
@@ -522,7 +522,7 @@ contains
          indexCurv = indexfound
          kappa = sign(kappa,mx(try(1)))
          ! This stops the code in case kappa becomes NaN.
-         if(kappa.ne.kappa) call pariserror("HF6: Invalid Curvature")
+!--debu         if(kappa.ne.kappa) call pariserror("HF6: Invalid Curvature")
          nposit=0
          return
       else  ! ind_pos <= 5
@@ -530,7 +530,7 @@ contains
          ! use direction closest to normal
          nfound = -100 + nfound  ! encode number of independent positions into nfound
          indexcurv=indexfound
-         nposit=1
+         nposit=0
          do m=-1,1; do n=-1,1; do l=-1,1
             i=i0+m
             j=j0+n
@@ -547,6 +547,7 @@ contains
 !                   if(height(i,j,k,index) < 1d6) then   !  Use height if it exists
 !                      height_found=.true.
 !                      d = (index-1)/2 + 1
+!                      nposit = nposit + 1
 !                      do s=1,3  ! positions relative to center if i0,j0,k0 in cell units
 !                         if(d==s) then
 !                            fit(nposit,s) = c(s)
@@ -554,15 +555,15 @@ contains
 !                            fit(nposit,s) = c(s) + height(i,j,k,index)
 !                         endif
 !                      enddo ! do s
-!                      nposit = nposit + 1
 !                   endif ! height exists
 !               enddo ! do index
                if(.not.height_found) then
+                  nposit = nposit + 1
                   call FindCutAreaCentroid(i,j,k,centroid)
                   do s=1,3 
                      fit(nposit,s) = centroid(s) + c(s)
                   end do
-                  nposit = nposit + 1
+!                  write(92,'(1X,E10.2)',advance='no') fit(:,1)
                endif 
             endif ! vof_flag
          enddo; enddo; enddo ! do m
@@ -579,13 +580,13 @@ contains
 
          kappa = 2.d0*(a(1)*(1.d0+a(5)*a(5)) + a(2)*(1.d0+a(4)*a(4)) - a(3)*a(4)*a(5)) &
               /(1.d0+a(4)*a(4)+a(5)*a(5))**(1.5d0)
-         kappa = sign(kappa,mx(try(1)))
+         kappa = sign(1.d0,mx(try(1)))*kappa
          ! This stops the code in case kappa becomes NaN.
 !         WRITE(*,*) "KAPPA", KAPPA
-         if(kappa.ne.kappa) then
+!--debu         if(kappa.ne.kappa) then
 !           if(rank==0) write(*,*) "PF6: kappa,try,mx,nposit ",kappa,try,mx,nposit
-            call pariserror("PF6: Invalid Curvature")  
-         endif
+!--debu            call pariserror("PF6: Invalid Curvature")  
+!--debu         endif
       end if ! -nfound > 5
    end subroutine get_curvature
 
@@ -636,6 +637,7 @@ contains
             end if ! cvof(i,j,k)
          end do; end do; end do
       else if ( test_curvature_2D) then 
+         k = (Nz+4)/2
          kappa_exact = 1.d0/rad(ib)
          sumCount = 0
          S2_err_K=0.d0
@@ -646,14 +648,13 @@ contains
             Lm_err_h=0.d0;Lm_err_hp=0.d0;Lm_err_hm=0.d0;Lm_err_dh=0.d0;Lm_err_d2h=0.d0;
          endif
 
-         k = (Nz+4)/2
-
+         if(1==0) then ! remove extensive debugging
          do i=is,ie
             write(92,'(3X,I1,3X)',advance='no') i
          enddo
          write(92,*) " "
 !         do j=je,js,-1
-                    do j=js,je
+         do j=js,je
             write(92,'(I2)',advance='no') j
             do i=is,ie
                if (vof_flag(i,j,k) == 2) then 
@@ -680,8 +681,6 @@ contains
                      stencil3x3(m,n,l) = cvof(i+m,j+n,k+l)
                   enddo;enddo;enddo
                   call fd32(stencil3x3,mx)
-
-                  call get_curvature(i,j,k,kappa,indexCurv,nfound,nposit)
                   write(92,'(1X,E10.2)',advance='no') mx(1)
                else
                   write(92,'(2X,"*",I1,"*",2X)',advance='no') vof_flag(i,j,k)
@@ -703,8 +702,6 @@ contains
                      stencil3x3(m,n,l) = cvof(i+m,j+n,k+l)
                   enddo;enddo;enddo
                   call fd32(stencil3x3,mx)
-
-                  call get_curvature(i,j,k,kappa,indexCurv,nfound,nposit)
                   write(92,'(1X,E10.2)',advance='no') mx(2)
                else
                   write(92,'(2X,"*",I1,"*",2X)',advance='no') vof_flag(i,j,k)
@@ -726,8 +723,6 @@ contains
                      stencil3x3(m,n,l) = cvof(i+m,j+n,k+l)
                   enddo;enddo;enddo
                   call fd32(stencil3x3,mx)
-
-                  call get_curvature(i,j,k,kappa,indexCurv,nfound,nposit)
                   write(92,'(1X,E10.2)',advance='no') mx(3)
                else
                   write(92,'(2X,"*",I1,"*",2X)',advance='no') vof_flag(i,j,k)
@@ -807,7 +802,10 @@ contains
          enddo
          write(92,*) " "
 
+         end if ! stop debugging output
+
          do i=is,ie; do j=js,je
+!             write(*,*) "i,j ", i,j
             if (vof_flag(i,j,k) == 2) then 
                call get_curvature(i,j,k,kappa,indexCurv,nfound,nposit)
                ! This stops the code in case kappa becomes NaN.
@@ -816,15 +814,16 @@ contains
                   write(6,*) "i,j,k,nfound,nindepend,kappa ",i,j,k,nfound,nindepend,kappa
                   call pariserror("OC: curvature not found")
                else
-                  kappa = kappa*dble(Nx)
+                  kappa = kappa*dble(Nx)  ! Nx = L/deltax
                   kappamax = max(ABS(kappa),kappamax)
                   kappamin = min(ABS(kappa),kappamin)
                   angle = atan2(y(j)-yc(ib),x(i)-xc(ib))/PI*180.d0
                   write(89,*) angle,ABS(kappa)
                   write(90,*) angle,kappa_exact
 
-                  err_K    = ABS(ABS(kappa)-kappa_exact)/kappa_exact
-                  S2_err_K    = S2_err_K  + err_K  **2.d0
+                  err_K    = ABS(ABS(kappa)-abs(kappa_exact))/kappa_exact
+                  S2_err_K    = S2_err_K  + err_K**2
+!                  write(*,*) i,j,err_K,kappa,S2_err_K
                   Lm_err_K    = MAX(Lm_err_K,   err_K) 
                   sumCount = sumCount + 1
 
@@ -890,7 +889,7 @@ contains
                write(*,'(I5,1X,6(E15.8,1X))') Nx,Lm_err_h,Lm_err_hp,Lm_err_hm,Lm_err_dh,Lm_err_d2h,Lm_err_K
             endif
          endif
-         L2_err_K    = sqrt(S2_err_K)  /dble(sumCount)
+         L2_err_K    = sqrt(S2_err_K/dble(sumCount))
          write(*,*) 'L2 Norm:'
          write(*,'(I5,I5,1X,(E15.8,1X))') Nx,rank,L2_err_K
          write(*,*) 'Linfty Norm:'

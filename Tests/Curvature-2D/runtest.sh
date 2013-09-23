@@ -27,7 +27,7 @@ npx=2
 let np=$npx*$npx*$npz
 
 
-/bin/rm -f paris-$dim.txt
+/bin/rm -f *.tmp
 for level in $list; do
     echo $level
     nx=`awk -v level=$level 'BEGIN {print 2**level}'`
@@ -46,7 +46,8 @@ for level in $list; do
 	    cd out
 	    cat curvature-0000?.txt >> curvature.txt
 	    cat reference-0000?.txt >> reference.txt
-	    compare curvature.txt reference.txt 0.1 1 2
+	    compare curvature.txt reference.txt 1e20 1 2 >> ../cmpout.tmp
+    echo `awk -v nx=$nx -v radius=$radius 'BEGIN {print nx * radius }'`  `compare curvature.txt reference.txt 0.1 1 2 `  >> ../out.tmp
 	    cd ..
 	else
 	    RED="\\033[1;31m"
@@ -55,6 +56,9 @@ for level in $list; do
 	fi
     done
 done
+
+# one more time for radius 0.4 at max level
+
 radius=0.4
 echo $level
 sed s/NXTEMP/$nx/g testinput.template | sed s/NZTEMP/$nz/g | sed s/NPXTEMP/$npx/g  | sed s/NPZTEMP/$npz/g > testinput
@@ -66,10 +70,23 @@ if [ -d out ]; then
     cd out
     cat curvature-0000?.txt >> curvature.txt
     cat reference-0000?.txt >> reference.txt
-    compare curvature.txt reference.txt 0.1 1 2
+    compare curvature.txt reference.txt 1e20 1 2 >> ../cmpout.tmp
+    echo `awk -v nx=$nx -v radius=$radius 'BEGIN {print nx * radius }'`  `compare curvature.txt reference.txt 0.1 1 2 `  >> ../out.tmp
     cd ..
 else
     RED="\\033[1;31m"
     NORMAL="\\033[0m"
     echo -e "$RED" "FAIL: directory 'out' not found."  "$NORMAL"
 fi
+
+
+gnuplot <<EOF
+set log x
+set log y
+set xlabel "Grid points per Radius"
+set ylabel "Curvature Error"
+plot "out.tmp" u 1:2 t "L2", 2/(x*x) 
+set term pdf
+set out "curvature.pdf"
+plot "out.tmp" u 1:2 t "L2"
+EOF

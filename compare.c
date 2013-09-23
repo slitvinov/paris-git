@@ -82,11 +82,18 @@ int main (int argc, char * argv[])
 	  printf("\n");
 	}
       else
-	printf("second: %g\n",diff);
+	printf(" %g\n",diff);
     }
   else
     {
-      printf("\033[31;1m FAIL\033[0m error=%g \n",diff);
+      if(output < 2) 
+	{
+	  printf("\033[31;1m FAIL\033[0m error=%g \n",diff);
+	}
+      else
+	{
+	  printf("%g \n",diff);
+	}
     }
   return 0;
 }

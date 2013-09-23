@@ -62,7 +62,7 @@ Program paris
   include 'mpif.h'
   integer :: ierr, icolor
   ! Locals for marching and timing
-  real(8) :: start_time, end_time
+  real(8) :: start_time, end_time=0.d0
   integer :: req(48),sta(MPI_STATUS_SIZE,48)
   INTEGER :: irank, ii, i, j, k
   real(8) :: residual
