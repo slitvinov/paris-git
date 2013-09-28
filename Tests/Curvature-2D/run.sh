@@ -1,13 +1,15 @@
 #!/bin/bash
 #set -x
 
-let nx=64
-radius=0.25
-
-
+let nx=16
+let nz=2
+let npx=2
+let npz=1
+radius=0.32
+refinement=4
 
 /bin/rm -fr out input reference.txt
-let npstart=8
+let npstart=4
 if [ $# -gt 0 ]; then
     if [ $1 == mono ]; then
 	echo "mono"
@@ -19,8 +21,11 @@ if [ $# -gt 0 ]; then
 	exit 1
     fi
 else
-    ln -s testinput input
-    precision=4e-3
+    sed s/NXTEMP/$nx/g testinput.template | sed s/NZTEMP/$nz/g | sed s/NPXTEMP/$npx/g  | sed s/NPZTEMP/$npz/g > testinput
+    sed s/RADIUSTEMP/$radius/g testinput > testinput-$dim-$nx-$radius 
+    ln -s testinput-$dim-$nx-$radius input
+    sed s/REFINEMENTTEMP/$refinement/g inputvof.template > inputvof
+    precision=4e-2
 fi
 
 mpirun -np $npstart paris > tmpout 2>&1
@@ -38,4 +43,6 @@ else
     echo -e "$RED" "FAIL: directory 'out' not found."  "$NORMAL"
 fi
 
-
+gnuplot <<EOF
+call "../grid.gp"
+EOF

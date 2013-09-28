@@ -88,5 +88,5 @@ set ylabel "Curvature Error"
 plot "out.tmp" u 1:2 t "L2", 2/(x*x) 
 set term pdf
 set out "curvature.pdf"
-plot "out.tmp" u 1:2 t "L2"
+plot "out.tmp" u 1:2 t "L2", 2/(x*x) 
 EOF

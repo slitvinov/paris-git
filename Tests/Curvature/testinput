@@ -14,7 +14,7 @@
 !=================================================================================================
 ! General parameters
 
-TWOPHASE = T         ! TwoPhase: Is the flow two-phase?
+TWOPHASE  = T         ! TwoPhase: Is the flow two-phase?
 DoVOF 	  = T
 DoFront   = F
 GetPropertiesFromFront = F ! T: uses Front-Tracking data to compute mu, rho and Surface Tension. 
@@ -121,7 +121,7 @@ NumBubble =  1
 xyzrad(1, 1)  = 0.5 
 xyzrad(2, 1)  = 0.5 
 xyzrad(3, 1)  = 0.5 
-xyzrad(4, 1)  = 0.25 !  0.499
+xyzrad(4, 1)  = RADIUSTEMP
 
                    ! Initial bubble size and location : x,y,z,radius
 

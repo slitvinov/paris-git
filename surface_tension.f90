@@ -39,6 +39,7 @@ module module_surface_tension
   integer, parameter :: NDEPTH=2
   integer, parameter :: NOR=6 ! number of orientations
   integer, parameter :: NPOS=NOR*27
+  real(8), parameter :: EPS_GEOM = 1d-4
   real(8), dimension(:,:,:), allocatable :: n1,n2,n3 ! normals
   real(8), dimension(:,:,:,:), allocatable :: height ! 
 
@@ -501,7 +502,7 @@ contains
          a(5) = (h(0,1)-h(0,-1))/2.d0
          kappa = 2.d0*(a(1)*(1.d0+a(5)*a(5)) + a(2)*(1.d0+a(4)*a(4)) - a(3)*a(4)*a(5)) &
                /(1.d0+a(4)*a(4)+a(5)*a(5))**(1.5d0)
-         kappa = sign(kappa,mx(try(1)))
+         kappa = sign(1.d0,mx(try(1)))*kappa
          indexCurv = indexfound
          ! This stops the code in case kappa becomes NaN.
 !--debug         if(kappa.ne.kappa) call pariserror("HF9: Invalid Curvature")               
@@ -520,7 +521,7 @@ contains
          kappa = 2.d0*(a(1)*(1.d0+a(5)*a(5)) + a(2)*(1.d0+a(4)*a(4)) - a(3)*a(4)*a(5)) &
                /(1.d0+a(4)*a(4)+a(5)*a(5))**(1.5d0)
          indexCurv = indexfound
-         kappa = sign(kappa,mx(try(1)))
+         kappa = sign(1.d0,mx(try(1)))*kappa
          ! This stops the code in case kappa becomes NaN.
 !--debu         if(kappa.ne.kappa) call pariserror("HF6: Invalid Curvature")
          nposit=0
@@ -592,24 +593,26 @@ contains
 
    subroutine output_curvature()
       implicit none      
-      integer :: i,j,k,indexCurv,l,m,n
-      integer :: ib,try(3)
+      integer :: i,j,k,indexCurv ! ,l,m,n
+      integer :: ib ! ,try(3)
       real(8) :: kappa
       real(8) :: angle 
       real(8) :: kappamin
       real(8) :: kappamax
       real(8) :: kappa_exact
-      real(8) :: hex,hpex,hmex,dhex,d2hex
-      real(8) :: hnum,hpnum,hmnum,dhnum,d2hnum,hloc(-1:1,-1:1)
-      real(8) :: err_h,err_hp,err_hm,err_dh,err_d2h,err_K
-      real(8) :: L2_err_h,L2_err_hp,L2_err_hm,L2_err_dh,L2_err_d2h,L2_err_K
-      real(8) :: S2_err_h,S2_err_hp,S2_err_hm,S2_err_dh,S2_err_d2h,S2_err_K
-      real(8) :: Lm_err_h,Lm_err_hp,Lm_err_hm,Lm_err_dh,Lm_err_d2h,Lm_err_K
+ !     real(8) :: hex,hpex,hmex,dhex,d2hex
+ !      real(8) :: hnum,hpnum,hmnum,dhnum,d2hnum,hloc(-1:1,-1:1)
+!      real(8) :: err_h,err_hp,err_hm,err_dh,err_d2h,err_K
+!     real(8) :: L2_err_h,L2_err_hp,L2_err_hm,L2_err_dh,L2_err_d2h,L2_err_K
+!     real(8) :: S2_err_h,S2_err_hp,S2_err_hm,S2_err_dh,S2_err_d2h,S2_err_K
+!     real(8) :: Lm_err_h,Lm_err_hp,Lm_err_hm,Lm_err_dh,Lm_err_d2h,Lm_err_K
+      real(8) :: L2_err_K, err_K
+      real(8) :: S2_err_K
+      real(8) :: Lm_err_K
       integer :: sumCount,nfound,nindepend
-      integer :: i1(-1:1,-1:1,3), j1(-1:1,-1:1,3), k1(-1:1,-1:1,3)
-      real(8) :: stencil3x3(-1:1,-1:1,-1:1),mx(3)
+!       integer :: i1(-1:1,-1:1,3), j1(-1:1,-1:1,3), k1(-1:1,-1:1,3)
       integer :: nposit
-      real(8) :: points(NPOS,3)
+!       real(8) :: points(NPOS,3)
       real(8), parameter :: PI= 3.14159265359d0
 
       OPEN(UNIT=89,FILE=TRIM(out_path)//'/curvature-'//TRIM(int2text(rank,padding))//'.txt')
@@ -619,6 +622,9 @@ contains
       ib = 1
       kappamin = 1d20
       kappamax = -1d20
+      sumCount = 0
+      S2_err_K=0.d0
+      Lm_err_K=0.d0
       if ( test_curvature ) then 
          kappa_exact = 2.d0/rad(ib)
          do i=is,ie; do j=js,je; do k=ks,ke
@@ -629,188 +635,23 @@ contains
                kappamax = max(ABS(kappa),kappamax)
                kappamin = min(ABS(kappa),kappamin)
                angle = atan2(y(j)-yc(ib),x(i)-xc(ib))/PI*180.d0
-               write(89,*) angle,ABS(kappa)
+               write(89,'(2(E15.8,1X))') angle,kappa
+               write(92,'(2(E15.8,1X),I4)') angle,kappa,nfound
                write(90,*) angle,kappa_exact
                err_K = ABS(ABS(kappa)-kappa_exact)/kappa_exact
                if ( err_K > 0.1d0 ) &
-                    write(91,'(4(I3,1X),2(E15.8,1X),I2)') i,j,k,indexCurv,kappa,kappa_exact,nfound
+                    write(91,'(4(I3,1X),2(E15.8,1X),I4)') i,j,k,indexCurv,kappa,kappa_exact,nfound
             end if ! cvof(i,j,k)
          end do; end do; end do
       else if ( test_curvature_2D) then 
          k = (Nz+4)/2
          kappa_exact = 1.d0/rad(ib)
-         sumCount = 0
-         S2_err_K=0.d0
-         Lm_err_K=0.d0
-
-         if(1==0) then ! begin remove h to h_exact comparison
-            S2_err_h=0.d0;S2_err_hp=0.d0;S2_err_hm=0.d0;S2_err_dh=0.d0;S2_err_d2h=0.d0;
-            Lm_err_h=0.d0;Lm_err_hp=0.d0;Lm_err_hm=0.d0;Lm_err_dh=0.d0;Lm_err_d2h=0.d0;
-         endif
-
-         if(1==0) then ! remove extensive debugging
-         do i=is,ie
-            write(92,'(3X,I1,3X)',advance='no') i
-         enddo
-         write(92,*) " "
-!         do j=je,js,-1
-         do j=js,je
-            write(92,'(I2)',advance='no') j
-            do i=is,ie
-               if (vof_flag(i,j,k) == 2) then 
-                  call get_curvature(i,j,k,kappa,indexCurv,nfound,nposit)
-                  write(92,'(1X,E10.2)',advance='no') kappa
-               else
-                  write(92,'(2X,"*",I1,"*",2X)',advance='no') vof_flag(i,j,k)
-               endif
-            enddo
-            write(92,*) "  "
-         enddo
-         write(92,*) "  "
-
-         do i=is,ie
-            write(92,'(3X,I1,3X)',advance='no') i
-         enddo
-         write(92,*) " "
-         do j=je,js,-1
-            !         do j=js,je
-            write(92,'(I2)',advance='no') j
-            do i=is,ie
-               if (vof_flag(i,j,k) == 2) then 
-                  do m=-1,1; do n=-1,1; do l=-1,1
-                     stencil3x3(m,n,l) = cvof(i+m,j+n,k+l)
-                  enddo;enddo;enddo
-                  call fd32(stencil3x3,mx)
-                  write(92,'(1X,E10.2)',advance='no') mx(1)
-               else
-                  write(92,'(2X,"*",I1,"*",2X)',advance='no') vof_flag(i,j,k)
-               endif
-            enddo
-            write(92,*) "  "
-         enddo
-         write(92,*) "  "
-         do i=is,ie
-            write(92,'(3X,I1,3X)',advance='no') i
-         enddo
-         write(92,*) " "
-         do j=je,js,-1
-            !         do j=js,je
-            write(92,'(I2)',advance='no') j
-            do i=is,ie
-               if (vof_flag(i,j,k) == 2) then 
-                  do m=-1,1; do n=-1,1; do l=-1,1
-                     stencil3x3(m,n,l) = cvof(i+m,j+n,k+l)
-                  enddo;enddo;enddo
-                  call fd32(stencil3x3,mx)
-                  write(92,'(1X,E10.2)',advance='no') mx(2)
-               else
-                  write(92,'(2X,"*",I1,"*",2X)',advance='no') vof_flag(i,j,k)
-               endif
-            enddo
-            write(92,*) "  "
-         enddo
-         write(92,*) "  "
-         do i=is,ie
-            write(92,'(3X,I1,3X)',advance='no') i
-         enddo
-         write(92,*) " "
-         do j=je,js,-1
-            !         do j=js,je
-            write(92,'(I2)',advance='no') j
-            do i=is,ie
-               if (vof_flag(i,j,k) == 2) then 
-                  do m=-1,1; do n=-1,1; do l=-1,1
-                     stencil3x3(m,n,l) = cvof(i+m,j+n,k+l)
-                  enddo;enddo;enddo
-                  call fd32(stencil3x3,mx)
-                  write(92,'(1X,E10.2)',advance='no') mx(3)
-               else
-                  write(92,'(2X,"*",I1,"*",2X)',advance='no') vof_flag(i,j,k)
-               endif
-            enddo
-            write(92,*) "  "
-         enddo
-         write(92,*) "  "
-
-         do j=je,js,-1
-            !         do j=js,je
-            write(92,'(I2)',advance='no') j
-            do i=is,ie
-               if (vof_flag(i,j,k) == 2) then 
-                  call get_curvature(i,j,k,kappa,indexCurv,nfound,nposit)
-                  !                  write(92,'(1X,"<",I1,"-",I1,">")',advance='no') nfound,nindepend
-                  write(92,'(I4,1X)',advance='no') nfound
-               else
-                  write(92,'(1X,"*",I1,"*",1X)',advance='no') vof_flag(i,j,k)
-               endif
-            enddo
-            write(92,*) "  "
-         enddo
-         write(92,*) "  "
-
-         !         do j=je,js,-1
-         do j=js,je
-            write(92,'(I2)',advance='no') j
-            do i=is,ie
-               if (vof_flag(i,j,k) == 2) then 
-                  call get_curvature(i,j,k,kappa,indexCurv,nfound,nposit)
-                  !                  write(92,'(1X,"<",I1,"-",I1,">")',advance='no') nfound,nindepend
-                  write(92,'(I4,1X)',advance='no') nposit
-               else
-                  write(92,'(1X,"*",I1,"*",1X)',advance='no') vof_flag(i,j,k)
-               endif
-            enddo
-            write(92,*) "  "
-         enddo
-         write(92,*) "  "
-
-         !         do j=je,js,-1
-         do j=js,je
-            write(92,'(I2)',advance='no') j
-            do i=is,ie
-               if (vof_flag(i,j,k) == 2) then 
-                  call get_curvature(i,j,k,kappa,indexCurv,nfound,nposit)
-                  !                  write(92,'(1X,"<",I1,"-",I1,">")',advance='no') nfound,nindepend
-                  write(92,'(I4,1X)',advance='no') indexcurv
-               else
-                  write(92,'(1X,"*",I1,"*",1X)',advance='no') vof_flag(i,j,k)
-               endif
-            enddo
-            write(92,*) "  "
-         enddo
-         write(92,*) "  "
-
-         do n=1,6
-            write(92,*) " "
-            write(92,*) "orientation",n
-            write(92,*) " "
-            do i=is,ie
-               write(92,'(3X,I1,3X)',advance='no') i
-            enddo
-            write(92,*) " "
-            do j=je,js,-1
-               write(92,'(I2)',advance='no') j
-               do i=is,ie
-                  if(height(i,j,k,n)>1d6) then
-                     write(92,'(3X,".",3X)',advance='no')
-                  else
-                     write(92,'(1X,E10.2)',advance='no') height(i,j,k,n)
-                  endif
-               enddo
-               write(92,*) " "
-            enddo
-         enddo
-         write(92,*) " "
-
-         end if ! stop debugging output
-
-         do i=is,ie; do j=js,je
-!             write(*,*) "i,j ", i,j
+          do i=is,ie; do j=js,je
             if (vof_flag(i,j,k) == 2) then 
                call get_curvature(i,j,k,kappa,indexCurv,nfound,nposit)
                ! This stops the code in case kappa becomes NaN.
                if(kappa.ne.kappa) call pariserror("OC: Invalid Curvature")  
-               if(nfound==-1.or.abs(kappa)<1d-4) then
+               if(nfound==-1.or.abs(kappa)<EPS_GEOM) then
                   write(6,*) "i,j,k,nfound,nindepend,kappa ",i,j,k,nfound,nindepend,kappa
                   call pariserror("OC: curvature not found")
                else
@@ -820,75 +661,14 @@ contains
                   angle = atan2(y(j)-yc(ib),x(i)-xc(ib))/PI*180.d0
                   write(89,*) angle,ABS(kappa)
                   write(90,*) angle,kappa_exact
-
                   err_K    = ABS(ABS(kappa)-abs(kappa_exact))/kappa_exact
                   S2_err_K    = S2_err_K  + err_K**2
-!                  write(*,*) i,j,err_K,kappa,S2_err_K
                   Lm_err_K    = MAX(Lm_err_K,   err_K) 
                   sumCount = sumCount + 1
-
-                  if(1==0) then ! remove h to h_exact comparison
-                     call CalExactHeight_Circle(x(i),y(j),1.d0/dble(Nx),1.d0/dble(Ny),&
-                          xc(ib),yc(ib),rad(ib),indexCurv,hex,hpex,hmex,dhex,d2hex)
-                     call map3x3in2x2(i1,j1,k1,i,j,k)
-                     if(recomputenormals) then
-                        do m=-1,1; do n=-1,1; do l=-1,1
-                           stencil3x3(m,n,l) = cvof(i+m,j+n,k+l)
-                        enddo;enddo;enddo
-                        call fd32(stencil3x3,mx)
-                     else
-                        mx(1) = n1(i,j,k)      
-                        mx(2) = n2(i,j,k)      
-                        mx(3) = n3(i,j,k)
-                     endif
-                     call orientation(mx,try)
-
-                     call get_local_heights(i1,j1,k1,mx,try,nfound,indexCurv,hloc,points,nposit)
-                     hnum  = hloc( 0,0)/dble(Nx)
-                     hpnum = hloc( 1,0)/dble(Nx)
-                     hmnum = hloc(-1,0)/dble(Nx)
-                     if(hnum+hpnum+hmnum<1d6) then 
-                        dhnum = (hpnum-hmnum)/(2.d0/dble(Nx))
-                        d2hnum = (hpnum-2.d0*hnum+hmnum)/(1.d0/dble(Nx))**2.d0
-                        err_h    = ABS(hnum   - hex )
-                        err_hp   = ABS(hpnum  - hpex)
-                        err_hm   = ABS(hmnum  - hmex)
-                        err_dh   = ABS(dhnum  - dhex)
-                        err_d2h  = ABS(d2hnum - d2hex)/ABS(d2hex)
-                        write(91,'(7(E15.8,1X),6(I5,1X))') angle,err_h,err_hp,err_hm,& 
-                             err_dh,err_d2h,err_K,indexCurv,i,j,nfound,nindepend
-                        !@@                     sumCount = sumCount + 1
-                        S2_err_h    = S2_err_h  + err_h  **2.d0
-                        S2_err_hp   = S2_err_hp + err_hp **2.d0
-                        S2_err_hm   = S2_err_hm + err_hm **2.d0
-                        S2_err_dh   = S2_err_dh + err_dh **2.d0
-                        S2_err_d2h  = S2_err_d2h+ err_d2h**2.d0
-
-                        Lm_err_h    = MAX(Lm_err_h,   err_h ) 
-                        Lm_err_hp   = MAX(Lm_err_hp,  err_hp) 
-                        Lm_err_hm   = MAX(Lm_err_hm,  err_hm) 
-                        Lm_err_dh   = MAX(Lm_err_dh,  err_dh) 
-                        Lm_err_d2h  = MAX(Lm_err_d2h, err_d2h) 
-                     endif ! h < 1d6
-                  end if ! end remove h to hexact
                endif ! valid curvature
             end if ! cvof(i,j,k)
          end do; end do
 
-         if(1==0) then
-            if(SumCount>0) then
-               L2_err_h    = sqrt(S2_err_h)  /dble(sumCount)
-               L2_err_hp   = sqrt(S2_err_hp) /dble(sumCount)
-               L2_err_hm   = sqrt(S2_err_hm) /dble(sumCount)
-               L2_err_dh   = sqrt(S2_err_dh) /dble(sumCount)
-               L2_err_d2h  = sqrt(S2_err_d2h)/dble(sumCount)
-               L2_err_K    = sqrt(S2_err_K)  /dble(sumCount)
-               write(*,*) 'L2 Norm:'
-               write(*,'(I5,1X,6(E15.8,1X))') Nx,L2_err_h,L2_err_hp,L2_err_hm,L2_err_dh,L2_err_d2h,L2_err_K
-               write(*,*) 'Linfty Norm:'
-               write(*,'(I5,1X,6(E15.8,1X))') Nx,Lm_err_h,Lm_err_hp,Lm_err_hm,Lm_err_dh,Lm_err_d2h,Lm_err_K
-            endif
-         endif
          L2_err_K    = sqrt(S2_err_K/dble(sumCount))
          write(*,*) 'L2 Norm:'
          write(*,'(I5,I5,1X,(E15.8,1X))') Nx,rank,L2_err_K
@@ -900,47 +680,7 @@ contains
       CLOSE(89)
       CLOSE(90)
       CLOSE(91)
-
-    contains
-      ! TEMPORARY
-
-      subroutine CalExactHeight_Circle(x1,y1,dx,dy,xc,yc,R,ih,h,hp,hm,dh,d2h)
-
-        implicit none
-
-        real(8), intent(in)  :: x1,y1,dx,dy,xc,yc,R
-        integer, intent(in)  :: ih
-        real(8), intent(out) :: h,hp,hm,dh,d2h
-
-        integer :: s,d
-        real(8) :: xm,ym,xp,yp
-
-        s = -2*mod(ih,2)+1
-        d = (ih+1)/2
-
-        xm = x1-dx
-        xp = x1+dx
-        ym = y1-dy
-        yp = y1+dy
-
-        if ( d == 1 ) then 
-           h  = s*(ABS(x1-xc)-sqrt(R**2.d0-(y1-yc)**2.d0))
-           hp = s*(ABS(x1-xc)-sqrt(R**2.d0-(yp-yc)**2.d0))
-           hm = s*(ABS(x1-xc)-sqrt(R**2.d0-(ym-yc)**2.d0))
-           dh = s*(y1-yc)/sqrt(R**2.d0-(y1-yc)**2.d0)
-           d2h= s*(  1.d0/sqrt(R**2.d0-(y1-yc)**2.d0) &
-                + (y1-yc)**2.d0/(R**2.d0-(y1-yc)**2.d0)**1.5d0)
-        else if ( d == 2 ) then 
-           h  = s*(ABS(y1-yc)-sqrt(R**2.d0-(x1-xc)**2.d0))
-           hp = s*(ABS(y1-yc)-sqrt(R**2.d0-(xp-xc)**2.d0))
-           hm = s*(ABS(y1-yc)-sqrt(R**2.d0-(xm-xc)**2.d0))
-           dh = s*(x1-xc)/sqrt(R**2.d0-(x1-xc)**2.d0)
-           d2h= s*(  1.d0/sqrt(R**2.d0-(x1-xc)**2.d0) &
-                + (x1-xc)**2.d0/(R**2.d0-(x1-xc)**2.d0)**1.5d0)
-        end if ! d
-
-      end subroutine CalExactHeight_Circle
-      ! END TEMPORARY
+      CLOSE(92)
     end subroutine output_curvature
 
     subroutine parabola_fit(xfit,yfit,hfit,nposit,a,fit_success)
@@ -1199,9 +939,9 @@ contains
      real(8) :: area,b,amax
 
      if(mx<0.d0.or.my<0.d0.or.mz<0.d0) call pariserror("invalid mx-my-mz")
-     if(abs(mx+my+mz-1d0)>1d-4) call pariserror("invalid mx+my+mz")
+     if(abs(mx+my+mz-1d0)>EPS_GEOM) call pariserror("invalid mx+my+mz")
 
-     if (mx < 1d-4) then
+     if (mx < EPS_GEOM) then
         nx = my
         ny = mz
         call LineCenter (nx,ny, alpha, qx,qy)
@@ -1210,7 +950,7 @@ contains
         pz = qy
         return
      endif
-     if (my < 1d-4) then
+     if (my < EPS_GEOM) then
         nx = mz
         ny = mx
         call LineCenter (nx,ny, alpha, qx,qy)
@@ -1219,7 +959,7 @@ contains
         pz = qx
         return
      endif
-     if (mz < 1d-4) then
+     if (mz < EPS_GEOM) then
         call LineCenter (mx,my, alpha, px,py)
         pz = 0.5
         return
@@ -1295,13 +1035,13 @@ contains
       
      if (alpha <= 0.d0 .or. alpha >= 1.d0) call pariserror("LC: invalid alpha")
 
-     if (mx < 1d-4) then
+     if (mx < EPS_GEOM) then
         px = 0.5
         py = alpha;
         return
      endif
 
-     if (my < 1d-4) then
+     if (my < EPS_GEOM) then
         py = 0.5;
         px = alpha
         return
@@ -1395,7 +1135,6 @@ contains
    subroutine test_VOF_HF()
      implicit none
      integer :: calc_imax
-
      if(calc_imax(vof_flag)/=2) then
         write(*,*) calc_imax(vof_flag), "expecting maximum flag = 2"
         call pariserror("bad flags")
@@ -1406,7 +1145,154 @@ contains
      else if(test_curvature .or. test_curvature_2D) then
         call output_curvature()
      end if
+     if(test_curvature_2D) then
+        call  plot_curvature()
+     endif
   end subroutine test_VOF_HF
  
+  subroutine plot_curvature()
+    implicit none
+    integer :: i,j,k,iem,jem
+    real(8) :: centroid(3),x1,y1,xvec,yvec
+    k = (Nz+4)/2
+
+    if(rank==0) then
+      OPEN(UNIT=89,FILE=TRIM(out_path)//'/grid.txt')
+      OPEN(UNIT=90,FILE=TRIM(out_path)//'/segments.txt')
+      OPEN(UNIT=91,FILE=TRIM(out_path)//'/points.txt')
+      OPEN(UNIT=92,FILE=TRIM(out_path)//'/parabola-'//TRIM(int2text(rank,padding))//'.txt')
+      jem = je - 2
+      iem = ie - 2
+      do i=js,jem
+         write(89,'(4(E15.8,1X))') xh(is),yh(i),xh(iem)-xh(is),0.d0
+      enddo
+      do i=is,iem
+         write(89,'(4(E15.8,1X))') xh(i),yh(js),0.,yh(jem)-yh(js)
+      enddo
+      do i=is,ie; do j=js,je
+!         write(90,*) i,j,k
+         if(vof_flag(i,j,k).eq.2) then
+            call PlotCutAreaCentroid(i,j,k,centroid,x1,y1,xvec,yvec)
+            write(90,'(4(E15.8,1X))') x1,y1,xvec,yvec
+            write(91,'(2(E15.8,1X))') centroid(1),centroid(2) 
+         endif
+      enddo; enddo
+      CLOSE(89)
+      CLOSE(90)
+      CLOSE(91)
+      CLOSE(92)
+   endif
+ end subroutine plot_curvature
+ 
+subroutine PlotCutAreaCentroid(i,j,k,centroid,x1,y1,xvec,yvec)
+      implicit none
+      integer, intent(in)  :: i,j,k
+      real(8), intent(out) :: centroid(3),x1,y1,xvec,yvec
+      integer :: l,m,n
+      real(8) :: dmx,dmy,dmz, mxyz(3),px,py,pz
+      real(8) :: invx,invy
+      real(8) :: alpha, al3d
+      real(8) :: stencil3x3(-1:1,-1:1,-1:1)
+      logical :: inv, swap
+      real(8) :: deltax, tmp
+
+      deltax=dx(nx/2)
+      ! plot cut area centroid 
+      !***
+      !     (1) normal vector: dmx,dmy,dmz, and |dmx|+|dmy|+|dmz| = 1.
+      !     (2) dmx,dmy,dmz>0 and record sign
+      !     (3) get alpha;               
+      !     (4) compute centroid with dmx,dmy,dmz and alpha;
+      !     (5) transfer to local coordinate;
+      !*(1)*
+
+      if(recomputenormals) then
+         do l=-1,1; do m=-1,1; do n=-1,1
+            stencil3x3(l,m,n) = cvof(i+l,j+m,k+n)
+         enddo;enddo;enddo
+         call youngs(stencil3x3,mxyz)
+         dmx = mxyz(1)
+         dmy = mxyz(2)
+         dmz = mxyz(3)      
+      else
+         dmx = n1(i,j,k)      
+         dmy = n2(i,j,k)      
+         dmz = n3(i,j,k)
+      endif
+      if(abs(dmz).gt.EPS_GEOM) call pariserror("PCAC: invalid dmz.")
+      !*(2)*  
+      invx = 1.d0
+      invy = 1.d0
+      if (dmx .lt. 0.0d0) then
+         dmx = -dmx
+         invx = -1.d0
+      endif
+      if (dmy .lt. 0.0d0) then
+         dmy = -dmy
+         invy = -1.d0
+      endif
+      alpha = al3d(dmx,dmy,dmz,cvof(i,j,k))
+      !*(4)*  
+      call PlaneAreaCenter(dmx,dmy,dmz,alpha,px,py,pz)
+      !*(5)*
+      ! rotate
+      centroid(1) = px*invx
+      centroid(2) = py*invy
+      ! shift to cell-center coordinates
+      centroid(1) = centroid(1) - invx*0.5d0
+      centroid(2) = centroid(2) - invy*0.5d0
+      ! rescale
+      do n=1,2; centroid(n) = deltax*centroid(n); enddo
+      !*(6) 
+      ! test alpha
+      inv = .false.
+      swap = .false.
+      if(dmy > dmx ) then
+         swap = .true.
+         tmp = dmy
+         dmy = dmx
+         dmx = tmp
+      endif
+
+      if(alpha > 0.5d0) then
+         inv = .true.
+         alpha = 1.d0 - alpha
+      endif
+      x1 = alpha/dmx
+      y1 = 0.d0
+      if(alpha < dmy) then
+         xvec = - x1
+         yvec = alpha/dmy
+      else
+         xvec = - dmy/dmx
+         yvec = 1.d0
+      endif
+      if(inv) then
+         x1 = 1.d0 - x1; y1 = 1.d0 - y1
+         xvec = -xvec; yvec = - yvec
+      endif
+      if(swap) then
+         tmp = y1
+         y1 = x1
+         x1 = tmp
+         tmp = yvec
+         yvec = xvec
+         xvec = tmp
+      endif
+
+      ! shift to cell center coordinates
+      x1 = x1 - 0.5d0; y1 = y1 - 0.5d0
+      ! reverse if needed and rescale
+      x1 = x1*invx*deltax
+      xvec = xvec*invx*deltax
+      y1 = y1*invy*deltax
+      yvec = yvec*invy*deltax
+      ! shift
+      x1 = x1 + x(i)
+      centroid(1) = centroid(1) + x(i) 
+      y1 = y1 + y(j)
+      centroid(2) = centroid(2) + y(j)
+   end subroutine PlotCutAreaCentroid
+
 end module module_surface_tension
 
