@@ -129,10 +129,10 @@ module module_IO
   logical :: read_x, read_y, read_z, restart, ICOut, restartFront, restartAverages
   contains
 !=================================================================================================
-subroutine write_vec_gnuplot(u,v,w,iout)
+subroutine write_vec_gnuplot(u,v,iout)
   use module_grid
   implicit none
-  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: u, v, w
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: u, v
   integer, intent(in) :: iout
   integer :: i,j,k
   real(8) :: norm=0.d0, coeff
@@ -906,7 +906,6 @@ module module_poisson
     real(8), intent(in) :: maxError
     integer, intent(in) :: maxit
     integer, intent(out):: num_iterations
-    real(8) :: final_res_norm
 !----------------------------------------Fill in matrix Amat--------------------------------------
     num_iterations = 0
     nvalues = mx * my * mz * nstencil
@@ -1051,18 +1050,18 @@ subroutine SetupDensity(dIdx,dIdy,dIdz,A,color) !,mask)
   endif
 
   if(.not. first)then
-  	first=.false.
-    do k=ks,ke; do j=js,je; do i=is,ie
-      dI(i,j,k) = ( (dIdx(i,j,k)+dIdx(i-1,j,k))**2 + &
-                    (dIdx(i,j,k)+dIdx(i-1,j,k))**2 + &
-                    (dIdx(i,j,k)+dIdx(i-1,j,k))**2 )
-      if( dI(i,j,k)<1e-6 )then
-        A(i,j,k,1:6) = 0d0
-        A(i,j,k,7) = 1d0
-        A(i,j,k,8) = float(floor(color(i,j,k)+0.5))
-      endif
-    enddo; enddo; enddo
- endif
+     first=.false.
+     do k=ks,ke; do j=js,je; do i=is,ie
+        dI(i,j,k) = ( (dIdx(i,j,k)+dIdx(i-1,j,k))**2 + &
+             (dIdx(i,j,k)+dIdx(i-1,j,k))**2 + &
+             (dIdx(i,j,k)+dIdx(i-1,j,k))**2 )
+        if( dI(i,j,k)<1e-6 )then
+           A(i,j,k,1:6) = 0d0
+           A(i,j,k,7) = 1d0
+           A(i,j,k,8) = float(floor(color(i,j,k)+0.5))
+        endif
+     enddo; enddo; enddo
+  endif
 
 !  do k=ks,ke; do j=js,je; do i=is,ie
 !      A(i,j,k,7) = sum(A(i,j,k,1:6))
@@ -1492,8 +1491,7 @@ subroutine calcsum2(p,flowrate)
   use module_BC
   implicit none
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: p
-  real(8) :: flow, totalflow, flowrate
-  integer :: i,j,k, ierr
+  real(8) :: flow,flowrate
   call calcsum_shift(p,flow,1,0,0)
   call calcsum_shift(p,flow,0,1,0)
   call calcsum_shift(p,flow,0,0,1)

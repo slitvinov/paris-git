@@ -455,15 +455,15 @@ contains
 
    end subroutine get_local_heights
 !
-   subroutine get_curvature(i0,j0,k0,kappa,indexCurv,nfound,nposit)
+   subroutine get_curvature(i0,j0,k0,kappa,indexCurv,nfound,nposit,a)
       implicit none
       integer, intent(in) :: i0,j0,k0
-      real(8), intent(out) :: kappa  
+      real(8), intent(out) :: kappa,a(6)  
       integer, intent(out) :: indexCurv, nfound
       integer, intent(out) :: nposit
 
       integer :: indexfound
-      real(8) :: h(-1:1,-1:1),a(6)
+      real(8) :: h(-1:1,-1:1)
 !      integer :: nCentroids
 
       integer :: m,n,l,i,j,k
@@ -495,6 +495,9 @@ contains
       
       ! if all nine heights found 
       if ( nfound == 9 ) then
+!
+!  h = a6  + a4 x + a5 y + a3 xy + a1 x**2 + a2 y**2
+!
          a(1) = (h(1,0)-2.d0*h(0,0)+h(-1,0))/2.d0
          a(2) = (h(0,1)-2.d0*h(0,0)+h(0,-1))/2.d0
          a(3) = (h(1,1)-h(-1,1)-h(1,-1)+h(-1,-1))/4.d0
@@ -583,7 +586,6 @@ contains
               /(1.d0+a(4)*a(4)+a(5)*a(5))**(1.5d0)
          kappa = sign(1.d0,mx(try(1)))*kappa
          ! This stops the code in case kappa becomes NaN.
-!         WRITE(*,*) "KAPPA", KAPPA
 !--debu         if(kappa.ne.kappa) then
 !           if(rank==0) write(*,*) "PF6: kappa,try,mx,nposit ",kappa,try,mx,nposit
 !--debu            call pariserror("PF6: Invalid Curvature")  
@@ -594,25 +596,17 @@ contains
    subroutine output_curvature()
       implicit none      
       integer :: i,j,k,indexCurv ! ,l,m,n
-      integer :: ib ! ,try(3)
-      real(8) :: kappa
+      integer :: ib 
+      real(8) :: kappa,a(6)
       real(8) :: angle 
       real(8) :: kappamin
       real(8) :: kappamax
       real(8) :: kappa_exact
- !     real(8) :: hex,hpex,hmex,dhex,d2hex
- !      real(8) :: hnum,hpnum,hmnum,dhnum,d2hnum,hloc(-1:1,-1:1)
-!      real(8) :: err_h,err_hp,err_hm,err_dh,err_d2h,err_K
-!     real(8) :: L2_err_h,L2_err_hp,L2_err_hm,L2_err_dh,L2_err_d2h,L2_err_K
-!     real(8) :: S2_err_h,S2_err_hp,S2_err_hm,S2_err_dh,S2_err_d2h,S2_err_K
-!     real(8) :: Lm_err_h,Lm_err_hp,Lm_err_hm,Lm_err_dh,Lm_err_d2h,Lm_err_K
       real(8) :: L2_err_K, err_K
       real(8) :: S2_err_K
       real(8) :: Lm_err_K
       integer :: sumCount,nfound,nindepend
-!       integer :: i1(-1:1,-1:1,3), j1(-1:1,-1:1,3), k1(-1:1,-1:1,3)
       integer :: nposit
-!       real(8) :: points(NPOS,3)
       real(8), parameter :: PI= 3.14159265359d0
 
       OPEN(UNIT=89,FILE=TRIM(out_path)//'/curvature-'//TRIM(int2text(rank,padding))//'.txt')
@@ -630,8 +624,8 @@ contains
          do i=is,ie; do j=js,je; do k=ks,ke
             ! find curvature only for cut cells
             if (vof_flag(i,j,k) == 2 ) then 
-               call get_curvature(i,j,k,kappa,indexCurv,nfound,nposit)
-               kappa = kappa*dble(Nx)
+               call get_curvature(i,j,k,kappa,indexCurv,nfound,nposit,a)
+               kappa = kappa*dble(Nx) ! Nx = L/deltax
                kappamax = max(ABS(kappa),kappamax)
                kappamin = min(ABS(kappa),kappamin)
                angle = atan2(y(j)-yc(ib),x(i)-xc(ib))/PI*180.d0
@@ -648,7 +642,7 @@ contains
          kappa_exact = 1.d0/rad(ib)
           do i=is,ie; do j=js,je
             if (vof_flag(i,j,k) == 2) then 
-               call get_curvature(i,j,k,kappa,indexCurv,nfound,nposit)
+               call get_curvature(i,j,k,kappa,indexCurv,nfound,nposit,a)
                ! This stops the code in case kappa becomes NaN.
                if(kappa.ne.kappa) call pariserror("OC: Invalid Curvature")  
                if(nfound==-1.or.abs(kappa)<EPS_GEOM) then
@@ -690,12 +684,13 @@ contains
       real(8), intent(out) :: a(6)
       logical, intent(out) :: fit_success
 
-      real(8) :: m(6,6), invm(6,6)
+      real(8) :: m(6,6), invm(6,6),error
       real(8) :: rhs(6)
       integer :: ifit, im,jm, nposit
       logical :: inv_success
       real(8) :: x1,x2,x3,x4,y1,y2,y3,y4
 
+      fit_success=.false.
       a = 0.d0
 
       ! evaluate the linear system for least-square fit
@@ -754,9 +749,21 @@ contains
                a(im) = a(im) + invm(im,jm)*rhs(jm)
             end do
          end do 
+
+         write(*,*) "  "
+         write(*,*) "x1, x2", xfit(1), hfit(1)
+
+         do im=1,6
+            error = 0.
+            do jm=1,6
+               error = error + m(im,jm)*a(jm) 
+            end do
+            error = error - rhs(im)
+            write(*,*) "i, error ", error
+         end do 
+
+
          fit_success = .true.
-      else
-         fit_success = .false.
       end if ! inv_success
    end subroutine parabola_fit
 !
@@ -968,7 +975,7 @@ contains
      if (alpha < 0.d0 .or. alpha > 1.d0) call pariserror("PAC: invalid alpha")
 
      area = alpha*alpha
-     pz = area*alpha
+     px = area*alpha
      py = area*alpha
      pz = area*alpha
      b = alpha - mx
@@ -1145,22 +1152,23 @@ contains
      else if(test_curvature .or. test_curvature_2D) then
         call output_curvature()
      end if
-     if(test_curvature_2D) then
+     if(test_curvature_2D.and.nx<=8.and.ny<=8.and.nz<=2) then
         call  plot_curvature()
      endif
   end subroutine test_VOF_HF
  
   subroutine plot_curvature()
     implicit none
-    integer :: i,j,k,iem,jem
-    real(8) :: centroid(3),x1,y1,xvec,yvec
+    integer :: i,j,k,iem,jem,n
+    real(8) :: centroid(3),x1,y1,xvec,yvec,kappa,a(6),xpoint(0:2),ypoint(0:2),pc(12,12,2),diff(0:2)
+    integer :: direction,indexcurv,nfound,nposit
     k = (Nz+4)/2
 
     if(rank==0) then
       OPEN(UNIT=89,FILE=TRIM(out_path)//'/grid.txt')
       OPEN(UNIT=90,FILE=TRIM(out_path)//'/segments.txt')
       OPEN(UNIT=91,FILE=TRIM(out_path)//'/points.txt')
-      OPEN(UNIT=92,FILE=TRIM(out_path)//'/parabola-'//TRIM(int2text(rank,padding))//'.txt')
+      OPEN(UNIT=92,FILE=TRIM(out_path)//'/parabola.txt')
       jem = je - 2
       iem = ie - 2
       do i=js,jem
@@ -1170,13 +1178,32 @@ contains
          write(89,'(4(E15.8,1X))') xh(i),yh(js),0.,yh(jem)-yh(js)
       enddo
       do i=is,ie; do j=js,je
-!         write(90,*) i,j,k
          if(vof_flag(i,j,k).eq.2) then
             call PlotCutAreaCentroid(i,j,k,centroid,x1,y1,xvec,yvec)
+            do n=1,2
+               pc(i,j,n) = centroid(n)
+            enddo
             write(90,'(4(E15.8,1X))') x1,y1,xvec,yvec
             write(91,'(2(E15.8,1X))') centroid(1),centroid(2) 
          endif
       enddo; enddo
+      i=5; j=5
+      call get_curvature(i,j,k,kappa,indexCurv,nfound,nposit,a)
+      xpoint(0)=pc(i,j,1)
+      ypoint(0)=pc(i,j,2)
+      i=5; j=6
+      xpoint(1)=pc(i,j,1)
+      ypoint(1)=pc(i,j,2)
+      i=6; j=5
+      xpoint(2)=pc(i,j,1)
+      ypoint(2)=pc(i,j,2)
+!  h  = a4 x + a1 x**2 + a6
+!      do n=0,2
+!          diff(n) = abs(xpoint(n) - a(4)*ypoint(n) - a(1)*ypoint(n)**2 - a(6))
+!         write(*,*) n, diff(n), a
+!         diff(n) = abs(xpoint(n) - a(5)*ypoint(n) - a(2)*ypoint(n)**2 - a(6))
+!         write(*,*) n, diff(n), "second orientation", nposit
+!      enddo
       CLOSE(89)
       CLOSE(90)
       CLOSE(91)

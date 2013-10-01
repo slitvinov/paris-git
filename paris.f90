@@ -138,7 +138,7 @@ Program paris
         call output(0,is,ie+1,js,je+1,ks,ke+1)
 !        call output_VOF(0,imin,imax,jmin,jmax,kmin,kmax)
         call setvelocityBC(u,v,w,umask,vmask,wmask)
-        call write_vec_gnuplot(u,v,w,itimestep)
+        call write_vec_gnuplot(u,v,itimestep)
         call calcstats
         if(rank==0) then
            end_time =  MPI_WTIME()
@@ -364,7 +364,7 @@ Program paris
 
         if(mod(itimestep,nbackup)==0)call backup_write
         if(mod(itimestep,nout)==0) then 
-           call write_vec_gnuplot(u,v,w,itimestep)
+           call write_vec_gnuplot(u,v,itimestep)
            call output(ITIMESTEP/nout,is,ie+1,js,je+1,ks,ke+1)
            if(DoVOF) call output_VOF(ITIMESTEP/nout,imin,imax,jmin,jmax,kmin,kmax)
            if(rank==0)then
