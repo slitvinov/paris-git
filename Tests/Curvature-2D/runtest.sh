@@ -14,7 +14,7 @@ dim="$d"D
 init=$2
 
 if [ $d == 2 ]; then
-list="4 5 6 7"
+list="3 4 5 6 7"
 npz=1
 nz=2
 else
