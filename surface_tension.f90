@@ -52,6 +52,7 @@ module module_surface_tension
   logical :: recomputenormals = .true.
   logical :: debug_curvature = .false.
   logical :: debug_ij55 = .false.
+  integer, parameter :: nfound_min=25
 contains
 !=================================================================================================
   subroutine initialize_surface_tension()
@@ -553,7 +554,7 @@ contains
             origin(n) = centroid(n)
          enddo
       endif
-      if ( (-nfound) > 6 )  then  ! more than 6 points to avoid special 2D degeneracy. 
+      if ( (-nfound) > nfound_min )  then  ! more than 6 points to avoid special 2D degeneracy. 
          xfit=fit(:,try(2)) - origin(try(2))
          yfit=fit(:,try(3)) - origin(try(3))
          hfit=fit(:,try(1)) - origin(try(1))
@@ -706,7 +707,7 @@ contains
       S2_err_K=0.d0
       Lm_err_K=0.d0
       if ( test_curvature ) then 
-         kappa_exact = 2.d0/rad(ib)
+         kappa_exact = - 2.d0/rad(ib)
          do i=is,ie; do j=js,je; do k=ks,ke
             ! find curvature only for cut cells
             if (vof_flag(i,j,k) == 2 ) then 

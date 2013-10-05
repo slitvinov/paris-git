@@ -43,6 +43,10 @@ else
     echo -e "$RED" "FAIL: directory 'out' not found."  "$NORMAL"
 fi
 
-gnuplot <<EOF
+if [ $# -gt 0 ]; then
+    if [ $1 == mono ]; then
+	gnuplot <<EOF
 call "../grid.gp"
 EOF
+    fi
+fi
