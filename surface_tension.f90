@@ -52,7 +52,7 @@ module module_surface_tension
   logical :: recomputenormals = .true.
   logical :: debug_curvature = .false.
   logical :: debug_ij55 = .false.
-  integer, parameter :: nfound_min=25
+  integer, parameter :: nfound_min=6   !  25
 contains
 !=================================================================================================
   subroutine initialize_surface_tension()
@@ -374,6 +374,7 @@ contains
 !
 !  Loop over directions until an orientation with 9 heights is found. 
 ! 
+      points = 0.d0
       hloc = 2d6
       indexfound = -1
       nposit = 0 
@@ -403,9 +404,9 @@ contains
                      hloc(m,n) = height(i1(m,n,d),j1(m,n,d),k1(m,n,d),index)
                      nfound = nfound + 1
                      nposit = nposit + 1
-                     points(nposit,1) = x(i1(m,n,d))/deltax + hloc(m,n)*si
-                     points(nposit,2) = y(j1(m,n,d))/deltax + hloc(m,n)*sj
-                     points(nposit,3) = z(k1(m,n,d))/deltax + hloc(m,n)*sk
+                     points(nposit,1) = hloc(m,n)*si + i1(m,n,d)-i
+                     points(nposit,2) = hloc(m,n)*sj + j1(m,n,d)-j
+                     points(nposit,3) = hloc(m,n)*sk + k1(m,n,d)-k
                   else
                      s = 1 
                      heightnotfound=.true.
@@ -414,17 +415,17 @@ contains
                            hloc(m,n) = height(i1(m,n,d)+si*s,j1(m,n,d)+sj*s,k1(m,n,d)+sk*s,index) + s
                            nfound = nfound + 1
                            nposit = nposit + 1
-                           points(nposit,1) = x(i1(m,n,d)+si*s)/deltax + hloc(m,n)*si
-                           points(nposit,2) = y(j1(m,n,d)+sj*s)/deltax + hloc(m,n)*sj
-                           points(nposit,3) = z(k1(m,n,d)+sk*s)/deltax + hloc(m,n)*sk
+                           points(nposit,1) = hloc(m,n)*si + i1(m,n,d)-i
+                           points(nposit,2) = hloc(m,n)*sj + j1(m,n,d)-j
+                           points(nposit,3) = hloc(m,n)*sk + k1(m,n,d)-k
                            heightnotfound=.false.  ! to exit loop
                         else if  (height(i1(m,n,d)-si*s,j1(m,n,d)-sj*s,k1(m,n,d)-sk*s,index).lt.1d6) then
                            hloc(m,n) = height(i1(m,n,d)-si*s,j1(m,n,d)-sj*s,k1(m,n,d)-sk*s,index) - s
                            nfound = nfound + 1
                            nposit = nposit + 1
-                           points(nposit,1) = x(i1(m,n,d)+si*s)/deltax + hloc(m,n)*si
-                           points(nposit,2) = y(j1(m,n,d)+sj*s)/deltax + hloc(m,n)*sj
-                           points(nposit,3) = z(k1(m,n,d)+sk*s)/deltax + hloc(m,n)*sk
+                           points(nposit,1) = hloc(m,n)*si + i1(m,n,d)-i
+                           points(nposit,2) = hloc(m,n)*sj + j1(m,n,d)-j
+                           points(nposit,3) = hloc(m,n)*sk + k1(m,n,d)-k
                            heightnotfound=.false.  ! to exit loop
                         endif
                         s = s + 1
@@ -436,7 +437,7 @@ contains
             if(nfound.eq.9) then
                dirnotfound = .false.
                indexfound = index
-               ! on exit, let try(1) be the h direction found
+               ! on exit, redefine try() so that try(1) be the h direction found
                m=1
                n=2
                do while (m.le.3)
@@ -555,9 +556,9 @@ contains
          enddo
       endif
       if ( (-nfound) > nfound_min )  then  ! more than 6 points to avoid special 2D degeneracy. 
-         xfit=fit(:,try(2)) - origin(try(2))
-         yfit=fit(:,try(3)) - origin(try(3))
-         hfit=fit(:,try(1)) - origin(try(1))
+         xfit=points(:,try(2)) - origin(try(2))
+         yfit=points(:,try(3)) - origin(try(3))
+         hfit=points(:,try(1)) - origin(try(1))
          ! fit over all positions, not only independent ones. 
          call parabola_fit(xfit,yfit,hfit,nposit,a,fit_success) 
          if(.not.fit_success) call pariserror("no fit success")
