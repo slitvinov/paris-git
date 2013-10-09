@@ -53,6 +53,7 @@ module module_surface_tension
   logical :: debug_curvature = .false.
   logical :: debug_ij55 = .false.
   integer, parameter :: nfound_min=6   !  25
+  integer :: method_count(3)
 contains
 !=================================================================================================
   subroutine initialize_surface_tension()
@@ -480,26 +481,6 @@ contains
       real(8) :: xfit(NPOS),yfit(NPOS),hfit(NPOS),fit(NPOS,3)
       real(8) :: centroid(3),mx(3),stencil3x3(-1:1,-1:1,-1:1)
 
-      ! debug
-      integer :: k00
-      real(8) :: debugfit(-1:1,-1:1,2)
-      real(8) :: deltax
-      integer :: iem,jem
-      real(8) :: x1,y1,xvec,yvec,xpoint(0:2),ypoint(0:2),pc(12,12,2),diff(0:2)
-      if(debug_curvature) then
-         k00 = (Nz+4)/2
-         jem = je - 2
-         iem = ie - 2
-         deltax=dx(nx/2)
-         do i=js,jem
-            write(79,'(4(E15.8,1X))') xh(is),yh(i),xh(iem)-xh(is),0.d0
-         enddo
-         do i=is,iem
-            write(79,'(4(E15.8,1X))') xh(i),yh(js),0.,yh(jem)-yh(js)
-         enddo
-      endif
-      ! end debug
-
       call map3x3in2x2(i1,j1,k1,i0,j0,k0)
 !   define in which order directions will be tried 
 !   direction closest to normal first
@@ -570,13 +551,12 @@ contains
 !--debu         if(kappa.ne.kappa) call pariserror("HF6: Invalid Curvature")
          nposit=0
          return
-      else  ! ind_pos <= 5
+      else  ! ind_pos <= nfound_min
          ! Find all centroids in 3**3
          ! use direction closest to normal
          nfound = -100 + nfound  ! encode number of independent positions into nfound
          indexcurv=indexfound
          nposit=0
-         debugfit=2e6
          do m=-1,1; do n=-1,1; do l=-1,1
             i=i0+m
             j=j0+n
@@ -608,13 +588,7 @@ contains
                   call FindCutAreaCentroid(i,j,k,centroid)
                   do s=1,3 
                      fit(nposit,s) = centroid(s) + c(s)
-                     if(debug_curvature) then
-                        if(k0==k00.and.l==0.and.s<3) then
-                           debugfit(m,n,s) = centroid(s) + c(s)
-                        endif
-                     endif
                   end do
-!                  write(92,'(1X,E10.2)',advance='no') fit(:,1)
 !               endif 
             endif ! vof_flag
          enddo; enddo; enddo ! do m,n,l
@@ -626,44 +600,6 @@ contains
          hfit=fit(:,try(1)) - origin(try(1))
          if(nposit.gt.NPOS) call pariserror("GLH: nposit")
          call parabola_fit(xfit,yfit,hfit,nposit,a,fit_success)
-         if(debug_curvature) then
-            if(rank==0) then
-               if(is<=i0.and.i0<=ie.and.js<=j0.and.j0<=je) then
-                  call PlotCutAreaCentroid(i0,j0,k0,centroid,x1,y1,xvec,yvec)
-                  write(80,'(4(E15.8,1X))') x1,y1,xvec,yvec
-                  ! rescale
-                  do n=1,2
-                     centroid(n) = deltax*debugfit(0,0,n)
-                  enddo
-                  centroid(1) = centroid(1) + x(i0) 
-                  centroid(2) = centroid(2) + y(j0)
-                  write(81,'(2(E15.8,1X))') centroid
-               endif
-               if(i0==5.and.j0==5.and.k0==k00) then
-                  if(try(3).ne.3) then
-                     write(*,*) "try: ",try
-                     call pariserror("unexpected try(3)")
-                  endif
-                  if(try(1).ne.1) then
-                     call pariserror("unexpected try(1)")
-                  endif
-                  xpoint(0)=debugfit(0,0,1)
-                  ypoint(0)=debugfit(0,0,2)
-                  xpoint(1)=debugfit(1,0,1)
-                  ypoint(1)=debugfit(1,0,2)
-                  xpoint(2)=debugfit(0,1,1)
-                  ypoint(2)=debugfit(0,1,2)
-                  !  h  = a4 t + a1 t**2 + a6   h=x, t=y
-                  do n=0,2
-                     diff(n) = abs(xpoint(n) - a(4)*ypoint(n) - a(1)*ypoint(n)**2 - a(6))
-                     write(*,*) n, diff(n), a, nposit
-                  enddo
-                  WRITE(*,*) "debugfit ",debugfit(:,1,1)
-               endif ! i0,j0=5,5
-            endif ! rank=0
-         endif ! debug
-!         if(rank==0) write(*,*) "PF6: kappa,try,mx,nposit ",kappa,try,mx,nposit
-!         if(rank==0) write(*,*) "PF6: a, fit_success ", a,fit_success
          kappa = 2.d0*(a(1)*(1.d0+a(5)*a(5)) + a(2)*(1.d0+a(4)*a(4)) - a(3)*a(4)*a(5)) &
              /sqrt(1.d0+a(4)*a(4)+a(5)*a(5))**3
          kappa = sign(1.d0,mx(try(1)))*kappa
@@ -695,24 +631,26 @@ contains
       OPEN(UNIT=90,FILE=TRIM(out_path)//'/reference-'//TRIM(int2text(rank,padding))//'.txt')
       OPEN(UNIT=91,FILE=TRIM(out_path)//'/bigerror-'//TRIM(int2text(rank,padding))//'.txt')
       OPEN(UNIT=92,FILE=TRIM(out_path)//'/debug-'//TRIM(int2text(rank,padding))//'.txt')
-      if(rank==0) then
-         OPEN(UNIT=79,FILE=TRIM(out_path)//'/grid.txt')
-         OPEN(UNIT=80,FILE=TRIM(out_path)//'/segments.txt')
-         OPEN(UNIT=81,FILE=TRIM(out_path)//'/points.txt')
-         OPEN(UNIT=82,FILE=TRIM(out_path)//'/parabola.txt')
-      endif
       ib = 1
       kappamin = 1d20
       kappamax = -1d20
       sumCount = 0
       S2_err_K=0.d0
       Lm_err_K=0.d0
+      method_count=0.d0
       if ( test_curvature ) then 
          kappa_exact = - 2.d0/rad(ib)
          do i=is,ie; do j=js,je; do k=ks,ke
             ! find curvature only for cut cells
             if (vof_flag(i,j,k) == 2 ) then 
                call get_curvature(i,j,k,kappa,indexCurv,nfound,nposit,a)
+               if(nfound > 0) then
+                  method_count(1) = method_count(1) + 1
+               else if( -nfound < 50) then
+                  method_count(2) = method_count(2) + 1
+               else if (-nfound > 50) then
+                  method_count(3) = method_count(3) + 1
+               endif
                kappa = kappa*dble(Nx) ! Nx = L/deltax
                kappamax = max(ABS(kappa),kappamax)
                kappamin = min(ABS(kappa),kappamin)
@@ -730,11 +668,14 @@ contains
          kappa_exact = 1.d0/rad(ib)
           do i=is,ie; do j=js,je
             if (vof_flag(i,j,k) == 2) then 
-               if(debug_ij55) then
-                  debug_curvature = .true.
-               endif
                call get_curvature(i,j,k,kappa,indexCurv,nfound,nposit,a)
-               debug_curvature = .false.
+               if(nfound > 0) then
+                  method_count(1) = method_count(1) + 1
+               else if( -nfound < 50) then
+                  method_count(2) = method_count(2) + 1
+               else if (-nfound > 50) then
+                  method_count(3) = method_count(3) + 1
+               endif
                ! This stops the code in case kappa becomes NaN.
                if(kappa.ne.kappa) call pariserror("OC: Invalid Curvature")  
                if(nfound==-1.or.abs(kappa)<EPS_GEOM) then
@@ -763,16 +704,27 @@ contains
       end if ! test_curvature
       write(*,*) 'max, min, and exact ABS(kappa)', kappamax, kappamin,kappa_exact
       write(*,*) 'max relative error', MAX(ABS(kappamax-kappa_exact), ABS(kappamin-kappa_exact))/kappa_exact
-      if(rank==0) then
-         CLOSE(79)
-         CLOSE(80)
-         CLOSE(81)
-         CLOSE(82)
-      endif
       CLOSE(89)
       CLOSE(90)
       CLOSE(91)
       CLOSE(92)
+      call print_method() 
+contains
+  subroutine print_method()
+    integer :: total=0
+    integer :: n
+    real(8) :: fraction(3)
+    do n=1,3
+       total = method_count(n) + total
+    enddo
+    do n=1,3
+       fraction(n) = float(method_count(n)) / float(total)   
+    enddo
+
+    OPEN(UNIT=89,FILE='mcount.tmp')
+    write(89,*) fraction
+    close(89)
+end subroutine print_method
     end subroutine output_curvature
 
     subroutine parabola_fit(xfit,yfit,hfit,nposit,a,fit_success)
@@ -1240,185 +1192,10 @@ contains
      if(test_heights) then
         call output_heights()
      else if(test_curvature .or. test_curvature_2D) then
+        method_count=0.
         call output_curvature()
      end if
-     if(.not.debug_ij55.and.test_curvature_2D.and.nx<=8.and.ny<=8.and.nz<=2) then
-        call  plot_curvature()
-     endif
   end subroutine test_VOF_HF
- 
-  subroutine plot_curvature()
-    implicit none
-    integer :: i,j,k,iem,jem,n,i0,j0,k0
-    real(8) :: centroid(3),x1,y1,xvec,yvec,kappa,a(6),xpoint(0:2),ypoint(0:2),pc(12,12,2),diff(0:2)
-    integer :: direction,indexcurv,nfound,nposit
-    real(8) :: centroid_scaled(2), deltax
-    k0 = (Nz+4)/2
-    deltax=dx(nx/2)
-
-    if(rank==0) then
-      OPEN(UNIT=79,FILE=TRIM(out_path)//'/grid.txt')
-      OPEN(UNIT=80,FILE=TRIM(out_path)//'/segments.txt')
-      OPEN(UNIT=81,FILE=TRIM(out_path)//'/points.txt')
-      OPEN(UNIT=82,FILE=TRIM(out_path)//'/parabola.txt')
-      jem = je - 2
-      iem = ie - 2
-      do i=js,jem
-         write(79,'(4(E15.8,1X))') xh(is),yh(i),xh(iem)-xh(is),0.d0
-      enddo
-      do i=is,iem
-         write(79,'(4(E15.8,1X))') xh(i),yh(js),0.,yh(jem)-yh(js)
-      enddo
-      do i=is,ie; do j=js,je
-         if(vof_flag(i,j,k).eq.2) then
-            call PlotCutAreaCentroid(i,j,k,centroid,x1,y1,xvec,yvec)
-            do n=1,2
-               pc(i,j,n) = centroid(n)
-            enddo
-            write(80,'(4(E15.8,1X))') x1,y1,xvec,yvec
-            do n=1,2 
-               centroid_scaled(n) = deltax*centroid(n) 
-            enddo
-            centroid_scaled(1) = centroid_scaled(1) + x(i)
-            centroid_scaled(2) = centroid_scaled(2) + y(j)
-            write(81,'(2(E15.8,1X))') centroid_scaled(1),centroid_scaled(2) 
-         endif
-      enddo; enddo
-      i0=5; j0=5
-      call get_curvature(i0,j0,k0,kappa,indexCurv,nfound,nposit,a)
-      i=i0
-      j=j0
-      xpoint(0)=0.d0
-      ypoint(0)=0.d0
-      i=i0+1; j=j0
-      xpoint(1)=pc(i,j,1) + 1 - pc(i0,j0,1)
-      ypoint(1)=pc(i,j,2) + 0 - pc(i0,j0,2)
-      i=i0; j=j0+1
-      xpoint(2)=pc(i,j,1) + 0 - pc(i0,j0,1)
-      ypoint(2)=pc(i,j,2) + 1 - pc(i0,j0,2)
-!  h  = a4 x + a1 x**2 + a6
-      do n=0,2
-          diff(n) = abs(xpoint(n) - a(4)*ypoint(n) - a(1)*ypoint(n)**2 - a(6))
-         write(*,*) n, diff(n), a, nposit
-!         diff(n) = abs(xpoint(n) - a(5)*ypoint(n) - a(2)*ypoint(n)**2 - a(6))
-!         write(*,*) n, diff(n), "second orientation", nposit
-      enddo
-      CLOSE(79)
-      CLOSE(80)
-      CLOSE(81)
-      CLOSE(82)
-   endif
- end subroutine plot_curvature
- 
-subroutine PlotCutAreaCentroid(i,j,k,centroid,x1,y1,xvec,yvec)
-      implicit none
-      integer, intent(in)  :: i,j,k
-      real(8), intent(out) :: centroid(3),x1,y1,xvec,yvec
-      integer :: l,m,n
-      real(8) :: dmx,dmy,dmz, mxyz(3),px,py,pz
-      real(8) :: invx,invy
-      real(8) :: alpha, al3d
-      real(8) :: stencil3x3(-1:1,-1:1,-1:1)
-      logical :: inv, swap
-      real(8) :: deltax, tmp
-
-      deltax=dx(nx/2)
-      ! plot cut area centroid 
-      !***
-      !     (1) normal vector: dmx,dmy,dmz, and |dmx|+|dmy|+|dmz| = 1.
-      !     (2) dmx,dmy,dmz>0 and record sign
-      !     (3) get alpha;               
-      !     (4) compute centroid with dmx,dmy,dmz and alpha;
-      !     (5) transfer to local coordinate;
-      !*(1)*
-
-      if(recomputenormals) then
-         do l=-1,1; do m=-1,1; do n=-1,1
-            stencil3x3(l,m,n) = cvof(i+l,j+m,k+n)
-         enddo;enddo;enddo
-         call youngs(stencil3x3,mxyz)
-         dmx = mxyz(1)
-         dmy = mxyz(2)
-         dmz = mxyz(3)      
-      else
-         dmx = n1(i,j,k)      
-         dmy = n2(i,j,k)      
-         dmz = n3(i,j,k)
-      endif
-      if(abs(dmz).gt.EPS_GEOM) call pariserror("PCAC: invalid dmz.")
-      !*(2)*  
-      invx = 1.d0
-      invy = 1.d0
-      if (dmx .lt. 0.0d0) then
-         dmx = -dmx
-         invx = -1.d0
-      endif
-      if (dmy .lt. 0.0d0) then
-         dmy = -dmy
-         invy = -1.d0
-      endif
-      alpha = al3d(dmx,dmy,dmz,cvof(i,j,k))
-      !*(4)*  
-      call PlaneAreaCenter(dmx,dmy,dmz,alpha,px,py,pz)
-      !*(5)*
-      ! rotate
-      centroid(1) = px*invx
-      centroid(2) = py*invy
-      ! shift to cell-center coordinates
-      centroid(1) = centroid(1) - invx*0.5d0
-      centroid(2) = centroid(2) - invy*0.5d0
-      ! rescale
-!      do n=1,2; centroid(n) = deltax*centroid(n); enddo
-      !*(6) 
-      ! test alpha
-      inv = .false.
-      swap = .false.
-      if(dmy > dmx ) then
-         swap = .true.
-         tmp = dmy
-         dmy = dmx
-         dmx = tmp
-      endif
-
-      if(alpha > 0.5d0) then
-         inv = .true.
-         alpha = 1.d0 - alpha
-      endif
-      x1 = alpha/dmx
-      y1 = 0.d0
-      if(alpha < dmy) then
-         xvec = - x1
-         yvec = alpha/dmy
-      else
-         xvec = - dmy/dmx
-         yvec = 1.d0
-      endif
-      if(inv) then
-         x1 = 1.d0 - x1; y1 = 1.d0 - y1
-         xvec = -xvec; yvec = - yvec
-      endif
-      if(swap) then
-         tmp = y1
-         y1 = x1
-         x1 = tmp
-         tmp = yvec
-         yvec = xvec
-         xvec = tmp
-      endif
-
-      ! shift to cell center coordinates
-      x1 = x1 - 0.5d0; y1 = y1 - 0.5d0
-      ! reverse if needed and rescale
-      x1 = x1*invx*deltax
-      xvec = xvec*invx*deltax
-      y1 = y1*invy*deltax
-      yvec = yvec*invy*deltax
-      ! shift
-      x1 = x1 + x(i)
-      centroid(1) = centroid(1)
-      y1 = y1 + y(j)
-      centroid(2) = centroid(2)
-   end subroutine PlotCutAreaCentroid
 
 end module module_surface_tension
 
