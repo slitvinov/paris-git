@@ -49,6 +49,45 @@ module module_grid
   integer, dimension(:), allocatable :: dims, coords, periodic, reorder
   integer :: MPI_Comm_Cart, MPI_Comm_Domain, MPI_Comm_Active
   integer :: imin, imax, jmin, jmax, kmin, kmax
+! added by SZ
+  contains
+  function coordstart(d)
+    integer, intent(in) :: d
+    integer :: coordstart
+    if      (d==1) then
+       coordstart = is
+    else if (d==2) then
+       coordstart = js
+    else if (d==3) then
+       coordstart = ks
+    else
+       call pariserror("coordstart: wrong d.")
+    endif
+  end function coordstart
+  function coordend(d)
+    integer, intent(in) :: d
+    integer :: coordend
+    if      (d==1) then
+       coordend = ie
+    else if (d==2) then
+       coordend = je
+    else if (d==3) then
+       coordend = ke
+    else
+       call pariserror("coordend: wrong d.")
+    endif
+  end function coordend
+  function coordlimit(d,sign)
+    integer, intent(in) :: d,sign
+    integer :: coordlimit
+    if(sign==1) then
+       coordlimit = coordend(d)
+    else if(sign==-1) then
+       coordlimit = coordstart(d)
+    else
+       call pariserror("coordlimit: wrong sign")
+    endif
+  end function coordlimit
 end module module_grid
 
 !=================================================================================================

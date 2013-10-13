@@ -36,7 +36,8 @@ module module_surface_tension
   use module_VOF
   use module_flow ! for curvature test only
   implicit none
-  integer, parameter :: NDEPTH=2
+  integer, parameter :: NDEPTH=3
+  integer, parameter :: BIGINT=100
   integer, parameter :: NOR=6 ! number of orientations
   integer, parameter :: NPOS=NOR*27
   real(8), parameter :: EPS_GEOM = 1d-4
@@ -106,203 +107,97 @@ contains
    subroutine get_all_heights
      implicit none
      include 'mpif.h'
-     integer :: direction, ierr
+     integer :: direction, ierr, i
      integer :: req(24),sta(MPI_STATUS_SIZE,24)
      if(.not.st_initialized) call initialize_surface_tension()
 
      do direction=1,3
-        call get_heights(direction)
+        call get_heights_pass1(direction)
      enddo
-     call ghost_x(height(:,:,:,1),2,req( 1: 4));  
-     call ghost_x(height(:,:,:,2),2,req( 5: 8)); 
-     call ghost_x(height(:,:,:,3),2,req( 9:12));
-     call ghost_x(height(:,:,:,4),2,req(13:16));
-     call ghost_x(height(:,:,:,5),2,req(17:20));
-     call ghost_x(height(:,:,:,6),2,req(21:24));
-     call MPI_WAITALL(24,req(1:24),sta(:,1:24),ierr)
 
-     call ghost_y(height(:,:,:,1),2,req( 1: 4));  
-     call ghost_y(height(:,:,:,2),2,req( 5: 8)); 
-     call ghost_y(height(:,:,:,3),2,req( 9:12));
-     call ghost_y(height(:,:,:,4),2,req(13:16));
-     call ghost_y(height(:,:,:,5),2,req(17:20));
-     call ghost_y(height(:,:,:,6),2,req(21:24));
+     do i=1,6
+        call ghost_x(height(:,:,:,i),2,req(4*(i-1)+1:4*i))
+     enddo
      call MPI_WAITALL(24,req(1:24),sta(:,1:24),ierr)
-
-     call ghost_z(height(:,:,:,1),2,req( 1: 4));  
-     call ghost_z(height(:,:,:,2),2,req( 5: 8)); 
-     call ghost_z(height(:,:,:,3),2,req( 9:12));
-     call ghost_z(height(:,:,:,4),2,req(13:16));
-     call ghost_z(height(:,:,:,5),2,req(17:20));
-     call ghost_z(height(:,:,:,6),2,req(21:24));
+     do i=1,6
+        call ghost_y(height(:,:,:,i),2,req(4*(i-1)+1:4*i))
+     enddo
      call MPI_WAITALL(24,req(1:24),sta(:,1:24),ierr)
+     do i=1,6
+        call ghost_z(height(:,:,:,i),2,req(4*(i-1)+1:4*i))
+     enddo
+     call MPI_WAITALL(24,req(1:24),sta(:,1:24),ierr)
+     
+     do direction=1,3
+!        call get_heights_pass2(direction)
+     enddo
    end subroutine get_all_heights
 !=================================================================================================
 ! 
 !   the actual HF
 ! 
 !=================================================================================================
-   subroutine get_heights(direction)
+   subroutine get_heights_pass1(d)
      implicit none
-     integer, intent(in) :: direction
+     integer, intent(in) :: d
      integer :: index
-     logical :: base_not_found, bottom_n_found, bottom_p_found, top_n_found, top_p_found
-     real(8) :: height_p, height_n
-     integer :: si,sj,sk
-     integer :: i,j,k
-     integer :: i0,j0,k0
-     integer :: nd
+     logical :: same_flag, limit_not_found
+     real(8) :: height_p     !  partial height 
+     integer :: i0,j0,k0,s,c0,c1,c(3)
+     integer :: sign, flag_other_end, climit, normalsign
      ! NDEPTH is the depth of layers tested above or below the reference cell. 
-     ! including the central layer
-     ! NDEPTH*2 - 1 = 5 means a 5 x 3 stencil. 
+     ! including the central layer and the empty/full cells
+     ! NDEPTH*2 + 1 = 7 means a 7 x 3^2 stencil. 
      !
      !  Note the normal is - grad C
-     !  height_p : height for a normal pointing up (reference phase under the other phase)
-     !  height_n : height for a normal pointing down (reference phase above the other phase)
-    
-     if(direction.eq.1) then
-        si=1; sj=0; sk=0;
-     else if (direction.eq.2) then
-        si=0; sj=1; sk=0;
-     else if (direction.eq.3) then
-        si=0; sj=0; sk=1
-     else
-       stop "bad direction"
-     endif
-   
-     do k=ks,ke
-        do j=js,je
-           do i=is,ie
-!
-!  first case: cell is either full or empty
-!  odd index: reference fluid (C=1) is below. p-height.
-!
-              index = 2*(direction-1) + 1
-              if(vof_flag(i,j,k).eq.0.and.vof_flag(i-si,j-sj,k-sk).eq.1) then
-                 height(i,j,k,index) =  - 0.5d0
-              else if(vof_flag(i,j,k).eq.1.and.vof_flag(i+si,j+sj,k+sk).eq.0) then
-                 height(i,j,k,index) = 0.5d0
-              else
-                 height(i,j,k,index) = 2d6
-              endif
 
-!  even index: reference fluid (C=1) is above. n-height.
-
-              index = 2*(direction-1) + 2
-              if(vof_flag(i,j,k).eq.1.and.vof_flag(i-si,j-sj,k-sk).eq.0) then
-                 height(i,j,k,index) =  - 0.5d0
-               else if(vof_flag(i,j,k).eq.0.and.vof_flag(i+si,j+sj,k+sk).eq.1) then
-                 height(i,j,k,index) = 0.5d0
-               else
-                 height(i,j,k,index) = 2d6
-               endif
-               !
-               !  end empty/full case
-               !
-               !  second case: cell is fractional
-               !
-              if(vof_flag(i,j,k).eq.2) then
-                 
-                 height_p = cvof(i,j,k) - 0.5d0
-                 height_n = - height_p
-
-                 bottom_p_found=.false.
-                 bottom_n_found=.false.
-                 top_p_found=.false.
-                 top_n_found=.false.
-                 
-                 ! going down
-                 ! First pass of "p-heights"
-
-                 i0 = i - si; j0 = j - sj; k0 = k - sk
-                 base_not_found = .true.
-                 nd = 1
-                 do while ( base_not_found ) 
-                    height_p = height_p + cvof(i0,j0,k0) - 1.d0
-                    i0 = i0 - si; j0 = j0 - sj; k0 = k0 - sk
-                    nd = nd + 1
-                    if(vof_flag(i0,j0,k0).eq.1) then
-                       bottom_p_found = .true.
-                       base_not_found = .false.
-                    endif
-                    if(nd .eq. NDEPTH) base_not_found = .false.
-                 end do
-
-                 ! First pass of "n-heights"
-
-                 i0 = i - si; j0 = j - sj; k0 = k - sk
-                 base_not_found = .true.
-                 nd = 1
-                 do while ( base_not_found ) 
-                    height_n = height_n - cvof(i0,j0,k0) 
-                    i0 = i0 - si; j0 = j0 - sj; k0 = k0 - sk
-                    nd = nd + 1
-                    if(vof_flag(i0,j0,k0).eq.0) then
-                       bottom_n_found = .true.
-                       base_not_found = .false.
-                    endif
-                    if(nd .eq. NDEPTH) base_not_found = .false.
-                 end do
-
-                 ! same thing going up
-                 ! Second pass of "p-heights"
-
-                 i0 = i + si; j0 = j + sj; k0 = k + sk
-                 nd = 1
-                 base_not_found = .true.
-                 do while ( base_not_found ) 
-                    height_p = height_p + cvof(i0,j0,k0) 
-                    i0 = i0 + si; j0 = j0 + sj; k0 = k0 + sk
-                    nd = nd + 1
-                    if(vof_flag(i0,j0,k0).eq.0) then
-                       top_p_found = .true.
-                       base_not_found = .false.
-                    endif
-                    if(nd .eq. NDEPTH) base_not_found = .false.
-                 end do
-
-                 ! Second pass of "n-heights"
-
-                 i0 = i + si; j0 = j + sj; k0 = k + sk
-                 nd = 1
-                 base_not_found = .true.
-                 do while ( base_not_found ) 
-                    height_n = height_n - cvof(i0,j0,k0) + 1.d0
-                    i0 = i0 + si; j0 = j0 + sj; k0 = k0 + sk
-                    nd = nd + 1
-                    if(vof_flag(i0,j0,k0).eq.1) then
-                       top_n_found = .true.
-                       base_not_found = .false.
-                    endif
-                    if(nd .eq. NDEPTH) base_not_found = .false.
-                 end do
-
-! put everything in the height array.
-
-! "p-heights" have indexes 1, 3, 5
- 
-                 index = 2*(direction-1) + 1
-                 if (bottom_p_found.and.top_p_found) then 
-                    height(i,j,k,index) = height_p
-                 else
-                    height(i,j,k,index) = 2d6
+     do k0=ks,ke; do j0=js,je; do i0=is,ie
+        if(vof_flag(i0,j0,k0)/2==0) then ! flag is 0 or 1
+           c(1)=i0; c(2)=j0; c(3)=k0
+           ! loop over search directions
+           do sign=-1,1,2
+              ! Positive normal orientation if vof_flag=1 and sign = +, etc...
+              normalsign = (2*vof_flag(i0,j0,k0)-1) * sign
+!  index: 2*(d-1) + 1 for normal pointing up (reference phase under the other phase)
+!  index: 2*(d-1) + 2 for normal pointing down
+              index = 2*(d-1) + 1 + (-normalsign+1)/2
+              flag_other_end = 1 - vof_flag(i0,j0,k0)
+              climit = coordlimit(d,sign)
+              height_p = 0.d0
+              s = 0
+              c0 = c(d) ! start of stack
+              c1 = c0 + sign*ndepth ! middle of stack starting at c0
+              limit_not_found=.true.
+              do while (limit_not_found) 
+                 same_flag = s>0.and.vof_flag(c(1),c(2),c(3))==vof_flag(i0,j0,k0)
+                 height_p = height_p + cvof(c(1),c(2),c(3)) - 0.5d0
+                 limit_not_found = .not.(vof_flag(c(1),c(2),c(3))==flag_other_end &
+                      .or.c(d)==climit.or.s==2*ndepth.or.same_flag)
+                 if(limit_not_found) then
+                    s = s + 1
+                    c(d) = c(d) + sign ! go forward
                  endif
-
-! "n-heights" have indexes 2, 4, 6
-
-                 index = 2*(direction-1) + 2
-                 if (bottom_n_found.and.top_n_found) then 
-                    height(i,j,k,index) = height_n
-                 else
-                    height(i,j,k,index) = 2d6
-                 endif
+              enddo
+              if(same_flag) then
+                 ! no height, do nothing
+                 continue
+              else if(vof_flag(c(1),c(2),c(3))==flag_other_end) then
+                 ! there are missing terms in the sum since the top (s=2*ndepth) of the stack was not
+                 ! necessarily reached. Add these terms:
+                 height_p = height_p + (2*ndepth-s)*(cvof(c(1),c(2),c(3))-0.5d0)
+                 do while (c(d)/=(c0-sign))
+                    height(c(1),c(2),c(3),index) = height_p + c1 - c(d)
+                    c(d) = c(d) - sign ! go back
+                 enddo
+                 ! reached boundary, save partial height at boundary
+              else if(c(d)==climit) then ! reached top but : not full height since checked above
+                 height(c(1),c(2),c(3),index) = height_p + BIGINT*(s+1)
+                 ! last possible case: reached ndepth and no proper height
               endif
-! end of fractional cell case
-! note: we could check that height orientation and normal orientation agree. 
-           enddo ! k
-        enddo ! j
-     enddo ! i
-   end subroutine get_heights    
+           enddo ! sign
+        endif ! vof_flag
+     enddo; enddo; enddo;  ! i0,j0,k0
+   end subroutine get_heights_pass1  
 
    subroutine output_heights()
      implicit none
@@ -327,7 +222,8 @@ contains
         else
            ! search for height
            d=0
-           do while(d.lt.3)
+           h = 2d6
+           do while(d.le.nz/2.and.h.gt.1d6)
               d = d + 1
               if (height(i,j,k+d,index).lt.1d6) then
                  h = height(i,j,k+d,index) + d

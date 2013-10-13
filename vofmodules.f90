@@ -37,7 +37,7 @@ module module_VOF
   !   2 fractional
   !   3 unknown
 
-  real(8), parameter  :: A_h = 2d0  ! For initialisation of height test
+  real(8), parameter  :: A_h = 7d0  ! For initialisation of height test
   real(8), parameter  :: TINY = 1d-50
   character(20) :: vofbdry_cond(3),test_type,vof_advect
   integer :: parameters_read=0, refinement=-1
