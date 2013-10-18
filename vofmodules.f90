@@ -48,6 +48,7 @@ module module_VOF
   logical :: test_HF = .false.
   logical :: test_LP = .false.
   logical :: test_tag = .false.
+  logical :: test_D2P = .false.
 contains
 !=================================================================================================
 !=================================================================================================
@@ -119,12 +120,14 @@ contains
        cylinder_heights = .true.
     else if(test_type=='tag_test') then
        test_tag = .true.
+    else if(test_type=='D2P_test') then
+       test_D2P = .true.
     else
        stop 'unknown initialization'
     endif
     test_HF = test_heights .or. test_curvature .or. test_curvature_2D &
          .or. cylinder_heights
-    test_LP = test_tag
+    test_LP = test_tag .or. test_D2P
   end subroutine initialize_VOF
 !=================================================================================================
 !   a hack to get the flags quickly (temporary)
@@ -160,6 +163,10 @@ contains
     integer :: ierr, req(12),sta(MPI_STATUS_SIZE,12)
     integer , parameter :: ngh=2
     integer :: ipar
+    
+    if( test_D2P) then 
+      call random_bubbles
+    end if ! test_D2P
 
     if(cylinder_dir==0) cylinder_dir=2
  
@@ -184,6 +191,24 @@ contains
     call setVOFBC(cvof,vof_flag)
     return
   end subroutine initconditions_VOF
+  !=================================================================================================
+  !   Generate random bubbles 
+  !=================================================================================================
+  subroutine random_bubbles()
+    use module_2phase
+    implicit none
+    integer ib
+
+    if(NumBubble>1) then 
+      do ib=1,NumBubble
+         rad(ib) = 0.02 + rand()*0.04
+         xc(ib)  = 0.15 + rand()*0.7
+         yc(ib)  = 0.15 + rand()*0.7
+         zc(ib)  = 0.15 + rand()*0.7
+      end do
+       
+    end if ! NumBubble
+  end subroutine random_bubbles 
   !=================================================================================================
   !   Spheres and cylinders
   !=================================================================================================
