@@ -36,8 +36,10 @@ module module_surface_tension
   use module_VOF
   use module_flow ! for curvature test only
   implicit none
-  integer, parameter :: NDEPTH=3
+  integer, parameter :: NDEPTH=2
   integer, parameter :: BIGINT=100
+  integer, parameter :: D_HALF_BIGINT = DBLE(BIGINT/2)
+  integer, parameter :: MAX_EXT_H = ndepth
   integer, parameter :: NOR=6 ! number of orientations
   integer, parameter :: NPOS=NOR*27
   real(8), parameter :: EPS_GEOM = 1d-4
@@ -53,7 +55,7 @@ module module_surface_tension
   logical :: recomputenormals = .true.
   logical :: debug_curvature = .false.
   logical :: debug_ij55 = .false.
-  integer, parameter :: nfound_min=6   !  25
+  integer, parameter :: nfound_min=6  
   integer :: method_count(3)
 contains
 !=================================================================================================
@@ -64,9 +66,11 @@ contains
                n3(imin:imax,jmin:jmax,kmin:kmax))
     endif
     allocate(height(imin:imax,jmin:jmax,kmin:kmax,6))
-      if(nx.ge.500000.or.ny.gt.500000.or.nz.gt.500000) then
-         stop 'nx too large'
-      endif
+      if(nx.ge.500000.or.ny.gt.500000.or.nz.gt.500000) call pariserror("nx too large")
+      if(NDEPTH.gt.20) call pariserror("ndepth too large")
+      if(NDEPTH>BIGINT/2-2) call pariserror("BIGINT too small")
+      if(MAX_EXT_H>BIGINT/2-2) call pariserror("MAX_EXT not > BIGINT/2")
+      if(MAX_EXT_H>nx/2) call pariserror("MAX_EXT not > nx/2")
       height = 2.d6
       st_initialized=.true.
    end subroutine initialize_surface_tension
@@ -129,7 +133,8 @@ contains
      call MPI_WAITALL(24,req(1:24),sta(:,1:24),ierr)
      
      do direction=1,3
-!        call get_heights_pass2(direction)
+        call get_heights_pass2(direction)
+        call get_heights_pass3(direction)
      enddo
    end subroutine get_all_heights
 !=================================================================================================
@@ -141,38 +146,41 @@ contains
      implicit none
      integer, intent(in) :: d
      integer :: index
-     logical :: same_flag, limit_not_found
+     logical :: same_flag, limit_not_found, height_found
      real(8) :: height_p     !  partial height 
-     integer :: i0,j0,k0,s,c0,c1,c(3)
-     integer :: sign, flag_other_end, climit, normalsign
+     integer :: i,j,k,s,c0,c1,c(3)
+     integer :: sign, flag_other_end, climitp1, normalsign
      ! NDEPTH is the depth of layers tested above or below the reference cell. 
      ! including the central layer and the empty/full cells
      ! NDEPTH*2 + 1 = 7 means a 7 x 3^2 stencil. 
-     !
      !  Note the normal is - grad C
 
-     do k0=ks,ke; do j0=js,je; do i0=is,ie
-        if(vof_flag(i0,j0,k0)/2==0) then ! flag is 0 or 1
-           c(1)=i0; c(2)=j0; c(3)=k0
+     !*** Initialize
+     height=2d6
+
+     do k=ks,ke; do j=js,je; do i=is,ie
+        if(vof_flag(i,j,k)/2==0) then ! flag is 0 or 1
            ! loop over search directions
            do sign=-1,1,2
+              c(1)=i; c(2)=j; c(3)=k
               ! Positive normal orientation if vof_flag=1 and sign = +, etc...
-              normalsign = (2*vof_flag(i0,j0,k0)-1) * sign
+              normalsign = (2*vof_flag(i,j,k)-1) * sign
 !  index: 2*(d-1) + 1 for normal pointing up (reference phase under the other phase)
 !  index: 2*(d-1) + 2 for normal pointing down
               index = 2*(d-1) + 1 + (-normalsign+1)/2
-              flag_other_end = 1 - vof_flag(i0,j0,k0)
-              climit = coordlimit(d,sign)
+              flag_other_end = 1 - vof_flag(i,j,k)
+              climitp1 = coordlimit(d,sign) + sign
               height_p = 0.d0
               s = 0
               c0 = c(d) ! start of stack
-              c1 = c0 + sign*ndepth ! middle of stack starting at c0
+              c1 = c0 + sign*ndepth ! middle of stack starting at c0 in direction sign
               limit_not_found=.true.
+              height_found  = height(c(1),c(2),c(3),index)<D_HALF_BIGINT
               do while (limit_not_found) 
-                 same_flag = s>0.and.vof_flag(c(1),c(2),c(3))==vof_flag(i0,j0,k0)
+                 same_flag = s>0.and.vof_flag(c(1),c(2),c(3))==vof_flag(i,j,k)
                  height_p = height_p + cvof(c(1),c(2),c(3)) - 0.5d0
                  limit_not_found = .not.(vof_flag(c(1),c(2),c(3))==flag_other_end &
-                      .or.c(d)==climit.or.s==2*ndepth.or.same_flag)
+                      .or.c(d)==climitp1.or.s==2*ndepth.or.same_flag.or.height_found)
                  if(limit_not_found) then
                     s = s + 1
                     c(d) = c(d) + sign ! go forward
@@ -181,23 +189,146 @@ contains
               if(same_flag) then
                  ! no height, do nothing
                  continue
-              else if(vof_flag(c(1),c(2),c(3))==flag_other_end) then
-                 ! there are missing terms in the sum since the top (s=2*ndepth) of the stack was not
-                 ! necessarily reached. Add these terms:
+              else if(height_found) then
+                 ! height already found, do nothing
+                 continue
+              else if(vof_flag(c(1),c(2),c(3))==flag_other_end) then ! *found the full height* !
+                 ! there may be missing terms in the sum since the top (s=2*ndepth) of the stack was not
+                 ! necessarily reached. Add these terms. Here s = c(d) - c0
                  height_p = height_p + (2*ndepth-s)*(cvof(c(1),c(2),c(3))-0.5d0)
                  do while (c(d)/=(c0-sign))
                     height(c(1),c(2),c(3),index) = height_p + c1 - c(d)
-                    c(d) = c(d) - sign ! go back
+                    c(d) = c(d) - sign ! go back down
                  enddo
                  ! reached boundary, save partial height at boundary
-              else if(c(d)==climit) then ! reached top but : not full height since checked above
-                 height(c(1),c(2),c(3),index) = height_p + BIGINT*(s+1)
-                 ! last possible case: reached ndepth and no proper height
-              endif
+              else if(c(d)==climitp1) then ! reached top but : not full height since checked above
+                 height_p = height_p - cvof(c(1),c(2),c(3)) + 0.5d0 ! remove last addition
+                 c(d) = c(d) - sign ! go back one step to climit
+                 height(c(1),c(2),c(3),index) = height_p + BIGINT*s ! (**) here s = c(d) - c0 + 1 and s=1 for c(d)=c0=climit
+              endif        ! last possible case: reached ndepth and no proper height : do nothing
            enddo ! sign
         endif ! vof_flag
-     enddo; enddo; enddo;  ! i0,j0,k0
+     enddo; enddo; enddo;  ! i,j,k
    end subroutine get_heights_pass1  
+!
+!  enable parallel computation: exchange information accross boundaries. 
+!
+   subroutine get_heights_pass2(d)
+     implicit none
+     integer, intent(in) :: d
+     integer :: index,i,j,k
+     real(8) :: ha,hb
+     integer :: l,m,n,c0,c1,cb,c(3),try(3)
+     integer :: sign, sabove, sbelow
+     logical :: found_matching
+     ! NDEPTH is the depth of layers tested above or below the reference cell. 
+     try(1)=d 
+     m=1
+     n=2
+     do while (m.le.3)
+        if(m.ne.d) then
+           try(n) = m
+           n=n+1
+        endif
+        m=m+1
+     enddo
+
+     do l=coordstart(try(2)),coordend(try(2))
+        do m=coordstart(try(3)),coordend(try(3))
+           c(try(2)) = l; c(try(3)) = m
+           do sign=-1,1,2  ! search in both directions
+               do index = 2*(d-1) + 1, 2*(d-1) + 2  ! and for both indexes. 
+                  cb = coordlimit(d,sign)   ! coordinate "below" boundary
+                  c(d) = cb
+                  hb = height(c(1),c(2),c(3),index)
+                  if(hb>D_HALF_BIGINT.and.hb<1d6) then ! partial height in cell below
+                     c(d) = cb + sign  
+                     ha = height(c(1),c(2),c(3),index)
+                     c(d) = cb
+                     if(ha<D_HALF_BIGINT) then ! height already found above
+                        height(c(1),c(2),c(3),index) = ha + sign
+                     else if(ha>D_HALF_BIGINT.and.ha<1d6) then ! try to match
+                        sbelow = FLOOR(REAL(hb + D_HALF_BIGINT)/REAL(BIGINT)) 
+                        hb = hb - BIGINT*sbelow  ! above, below in direction of sign
+                        sabove = FLOOR(REAL(ha + D_HALF_BIGINT)/REAL(BIGINT))
+                        ha = ha - BIGINT*sabove
+                        ! c(d) = c0 bottom of stack
+                        !        c2 top of stack
+                        !        c2-c0+1 = length of stack
+                        ! see (**) : |cb-c0|=sbelow-1
+                        !            |ca-c0|=sabove-1
+                        ! hence
+                        ! c2-c0+1 = 2*ndepth+1
+                        ! hence
+                        !  |cb-c0| +  |ca-c0| + 1 = c2-c0 + 1 = sabove + sbelow - 1
+                        if(sabove + sbelow - 1 <= 2*ndepth+1) then  ! 
+                           ! bottom is at 
+                           c0   = cb - (sbelow-1)*sign  
+                           c1   = c0 + ndepth*sign
+                           c(d) = cb + 2*sign  ! ???fixme: this neglects possible full heights higher above. ??? no. 
+                           do while (c(d)/=(c0-sign)) 
+                              height(c(1),c(2),c(3),index) = ha + hb + c1 - c(d)
+                              c(d) = c(d) - sign ! go back to c0 
+                           enddo
+                        endif ! not over stack height
+                     else if(ha<1d6) then ! full height above
+                        c(d) = cb ! and full cell below with partial height => cell is bottom of stack
+                        if(vof_flag(c(1),c(2),c(3))/2==0) then 
+                           height(c(1),c(2),c(3),index) = ha + sign
+                           c(d) = cb + sign
+                           height(c(1),c(2),c(3),index) = ha ! re-establish ha
+                        else
+                           call pariserror("GHP2: case impossible")
+                        endif
+                     endif ! partial height above
+                  endif ! partial height in cell below: if not, either full height or no-height, leave as is
+               enddo ! index
+            enddo ! sign
+         enddo ! l
+      enddo ! m
+
+      do index = 2*(d-1) + 1, 2*(d-1) + 2  ! and for both indexes. 
+         do k=kmin,kmax;do j=jmin,jmax;do i=imin,imax
+            if(height(i,j,k,index)>D_HALF_BIGINT) height(i,j,k,index)=2d6
+         enddo;enddo;enddo
+      enddo
+         
+   end subroutine get_heights_pass2
+
+   subroutine get_heights_pass3(d)
+     implicit none
+     integer, intent(in) :: d
+     integer :: index
+     logical :: same_flag, limit_not_found
+     integer :: i,j,k,c0,c(3)
+     integer :: sign, climit, normalsign
+! need to extend heights
+! start from full cells and go the opposite way (towards the opposite interface); 
+     do i=is-1,ie+1; do j=js-1,je+1; do k=ks-1,ke+1
+              if(vof_flag(i,j,k)/2==0) then
+                 ! loop over search directions
+                 do sign=-1,1,2; 
+                    ! do index=2*(d-1) + 1, 2*(d-1) + 2
+                    ! Opposite of search direction in pass 1 so negative normal orientation if vof_flag=1 and sign = +, etc...
+                    normalsign = - (2*vof_flag(i,j,k)-1) * sign
+                    index = 2*(d-1) + 1 + (-normalsign+1)/2
+                    if(height(i,j,k,index)<D_HALF_BIGINT) then ! flag is 0 or 1
+                       climit = coordlimit(d,sign) + 2*sign
+                       c(1) = i; c(2) = j; c(3) = k
+                       c0 = c(d)
+                       c(d) = c0 + sign ! start of region to be filled
+                       limit_not_found=.not.(c0==climit)
+                       do while (limit_not_found) 
+                          limit_not_found = .not.(vof_flag(c(1),c(2),c(3))==2 &
+                               .or.c(d)==climit.or.abs(c(d)-c0).ge.MAX_EXT_H)
+                          height(c(1),c(2),c(3),index) = height(i,j,k,index) + c0 - c(d)
+                          c(d) = c(d) + sign 
+                       enddo
+                    endif
+                 enddo!; enddo
+              endif
+     enddo; enddo; enddo
+   end subroutine get_heights_pass3
 
    subroutine output_heights()
      implicit none
@@ -223,7 +354,7 @@ contains
            ! search for height
            d=0
            h = 2d6
-           do while(d.le.nz/2.and.h.gt.1d6)
+           do while(h.gt.1d6.and.k+d<ke.and.k-d>ks)
               d = d + 1
               if (height(i,j,k+d,index).lt.1d6) then
                  h = height(i,j,k+d,index) + d
@@ -1076,6 +1207,178 @@ end subroutine print_method
 !  Testing section
 ! 
 !=========================================================================================================
+  subroutine plot_curvature()
+    implicit none
+    integer :: i,j,k,iem,jem,n,i0,j0,k0
+    real(8) :: centroid(3),x1,y1,xvec,yvec,kappa,a(6),xpoint(0:2),ypoint(0:2),pc(12,12,2),diff(0:2)
+    integer :: direction,indexcurv,nfound,nposit
+    real(8) :: centroid_scaled(2), deltax
+    k0 = (Nz+4)/2
+    deltax=dx(nx/2)
+
+    if(rank==0) then
+      OPEN(UNIT=79,FILE=TRIM(out_path)//'/grid.txt')
+      OPEN(UNIT=80,FILE=TRIM(out_path)//'/segments.txt')
+      OPEN(UNIT=81,FILE=TRIM(out_path)//'/points.txt')
+      OPEN(UNIT=82,FILE=TRIM(out_path)//'/parabola.txt')
+      jem = je - 2
+      iem = ie - 2
+      do i=js,jem
+         write(79,'(4(E15.8,1X))') xh(is),yh(i),xh(iem)-xh(is),0.d0
+      enddo
+      do i=is,iem
+         write(79,'(4(E15.8,1X))') xh(i),yh(js),0.,yh(jem)-yh(js)
+      enddo
+      do i=is,ie; do j=js,je
+         if(vof_flag(i,j,k).eq.2) then
+            call PlotCutAreaCentroid(i,j,k,centroid,x1,y1,xvec,yvec)
+            do n=1,2
+               pc(i,j,n) = centroid(n)
+            enddo
+            write(80,'(4(E15.8,1X))') x1,y1,xvec,yvec
+            do n=1,2 
+               centroid_scaled(n) = deltax*centroid(n) 
+            enddo
+            centroid_scaled(1) = centroid_scaled(1) + x(i)
+            centroid_scaled(2) = centroid_scaled(2) + y(j)
+            write(81,'(2(E15.8,1X))') centroid_scaled(1),centroid_scaled(2) 
+         endif
+      enddo; enddo
+      i0=5; j0=5
+      call get_curvature(i0,j0,k0,kappa,indexCurv,nfound,nposit,a)
+      i=i0
+      j=j0
+      xpoint(0)=0.d0
+      ypoint(0)=0.d0
+      i=i0+1; j=j0
+      xpoint(1)=pc(i,j,1) + 1 - pc(i0,j0,1)
+      ypoint(1)=pc(i,j,2) + 0 - pc(i0,j0,2)
+      i=i0; j=j0+1
+      xpoint(2)=pc(i,j,1) + 0 - pc(i0,j0,1)
+      ypoint(2)=pc(i,j,2) + 1 - pc(i0,j0,2)
+!  h  = a4 x + a1 x**2 + a6
+      do n=0,2
+          diff(n) = abs(xpoint(n) - a(4)*ypoint(n) - a(1)*ypoint(n)**2 - a(6))
+         write(*,*) n, diff(n), a, nposit
+!         diff(n) = abs(xpoint(n) - a(5)*ypoint(n) - a(2)*ypoint(n)**2 - a(6))
+!         write(*,*) n, diff(n), "second orientation", nposit
+      enddo
+      CLOSE(79)
+      CLOSE(80)
+      CLOSE(81)
+      CLOSE(82)
+   endif
+ end subroutine plot_curvature
+ 
+subroutine PlotCutAreaCentroid(i,j,k,centroid,x1,y1,xvec,yvec)
+      implicit none
+      integer, intent(in)  :: i,j,k
+      real(8), intent(out) :: centroid(3),x1,y1,xvec,yvec
+      integer :: l,m,n
+      real(8) :: dmx,dmy,dmz, mxyz(3),px,py,pz
+      real(8) :: invx,invy
+      real(8) :: alpha, al3d
+      real(8) :: stencil3x3(-1:1,-1:1,-1:1)
+      logical :: inv, swap
+      real(8) :: deltax, tmp
+
+      deltax=dx(nx/2)
+      ! plot cut area centroid 
+      !***
+      !     (1) normal vector: dmx,dmy,dmz, and |dmx|+|dmy|+|dmz| = 1.
+      !     (2) dmx,dmy,dmz>0 and record sign
+      !     (3) get alpha;               
+      !     (4) compute centroid with dmx,dmy,dmz and alpha;
+      !     (5) transfer to local coordinate;
+      !*(1)*
+
+      if(recomputenormals) then
+         do l=-1,1; do m=-1,1; do n=-1,1
+            stencil3x3(l,m,n) = cvof(i+l,j+m,k+n)
+         enddo;enddo;enddo
+         call youngs(stencil3x3,mxyz)
+         dmx = mxyz(1)
+         dmy = mxyz(2)
+         dmz = mxyz(3)      
+      else
+         dmx = n1(i,j,k)      
+         dmy = n2(i,j,k)      
+         dmz = n3(i,j,k)
+      endif
+      if(abs(dmz).gt.EPS_GEOM) call pariserror("PCAC: invalid dmz.")
+      !*(2)*  
+      invx = 1.d0
+      invy = 1.d0
+      if (dmx .lt. 0.0d0) then
+         dmx = -dmx
+         invx = -1.d0
+      endif
+      if (dmy .lt. 0.0d0) then
+         dmy = -dmy
+         invy = -1.d0
+      endif
+      alpha = al3d(dmx,dmy,dmz,cvof(i,j,k))
+      !*(4)*  
+      call PlaneAreaCenter(dmx,dmy,dmz,alpha,px,py,pz)
+      !*(5)*
+      ! rotate
+      centroid(1) = px*invx
+      centroid(2) = py*invy
+      ! shift to cell-center coordinates
+      centroid(1) = centroid(1) - invx*0.5d0
+      centroid(2) = centroid(2) - invy*0.5d0
+      ! rescale
+!      do n=1,2; centroid(n) = deltax*centroid(n); enddo
+      !*(6) 
+      ! test alpha
+      inv = .false.
+      swap = .false.
+      if(dmy > dmx ) then
+         swap = .true.
+         tmp = dmy
+         dmy = dmx
+         dmx = tmp
+      endif
+
+      if(alpha > 0.5d0) then
+         inv = .true.
+         alpha = 1.d0 - alpha
+      endif
+      x1 = alpha/dmx
+      y1 = 0.d0
+      if(alpha < dmy) then
+         xvec = - x1
+         yvec = alpha/dmy
+      else
+         xvec = - dmy/dmx
+         yvec = 1.d0
+      endif
+      if(inv) then
+         x1 = 1.d0 - x1; y1 = 1.d0 - y1
+         xvec = -xvec; yvec = - yvec
+      endif
+      if(swap) then
+         tmp = y1
+         y1 = x1
+         x1 = tmp
+         tmp = yvec
+         yvec = xvec
+         xvec = tmp
+      endif
+
+      ! shift to cell center coordinates
+      x1 = x1 - 0.5d0; y1 = y1 - 0.5d0
+      ! reverse if needed and rescale
+      x1 = x1*invx*deltax
+      xvec = xvec*invx*deltax
+      y1 = y1*invy*deltax
+      yvec = yvec*invy*deltax
+      ! shift
+      x1 = x1 + x(i)
+      centroid(1) = centroid(1)
+      y1 = y1 + y(j)
+      centroid(2) = centroid(2)
+   end subroutine PlotCutAreaCentroid
 
    subroutine test_VOF_HF()
      implicit none
@@ -1090,6 +1393,9 @@ end subroutine print_method
      else if(test_curvature .or. test_curvature_2D) then
         method_count=0.
         call output_curvature()
+     end if
+     if(test_curvature_2D) then
+        call plot_curvature()
      end if
   end subroutine test_VOF_HF
 

@@ -37,7 +37,7 @@ module module_VOF
   !   2 fractional
   !   3 unknown
 
-  real(8), parameter  :: A_h = 7d0  ! For initialisation of height test
+  real(8), parameter  :: A_h = 2d0  ! For initialisation of height test
   real(8), parameter  :: TINY = 1d-50
   character(20) :: vofbdry_cond(3),test_type,vof_advect
   integer :: parameters_read=0, refinement=-1
@@ -223,6 +223,9 @@ contains
     call ighost_x(vof_flag,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
     call ighost_y(vof_flag,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
     call ighost_z(vof_flag,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+    call ghost_x(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+    call ghost_y(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+    call ghost_z(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
     call setVOFBC(cvof,vof_flag)
     call ls2vof_refined(lsfunction,ipar,refinement)
   end subroutine levelset2vof
