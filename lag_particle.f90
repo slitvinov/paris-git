@@ -344,10 +344,10 @@ contains
          call output_DP()
       end if
                                                                              
-      ! Exit MPI gracefully
-      call MPI_BARRIER(MPI_COMM_WORLD,ierr)
-      call MPI_finalize(ierr)
-      stop
+!      ! Exit MPI gracefully
+!      call MPI_BARRIER(MPI_COMM_WORLD,ierr)
+!      call MPI_finalize(ierr)
+!      stop
    end subroutine test_Lag_part
 
 ! ===============================================
