@@ -40,9 +40,10 @@ module module_VOF
   real(8), parameter  :: A_h = 2d0  ! For initialisation of height test
   real(8), parameter  :: TINY = 1d-50
   character(20) :: vofbdry_cond(3),test_type,vof_advect
-  integer :: parameters_read=0, refinement=-1
+  integer :: parameters_read=0, refinement=-1, cylinder_dir
   logical :: test_heights = .false.  
   logical :: test_curvature = .false.  
+  logical :: cylinder_heights = .false.  
   logical :: test_curvature_2D = .false.  
   logical :: test_HF = .false.
   logical :: test_LP = .false.
@@ -66,7 +67,8 @@ contains
     include 'mpif.h'
     integer ierr,in
     logical file_is_there
-    namelist /vofparameters/ vofbdry_cond,test_type,VOF_advect,refinement
+    namelist /vofparameters/ vofbdry_cond,test_type,VOF_advect,refinement, &
+         cylinder_dir
     in=31
 
     call MPI_COMM_RANK(MPI_COMM_WORLD, rank, ierr)
@@ -111,14 +113,17 @@ contains
        test_heights = .true.
     else if(test_type=='curvature_test') then
        test_curvature = .true.
-    else if(test_type=='curvature_test2D') then
+    else if(test_type=='Curvature2D') then
        test_curvature_2D = .true.
+    else if(test_type=='cylinder_heights') then
+       cylinder_heights = .true.
     else if(test_type=='tag_test') then
        test_tag = .true.
     else
        stop 'unknown initialization'
     endif
-    test_HF = test_heights .or. test_curvature .or. test_curvature_2D
+    test_HF = test_heights .or. test_curvature .or. test_curvature_2D &
+         .or. cylinder_heights
     test_LP = test_tag
   end subroutine initialize_VOF
 !=================================================================================================
@@ -156,12 +161,15 @@ contains
     integer , parameter :: ngh=2
     integer :: ipar
 
-    if(test_heights) then
-       ipar=2  ! interface invariant in y direction
+    if(cylinder_dir==0) cylinder_dir=2
+ 
+    if(test_heights) then 
+       ipar=cylinder_dir
        call levelset2vof(wave2ls,ipar)
     else if(NumBubble>0) then
        ipar=0 ! spheres: default
-       if(test_curvature_2D) ipar=-3  ! cylinder in -ipar direction otherwise spheres
+       if(test_curvature_2D.or.cylinder_heights) ipar=-cylinder_dir
+       ! cylinder in -ipar direction otherwise spheres
        call levelset2vof(shapes2ls,ipar)
     else
        cvof=0.d0
@@ -187,13 +195,15 @@ contains
     real(8) :: a, cdir(0:3), shapes2ls
     integer ib
 
-    if(.not.(-3<=ipar.and.ipar<=1)) call pariserror("invalid ipar")
+    if(.not.(-3<=ipar.and.ipar<=0)) call pariserror("S: invalid ipar")
     cdir = 1.d0
     cdir(-ipar) = 0.d0
     shapes2ls = -2.d6
-    if(ipar < 0.and.NumBubble/=1) call pariserror("invalid NumBubbles")
+    ! ipar < 0 cylinder case
+    ! ipar = 0 spheres
+    if(ipar < 0.and.NumBubble/=1) call pariserror("S: invalid NumBubbles")
     do ib=1,NumBubble
-       a = rad(ib)**2 - (cdir(ib)*(xx-xc(1))**2+cdir(2)*(yy-yc(ib))**2+cdir(3)*(zz-zc(ib))**2)
+       a = rad(ib)**2 - (cdir(1)*(xx-xc(ib))**2+cdir(2)*(yy-yc(ib))**2+cdir(3)*(zz-zc(ib))**2)
        shapes2ls = MAX(shapes2ls,a)
     end do
   end function shapes2ls
@@ -206,7 +216,27 @@ contains
     real(8) wave2ls
     real(8), intent(in) :: xx,zz,yy
     integer, intent(in) :: ipar
-    wave2ls = - zz + zlength/2.d0  + A_h*dx(nx/2+2)*cos(2.*3.14159*xx/xlength) 
+    integer :: hpar,vpar
+    real(8) ::  vdir(13),hdir(3)
+    if(.not.(1<=ipar.and.ipar<=3)) call pariserror("invalid ipar")
+    if (ipar == 1) then
+       hpar = 2
+       vpar = 3
+    else if (ipar == 2) then
+       hpar = 1
+       vpar = 3
+    else
+       hpar = 1
+       vpar = 2
+    endif
+       
+    vdir = 0.d0
+    vdir(vpar) = 1.d0
+    hdir = 0.d0
+    hdir(hpar) = 1.d0
+
+    wave2ls = vdir(3)*(- zz + zLength/2.d0) + vdir(2)*(-yy + yLength/2.d0) + vdir(1)*(-xx + xLength/2.d0) &
+         + A_h*dx(nx/2+2)*cos(2.*3.14159*(hdir(1)*xx/xlength + hdir(2)*yy/ylength + hdir(3)*zz/zlength))
   end function wave2ls
   !=================================================================================================
   !   Converts a level-set field into a VOF field

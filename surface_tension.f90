@@ -34,7 +34,7 @@ module module_surface_tension
   use module_tmpvar
   use module_2phase
   use module_VOF
-  use module_flow ! for curvature test only
+!  use module_flow ! for curvature test only ????
   implicit none
   integer, parameter :: NDEPTH=2
   integer, parameter :: BIGINT=100
@@ -85,7 +85,7 @@ contains
      integer :: i,j,k
      integer :: i0,j0,k0
      real(8) :: mxyz(3)
-     if(recomputenormals) call pariserror("normals not allocated")
+     if(recomputenormals) call pariserror("recomputenormals is true, normals not allocated")
      if(.not.st_initialized) call initialize_surface_tension()
 
      if(ng.lt.2) stop "wrong ng"
@@ -118,7 +118,6 @@ contains
      do direction=1,3
         call get_heights_pass1(direction)
      enddo
-
      do i=1,6
         call ghost_x(height(:,:,:,i),2,req(4*(i-1)+1:4*i))
      enddo
@@ -131,7 +130,6 @@ contains
         call ghost_z(height(:,:,:,i),2,req(4*(i-1)+1:4*i))
      enddo
      call MPI_WAITALL(24,req(1:24),sta(:,1:24),ierr)
-     
      do direction=1,3
         call get_heights_pass2(direction)
         call get_heights_pass3(direction)
@@ -163,7 +161,10 @@ contains
            ! loop over search directions
            do sign=-1,1,2
               c(1)=i; c(2)=j; c(3)=k
-              ! Positive normal orientation if vof_flag=1 and sign = +, etc...
+              !  vof_flag=1 and sign = +  positive normal orientation 
+              !  vof_flag=1 and sign = -  negative normal orientation 
+              !  vof_flag=0 and sign = +  negative normal orientation 
+              !  vof_flag=0 and sign = -  positive normal orientation 
               normalsign = (2*vof_flag(i,j,k)-1) * sign
 !  index: 2*(d-1) + 1 for normal pointing up (reference phase under the other phase)
 !  index: 2*(d-1) + 2 for normal pointing down
@@ -204,14 +205,15 @@ contains
               else if(c(d)==climitp1) then ! reached top but : not full height since checked above
                  height_p = height_p - cvof(c(1),c(2),c(3)) + 0.5d0 ! remove last addition
                  c(d) = c(d) - sign ! go back one step to climit
-                 height(c(1),c(2),c(3),index) = height_p + BIGINT*s ! (**) here s = c(d) - c0 + 1 and s=1 for c(d)=c0=climit
+                 ! (**) here s = c(d) - c0 + 1 and s=1 for c(d)=c0=climit
+                 height(c(1),c(2),c(3),index) = height_p + BIGINT*s 
               endif        ! last possible case: reached ndepth and no proper height : do nothing
            enddo ! sign
         endif ! vof_flag
      enddo; enddo; enddo;  ! i,j,k
    end subroutine get_heights_pass1  
 !
-!  enable parallel computation: exchange information accross boundaries. 
+!  Enable parallel computation: exchange information accross boundaries. 
 !
    subroutine get_heights_pass2(d)
      implicit none
@@ -220,7 +222,6 @@ contains
      real(8) :: ha,hb
      integer :: l,m,n,c0,c1,cb,c(3),try(3)
      integer :: sign, sabove, sbelow
-     logical :: found_matching
      ! NDEPTH is the depth of layers tested above or below the reference cell. 
      try(1)=d 
      m=1
@@ -255,7 +256,8 @@ contains
                         ! c(d) = c0 bottom of stack
                         !        c2 top of stack
                         !        c2-c0+1 = length of stack
-                        ! see (**) : |cb-c0|=sbelow-1
+                        ! see (**) in pass 1 :
+                        !            |cb-c0|=sbelow-1
                         !            |ca-c0|=sabove-1
                         ! hence
                         ! c2-c0+1 = 2*ndepth+1
@@ -287,7 +289,7 @@ contains
          enddo ! l
       enddo ! m
 
-      do index = 2*(d-1) + 1, 2*(d-1) + 2  ! and for both indexes. 
+      do index = 2*(d-1) + 1, 2*(d-1) + 2  ! for both indexes. 
          do k=kmin,kmax;do j=jmin,jmax;do i=imin,imax
             if(height(i,j,k,index)>D_HALF_BIGINT) height(i,j,k,index)=2d6
          enddo;enddo;enddo
@@ -299,9 +301,9 @@ contains
      implicit none
      integer, intent(in) :: d
      integer :: index
-     logical :: same_flag, limit_not_found
+     logical :: limit_not_found
      integer :: i,j,k,c0,c(3)
-     integer :: sign, climit, normalsign
+     integer :: sign, climit, oppnormalsign
 ! need to extend heights
 ! start from full cells and go the opposite way (towards the opposite interface); 
      do i=is-1,ie+1; do j=js-1,je+1; do k=ks-1,ke+1
@@ -310,14 +312,14 @@ contains
                  do sign=-1,1,2; 
                     ! do index=2*(d-1) + 1, 2*(d-1) + 2
                     ! Opposite of search direction in pass 1 so negative normal orientation if vof_flag=1 and sign = +, etc...
-                    normalsign = - (2*vof_flag(i,j,k)-1) * sign
-                    index = 2*(d-1) + 1 + (-normalsign+1)/2
+                    oppnormalsign = - (2*vof_flag(i,j,k)-1) * sign
+                    index = 2*(d-1) + 1 + (-oppnormalsign+1)/2
                     if(height(i,j,k,index)<D_HALF_BIGINT) then ! flag is 0 or 1
                        climit = coordlimit(d,sign) + 2*sign
                        c(1) = i; c(2) = j; c(3) = k
                        c0 = c(d)
                        c(d) = c0 + sign ! start of region to be filled
-                       limit_not_found=.not.(c0==climit)
+                       limit_not_found=.not.(c0==climit) ! ??
                        do while (limit_not_found) 
                           limit_not_found = .not.(vof_flag(c(1),c(2),c(3))==2 &
                                .or.c(d)==climit.or.abs(c(d)-c0).ge.MAX_EXT_H)
@@ -379,11 +381,11 @@ contains
 !=======================================================================================================
 !   Check if we find nine heights in the neighboring cells, if not collect all heights in all directions
 !=======================================================================================================
-   subroutine get_local_heights(i1,j1,k1,mx,try,nfound,indexfound,hloc,points,nposit)
+   subroutine get_local_heights(i1,j1,k1,mxyz,try,nfound,indexfound,hloc,points,nposit)
       implicit none
       integer, intent(in) :: i1(-1:1,-1:1,3), j1(-1:1,-1:1,3), k1(-1:1,-1:1,3)  ! i1(:,:,d) 3x3 plane rotated in direction d
       integer, intent(out) :: nfound, indexfound
-      real(8), intent(in)  :: mx(3)
+      real(8), intent(in)  :: mxyz(3)
       real(8), intent(out) :: hloc(-1:1,-1:1)   
       real(8), intent(out) :: points(NPOS,3)
       integer, intent(out) :: nposit
@@ -422,7 +424,7 @@ contains
             stop "bad direction"
          endif
          index =  2*(d-1)+2
-         if(mx(d).gt.0) index = 2*(d-1)+1
+         if(mxyz(d).gt.0) index = 2*(d-1)+1
             hloc = 2d6
             nfound = 0
             do m=-1,1 
@@ -481,7 +483,7 @@ contains
             end if ! nfound = 9
       end do ! d and dirnotfound
       indexfound =  2*(try(1)-1)+2
-      if(mx(try(1)).gt.0) indexfound = 2*(try(1)-1)+1
+      if(mxyz(try(1)).gt.0) indexfound = 2*(try(1)-1)+1
       if(nposit.gt.NPOS) call pariserror("GLH: nposit")
 !      write(*,*) "GLH: not F:i,j,k, try,nposit,nfound ",i,j,k,try,nposit,nfound
 
@@ -506,7 +508,7 @@ contains
       
       real(8) :: points(NPOS,3),origin(3)
       real(8) :: xfit(NPOS),yfit(NPOS),hfit(NPOS),fit(NPOS,3)
-      real(8) :: centroid(3),mx(3),stencil3x3(-1:1,-1:1,-1:1)
+      real(8) :: centroid(3),mxyz(3),stencil3x3(-1:1,-1:1,-1:1)
 
       call map3x3in2x2(i1,j1,k1,i0,j0,k0)
 !   define in which order directions will be tried 
@@ -515,14 +517,14 @@ contains
          do m=-1,1; do n=-1,1; do l=-1,1
             stencil3x3(m,n,l) = cvof(i0+m,j0+n,k0+l)
          enddo;enddo;enddo
-         call fd32(stencil3x3,mx)
+         call fd32(stencil3x3,mxyz)
       else
-         mx(1) = n1(i0,j0,k0)      
-         mx(2) = n2(i0,j0,k0)      
-         mx(3) = n3(i0,j0,k0)
+         mxyz(1) = n1(i0,j0,k0)      
+         mxyz(2) = n2(i0,j0,k0)      
+         mxyz(3) = n3(i0,j0,k0)
       endif
-      call orientation(mx,try)
-      call get_local_heights(i1,j1,k1,mx,try,nfound,indexfound,h,points,nposit)
+      call orientation(mxyz,try)
+      call get_local_heights(i1,j1,k1,mxyz,try,nfound,indexfound,h,points,nposit)
       kappa = 0.d0
       ! if all nine heights found 
       if ( nfound == 9 ) then
@@ -536,7 +538,7 @@ contains
          a(5) = (h(0,1)-h(0,-1))/2.d0
          kappa = 2.d0*(a(1)*(1.d0+a(5)*a(5)) + a(2)*(1.d0+a(4)*a(4)) - a(3)*a(4)*a(5)) &
                /(1.d0+a(4)*a(4)+a(5)*a(5))**(1.5d0)
-         kappa = sign(1.d0,mx(try(1)))*kappa
+         kappa = sign(1.d0,mxyz(try(1)))*kappa
          indexCurv = indexfound
          ! This stops the code in case kappa becomes NaN.
 !--debug         if(kappa.ne.kappa) call pariserror("HF9: Invalid Curvature")               
@@ -569,11 +571,11 @@ contains
          hfit=points(:,try(1)) - origin(try(1))
          ! fit over all positions, not only independent ones. 
          call parabola_fit(xfit,yfit,hfit,nposit,a,fit_success) 
-         if(.not.fit_success) call pariserror("no fit success")
+         if(.not.fit_success) call pariserror("no fit success after mixed heights")
          kappa = 2.d0*(a(1)*(1.d0+a(5)*a(5)) + a(2)*(1.d0+a(4)*a(4)) - a(3)*a(4)*a(5)) &
                /(1.d0+a(4)*a(4)+a(5)*a(5))**(1.5d0)
          indexCurv = indexfound
-         kappa = sign(1.d0,mx(try(1)))*kappa
+         kappa = sign(1.d0,mxyz(try(1)))*kappa
          ! This stops the code in case kappa becomes NaN.
 !--debu         if(kappa.ne.kappa) call pariserror("HF6: Invalid Curvature")
          nposit=0
@@ -627,12 +629,13 @@ contains
          hfit=fit(:,try(1)) - origin(try(1))
          if(nposit.gt.NPOS) call pariserror("GLH: nposit")
          call parabola_fit(xfit,yfit,hfit,nposit,a,fit_success)
+         if(.not.fit_success) call pariserror("no fit success after centroids")
          kappa = 2.d0*(a(1)*(1.d0+a(5)*a(5)) + a(2)*(1.d0+a(4)*a(4)) - a(3)*a(4)*a(5)) &
              /sqrt(1.d0+a(4)*a(4)+a(5)*a(5))**3
-         kappa = sign(1.d0,mx(try(1)))*kappa
+         kappa = sign(1.d0,mxyz(try(1)))*kappa
          ! This stops the code in case kappa becomes NaN.
 !--debu         if(kappa.ne.kappa) then
-!           if(rank==0) write(*,*) "PF6: kappa,try,mx,nposit ",kappa,try,mx,nposit
+!           if(rank==0) write(*,*) "PF6: kappa,try,dmx,nposit ",kappa,try,dmx,nposit
 !--debu            call pariserror("PF6: Invalid Curvature")  
 !--debu         endif
       end if ! -nfound > 5
@@ -1005,38 +1008,38 @@ end subroutine print_method
 ! * obtained by interseectiing the plane  (m,alpha).
 ! * with the reference cell.
 !
-!  assumptions: mx,my,mz > 0 and |mx| + |my| + |mz| = 1
+!  assumptions: dmx,dmy,dmz > 0 and |dmx| + |dmy| + |dmz| = 1
 !
-   subroutine PlaneAreaCenter (mx,my,mz, alpha, px,py,pz)
+   subroutine PlaneAreaCenter (dmx,dmy,dmz, alpha, px,py,pz)
      implicit none
-     real(8), intent(in) :: mx,my,mz,alpha
+     real(8), intent(in) :: dmx,dmy,dmz,alpha
      real(8), intent(out) :: px,py,pz
      real(8) :: nx,ny,qx,qy
      real(8) :: area,b,amax
 
-     if(mx<0.d0.or.my<0.d0.or.mz<0.d0) call pariserror("invalid mx my mz")
-     if(abs(mx+my+mz-1d0)>EPS_GEOM) call pariserror("invalid mx+my+mz")
+     if(dmx<0.d0.or.dmy<0.d0.or.dmz<0.d0) call pariserror("invalid dmx dmy dmz")
+     if(abs(dmx+dmy+dmz-1d0)>EPS_GEOM) call pariserror("invalid dmx+dmy+dmz")
 
-     if (mx < EPS_GEOM) then
-        nx = my
-        ny = mz
+     if (dmx < EPS_GEOM) then
+        nx = dmy
+        ny = dmz
         call LineCenter (nx,ny, alpha, qx,qy)
         px = 0.5d0
         py = qx
         pz = qy
         return
      endif
-     if (my < EPS_GEOM) then
-        nx = mz
-        ny = mx
+     if (dmy < EPS_GEOM) then
+        nx = dmz
+        ny = dmx
         call LineCenter (nx,ny, alpha, qx,qy)
         px = qy
         py = 0.5d0
         pz = qx
         return
      endif
-     if (mz < EPS_GEOM) then
-        call LineCenter (mx,my, alpha, px,py)
+     if (dmz < EPS_GEOM) then
+        call LineCenter (dmx,dmy, alpha, px,py)
         pz = 0.5
         return
      endif
@@ -1047,55 +1050,55 @@ end subroutine print_method
      px = area*alpha
      py = area*alpha
      pz = area*alpha
-     b = alpha - mx
+     b = alpha - dmx
      if (b > 0.) then
         area = area - b*b
-        px = px - b*b*(2.*mx + alpha)
+        px = px - b*b*(2.*dmx + alpha)
         py = py - b*b*b
         pz = pz - b*b*b
      endif
-     b = alpha - my
+     b = alpha - dmy
      if (b > 0.) then
         area = area - b*b
-        py = py - b*b*(2.*my + alpha)
+        py = py - b*b*(2.*dmy + alpha)
         px = px - b*b*b
         pz = pz - b*b*b
      endif
-     b = alpha - mz
+     b = alpha - dmz
      if (b > 0.) then
         area = area - b*b
-        pz = pz - b*b*(2.*mz + alpha)
+        pz = pz - b*b*(2.*dmz + alpha)
         px = px - b*b*b
         py = py - b*b*b
      endif
 
      amax = alpha - 1.d0
-     b = amax + mx
+     b = amax + dmx
      if (b > 0.) then
         area = area + b*b
-        py = py + b*b*(2.*my + alpha - mz)
-        pz = pz + b*b*(2.*mz + alpha - my)
+        py = py + b*b*(2.*dmy + alpha - dmz)
+        pz = pz + b*b*(2.*dmz + alpha - dmy)
         px = px + b*b*b
      endif
-     b = amax + my
+     b = amax + dmy
      if (b > 0.) then
         area = area + b*b
-        px = px + b*b*(2.*mx + alpha - mz)
-        pz = pz + b*b*(2.*mz + alpha - mx)
+        px = px + b*b*(2.*dmx + alpha - dmz)
+        pz = pz + b*b*(2.*dmz + alpha - dmx)
         py = py + b*b*b
      endif
-     b = amax + mz
+     b = amax + dmz
      if (b > 0.) then
         area = area + b*b
-        px = px + b*b*(2.*mx + alpha - my)
-        py = py + b*b*(2.*my + alpha - mx)
+        px = px + b*b*(2.*dmx + alpha - dmy)
+        py = py + b*b*(2.*dmy + alpha - dmx)
         pz = pz + b*b*b
      endif
 
      area  = 3.d0*area
-     px = px/(area*mx)
-     py = py/(area*my)
-     pz = pz/(area*mz)
+     px = px/(area*dmx)
+     py = py/(area*dmy)
+     pz = pz/(area*dmz)
 
      call THRESHOLD (px)
      call THRESHOLD (py)
@@ -1104,20 +1107,20 @@ end subroutine print_method
    end subroutine PlaneAreaCenter
 
 !-------------------------------------------------------------------------------------------------------
-   subroutine LineCenter (mx,my, alpha, px,py)
+   subroutine LineCenter (dmx,dmy, alpha, px,py)
      implicit none
-     real(8), intent(in) :: mx,my,alpha
+     real(8), intent(in) :: dmx,dmy,alpha
      real(8), intent(out) :: px,py
       
      if (alpha <= 0.d0 .or. alpha >= 1.d0) call pariserror("LC: invalid alpha")
 
-     if (mx < EPS_GEOM) then
+     if (dmx < EPS_GEOM) then
         px = 0.5
         py = alpha;
         return
      endif
 
-     if (my < EPS_GEOM) then
+     if (dmy < EPS_GEOM) then
         py = 0.5;
         px = alpha
         return
@@ -1125,18 +1128,18 @@ end subroutine print_method
 
      px = 0.; py = 0.
 
-     if (alpha >= mx) then
+     if (alpha >= dmx) then
         px = px +  1.
-        py = py +  (alpha - mx)/my
+        py = py +  (alpha - dmx)/dmy
      else
-        px = px +  alpha/mx
+        px = px +  alpha/dmx
      endif
 
-     if (alpha >= my) then
+     if (alpha >= dmy) then
         py = py +  1.
-        px = px +  (alpha - my)/mx
+        px = px +  (alpha - dmy)/dmx
      else
-        py = py +  alpha/my
+        py = py +  alpha/dmy
      endif
 
      px = px/2.
@@ -1244,25 +1247,27 @@ end subroutine print_method
             write(81,'(2(E15.8,1X))') centroid_scaled(1),centroid_scaled(2) 
          endif
       enddo; enddo
-      i0=5; j0=5
-      call get_curvature(i0,j0,k0,kappa,indexCurv,nfound,nposit,a)
-      i=i0
-      j=j0
-      xpoint(0)=0.d0
-      ypoint(0)=0.d0
-      i=i0+1; j=j0
-      xpoint(1)=pc(i,j,1) + 1 - pc(i0,j0,1)
-      ypoint(1)=pc(i,j,2) + 0 - pc(i0,j0,2)
-      i=i0; j=j0+1
-      xpoint(2)=pc(i,j,1) + 0 - pc(i0,j0,1)
-      ypoint(2)=pc(i,j,2) + 1 - pc(i0,j0,2)
+      if(test_curvature_2D.and.nx<=8.and.ny<=8.and.nz==2) then
+         i0=5; j0=5
+         call get_curvature(i0,j0,k0,kappa,indexCurv,nfound,nposit,a)
+         i=i0
+         j=j0
+         xpoint(0)=0.d0
+         ypoint(0)=0.d0
+         i=i0+1; j=j0
+         xpoint(1)=pc(i,j,1) + 1 - pc(i0,j0,1)
+         ypoint(1)=pc(i,j,2) + 0 - pc(i0,j0,2)
+         i=i0; j=j0+1
+         xpoint(2)=pc(i,j,1) + 0 - pc(i0,j0,1)
+         ypoint(2)=pc(i,j,2) + 1 - pc(i0,j0,2)
 !  h  = a4 x + a1 x**2 + a6
-      do n=0,2
-          diff(n) = abs(xpoint(n) - a(4)*ypoint(n) - a(1)*ypoint(n)**2 - a(6))
-         write(*,*) n, diff(n), a, nposit
-!         diff(n) = abs(xpoint(n) - a(5)*ypoint(n) - a(2)*ypoint(n)**2 - a(6))
-!         write(*,*) n, diff(n), "second orientation", nposit
-      enddo
+         do n=0,2
+            diff(n) = abs(xpoint(n) - a(4)*ypoint(n) - a(1)*ypoint(n)**2 - a(6))
+            write(*,*) n, diff(n), a, nposit
+            !         diff(n) = abs(xpoint(n) - a(5)*ypoint(n) - a(2)*ypoint(n)**2 - a(6))
+            !         write(*,*) n, diff(n), "second orientation", nposit
+         enddo
+      endif
       CLOSE(79)
       CLOSE(80)
       CLOSE(81)
@@ -1394,12 +1399,44 @@ subroutine PlotCutAreaCentroid(i,j,k,centroid,x1,y1,xvec,yvec)
         method_count=0.
         call output_curvature()
      end if
-     if(test_curvature_2D) then
+     if(test_curvature_2D.and.nx<=16.and.ny<=16.and.nz<=16) then
         call plot_curvature()
      end if
+     if(cylinder_heights) then
+        call plot_HF()
+     endif
   end subroutine test_VOF_HF
 
-end module module_surface_tension
+
+   subroutine plot_HF()
+      implicit none      
+      integer :: i,j,k,index
+      integer :: d !, c(3)
+
+      d=cylinder_dir
+      !k = (nz+4)/2
+      j = (ny+4)/2
+      OPEN(UNIT=89,FILE=TRIM(out_path)//'/heights-'//TRIM(int2text(rank,padding))//'.txt')
+      do index=1,6
+         write(89,*) ' '
+         write(89,*) ' '
+         write(89,*) index
+         do i=is,ie; 
+            write(89,*) ' '
+            write(89,'(I2)',advance='no') i
+            do k=ks,ke ! do j=js,je
+               if(height(i,j,k,index)<1d6) then
+                  write(89,'(A2)',advance='no') '+'
+               else
+                  write(89,'(A2)',advance='no') ' ' 
+               endif
+            enddo
+            write(89,'(A2)',advance='no') '.'
+         enddo
+      enddo
+      CLOSE(89)
+    end subroutine plot_HF
+  end module module_surface_tension
 
 
 
