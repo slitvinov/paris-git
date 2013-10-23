@@ -115,9 +115,14 @@ contains
      integer :: req(24),sta(MPI_STATUS_SIZE,24)
      if(.not.st_initialized) call initialize_surface_tension()
 
-     do direction=1,3
+     !*** Initialize
+     height=2d6
+
+     do direction=1,2 !@@@
         call get_heights_pass1(direction)
+!        call plot_HF(direction,1)
      enddo
+
      do i=1,6
         call ghost_x(height(:,:,:,i),2,req(4*(i-1)+1:4*i))
      enddo
@@ -130,9 +135,11 @@ contains
         call ghost_z(height(:,:,:,i),2,req(4*(i-1)+1:4*i))
      enddo
      call MPI_WAITALL(24,req(1:24),sta(:,1:24),ierr)
-     do direction=1,3
+     do direction=1,1 !@@@
         call get_heights_pass2(direction)
+ !       call plot_HF(direction,2)
         call get_heights_pass3(direction)
+ !       call plot_HF(direction,3)
      enddo
    end subroutine get_all_heights
 !=================================================================================================
@@ -152,9 +159,6 @@ contains
      ! including the central layer and the empty/full cells
      ! NDEPTH*2 + 1 = 7 means a 7 x 3^2 stencil. 
      !  Note the normal is - grad C
-
-     !*** Initialize
-     height=2d6
 
      do k=ks,ke; do j=js,je; do i=is,ie
         if(vof_flag(i,j,k)/2==0) then ! flag is 0 or 1
@@ -199,6 +203,7 @@ contains
                  height_p = height_p + (2*ndepth-s)*(cvof(c(1),c(2),c(3))-0.5d0)
                  do while (c(d)/=(c0-sign))
                     height(c(1),c(2),c(3),index) = height_p + c1 - c(d)
+                    call check_all(c(1),c(2),c(3),index)
                     c(d) = c(d) - sign ! go back down
                  enddo
                  ! reached boundary, save partial height at boundary
@@ -207,6 +212,7 @@ contains
                  c(d) = c(d) - sign ! go back one step to climit
                  ! (**) here s = c(d) - c0 + 1 and s=1 for c(d)=c0=climit
                  height(c(1),c(2),c(3),index) = height_p + BIGINT*s 
+                 call check_all(c(1),c(2),c(3),index)
               endif        ! last possible case: reached ndepth and no proper height : do nothing
            enddo ! sign
         endif ! vof_flag
@@ -248,6 +254,7 @@ contains
                      c(d) = cb
                      if(ha<D_HALF_BIGINT) then ! height already found above
                         height(c(1),c(2),c(3),index) = ha + sign
+                        call check_all(c(1),c(2),c(3),index)
                      else if(ha>D_HALF_BIGINT.and.ha<1d6) then ! try to match
                         sbelow = FLOOR(REAL(hb + D_HALF_BIGINT)/REAL(BIGINT)) 
                         hb = hb - BIGINT*sbelow  ! above, below in direction of sign
@@ -270,18 +277,10 @@ contains
                            c(d) = cb + 2*sign  ! ???fixme: this neglects possible full heights higher above. ??? no. 
                            do while (c(d)/=(c0-sign)) 
                               height(c(1),c(2),c(3),index) = ha + hb + c1 - c(d)
+                              call check_all(c(1),c(2),c(3),index)
                               c(d) = c(d) - sign ! go back to c0 
                            enddo
                         endif ! not over stack height
-                     else if(ha<1d6) then ! full height above
-                        c(d) = cb ! and full cell below with partial height => cell is bottom of stack
-                        if(vof_flag(c(1),c(2),c(3))/2==0) then 
-                           height(c(1),c(2),c(3),index) = ha + sign
-                           c(d) = cb + sign
-                           height(c(1),c(2),c(3),index) = ha ! re-establish ha
-                        else
-                           call pariserror("GHP2: case impossible")
-                        endif
                      endif ! partial height above
                   endif ! partial height in cell below: if not, either full height or no-height, leave as is
                enddo ! index
@@ -292,6 +291,7 @@ contains
       do index = 2*(d-1) + 1, 2*(d-1) + 2  ! for both indexes. 
          do k=kmin,kmax;do j=jmin,jmax;do i=imin,imax
             if(height(i,j,k,index)>D_HALF_BIGINT) height(i,j,k,index)=2d6
+            call check_all(i,j,k,index)
          enddo;enddo;enddo
       enddo
          
@@ -324,6 +324,7 @@ contains
                           limit_not_found = .not.(vof_flag(c(1),c(2),c(3))==2 &
                                .or.c(d)==climit.or.abs(c(d)-c0).ge.MAX_EXT_H)
                           height(c(1),c(2),c(3),index) = height(i,j,k,index) + c0 - c(d)
+                          call check_all(c(1),c(2),c(3),index)
                           c(d) = c(d) + sign 
                        enddo
                     endif
@@ -331,6 +332,22 @@ contains
               endif
      enddo; enddo; enddo
    end subroutine get_heights_pass3
+
+   subroutine check_bounds(i,j,k)
+     implicit none
+     integer, intent(in) :: i,j,k
+     if(i<imin.or.i>imax.or.j<jmin.or.j>jmax.or.k<kmin.or.k>kmax) then
+        call pariserror("out of bounds ijk")
+     endif
+     return
+   end subroutine check_bounds
+
+   subroutine check_all(i,j,k,index)
+     implicit none
+     integer, intent(in) :: i,j,k,index
+     if(index<1.or.index>6) call pariserror("index out of bounds")
+     call check_bounds(i,j,k)
+   end subroutine check_all
 
    subroutine output_heights()
      implicit none
@@ -483,7 +500,7 @@ contains
             end if ! nfound = 9
       end do ! d and dirnotfound
       indexfound =  2*(try(1)-1)+2
-      if(mxyz(try(1)).gt.0) indexfound = 2*(try(1)-1)+1
+      if(mxyz(try(1)).gt.0.d0) indexfound = 2*(try(1)-1)+1
       if(nposit.gt.NPOS) call pariserror("GLH: nposit")
 !      write(*,*) "GLH: not F:i,j,k, try,nposit,nfound ",i,j,k,try,nposit,nfound
 
@@ -1402,33 +1419,40 @@ subroutine PlotCutAreaCentroid(i,j,k,centroid,x1,y1,xvec,yvec)
      if(test_curvature_2D.and.nx<=16.and.ny<=16.and.nz<=16) then
         call plot_curvature()
      end if
-     if(cylinder_heights) then
-        call plot_HF()
-     endif
   end subroutine test_VOF_HF
 
 
-   subroutine plot_HF()
+   subroutine plot_HF(d,pass)
       implicit none      
       integer :: i,j,k,index
-      integer :: d !, c(3)
+      integer,intent(in)  :: d, pass!, c(3)
 
-      d=cylinder_dir
+ !     d=cylinder_dir
       !k = (nz+4)/2
       j = (ny+4)/2
-      OPEN(UNIT=89,FILE=TRIM(out_path)//'/heights-'//TRIM(int2text(rank,padding))//'.txt')
+      OPEN(UNIT=89,FILE=TRIM(out_path)//'/heights-'//TRIM(int2text(rank,padding))//'.txt',access='append')
+         write(89,*) ' '
+         write(89,*) '----- '
+         write(89,*) ' direction is @@',d,'@@ pass is',pass,' @@@'
+         write(89,*) '----- '
+         write(89,*) ' '
+
       do index=1,6
-         write(89,*) ' '
-         write(89,*) ' '
          write(89,*) index
          do i=is,ie; 
             write(89,*) ' '
             write(89,'(I2)',advance='no') i
             do k=ks,ke ! do j=js,je
-               if(height(i,j,k,index)<1d6) then
-                  write(89,'(A2)',advance='no') '+'
-               else
-                  write(89,'(A2)',advance='no') ' ' 
+               if(height(i,j,k,index)==2d6) then
+                  write(89,'(A2)',advance='no') ' '
+               else if(height(i,j,k,index)<2d6.and.height(i,j,k,index)>D_HALF_BIGINT) then 
+                  write(89,'(A2)',advance='no') '*' 
+               else if(height(i,j,k,index)>2d6) then
+                  write(89,'(A2)',advance='no') '>' 
+               else if(height(i,j,k,index)<=D_HALF_BIGINT) then 
+                  write(89,'(A2)',advance='no') '+' 
+               else ! impossible
+                  write(89,'(A2)',advance='no') '@' 
                endif
             enddo
             write(89,'(A2)',advance='no') '.'

@@ -8,6 +8,9 @@ FC = mpif90
 # remove funny cflags from my environment
 
 #FFLAGS = -O3 -Wall -ffpe-trap=invalid,zero,overflow,underflow,precision,denormal # -g -gstabs # -O3 #
+
+# trap invalid to catch signaling NaN s ? 
+
 #FFLAGS = -g -Wall -ffpe-trap=invalid,zero,overflow # -g -gstabs # -O3 #
 #FOPTS =  -g -Wall -ffpe-trap=invalid,zero,overflow # -g -gstabs # -O3 #
 FFLAGS = -O3 # -g -fimplicit-none -fbounds-check
