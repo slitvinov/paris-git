@@ -118,9 +118,9 @@ contains
      !*** Initialize
      height=2d6
 
-     do direction=1,2 !@@@
+     do direction=1,3 !@@@
         call get_heights_pass1(direction)
-!        call plot_HF(direction,1)
+        call plot_HF(direction,1)
      enddo
 
      do i=1,6
@@ -135,11 +135,11 @@ contains
         call ghost_z(height(:,:,:,i),2,req(4*(i-1)+1:4*i))
      enddo
      call MPI_WAITALL(24,req(1:24),sta(:,1:24),ierr)
-     do direction=1,1 !@@@
+     do direction=1,3 !@@@
         call get_heights_pass2(direction)
- !       call plot_HF(direction,2)
+        call plot_HF(direction,2)
         call get_heights_pass3(direction)
- !       call plot_HF(direction,3)
+        call plot_HF(direction,3)
      enddo
    end subroutine get_all_heights
 !=================================================================================================
@@ -203,7 +203,7 @@ contains
                  height_p = height_p + (2*ndepth-s)*(cvof(c(1),c(2),c(3))-0.5d0)
                  do while (c(d)/=(c0-sign))
                     height(c(1),c(2),c(3),index) = height_p + c1 - c(d)
-                    call check_all(c(1),c(2),c(3),index)
+!                    call check_all(c(1),c(2),c(3),index)
                     c(d) = c(d) - sign ! go back down
                  enddo
                  ! reached boundary, save partial height at boundary
@@ -212,7 +212,7 @@ contains
                  c(d) = c(d) - sign ! go back one step to climit
                  ! (**) here s = c(d) - c0 + 1 and s=1 for c(d)=c0=climit
                  height(c(1),c(2),c(3),index) = height_p + BIGINT*s 
-                 call check_all(c(1),c(2),c(3),index)
+ !                call check_all(c(1),c(2),c(3),index)
               endif        ! last possible case: reached ndepth and no proper height : do nothing
            enddo ! sign
         endif ! vof_flag
@@ -254,7 +254,7 @@ contains
                      c(d) = cb
                      if(ha<D_HALF_BIGINT) then ! height already found above
                         height(c(1),c(2),c(3),index) = ha + sign
-                        call check_all(c(1),c(2),c(3),index)
+!                        call check_all(c(1),c(2),c(3),index)
                      else if(ha>D_HALF_BIGINT.and.ha<1d6) then ! try to match
                         sbelow = FLOOR(REAL(hb + D_HALF_BIGINT)/REAL(BIGINT)) 
                         hb = hb - BIGINT*sbelow  ! above, below in direction of sign
@@ -277,7 +277,7 @@ contains
                            c(d) = cb + 2*sign  ! ???fixme: this neglects possible full heights higher above. ??? no. 
                            do while (c(d)/=(c0-sign)) 
                               height(c(1),c(2),c(3),index) = ha + hb + c1 - c(d)
-                              call check_all(c(1),c(2),c(3),index)
+!                              call check_all(c(1),c(2),c(3),index)
                               c(d) = c(d) - sign ! go back to c0 
                            enddo
                         endif ! not over stack height
@@ -291,7 +291,7 @@ contains
       do index = 2*(d-1) + 1, 2*(d-1) + 2  ! for both indexes. 
          do k=kmin,kmax;do j=jmin,jmax;do i=imin,imax
             if(height(i,j,k,index)>D_HALF_BIGINT) height(i,j,k,index)=2d6
-            call check_all(i,j,k,index)
+!            call check_all(i,j,k,index)
          enddo;enddo;enddo
       enddo
          
@@ -324,7 +324,7 @@ contains
                           limit_not_found = .not.(vof_flag(c(1),c(2),c(3))==2 &
                                .or.c(d)==climit.or.abs(c(d)-c0).ge.MAX_EXT_H)
                           height(c(1),c(2),c(3),index) = height(i,j,k,index) + c0 - c(d)
-                          call check_all(c(1),c(2),c(3),index)
+!                           call check_all(c(1),c(2),c(3),index)
                           c(d) = c(d) + sign 
                        enddo
                     endif
@@ -333,27 +333,13 @@ contains
      enddo; enddo; enddo
    end subroutine get_heights_pass3
 
-   subroutine check_bounds(i,j,k)
-     implicit none
-     integer, intent(in) :: i,j,k
-     if(i<imin.or.i>imax.or.j<jmin.or.j>jmax.or.k<kmin.or.k>kmax) then
-        call pariserror("out of bounds ijk")
-     endif
-     return
-   end subroutine check_bounds
-
-   subroutine check_all(i,j,k,index)
-     implicit none
-     integer, intent(in) :: i,j,k,index
-     if(index<1.or.index>6) call pariserror("index out of bounds")
-     call check_bounds(i,j,k)
-   end subroutine check_all
-
    subroutine output_heights()
      implicit none
      integer i,j,k,d,index
      real(8) h, th
-     integer :: direction=2
+     integer :: direction
+
+     direction = cylinder_dir
      k = nz/2 + 2  ! +2 because of ghost layers
      j = ny/2 + 2  ! +2 because of ghost layers
 
@@ -363,6 +349,7 @@ contains
      OPEN(UNIT=89,FILE=TRIM(out_path)//'/height-'//TRIM(int2text(rank,padding))//'.txt')
      OPEN(UNIT=90,FILE=TRIM(out_path)//'/reference-'//TRIM(int2text(rank,padding))//'.txt')
 
+     if(direction==2) then
      index=5
      do i=is,ie
         th = wave2ls(x(i),y(j),z(k),direction)/dx(nx/2+2)
@@ -390,6 +377,37 @@ contains
            write(89,100) x(i), h 
         endif
      enddo
+     else if(direction==3) then
+    index=3
+     do i=is,ie
+        th = wave2ls(x(i),y(j),z(k),direction)/dx(nx/2+2)
+        write(90,100) x(i),th
+        if (height(i,j,k,index).lt.1d6) then
+           h = height(i,j,k,index)
+        else
+           ! search for height
+           d=0
+           h = 2d6
+           do while(h.gt.1d6.and.k+d<ke.and.k-d>ks)
+              d = d + 1
+              if (height(i,j+d,k,index).lt.1d6) then
+                 h = height(i,j+d,k,index) + d
+                 height(i,j,k,index) = h 
+              else if (height(i,j-d,k,index).lt.1d6) then
+                 h = height(i,j-d,k,index) - d
+                 height(i,j,k,index) = h 
+              endif
+           enddo
+        endif
+        if(height(i,j,k,index).gt.1d6) then
+           write(89,101) x(i),' -'
+        else
+           write(89,100) x(i), h 
+        endif
+     enddo
+
+     endif
+
 100  format(2(f24.16))
 101  format(f24.16,A2)
      close(89)
@@ -1430,7 +1448,7 @@ subroutine PlotCutAreaCentroid(i,j,k,centroid,x1,y1,xvec,yvec)
  !     d=cylinder_dir
       !k = (nz+4)/2
       j = (ny+4)/2
-      OPEN(UNIT=89,FILE=TRIM(out_path)//'/heights-'//TRIM(int2text(rank,padding))//'.txt',access='append')
+      OPEN(UNIT=89,FILE=TRIM(out_path)//'/states-'//TRIM(int2text(rank,padding))//'.txt',access='append')
          write(89,*) ' '
          write(89,*) '----- '
          write(89,*) ' direction is @@',d,'@@ pass is',pass,' @@@'

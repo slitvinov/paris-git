@@ -3,10 +3,10 @@
 VOFBDRY_COND = 'periodic' 'periodic' 'periodic' 
                    ! Type of VOF boundary condition in x,y,z direction: 'wet', '90deg','periodic'
 
-TEST_TYPE = 'height_test'
+TEST_TYPE = 'TYPETEMP'
 VOF_ADVECT = 'Dick_Yue'
-REFINEMENT = 1
-CYLINDER_DIR = 2
+REFINEMENT = REFINEMENTTEMP
+CYLINDER_DIR = CYLDIRTEMP
 !=================================================================================================
 
 &end
