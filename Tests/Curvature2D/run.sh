@@ -6,14 +6,15 @@ let nx=16
 if [ $# -gt 0 ]; then
     if [ $1 == mono ]; then
 	echo "mono"
-	nx=8
+#	nx=16
     fi
 fi
+
+cyldir=2
 
 ny=$nx; nz=$ny
 npx=2; npy=2; npz=2
 
-cyldir=3
 if [ $cyldir == 1 ];  then
     nx=2
     npx=1
@@ -25,6 +26,9 @@ fi
 if [ $cyldir == 3 ];  then
     nz=2
     npz=1
+    xc=`awk -F '=' ' /xyzrad\(1, 1\)/ {print $2}' < testinput.template | awk '{print $1}'`
+    yc=`awk -F '=' ' /xyzrad\(2, 1\)/ {print $2}' < testinput.template | awk '{print $1}'`
+    sed s/XC1/$xc/g gridgp.template | sed s/XC2/$yc/g > grid.gp
 fi
 if [ $cyldir -gt 3 ]; then
     echo "incorrect cyldir"
@@ -41,10 +45,8 @@ let npstart=4
 if [ $# -gt 0 ]; then
     if [ $1 == mono ]; then
 	npstart=1
-	npy=1
-	npz=1
-	npx=1
-	precision=1e-1
+	npy=1; npz=1; npx=1
+	precision=3e-1
 	radius=0.2
     else
 	echo "unknown option" $1 
@@ -53,7 +55,7 @@ if [ $# -gt 0 ]; then
 else
     precision=4e-2
 fi
-sed s/NXTEMP/$nx/g testinput.template | sed s/NZTEMP/$nz/g | sed s/NPXTEMP/$npx/g  | sed s/NPZTEMP/$npz/g  | sed s/NYTEMP/$ny/g | sed s/NPYTEMP/$npy/g > testinput
+sed s/NXTEMP/$nx/g testinput.template | sed s/NPXTEMP/$npx/g | sed s/NZTEMP/$nz/g | sed s/NPZTEMP/$npz/g  | sed s/NYTEMP/$ny/g | sed s/NPYTEMP/$npy/g > testinput
 sed s/RADIUSTEMP/$radius/g testinput > testinput-$dim-$nx-$radius 
 ln -s testinput-$dim-$nx-$radius input
 sed s/REFINEMENTTEMP/$refinement/g inputvof.template | sed s/TYPETEMP/$type/g  | sed s/CYLDIRTEMP/$cyldir/g > inputvof

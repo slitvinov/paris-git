@@ -168,7 +168,10 @@ contains
       call random_bubbles
     end if ! test_D2P
 
-    if(cylinder_dir==0) cylinder_dir=2
+    if(cylinder_dir==0) then
+       write(*,*) "IVOF: Warning: cylinder_dir=0 set to 2"
+       cylinder_dir=2
+    endif
  
     if(test_heights) then 
        ipar=cylinder_dir
@@ -179,6 +182,7 @@ contains
        ! cylinder in -ipar direction otherwise spheres
        call levelset2vof(shapes2ls,ipar)
     else
+       write(*,*) "IVOF: Warning: Nothing set. cylinder_dir=0 set to 2"
        cvof=0.d0
        vof_flag=0
     endif
@@ -228,7 +232,7 @@ contains
     ! ipar = 0 spheres
     if(ipar < 0.and.NumBubble/=1) call pariserror("S: invalid NumBubbles")
     do ib=1,NumBubble
-       a = rad(ib)**2 - (cdir(1)*(xx-xc(ib))**2+cdir(2)*(yy-yc(ib))**2+cdir(3)*(zz-zc(ib))**2)
+       a = rad(ib)**2 - (cdir(ib)*(xx-xc(1))**2+cdir(2)*(yy-yc(ib))**2+cdir(3)*(zz-zc(ib))**2) !fixme
        shapes2ls = MAX(shapes2ls,a)
     end do
   end function shapes2ls

@@ -39,7 +39,7 @@ module module_surface_tension
   integer, parameter :: NDEPTH=2
   integer, parameter :: BIGINT=100
   integer, parameter :: D_HALF_BIGINT = DBLE(BIGINT/2)
-  integer, parameter :: MAX_EXT_H = ndepth
+  integer, parameter :: MAX_EXT_H = 0
   integer, parameter :: NOR=6 ! number of orientations
   integer, parameter :: NPOS=NOR*27
   real(8), parameter :: EPS_GEOM = 1d-4
@@ -118,9 +118,9 @@ contains
      !*** Initialize
      height=2d6
 
-     do direction=1,3 !@@@
+     do direction=1,3
         call get_heights_pass1(direction)
-        call plot_HF(direction,1)
+!        call plot_HF(direction,1)
      enddo
 
      do i=1,6
@@ -135,9 +135,9 @@ contains
         call ghost_z(height(:,:,:,i),2,req(4*(i-1)+1:4*i))
      enddo
      call MPI_WAITALL(24,req(1:24),sta(:,1:24),ierr)
-     do direction=1,3 !@@@
+     do direction=1,3
         call get_heights_pass2(direction)
-        call plot_HF(direction,2)
+!        call plot_HF(direction,2)
         call get_heights_pass3(direction)
         call plot_HF(direction,3)
      enddo
@@ -252,7 +252,9 @@ contains
                      c(d) = cb + sign  
                      ha = height(c(1),c(2),c(3),index)
                      c(d) = cb
-                     if(ha<D_HALF_BIGINT) then ! height already found above
+                     if(ha<D_HALF_BIGINT) then ! height already found above 
+                        ! which implies that cb is full
+                        if(vof_flag(c(1),c(2),c(3))/2/=0) stop '@@@' 
                         height(c(1),c(2),c(3),index) = ha + sign
 !                        call check_all(c(1),c(2),c(3),index)
                      else if(ha>D_HALF_BIGINT.and.ha<1d6) then ! try to match
@@ -304,32 +306,32 @@ contains
      logical :: limit_not_found
      integer :: i,j,k,c0,c(3)
      integer :: sign, climit, oppnormalsign
-! need to extend heights
-! start from full cells and go the opposite way (towards the opposite interface); 
+     ! need to extend heights
+     ! start from full cells and go the opposite way (towards the opposite interface); 
      do i=is-1,ie+1; do j=js-1,je+1; do k=ks-1,ke+1
-              if(vof_flag(i,j,k)/2==0) then
-                 ! loop over search directions
-                 do sign=-1,1,2; 
-                    ! do index=2*(d-1) + 1, 2*(d-1) + 2
-                    ! Opposite of search direction in pass 1 so negative normal orientation if vof_flag=1 and sign = +, etc...
-                    oppnormalsign = - (2*vof_flag(i,j,k)-1) * sign
-                    index = 2*(d-1) + 1 + (-oppnormalsign+1)/2
-                    if(height(i,j,k,index)<D_HALF_BIGINT) then ! flag is 0 or 1
-                       climit = coordlimit(d,sign) + 2*sign
-                       c(1) = i; c(2) = j; c(3) = k
-                       c0 = c(d)
-                       c(d) = c0 + sign ! start of region to be filled
-                       limit_not_found=.not.(c0==climit) ! ??
-                       do while (limit_not_found) 
-                          limit_not_found = .not.(vof_flag(c(1),c(2),c(3))==2 &
-                               .or.c(d)==climit.or.abs(c(d)-c0).ge.MAX_EXT_H)
-                          height(c(1),c(2),c(3),index) = height(i,j,k,index) + c0 - c(d)
-!                           call check_all(c(1),c(2),c(3),index)
-                          c(d) = c(d) + sign 
-                       enddo
-                    endif
-                 enddo!; enddo
+        if(vof_flag(i,j,k)/2==0) then
+           ! loop over search directions
+           do sign=-1,1,2; 
+              ! do index=2*(d-1) + 1, 2*(d-1) + 2
+              ! Opposite of search direction in pass 1 so negative normal orientation if vof_flag=1 and sign = +, etc...
+              oppnormalsign = - (2*vof_flag(i,j,k)-1) * sign
+              index = 2*(d-1) + 1 + (-oppnormalsign+1)/2
+              if(height(i,j,k,index)<D_HALF_BIGINT) then ! flag is 0 or 1
+                 climit = coordlimit(d,sign) + 2*sign
+                 c(1) = i; c(2) = j; c(3) = k
+                 c0 = c(d)
+                 c(d) = c0 + sign ! start of region to be filled
+                 limit_not_found=.not.(c0==climit) ! ??
+                 do while (limit_not_found) 
+                    limit_not_found = .not.(vof_flag(c(1),c(2),c(3))==2 &
+                         .or.c(d)==climit.or.abs(c(d)-c0).ge.MAX_EXT_H)
+                    height(c(1),c(2),c(3),index) = height(i,j,k,index) + c0 - c(d)
+                    !                           call check_all(c(1),c(2),c(3),index)
+                    c(d) = c(d) + sign 
+                 enddo
               endif
+           enddo!; enddo
+        endif
      enddo; enddo; enddo
    end subroutine get_heights_pass3
 
@@ -350,62 +352,90 @@ contains
      OPEN(UNIT=90,FILE=TRIM(out_path)//'/reference-'//TRIM(int2text(rank,padding))//'.txt')
 
      if(direction==2) then
-     index=5
-     do i=is,ie
-        th = wave2ls(x(i),y(j),z(k),direction)/dx(nx/2+2)
-        write(90,100) x(i),th
-        if (height(i,j,k,index).lt.1d6) then
-           h = height(i,j,k,index)
-        else
-           ! search for height
-           d=0
-           h = 2d6
-           do while(h.gt.1d6.and.k+d<ke.and.k-d>ks)
-              d = d + 1
-              if (height(i,j,k+d,index).lt.1d6) then
-                 h = height(i,j,k+d,index) + d
-                 height(i,j,k,index) = h 
-              else if (height(i,j,k-d,index).lt.1d6) then
-                 h = height(i,j,k-d,index) - d
-                 height(i,j,k,index) = h 
-              endif
-           enddo
-        endif
-        if(height(i,j,k,index).gt.1d6) then
-           write(89,101) x(i),' -'
-        else
-           write(89,100) x(i), h 
-        endif
-     enddo
+        index=5
+        do i=is,ie
+           th = wave2ls(x(i),y(j),z(k),direction)/dx(nx/2+2)
+           write(90,100) x(i),th
+           if (height(i,j,k,index).lt.1d6) then
+              h = height(i,j,k,index)
+           else
+              ! search for height
+              d=0
+              h = 2d6
+              do while(h.gt.1d6.and.k+d<ke.and.k-d>ks)
+                 d = d + 1
+                 if (height(i,j,k+d,index).lt.1d6) then
+                    h = height(i,j,k+d,index) + d
+                    height(i,j,k,index) = h 
+                 else if (height(i,j,k-d,index).lt.1d6) then
+                    h = height(i,j,k-d,index) - d
+                    height(i,j,k,index) = h 
+                 endif
+              enddo
+           endif
+           if(height(i,j,k,index).gt.1d6) then
+              write(89,101) x(i),' -'
+           else
+              write(89,100) x(i), h 
+           endif
+        enddo
      else if(direction==3) then
-    index=3
-     do i=is,ie
-        th = wave2ls(x(i),y(j),z(k),direction)/dx(nx/2+2)
-        write(90,100) x(i),th
-        if (height(i,j,k,index).lt.1d6) then
-           h = height(i,j,k,index)
-        else
-           ! search for height
-           d=0
-           h = 2d6
-           do while(h.gt.1d6.and.k+d<ke.and.k-d>ks)
-              d = d + 1
-              if (height(i,j+d,k,index).lt.1d6) then
-                 h = height(i,j+d,k,index) + d
-                 height(i,j,k,index) = h 
-              else if (height(i,j-d,k,index).lt.1d6) then
-                 h = height(i,j-d,k,index) - d
-                 height(i,j,k,index) = h 
+        index=3
+        do i=is,ie
+           th = wave2ls(x(i),y(j),z(k),direction)/dx(nx/2+2)
+           write(90,100) x(i),th
+           if (height(i,j,k,index).lt.1d6) then
+              h = height(i,j,k,index)
+           else
+              ! search for height
+              d=0
+              h = 2d6
+              do while(h.gt.1d6.and.j+d<je.and.j-d>js)
+                 d = d + 1
+                 if (height(i,j+d,k,index).lt.1d6) then
+                    h = height(i,j+d,k,index) + d
+                    height(i,j,k,index) = h 
+                 else if (height(i,j-d,k,index).lt.1d6) then
+                    h = height(i,j-d,k,index) - d
+                    height(i,j,k,index) = h 
+                 endif
+              enddo
+           endif
+           if(height(i,j,k,index).gt.1d6) then
+              write(89,101) x(i),' -'
+           else
+              write(89,100) x(i), h 
+           endif
+        enddo
+        if(test_curvature_2D) then
+           write(89,101) x(i),' x(y)'
+           index=1
+           i = nx/2 + 2  ! +2 because of ghost layers
+           do j=js,je
+              if (height(i,j,k,index).lt.1d6) then
+                 h = height(i,j,k,index)
+              else
+                 ! search for height
+                 d=0
+                 h = 2d6
+                 do while(h.gt.1d6.and.i+d<ie.and.i-d>is)
+                    d = d + 1
+                    if (height(i+d,j,k,index).lt.1d6) then
+                       h = height(i+d,j,k,index) + d
+                       height(i,j,k,index) = h 
+                    else if (height(i-d,j,k,index).lt.1d6) then
+                       h = height(i-d,j,k,index) - d
+                       height(i,j,k,index) = h 
+                    endif
+                 enddo
+              endif
+              if(height(i,j,k,index).gt.1d6) then
+                 write(89,101) y(j),' -'
+              else
+                 write(89,100) y(j), h 
               endif
            enddo
         endif
-        if(height(i,j,k,index).gt.1d6) then
-           write(89,101) x(i),' -'
-        else
-           write(89,100) x(i), h 
-        endif
-     enddo
-
      endif
 
 100  format(2(f24.16))
@@ -520,11 +550,11 @@ contains
       indexfound =  2*(try(1)-1)+2
       if(mxyz(try(1)).gt.0.d0) indexfound = 2*(try(1)-1)+1
       if(nposit.gt.NPOS) call pariserror("GLH: nposit")
-!      write(*,*) "GLH: not F:i,j,k, try,nposit,nfound ",i,j,k,try,nposit,nfound
+      !      write(*,*) "GLH: not F:i,j,k, try,nposit,nfound ",i,j,k,try,nposit,nfound
 
-   end subroutine get_local_heights
-!
-   subroutine get_curvature(i0,j0,k0,kappa,indexCurv,nfound,nposit,a)
+    end subroutine get_local_heights
+    !
+    subroutine get_curvature(i0,j0,k0,kappa,indexCurv,nfound,nposit,a)
       implicit none
       integer, intent(in) :: i0,j0,k0
       real(8), intent(out) :: kappa,a(6)  
@@ -582,6 +612,7 @@ contains
       else 
          nfound = - ind_pos(points,nposit) 
       endif ! nfound == 9
+! *** determine the origin. 
 ! fixme: index not treated as it should (no reference to normal)
       height_found=.false.
       index=1
@@ -590,7 +621,7 @@ contains
             height_found=.true.
             d = (index+1)/2
             origin=0.d0
-            origin(d) = height(i0,j0,k0,index)
+            origin(d) = height(i0,j0,k0,index) 
          endif
          index=index+1
       enddo
@@ -715,6 +746,8 @@ contains
                   method_count(2) = method_count(2) + 1
                else if (-nfound > 50) then
                   method_count(3) = method_count(3) + 1
+               else
+                  call pariserror("OC: unknown method_count") 
                endif
                kappa = kappa*dble(Nx) ! Nx = L/deltax
                kappamax = max(ABS(kappa),kappamax)
@@ -1432,6 +1465,7 @@ subroutine PlotCutAreaCentroid(i,j,k,centroid,x1,y1,xvec,yvec)
         call output_heights()
      else if(test_curvature .or. test_curvature_2D) then
         method_count=0.
+        call output_heights()
         call output_curvature()
      end if
      if(test_curvature_2D.and.nx<=16.and.ny<=16.and.nz<=16) then
