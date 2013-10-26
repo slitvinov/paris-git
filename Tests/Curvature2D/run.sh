@@ -6,11 +6,11 @@ let nx=16
 if [ $# -gt 0 ]; then
     if [ $1 == mono ]; then
 	echo "mono"
-#	nx=16
     fi
 fi
 
-cyldir=2
+cyldir=3  # 3 does not work
+normup=T
 
 ny=$nx; nz=$ny
 npx=2; npy=2; npz=2
@@ -58,7 +58,7 @@ fi
 sed s/NXTEMP/$nx/g testinput.template | sed s/NPXTEMP/$npx/g | sed s/NZTEMP/$nz/g | sed s/NPZTEMP/$npz/g  | sed s/NYTEMP/$ny/g | sed s/NPYTEMP/$npy/g > testinput
 sed s/RADIUSTEMP/$radius/g testinput > testinput-$dim-$nx-$radius 
 ln -s testinput-$dim-$nx-$radius input
-sed s/REFINEMENTTEMP/$refinement/g inputvof.template | sed s/TYPETEMP/$type/g  | sed s/CYLDIRTEMP/$cyldir/g > inputvof
+sed s/REFINEMENTTEMP/$refinement/g inputvof.template | sed s/TYPETEMP/$type/g  | sed s/CYLDIRTEMP/$cyldir/g | sed s/NORMUPTEMP/$normup/g > inputvof > inputvof
 
 mpirun -np $npstart paris > tmpout 2>&1
 echo `awk ' /Step:/ { cpu = $8 } END { print "cpu = " cpu } ' < tmpout`

@@ -40,8 +40,10 @@ module module_VOF
   real(8), parameter  :: A_h = 2d0  ! For initialisation of height test
   real(8), parameter  :: TINY = 1d-50
   character(20) :: vofbdry_cond(3),test_type,vof_advect
-  integer :: parameters_read=0, refinement=-1, cylinder_dir
+  integer :: parameters_read=0, refinement=-1 
+  integer :: cylinder_dir = 0
   logical :: test_heights = .false.  
+  logical :: normal_up = .true.
   logical :: test_curvature = .false.  
   logical :: cylinder_heights = .false.  
   logical :: test_curvature_2D = .false.  
@@ -69,7 +71,7 @@ contains
     integer ierr,in
     logical file_is_there
     namelist /vofparameters/ vofbdry_cond,test_type,VOF_advect,refinement, &
-         cylinder_dir
+         cylinder_dir, normal_up
     in=31
 
     call MPI_COMM_RANK(MPI_COMM_WORLD, rank, ierr)
@@ -232,7 +234,7 @@ contains
     ! ipar = 0 spheres
     if(ipar < 0.and.NumBubble/=1) call pariserror("S: invalid NumBubbles")
     do ib=1,NumBubble
-       a = rad(ib)**2 - (cdir(ib)*(xx-xc(1))**2+cdir(2)*(yy-yc(ib))**2+cdir(3)*(zz-zc(ib))**2) !fixme
+       a = rad(ib)**2 - (cdir(1)*(xx-xc(ib))**2+cdir(2)*(yy-yc(ib))**2+cdir(3)*(zz-zc(ib))**2) !fixme
        shapes2ls = MAX(shapes2ls,a)
     end do
   end function shapes2ls
@@ -245,8 +247,15 @@ contains
     real(8) wave2ls
     real(8), intent(in) :: xx,zz,yy
     integer, intent(in) :: ipar
-    integer :: hpar,vpar
+    integer :: hpar,vpar,normalsign
     real(8) ::  vdir(13),hdir(3)
+
+    if(normal_up) then
+       normalsign=1
+    else
+       normalsign=-1
+    endif
+
     if(.not.(1<=ipar.and.ipar<=3)) call pariserror("invalid ipar")
     if (ipar == 1) then
        hpar = 2
@@ -264,8 +273,11 @@ contains
     hdir = 0.d0
     hdir(hpar) = 1.d0
 
-    wave2ls = vdir(3)*(- zz + zLength/2.d0) + vdir(2)*(-yy + yLength/2.d0) + vdir(1)*(-xx + xLength/2.d0) &
-         + A_h*dx(nx/2+2)*cos(2.*3.14159*(hdir(1)*xx/xlength + hdir(2)*yy/ylength + hdir(3)*zz/zlength))
+    wave2ls = vdir(3)*(- zz + zLength/2.d0) + vdir(2)*(-yy + yLength/2.d0) &
+         + vdir(1)*(-xx + xLength/2.d0) &
+         + A_h*dx(nx/2+2)*cos(2.*3.14159*(hdir(1)*xx/xLength &
+         + hdir(2)*yy/yLength + hdir(3)*zz/zLength))
+    wave2ls = wave2ls*dble(normalsign)
   end function wave2ls
   !=================================================================================================
   !   Converts a level-set field into a VOF field

@@ -118,7 +118,7 @@ SIGMA    = 0.0
 NumBubble =  1
                    ! number of bubbles
 
-xyzrad(1, 1)  = 0.475 
+xyzrad(1, 1)  = 0.475
 xyzrad(2, 1)  = 0.475 
 xyzrad(3, 1)  = 0.45 
 xyzrad(4, 1)  = RADIUSTEMP

@@ -7,6 +7,8 @@ TEST_TYPE = 'TYPETEMP'
 VOF_ADVECT = 'Dick_Yue'
 REFINEMENT = REFINEMENTTEMP
 CYLINDER_DIR = CYLDIRTEMP
+NORMAL_UP = NORMUPTEMP
+
 !=================================================================================================
 
 &end

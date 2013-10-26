@@ -39,7 +39,7 @@ module module_surface_tension
   integer, parameter :: NDEPTH=2
   integer, parameter :: BIGINT=100
   integer, parameter :: D_HALF_BIGINT = DBLE(BIGINT/2)
-  integer, parameter :: MAX_EXT_H = 0
+  integer, parameter :: MAX_EXT_H = 2
   integer, parameter :: NOR=6 ! number of orientations
   integer, parameter :: NPOS=NOR*27
   real(8), parameter :: EPS_GEOM = 1d-4
@@ -111,7 +111,7 @@ contains
    subroutine get_all_heights
      implicit none
      include 'mpif.h'
-     integer :: direction, ierr, i
+     integer :: direction, ierr, i,j,k,index
      integer :: req(24),sta(MPI_STATUS_SIZE,24)
      if(.not.st_initialized) call initialize_surface_tension()
 
@@ -120,7 +120,7 @@ contains
 
      do direction=1,3
         call get_heights_pass1(direction)
-!        call plot_HF(direction,1)
+ !       call plot_HF(direction,1)
      enddo
 
      do i=1,6
@@ -139,8 +139,15 @@ contains
         call get_heights_pass2(direction)
 !        call plot_HF(direction,2)
         call get_heights_pass3(direction)
-        call plot_HF(direction,3)
+!        call plot_HF(direction,3)
      enddo
+ !     do index=2,6,2
+!         do k=kmin,kmax;do j=jmin,jmax; do i=imin,imax
+!            if(height(i,j,k,index)<1d6) then
+!               height(i,j,k,index) = - height(i,j,k,index)
+!            endif
+!         enddo;enddo;enddo
+!      enddo
    end subroutine get_all_heights
 !=================================================================================================
 ! 
@@ -183,37 +190,38 @@ contains
               height_found  = height(c(1),c(2),c(3),index)<D_HALF_BIGINT
               do while (limit_not_found) 
                  same_flag = s>0.and.vof_flag(c(1),c(2),c(3))==vof_flag(i,j,k)
-                 height_p = height_p + cvof(c(1),c(2),c(3)) - 0.5d0
+                 height_p = height_p + (cvof(c(1),c(2),c(3)) - 0.5d0)*normalsign
                  limit_not_found = .not.(vof_flag(c(1),c(2),c(3))==flag_other_end &
                       .or.c(d)==climitp1.or.s==2*ndepth.or.same_flag.or.height_found)
                  if(limit_not_found) then
                     s = s + 1
                     c(d) = c(d) + sign ! go forward
-                 endif
-              enddo
-              if(same_flag) then
-                 ! no height, do nothing
-                 continue
-              else if(height_found) then
-                 ! height already found, do nothing
-                 continue
-              else if(vof_flag(c(1),c(2),c(3))==flag_other_end) then ! *found the full height* !
-                 ! there may be missing terms in the sum since the top (s=2*ndepth) of the stack was not
-                 ! necessarily reached. Add these terms. Here s = c(d) - c0
-                 height_p = height_p + (2*ndepth-s)*(cvof(c(1),c(2),c(3))-0.5d0)
-                 do while (c(d)/=(c0-sign))
-                    height(c(1),c(2),c(3),index) = height_p + c1 - c(d)
-!                    call check_all(c(1),c(2),c(3),index)
-                    c(d) = c(d) - sign ! go back down
-                 enddo
-                 ! reached boundary, save partial height at boundary
-              else if(c(d)==climitp1) then ! reached top but : not full height since checked above
-                 height_p = height_p - cvof(c(1),c(2),c(3)) + 0.5d0 ! remove last addition
-                 c(d) = c(d) - sign ! go back one step to climit
-                 ! (**) here s = c(d) - c0 + 1 and s=1 for c(d)=c0=climit
-                 height(c(1),c(2),c(3),index) = height_p + BIGINT*s 
- !                call check_all(c(1),c(2),c(3),index)
-              endif        ! last possible case: reached ndepth and no proper height : do nothing
+                 else
+                    if(same_flag) then
+                       ! no height, do nothing
+                       continue
+                    else if(height_found) then
+                       ! height already found, do nothing
+                       continue
+                    else if(vof_flag(c(1),c(2),c(3))==flag_other_end) then ! *found the full height* !
+                       ! there may be missing terms in the sum since the top (s=2*ndepth) of the stack was not
+                       ! necessarily reached. Add these terms. Here s = c(d) - c0
+                       height_p = height_p + (2*ndepth-s)*(cvof(c(1),c(2),c(3))-0.5d0)*normalsign
+                       do while (c(d)/=(c0-sign))
+                          height(c(1),c(2),c(3),index) = height_p + c1 - c(d)
+                          !                    call check_all(c(1),c(2),c(3),index)
+                          c(d) = c(d) - sign ! go back down
+                       enddo
+                       ! reached boundary, save partial height at boundary
+                    else if(c(d)==climitp1) then ! reached top but : not full height since checked above
+                       height_p = height_p + (- cvof(c(1),c(2),c(3)) + 0.5d0)*normalsign ! remove last addition
+                       c(d) = c(d) - sign ! go back one step to climit
+                       ! (**) here s = c(d) - c0 + 1 and s=1 for c(d)=c0=climit
+                       height(c(1),c(2),c(3),index) = height_p + BIGINT*s 
+                       !                call check_all(c(1),c(2),c(3),index)
+                    endif        ! last possible case: reached ndepth and no proper height : do nothing
+                 endif ! limit_not_found
+              enddo ! limit_not_found
            enddo ! sign
         endif ! vof_flag
      enddo; enddo; enddo;  ! i,j,k
@@ -252,9 +260,7 @@ contains
                      c(d) = cb + sign  
                      ha = height(c(1),c(2),c(3),index)
                      c(d) = cb
-                     if(ha<D_HALF_BIGINT) then ! height already found above 
-                        ! which implies that cb is full
-                        if(vof_flag(c(1),c(2),c(3))/2/=0) stop '@@@' 
+                     if(ha<D_HALF_BIGINT) then ! height already found above
                         height(c(1),c(2),c(3),index) = ha + sign
 !                        call check_all(c(1),c(2),c(3),index)
                      else if(ha>D_HALF_BIGINT.and.ha<1d6) then ! try to match
@@ -305,7 +311,7 @@ contains
      integer :: index
      logical :: limit_not_found
      integer :: i,j,k,c0,c(3)
-     integer :: sign, climit, oppnormalsign
+     integer :: sign, climitp2, oppnormalsign
      ! need to extend heights
      ! start from full cells and go the opposite way (towards the opposite interface); 
      do i=is-1,ie+1; do j=js-1,je+1; do k=ks-1,ke+1
@@ -317,14 +323,14 @@ contains
               oppnormalsign = - (2*vof_flag(i,j,k)-1) * sign
               index = 2*(d-1) + 1 + (-oppnormalsign+1)/2
               if(height(i,j,k,index)<D_HALF_BIGINT) then ! flag is 0 or 1
-                 climit = coordlimit(d,sign) + 2*sign
+                 climitp2 = coordlimit(d,sign) + 2*sign
                  c(1) = i; c(2) = j; c(3) = k
                  c0 = c(d)
                  c(d) = c0 + sign ! start of region to be filled
-                 limit_not_found=.not.(c0==climit) ! ??
+                 limit_not_found=.not.(c0==climitp2) ! ??
                  do while (limit_not_found) 
                     limit_not_found = .not.(vof_flag(c(1),c(2),c(3))==2 &
-                         .or.c(d)==climit.or.abs(c(d)-c0).ge.MAX_EXT_H)
+                         .or.c(d)==climitp2.or.abs(c(d)-c0).ge.MAX_EXT_H)
                     height(c(1),c(2),c(3),index) = height(i,j,k,index) + c0 - c(d)
                     !                           call check_all(c(1),c(2),c(3),index)
                     c(d) = c(d) + sign 
@@ -340,8 +346,17 @@ contains
      integer i,j,k,d,index
      real(8) h, th
      integer :: direction
+     integer :: normalsign
 
+     if(normal_up) then
+        normalsign=1
+     else
+        normalsign=-1
+     endif
+    
      direction = cylinder_dir
+
+
      k = nz/2 + 2  ! +2 because of ghost layers
      j = ny/2 + 2  ! +2 because of ghost layers
 
@@ -352,7 +367,7 @@ contains
      OPEN(UNIT=90,FILE=TRIM(out_path)//'/reference-'//TRIM(int2text(rank,padding))//'.txt')
 
      if(direction==2) then
-        index=5
+        index = 2*(direction-1) + 1 + (-normalsign+1)/2
         do i=is,ie
            th = wave2ls(x(i),y(j),z(k),direction)/dx(nx/2+2)
            write(90,100) x(i),th
@@ -380,7 +395,7 @@ contains
            endif
         enddo
      else if(direction==3) then
-        index=3
+        index = 2*(direction-1) + 1 + (-normalsign+1)/2
         do i=is,ie
            th = wave2ls(x(i),y(j),z(k),direction)/dx(nx/2+2)
            write(90,100) x(i),th
@@ -407,35 +422,6 @@ contains
               write(89,100) x(i), h 
            endif
         enddo
-        if(test_curvature_2D) then
-           write(89,101) x(i),' x(y)'
-           index=1
-           i = nx/2 + 2  ! +2 because of ghost layers
-           do j=js,je
-              if (height(i,j,k,index).lt.1d6) then
-                 h = height(i,j,k,index)
-              else
-                 ! search for height
-                 d=0
-                 h = 2d6
-                 do while(h.gt.1d6.and.i+d<ie.and.i-d>is)
-                    d = d + 1
-                    if (height(i+d,j,k,index).lt.1d6) then
-                       h = height(i+d,j,k,index) + d
-                       height(i,j,k,index) = h 
-                    else if (height(i-d,j,k,index).lt.1d6) then
-                       h = height(i-d,j,k,index) - d
-                       height(i,j,k,index) = h 
-                    endif
-                 enddo
-              endif
-              if(height(i,j,k,index).gt.1d6) then
-                 write(89,101) y(j),' -'
-              else
-                 write(89,100) y(j), h 
-              endif
-           enddo
-        endif
      endif
 
 100  format(2(f24.16))
@@ -476,7 +462,8 @@ contains
       l=0
       dirnotfound=.true.
       deltax=dx(nx/2)
-      do while (l.lt.3.and.dirnotfound)
+ !@@@     do while (l.lt.3.and.dirnotfound)
+     do while (l.lt.2.and.dirnotfound)
          l = l+1
          d = try(l)    ! on entry, try(l) sorts the directions , closest to normal first. 
          if(d.eq.1) then
@@ -490,68 +477,70 @@ contains
          endif
          index =  2*(d-1)+2
          if(mxyz(d).gt.0) index = 2*(d-1)+1
-            hloc = 2d6
-            nfound = 0
-            do m=-1,1 
-               do n=-1,1
-                  if(height(i1(m,n,d),j1(m,n,d),k1(m,n,d),index).lt.1d6) then  ! search at same level
-                     ! one height found
-                     hloc(m,n) = height(i1(m,n,d),j1(m,n,d),k1(m,n,d),index)
-                     nfound = nfound + 1
-                     nposit = nposit + 1
-                     points(nposit,1) = hloc(m,n)*si + i1(m,n,d)-i
-                     points(nposit,2) = hloc(m,n)*sj + j1(m,n,d)-j
-                     points(nposit,3) = hloc(m,n)*sk + k1(m,n,d)-k
-                  else
-                     s = 1 
-                     heightnotfound=.true.
-                     do while(s.le.NDEPTH.and.heightnotfound) ! search at other levels
-                         if (height(i1(m,n,d)+si*s,j1(m,n,d)+sj*s,k1(m,n,d)+sk*s,index).lt.1d6) then
-                           hloc(m,n) = height(i1(m,n,d)+si*s,j1(m,n,d)+sj*s,k1(m,n,d)+sk*s,index) + s
-                           nfound = nfound + 1
-                           nposit = nposit + 1
-                           points(nposit,1) = hloc(m,n)*si + i1(m,n,d)-i
-                           points(nposit,2) = hloc(m,n)*sj + j1(m,n,d)-j
-                           points(nposit,3) = hloc(m,n)*sk + k1(m,n,d)-k
-                           heightnotfound=.false.  ! to exit loop
-                        else if  (height(i1(m,n,d)-si*s,j1(m,n,d)-sj*s,k1(m,n,d)-sk*s,index).lt.1d6) then
-                           hloc(m,n) = height(i1(m,n,d)-si*s,j1(m,n,d)-sj*s,k1(m,n,d)-sk*s,index) - s
-                           nfound = nfound + 1
-                           nposit = nposit + 1
-                           points(nposit,1) = hloc(m,n)*si + i1(m,n,d)-i
-                           points(nposit,2) = hloc(m,n)*sj + j1(m,n,d)-j
-                           points(nposit,3) = hloc(m,n)*sk + k1(m,n,d)-k
-                           heightnotfound=.false.  ! to exit loop
-                        endif
-                        s = s + 1
-                    end do ! while s lt ndepth 
-                  end if ! search at same level
-               end do ! n
-            end do ! m 
-!            write(*,*) "GLH: end m,n: nposit,d,index,nfound ",nposit,d,index,nfound
-            if(nfound.eq.9) then
-               dirnotfound = .false.
-               indexfound = index
-               ! on exit, redefine try() so that try(1) be the h direction found
-               m=1
-               n=2
-               do while (m.le.3)
-                  if(m.ne.d) then
-                     try(n) = m
-                     n=n+1
-                  endif
-                  m=m+1
-               enddo
-               try(1)=d  ! then exit
-!               write(*,*) "GLH: 9F: i,j,k,try,nposit,nfound ",i,j,k,try,nposit,nfound
-               return
-            end if ! nfound = 9
+         hloc = 2d6
+         nfound = 0
+         do m=-1,1 
+            do n=-1,1
+               hloc(m,n) = height(i1(m,n,d),j1(m,n,d),k1(m,n,d),index)
+               if(height(i1(m,n,d),j1(m,n,d),k1(m,n,d),index).lt.1d6) then  ! search at same level
+                  ! one height found
+!@@@                  hloc(m,n) = height(i1(m,n,d),j1(m,n,d),k1(m,n,d),index)
+                  nfound = nfound + 1
+                  nposit = nposit + 1
+                  points(nposit,1) = hloc(m,n)*si + i1(m,n,d)-i
+                  points(nposit,2) = hloc(m,n)*sj + j1(m,n,d)-j
+                  points(nposit,3) = hloc(m,n)*sk + k1(m,n,d)-k
+!               else
+!                  s = 1 
+!                  heightnotfound=.true.
+!                  do while(s.le.NDEPTH.and.heightnotfound) ! search at other levels
+!                     if (height(i1(m,n,d)+si*s,j1(m,n,d)+sj*s,k1(m,n,d)+sk*s,index).lt.1d6) then
+!                        hloc(m,n) = height(i1(m,n,d)+si*s,j1(m,n,d)+sj*s,k1(m,n,d)+sk*s,index) + s
+ !!                       nfound = nfound + 1
+ !                       nposit = nposit + 1
+ !                       points(nposit,1) = hloc(m,n)*si + i1(m,n,d)-i
+ !                       points(nposit,2) = hloc(m,n)*sj + j1(m,n,d)-j
+ !                       points(nposit,3) = hloc(m,n)*sk + k1(m,n,d)-k
+ !                       heightnotfound=.false.  ! to exit loop
+ !                    else if  (height(i1(m,n,d)-si*s,j1(m,n,d)-sj*s,k1(m,n,d)-sk*s,index).lt.1d6) then
+  !                      hloc(m,n) = height(i1(m,n,d)-si*s,j1(m,n,d)-sj*s,k1(m,n,d)-sk*s,index) - s
+ !                       nfound = nfound + 1
+ !                       nposit = nposit + 1
+ !                       points(nposit,1) = hloc(m,n)*si + i1(m,n,d)-i
+ !                       points(nposit,2) = hloc(m,n)*sj + j1(m,n,d)-j
+ !                       points(nposit,3) = hloc(m,n)*sk + k1(m,n,d)-k
+ !                       heightnotfound=.false.  ! to exit loop
+ !                    endif
+ !                    s = s + 1
+ !                 end do ! while s lt ndepth 
+               end if ! search at same level
+            end do ! n
+         end do ! m 
+         !            write(*,*) "GLH: end m,n: nposit,d,index,nfound ",nposit,d,index,nfound
+         if(nfound.eq.9) then
+            dirnotfound = .false.
+            indexfound = index
+            ! on exit, redefine try() so that try(1) be the h direction found
+            if(d/=try(1)) write(*,*) "@@ reorder try directions"
+            m=1
+            n=2
+            do while (m.le.3)
+               if(m.ne.d) then
+                  try(n) = m
+                  n=n+1
+               endif
+               m=m+1
+            enddo
+            try(1)=d  ! then exit
+            !               write(*,*) "GLH: 9F: i,j,k,try,nposit,nfound ",i,j,k,try,nposit,nfound
+            return
+         end if ! nfound = 9
       end do ! d and dirnotfound
-      indexfound =  2*(try(1)-1)+2
+      indexfound =  2*(try(1)-1)+2 ! fixme: did we really find an index ? 
       if(mxyz(try(1)).gt.0.d0) indexfound = 2*(try(1)-1)+1
       if(nposit.gt.NPOS) call pariserror("GLH: nposit")
       !      write(*,*) "GLH: not F:i,j,k, try,nposit,nfound ",i,j,k,try,nposit,nfound
-
+      
     end subroutine get_local_heights
     !
     subroutine get_curvature(i0,j0,k0,kappa,indexCurv,nfound,nposit,a)
@@ -608,8 +597,33 @@ contains
          ! This stops the code in case kappa becomes NaN.
 !--debug         if(kappa.ne.kappa) call pariserror("HF9: Invalid Curvature")               
          ! if more than six independent heights found in all directions 
+
+!@@@
+        !  if(abs(kappa*dble(nx)+5d0).gt.1d0) then
+!             write(*,*) '@@ i0,j0,k0,kappa',i0,j0,k0,kappa*dble(nx)
+!            write(*,*) 'try,mxyz', try,mxyz
+
+!             do l=-1,1
+!                do m=-1,1
+!                   write(*,*) '@@ l,m,h(m,n)',l,m,h(l,m)
+!                enddo
+!             enddo
+!          endif
+
+
          return
       else 
+
+!@@@
+         write(*,*) '@no nine heights@ i0,j0,k0,nfound,nposit',i0,j0,k0,nfound,nposit
+         write(*,*) 'try,mxyz', try,mxyz
+
+         do l=-1,1
+            do m=-1,1
+               write(*,*) '@@ l,m,h(m,n)',l,m,h(l,m)
+            enddo
+         enddo
+         
          nfound = - ind_pos(points,nposit) 
       endif ! nfound == 9
 ! *** determine the origin. 
@@ -645,6 +659,17 @@ contains
          ! This stops the code in case kappa becomes NaN.
 !--debu         if(kappa.ne.kappa) call pariserror("HF6: Invalid Curvature")
          nposit=0
+
+         if(abs(kappa*dble(nx)+5d0).gt.1d0) then
+            write(*,*) '**+  i0,j0,k0,nfound,kappa',i0,j0,k0,nfound,kappa*dble(nx)
+
+            do l=-1,1
+               do m=-1,1
+                  write(*,*) '@@ l,m,h(m,n)',l,m,h(l,m)
+               enddo
+            enddo
+         endif
+
          return
       else  ! ind_pos <= nfound_min
          ! Find all centroids in 3**3
@@ -704,6 +729,11 @@ contains
 !           if(rank==0) write(*,*) "PF6: kappa,try,dmx,nposit ",kappa,try,dmx,nposit
 !--debu            call pariserror("PF6: Invalid Curvature")  
 !--debu         endif
+
+         if(abs(kappa*dble(nx)+5d0).gt.2d0) then
+            write(*,*) '+++  i0,j0,k0,nfound,kappa',i0,j0,k0,nfound,kappa*dble(nx)
+         endif
+
       end if ! -nfound > 5
    end subroutine get_curvature
 
@@ -763,7 +793,7 @@ contains
          end do; end do; end do
       else if ( test_curvature_2D) then 
          k = (Nz+4)/2
-         kappa_exact = 1.d0/rad(ib)
+         kappa_exact = - 1.d0/rad(ib)
           do i=is,ie; do j=js,je
             if (vof_flag(i,j,k) == 2) then 
                call get_curvature(i,j,k,kappa,indexCurv,nfound,nposit,a)
@@ -784,9 +814,9 @@ contains
                   kappamax = max(ABS(kappa),kappamax)
                   kappamin = min(ABS(kappa),kappamin)
                   angle = atan2(y(j)-yc(ib),x(i)-xc(ib))/PI*180.d0
-                  write(89,*) angle,ABS(kappa)
+                  write(89,*) angle,kappa
                   write(90,*) angle,kappa_exact
-                  err_K    = ABS(ABS(kappa)-abs(kappa_exact))/kappa_exact
+                  err_K    = ABS(kappa-kappa_exact)/kappa_exact
                   S2_err_K    = S2_err_K  + err_K**2
                   Lm_err_K    = MAX(Lm_err_K,   err_K) 
                   sumCount = sumCount + 1
