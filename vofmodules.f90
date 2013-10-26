@@ -170,12 +170,12 @@ contains
       call random_bubbles
     end if ! test_D2P
 
-    if(cylinder_dir==0) then
-       write(*,*) "IVOF: Warning: cylinder_dir=0 set to 2"
-       cylinder_dir=2
-    endif
  
     if(test_heights) then 
+       if(cylinder_dir==0) then
+          write(*,*) "IVOF: Warning: cylinder_dir=0 set to 2"
+          cylinder_dir=2
+       endif
        ipar=cylinder_dir
        call levelset2vof(wave2ls,ipar)
     else if(NumBubble>0) then

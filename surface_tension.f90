@@ -120,7 +120,6 @@ contains
 
      do direction=1,3
         call get_heights_pass1(direction)
- !       call plot_HF(direction,1)
      enddo
 
      do i=1,6
@@ -137,17 +136,8 @@ contains
      call MPI_WAITALL(24,req(1:24),sta(:,1:24),ierr)
      do direction=1,3
         call get_heights_pass2(direction)
-!        call plot_HF(direction,2)
         call get_heights_pass3(direction)
-!        call plot_HF(direction,3)
      enddo
- !     do index=2,6,2
-!         do k=kmin,kmax;do j=jmin,jmax; do i=imin,imax
-!            if(height(i,j,k,index)<1d6) then
-!               height(i,j,k,index) = - height(i,j,k,index)
-!            endif
-!         enddo;enddo;enddo
-!      enddo
    end subroutine get_all_heights
 !=================================================================================================
 ! 
@@ -343,9 +333,8 @@ contains
 
    subroutine output_heights()
      implicit none
-     integer i,j,k,d,index
+     integer i,j,k,d,index, direction
      real(8) h, th
-     integer :: direction
      integer :: normalsign
 
      if(normal_up) then
@@ -353,9 +342,6 @@ contains
      else
         normalsign=-1
      endif
-    
-     direction = cylinder_dir
-
 
      k = nz/2 + 2  ! +2 because of ghost layers
      j = ny/2 + 2  ! +2 because of ghost layers
@@ -366,10 +352,12 @@ contains
      OPEN(UNIT=89,FILE=TRIM(out_path)//'/height-'//TRIM(int2text(rank,padding))//'.txt')
      OPEN(UNIT=90,FILE=TRIM(out_path)//'/reference-'//TRIM(int2text(rank,padding))//'.txt')
 
-     if(direction==2) then
+     if(cylinder_dir==2) then
+        ! search in z direction
+        direction = 3
         index = 2*(direction-1) + 1 + (-normalsign+1)/2
         do i=is,ie
-           th = wave2ls(x(i),y(j),z(k),direction)/dx(nx/2+2)
+           th = normalsign*wave2ls(x(i),y(j),z(k),cylinder_dir)/dx(nx/2+2)
            write(90,100) x(i),th
            if (height(i,j,k,index).lt.1d6) then
               h = height(i,j,k,index)
@@ -394,10 +382,12 @@ contains
               write(89,100) x(i), h 
            endif
         enddo
-     else if(direction==3) then
+     else if(cylinder_dir==3) then
+        ! search in y direction
+        direction=2
         index = 2*(direction-1) + 1 + (-normalsign+1)/2
         do i=is,ie
-           th = wave2ls(x(i),y(j),z(k),direction)/dx(nx/2+2)
+           th = normalsign*wave2ls(x(i),y(j),z(k),cylinder_dir)/dx(nx/2+2)
            write(90,100) x(i),th
            if (height(i,j,k,index).lt.1d6) then
               h = height(i,j,k,index)
@@ -462,8 +452,7 @@ contains
       l=0
       dirnotfound=.true.
       deltax=dx(nx/2)
- !@@@     do while (l.lt.3.and.dirnotfound)
-     do while (l.lt.2.and.dirnotfound)
+      do while (l.lt.3.and.dirnotfound)
          l = l+1
          d = try(l)    ! on entry, try(l) sorts the directions , closest to normal first. 
          if(d.eq.1) then
@@ -481,38 +470,37 @@ contains
          nfound = 0
          do m=-1,1 
             do n=-1,1
-               hloc(m,n) = height(i1(m,n,d),j1(m,n,d),k1(m,n,d),index)
                if(height(i1(m,n,d),j1(m,n,d),k1(m,n,d),index).lt.1d6) then  ! search at same level
                   ! one height found
-!@@@                  hloc(m,n) = height(i1(m,n,d),j1(m,n,d),k1(m,n,d),index)
+                  hloc(m,n) = height(i1(m,n,d),j1(m,n,d),k1(m,n,d),index)
                   nfound = nfound + 1
                   nposit = nposit + 1
                   points(nposit,1) = hloc(m,n)*si + i1(m,n,d)-i
                   points(nposit,2) = hloc(m,n)*sj + j1(m,n,d)-j
                   points(nposit,3) = hloc(m,n)*sk + k1(m,n,d)-k
-!               else
-!                  s = 1 
-!                  heightnotfound=.true.
-!                  do while(s.le.NDEPTH.and.heightnotfound) ! search at other levels
-!                     if (height(i1(m,n,d)+si*s,j1(m,n,d)+sj*s,k1(m,n,d)+sk*s,index).lt.1d6) then
-!                        hloc(m,n) = height(i1(m,n,d)+si*s,j1(m,n,d)+sj*s,k1(m,n,d)+sk*s,index) + s
- !!                       nfound = nfound + 1
- !                       nposit = nposit + 1
- !                       points(nposit,1) = hloc(m,n)*si + i1(m,n,d)-i
- !                       points(nposit,2) = hloc(m,n)*sj + j1(m,n,d)-j
- !                       points(nposit,3) = hloc(m,n)*sk + k1(m,n,d)-k
- !                       heightnotfound=.false.  ! to exit loop
- !                    else if  (height(i1(m,n,d)-si*s,j1(m,n,d)-sj*s,k1(m,n,d)-sk*s,index).lt.1d6) then
-  !                      hloc(m,n) = height(i1(m,n,d)-si*s,j1(m,n,d)-sj*s,k1(m,n,d)-sk*s,index) - s
- !                       nfound = nfound + 1
- !                       nposit = nposit + 1
- !                       points(nposit,1) = hloc(m,n)*si + i1(m,n,d)-i
- !                       points(nposit,2) = hloc(m,n)*sj + j1(m,n,d)-j
- !                       points(nposit,3) = hloc(m,n)*sk + k1(m,n,d)-k
- !                       heightnotfound=.false.  ! to exit loop
- !                    endif
- !                    s = s + 1
- !                 end do ! while s lt ndepth 
+              else
+                 s = 1 
+                 heightnotfound=.true.
+                 do while(s.le.NDEPTH.and.heightnotfound) ! search at other levels
+                    if (height(i1(m,n,d)+si*s,j1(m,n,d)+sj*s,k1(m,n,d)+sk*s,index).lt.1d6) then
+                       hloc(m,n) = height(i1(m,n,d)+si*s,j1(m,n,d)+sj*s,k1(m,n,d)+sk*s,index) + s
+                       nfound = nfound + 1
+                       nposit = nposit + 1
+                       points(nposit,1) = hloc(m,n)*si + i1(m,n,d)-i
+                       points(nposit,2) = hloc(m,n)*sj + j1(m,n,d)-j
+                       points(nposit,3) = hloc(m,n)*sk + k1(m,n,d)-k
+                       heightnotfound=.false.  ! to exit loop
+                    else if  (height(i1(m,n,d)-si*s,j1(m,n,d)-sj*s,k1(m,n,d)-sk*s,index).lt.1d6) then
+                       hloc(m,n) = height(i1(m,n,d)-si*s,j1(m,n,d)-sj*s,k1(m,n,d)-sk*s,index) - s
+                       nfound = nfound + 1
+                       nposit = nposit + 1
+                       points(nposit,1) = hloc(m,n)*si + i1(m,n,d)-i
+                       points(nposit,2) = hloc(m,n)*sj + j1(m,n,d)-j
+                       points(nposit,3) = hloc(m,n)*sk + k1(m,n,d)-k
+                       heightnotfound=.false.  ! to exit loop
+                    endif
+                    s = s + 1
+                 end do ! while s lt ndepth 
                end if ! search at same level
             end do ! n
          end do ! m 
@@ -521,7 +509,7 @@ contains
             dirnotfound = .false.
             indexfound = index
             ! on exit, redefine try() so that try(1) be the h direction found
-            if(d/=try(1)) write(*,*) "@@ reorder try directions"
+!            if(d/=try(1)) write(*,*) "@@ reordering try directions"
             m=1
             n=2
             do while (m.le.3)
@@ -597,33 +585,8 @@ contains
          ! This stops the code in case kappa becomes NaN.
 !--debug         if(kappa.ne.kappa) call pariserror("HF9: Invalid Curvature")               
          ! if more than six independent heights found in all directions 
-
-!@@@
-        !  if(abs(kappa*dble(nx)+5d0).gt.1d0) then
-!             write(*,*) '@@ i0,j0,k0,kappa',i0,j0,k0,kappa*dble(nx)
-!            write(*,*) 'try,mxyz', try,mxyz
-
-!             do l=-1,1
-!                do m=-1,1
-!                   write(*,*) '@@ l,m,h(m,n)',l,m,h(l,m)
-!                enddo
-!             enddo
-!          endif
-
-
          return
       else 
-
-!@@@
-         write(*,*) '@no nine heights@ i0,j0,k0,nfound,nposit',i0,j0,k0,nfound,nposit
-         write(*,*) 'try,mxyz', try,mxyz
-
-         do l=-1,1
-            do m=-1,1
-               write(*,*) '@@ l,m,h(m,n)',l,m,h(l,m)
-            enddo
-         enddo
-         
          nfound = - ind_pos(points,nposit) 
       endif ! nfound == 9
 ! *** determine the origin. 
@@ -659,17 +622,6 @@ contains
          ! This stops the code in case kappa becomes NaN.
 !--debu         if(kappa.ne.kappa) call pariserror("HF6: Invalid Curvature")
          nposit=0
-
-         if(abs(kappa*dble(nx)+5d0).gt.1d0) then
-            write(*,*) '**+  i0,j0,k0,nfound,kappa',i0,j0,k0,nfound,kappa*dble(nx)
-
-            do l=-1,1
-               do m=-1,1
-                  write(*,*) '@@ l,m,h(m,n)',l,m,h(l,m)
-               enddo
-            enddo
-         endif
-
          return
       else  ! ind_pos <= nfound_min
          ! Find all centroids in 3**3
@@ -729,11 +681,6 @@ contains
 !           if(rank==0) write(*,*) "PF6: kappa,try,dmx,nposit ",kappa,try,dmx,nposit
 !--debu            call pariserror("PF6: Invalid Curvature")  
 !--debu         endif
-
-         if(abs(kappa*dble(nx)+5d0).gt.2d0) then
-            write(*,*) '+++  i0,j0,k0,nfound,kappa',i0,j0,k0,nfound,kappa*dble(nx)
-         endif
-
       end if ! -nfound > 5
    end subroutine get_curvature
 
@@ -1315,9 +1262,10 @@ end subroutine print_method
     integer :: direction,indexcurv,nfound,nposit
     real(8) :: centroid_scaled(2), deltax
     k0 = (Nz+4)/2
+    k = k0
     deltax=dx(nx/2)
 
-    if(rank==0) then
+    if(rank==0.and.cylinder_dir==3) then
       OPEN(UNIT=79,FILE=TRIM(out_path)//'/grid.txt')
       OPEN(UNIT=80,FILE=TRIM(out_path)//'/segments.txt')
       OPEN(UNIT=81,FILE=TRIM(out_path)//'/points.txt')

@@ -9,7 +9,7 @@ if [ $# -gt 0 ]; then
     fi
 fi
 
-cyldir=3  # 3 does not work
+cyldir=2
 normup=T
 
 ny=$nx; nz=$ny
@@ -76,7 +76,7 @@ else
 fi
 
 if [ $# -gt 0 ]; then
-    if [ $1 == mono ]; then
+    if [ $1 == mono ] && [ $cyldir == 3 ]; then
 	gnuplot <<EOF
 call "../grid.gp"
 EOF

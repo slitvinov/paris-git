@@ -3,8 +3,8 @@
 
 type=height_test
 
-normup=T
-cyldir=3
+normup=F
+cyldir=2
 
 radius=0.32
 precision=1e-20
