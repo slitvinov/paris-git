@@ -175,7 +175,7 @@ module module_front
     implicit none
     integer :: front,nps
     real(8) :: xc,yc,zc,radin, ee, rad
-    real(8) :: pi, dph, phi, theta, pt(4*nps*nps+2,3), spt(4*nps*nps+2,3), xp(3)
+    real(8) :: pi, dph, phi, theta, pt(4*nps*nps+2,3), xp(3)
     integer :: iq,i2,i1,iip,ist,iie,ia,ib,ic,id,icp(4*2*nps*nps,3),ine(4*2*nps*nps,3),iqq,ne,np, &
                indpt(4*nps*nps+2), indel(4*2*nps*nps), point, elem, i
     pi=4d0*ATAN(1d0)
@@ -495,7 +495,7 @@ module module_front
         call write_integer(iunit,3,LocalPointIndex(ElemCorner(elem,1)) &
                                   ,LocalPointIndex(ElemCorner(elem,2)) &
                                   ,LocalPointIndex(ElemCorner(elem,3)) )
-266     FORMAT (' 3',3I6)
+! 266     FORMAT (' 3',3I6)
         elem = ElemConnect(elem,1)
       enddo
       front = FrontConnect(front,1)
@@ -659,7 +659,7 @@ end subroutine write_integer
       d=min(a,b,c)
       a=max(a,b,c)
 
-  	  FrontProps(14,front) = sqrt(a/d)
+      FrontProps(14,front) = sqrt(a/d)
   	  
       front = FrontConnect(front,1)
     enddo
@@ -725,7 +725,7 @@ end subroutine write_integer
     use module_grid
     implicit none
     real(8) :: xp(3)
-    integer :: point,i,i1, Ndomain
+    integer :: point,i1, Ndomain
     Ndomain = floor(xp(1)/xLength)
     xp(1) = xp(1)-xLength*Ndomain
     do i1=Ng,Nx+Ng-1
@@ -1219,40 +1219,6 @@ end subroutine write_integer
       stop 'Error: Incorrect input for DistributeFront'
     endif
   end subroutine GetFront
-!=================================================================================================
-  subroutine GetFront0(send_recv,wait)
-    use module_grid
-    implicit none
-    save
-    include 'mpif.h'
-    character(len=4), intent(in) :: send_recv
-    character(len=4), intent(in), optional :: wait
-    integer :: ierr, req(2), sta(MPI_STATUS_SIZE,2)
-
-    if(send_recv=='recv')then
-      if(.not. present(wait))then
-        call MPI_IRECV(PointCoordsBuff(1,1),9*MaxPoint,MPI_DOUBLE_PRECISION, nPdomain,0, &
-                      MPI_Comm_Active,req(1),ierr)
-        call MPI_IRECV(GlobPointIndex(1),MaxPoint,MPI_INTEGER, nPdomain,1, MPI_Comm_Active, &
-                      req(2), ierr)
-      else
-        call MPI_WAITALL(2,req,sta,ierr)
-        call MPI_GET_COUNT(sta(:,2), MPI_INTEGER, NumLocPoint, ierr)
-      endif
-    elseif(send_recv=='send') then
-      if(.not. present(wait))then
-        call MPI_ISEND(PointCoordsBuff(1,1),9*NumLocPoint,MPI_DOUBLE_PRECISION, nPdomain,0, &
-                       MPI_Comm_Active,req(1),ierr)
-        call MPI_ISEND(GlobPointIndex(1),NumLocPoint,MPI_INTEGER, nPdomain,1, MPI_Comm_Active, &
-                       req(2), ierr)
-      else
-        call MPI_WAITALL(2,req,sta,ierr)
-      endif
-    else
-      stop 'Error: Incorrect input for DistributeFront'
-    endif
-  end subroutine GetFront0
-!=================================================================================================
 !=================================================================================================
 !-------------------------------------------------------------------------------------------------
   subroutine SmoothFront
@@ -1772,7 +1738,7 @@ integer :: nroot
 ! Declare variables
       complex(8) :: x(3)
       real(8) :: pi=3.141592654
-	  real(8) :: DD, p, q, phi, temp1, temp2, y1,y2,y3, u, v, y2r, y2i
+      real(8) :: DD, p, q, phi, temp1, temp2, y1,y2,y3, u, v, y2r, y2i
 
 DD=0d0;  p=0d0;  q=0d0;  phi=0d0;  temp1=0d0;  temp2=0d0;  y1=0d0; y2=0d0; y3=0d0;  u=0d0;  v=0d0;  y2r=0d0;  y2i=0d0
 
@@ -1785,18 +1751,18 @@ DD=0d0;  p=0d0;  q=0d0;  phi=0d0;  temp1=0d0;  temp2=0d0;  y1=0d0; y2=0d0; y3=0d
         else
 !         We have a linear equation with 1 root.
           nroot = 1
-          x(1) = cmplx(-d/c, 0.)
+          x(1) = cmplx(-d/c, 0.,kind=8)
         endif
       else
 !     We have a true quadratic equation.  Apply the quadratic formula to find two roots.
       nroot = 2
         DD = c*c-4.*b*d
         if(DD .ge. 0.)then
-          x(1) = cmplx((-c+sqrt(DD))/2./b, 0.)
-          x(2) = cmplx((-c-sqrt(DD))/2./b, 0.)
+          x(1) = cmplx((-c+sqrt(DD))/2./b, 0.,kind=8)
+          x(2) = cmplx((-c-sqrt(DD))/2./b, 0.,kind=8)
         else
-          x(1) = cmplx(-c/2./b, +sqrt(-DD)/2./b)
-          x(2) = cmplx(-c/2./b, -sqrt(-DD)/2./b)
+          x(1) = cmplx(-c/2./b, +sqrt(-DD)/2./b,kind=8)
+          x(2) = cmplx(-c/2./b, -sqrt(-DD)/2./b,kind=8)
         endif
       endif
 
@@ -1844,17 +1810,17 @@ DD=0d0;  p=0d0;  q=0d0;  phi=0d0;  temp1=0d0;  temp2=0d0;  y1=0d0; y2=0d0; y3=0d
 
 ! Assign answers -------------------------------------------------------
       if(DD .lt. 0.)then
-        x(1) = cmplx( y1,  0.)
-        x(2) = cmplx( y2,  0.)
-        x(3) = cmplx( y3,  0.)
+        x(1) = cmplx( y1,  0.,kind=8)
+        x(2) = cmplx( y2,  0.,kind=8)
+        x(3) = cmplx( y3,  0.,kind=8)
       elseif(DD .eq. 0.)then
-        x(1) = cmplx( y1,  0.)
-        x(2) = cmplx(y2r,  0.)
-        x(3) = cmplx(y2r,  0.)
+        x(1) = cmplx( y1,  0.,kind=8)
+        x(2) = cmplx(y2r,  0.,kind=8)
+        x(3) = cmplx(y2r,  0.,kind=8)
       else
-        x(1) = cmplx( y1,  0.)
-        x(2) = cmplx(y2r, y2i)
-        x(3) = cmplx(y2r,-y2i)
+        x(1) = cmplx( y1,  0.,kind=8)
+        x(2) = cmplx(y2r, y2i,kind=8)
+        x(3) = cmplx(y2r,-y2i,kind=8)
       endif
 
     ENDIF

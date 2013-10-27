@@ -70,7 +70,7 @@ contains
     include 'mpif.h'
     integer :: i,j,k,index
     real(8) :: s1
-    integer :: ierr, ins(4)
+    integer :: ierr
     integer :: req(48),sta(MPI_STATUS_SIZE,48)
     real(8) :: x0,y0,z0,radius,x2,y2,z2
 
@@ -353,14 +353,14 @@ contains
     write(8,18)
 16  format('POINT_DATA ',I17)
 17  format('SCALARS ',A20,' float 1')
-20  format('VECTORS uv float')
+! 20  format('VECTORS uv float')
 18  format('LOOKUP_TABLE default')
 
     do k=k1,k2; do j=j1,j2; do i=i1,i2;
       write(8,210) solids(i,j,k)
     enddo; enddo; enddo
 210 format(e14.5)
-310 format(e14.5,e14.5,e14.5)
+! 310 format(e14.5,e14.5,e14.5)
 
     close(8)
     if(rank==0) call close_solid_visit_file()

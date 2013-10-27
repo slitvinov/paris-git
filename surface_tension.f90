@@ -38,7 +38,7 @@ module module_surface_tension
   implicit none
   integer, parameter :: NDEPTH=2
   integer, parameter :: BIGINT=100
-  integer, parameter :: D_HALF_BIGINT = DBLE(BIGINT/2)
+  real(8), parameter :: D_HALF_BIGINT = DBLE(BIGINT/2)
   integer, parameter :: MAX_EXT_H = 2
   integer, parameter :: NOR=6 ! number of orientations
   integer, parameter :: NPOS=NOR*27
@@ -111,7 +111,7 @@ contains
    subroutine get_all_heights
      implicit none
      include 'mpif.h'
-     integer :: direction, ierr, i,j,k,index
+     integer :: direction, ierr, i
      integer :: req(24),sta(MPI_STATUS_SIZE,24)
      if(.not.st_initialized) call initialize_surface_tension()
 
@@ -710,7 +710,7 @@ contains
       sumCount = 0
       S2_err_K=0.d0
       Lm_err_K=0.d0
-      method_count=0.d0
+      method_count=0
       if ( test_curvature ) then 
          kappa_exact = - 2.d0/rad(ib)
          do i=is,ie; do j=js,je; do k=ks,ke
@@ -809,7 +809,7 @@ end subroutine print_method
       real(8), intent(out) :: a(6)
       logical, intent(out) :: fit_success
 
-      real(8) :: m(6,6), invm(6,6),error
+      real(8) :: m(6,6), invm(6,6)
       real(8) :: rhs(6)
       integer :: ifit, im,jm, nposit
       logical :: inv_success
@@ -1259,7 +1259,7 @@ end subroutine print_method
     implicit none
     integer :: i,j,k,iem,jem,n,i0,j0,k0
     real(8) :: centroid(3),x1,y1,xvec,yvec,kappa,a(6),xpoint(0:2),ypoint(0:2),pc(12,12,2),diff(0:2)
-    integer :: direction,indexcurv,nfound,nposit
+    integer :: indexcurv,nfound,nposit
     real(8) :: centroid_scaled(2), deltax
     k0 = (Nz+4)/2
     k = k0
@@ -1443,7 +1443,7 @@ subroutine PlotCutAreaCentroid(i,j,k,centroid,x1,y1,xvec,yvec)
      if(test_heights) then
         call output_heights()
      else if(test_curvature .or. test_curvature_2D) then
-        method_count=0.
+        method_count=0
         call output_heights()
         call output_curvature()
      end if

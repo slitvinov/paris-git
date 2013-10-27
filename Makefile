@@ -12,9 +12,9 @@ FC = mpif90
 
 # trap invalid to catch signaling NaN s ? 
 
-#FFLAGS = -g -Wall -ffpe-trap=invalid,zero,overflow # -g -gstabs # -O3 #
+FFLAGS = -g -Wall -ffpe-trap=invalid,zero,overflow # -g -gstabs # -O3 #
 #FOPTS =  -g -Wall -ffpe-trap=invalid,zero,overflow # -g -gstabs # -O3 #
-FFLAGS = -O3 # -std=f95 # -g -fimplicit-none -fbounds-check
+# FFLAGS = -O3 # -std=f95 # -g -fimplicit-none -fbounds-check
 
 CFLAGS = -O # -g -gstabs
 BINDIR = $(HOME)/bin
