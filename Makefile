@@ -1,7 +1,8 @@
 #--------- paris-ParisSimulator main Makefile --------------------------
 
 # babbage
-# OMPI_FC=gfortran44
+
+OMPI_FC=gfortran44
 
 FC = mpif90
 
@@ -13,16 +14,16 @@ FC = mpif90
 
 #FFLAGS = -g -Wall -ffpe-trap=invalid,zero,overflow # -g -gstabs # -O3 #
 #FOPTS =  -g -Wall -ffpe-trap=invalid,zero,overflow # -g -gstabs # -O3 #
-FFLAGS = -O3 # -g -fimplicit-none -fbounds-check
+FFLAGS = -O3 # -std=f95 # -g -fimplicit-none -fbounds-check
 
 CFLAGS = -O # -g -gstabs
 BINDIR = $(HOME)/bin
 
 # select option for hypre
 # default hypre installation without root privileges:
-# HYPRE_DIR = $(HOME)/hypre-2.8.0b/src
+HYPRE_DIR = $(HOME)/hypre-2.8.0b-babel/src
 # Macport installation in /opt 
-HYPRE_DIR = /opt/hypre
+# HYPRE_DIR = /opt/hypre
 # babbage
 # HYPRE_DIR = /share/apps/hypre
 
@@ -55,6 +56,10 @@ distclean: clean
 test:  install compare parisdeconv
 	@echo "This test takes approximately 1 minute on a 4-core intel i7 MacBookPro"
 	@cd Tests; chmod +x ./runtests.sh; ./runtests.sh
+
+longtest:  install compare parisdeconv
+	@echo "This test takes approximately 1 minute on a 4-core intel i7 MacBookPro"
+	@cd Tests; chmod +x ./runlongtests.sh; ./runlongtests.sh
 
 # single processor test
 minitest: install

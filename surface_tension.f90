@@ -1447,7 +1447,7 @@ subroutine PlotCutAreaCentroid(i,j,k,centroid,x1,y1,xvec,yvec)
         call output_curvature()
      end if
      if(test_curvature_2D.and.nx<=16.and.ny<=16.and.nz<=16) then
-        call plot_curvature()
+!        call plot_curvature()
      end if
   end subroutine test_VOF_HF
 

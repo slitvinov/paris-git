@@ -3,29 +3,28 @@
 
 
 
-if [ $# -lt 2 ]; then
+if [ $# -lt 1 ]; then
     echo "missing arguments"
-    echo usage $0 dimension initialisation-over-refinement-level
+#    echo usage $0 dimension initialisation-over-refinement-level
+    echo usage $0 initialisation-over-refinement-level
     exit
 fi
 
-let d=$1
+#let d=$1
+let d=2
 dim="$d"D
-init=$2
+init=$1 # !!
 
 if [ $d == 2 ]; then
-list="3 4 5 6 7"
+list="3 4 5"
 npz=1
-nz=2
+nz=2  # thus cyldir=3
+cyldir=3
 else
 list="3 4 5 6 7"
 npz=2
 fi
 echo $list
-
-npx=2
-let np=$npx*$npx*$npz
-
 
 /bin/rm -f *.tmp
 for level in $list; do
@@ -35,25 +34,14 @@ for level in $list; do
     if [ $d == 3 ]; then
 	nz=$nx
     fi
-    sed s/NXTEMP/$nx/g testinput.template | sed s/NZTEMP/$nz/g | sed s/NPXTEMP/$npx/g  | sed s/NPZTEMP/$npz/g > testinput
+
     for radius in 0.2 0.25 0.32; do 
-	sed s/RADIUSTEMP/$radius/g testinput > testinput-$dim-$nx-$radius 
-	sed s/REFINEMENTTEMP/$refinement/g inputvof.template > inputvof
-	rm -fr input out stats 
-	ln -s testinput-$dim-$nx-$radius input
-	mpirun -np $np paris > tmpout
-	if [ -d out ]; then
-	    cd out
-	    cat curvature-0000?.txt >> curvature.txt
-	    cat reference-0000?.txt >> reference.txt
-	    compare curvature.txt reference.txt 1e20 1 2 >> ../cmpout.tmp
-    echo `awk -v nx=$nx -v radius=$radius 'BEGIN {print nx * radius }'`  `compare curvature.txt reference.txt 0.1 1 2 `  >> ../out.tmp
-	    cd ..
-	else
-	    RED="\\033[1;31m"
-	    NORMAL="\\033[0m"
-	    echo -e "$RED" "FAIL: directory 'out' not found."  "$NORMAL"
-	fi
+	./run_one_test.sh F Curvature2D F $cyldir $radius 1e20 $init $nx > /dev/null
+	awk -v nx=$nx -v radius=$radius '{print nx * radius , $1, $2, $3 }' mcount.tmp >> allcount.tmp
+	cd out
+	compare curvature.txt reference.txt 1e20 1 2 >> ../cmpout.tmp
+	echo `awk -v nx=$nx -v radius=$radius 'BEGIN {print nx * radius }'`  `compare curvature.txt reference.txt 0.1 1 2 `  >> ../out.tmp
+	cd ..
     done
 done
 
@@ -61,23 +49,13 @@ done
 
 radius=0.4
 echo $level
-sed s/NXTEMP/$nx/g testinput.template | sed s/NZTEMP/$nz/g | sed s/NPXTEMP/$npx/g  | sed s/NPZTEMP/$npz/g > testinput
-sed s/RADIUSTEMP/$radius/g testinput > testinput-$dim-$nx-$radius 
-rm -fr input out stats 
-ln -s  testinput-$dim-$nx-$radius  input
-mpirun -np $np paris > tmpout
-if [ -d out ]; then
-    cd out
-    cat curvature-0000?.txt >> curvature.txt
-    cat reference-0000?.txt >> reference.txt
-    compare curvature.txt reference.txt 1e20 1 2 >> ../cmpout.tmp
-    echo `awk -v nx=$nx -v radius=$radius 'BEGIN {print nx * radius }'`  `compare curvature.txt reference.txt 0.1 1 2 `  >> ../out.tmp
-    cd ..
-else
-    RED="\\033[1;31m"
-    NORMAL="\\033[0m"
-    echo -e "$RED" "FAIL: directory 'out' not found."  "$NORMAL"
-fi
+
+./run_one_test.sh F Curvature2D F $cyldir $radius 1e20 $init $nx > /dev/null
+cd out
+compare curvature.txt reference.txt 1e20 1 2 >> ../cmpout.tmp
+echo `awk -v nx=$nx -v radius=$radius 'BEGIN {print nx * radius }'`  `compare curvature.txt reference.txt 0.1 1 2 `  >> ../out.tmp
+cd ..
+
 
 
 gnuplot <<EOF
@@ -85,7 +63,7 @@ set log x
 set log y
 set xlabel "Grid points per Radius"
 set ylabel "Curvature Error"
-plot "out.tmp" u 1:2 t "L2", 2/(x*x) 
+plot "out.tmp" u 1:2 t "L2", 2/(x*x)
 set term pdf
 set out "curvature.pdf"
 plot "out.tmp" u 1:2 t "L2", 2/(x*x) 

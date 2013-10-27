@@ -1,5 +1,6 @@
 #! /bin/bash
 #set -x
+export LANG=en_EN
 
 if [ $# -lt 5 ]; then
     echo "missing arguments"
