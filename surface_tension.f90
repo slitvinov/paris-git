@@ -1294,6 +1294,7 @@ end subroutine print_method
          endif
       enddo; enddo
       if(test_curvature_2D.and.nx<=8.and.ny<=8.and.nz==2) then
+         write(*,*)  "I was here"
          i0=5; j0=5
          call get_curvature(i0,j0,k0,kappa,indexCurv,nfound,nposit,a)
          i=i0
@@ -1447,7 +1448,7 @@ subroutine PlotCutAreaCentroid(i,j,k,centroid,x1,y1,xvec,yvec)
         call output_curvature()
      end if
      if(test_curvature_2D.and.nx<=16.and.ny<=16.and.nz<=16) then
-!        call plot_curvature()
+        call plot_curvature()
      end if
   end subroutine test_VOF_HF
 

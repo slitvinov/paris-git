@@ -140,6 +140,7 @@ Program paris
         call setvelocityBC(u,v,w,umask,vmask,wmask)
         call write_vec_gnuplot(u,v,itimestep)
         call calcstats
+
         if(rank==0) then
            end_time =  MPI_WTIME()
            open(unit=121,file='stats',access='append')
@@ -1007,7 +1008,7 @@ subroutine InitCondition
      else if (test_LP) then 
         call test_Lag_part()
      endif
-
+     call hello_coucou() ! 1
      if(DoFront) then
         call GetFront('recv')
         call GetFront('wait')
@@ -1041,14 +1042,16 @@ subroutine InitCondition
         rho=rho1
         mu=mu1
      endif
-
+     call hello_coucou() ! 2
      my_ave=0.0
      do k=ks,ke;  do j=js,je;  do i=is,ie
         my_ave=my_ave+rho(i,j,k)*dx(i)*dy(j)*dz(k)
      enddo;  enddo;  enddo
      my_ave = my_ave/(xLength*yLength*zLength)
+     call hello_coucou()  ! 3
      call MPI_ALLREDUCE(my_ave, rho_ave, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_Domain, ierr)
- !----------------------------------------------Front----------------------------------------------
+     call hello_coucou() ! 4
+!----------------------------------------------Front----------------------------------------------
   elseif((rank==nPdomain).and.DoFront)then
      if(restartFront)then
         call backup_front_read(time,iTimeStep)
@@ -1068,11 +1071,11 @@ subroutine InitCondition
 
   endif
   !---------------------------------------------End Front----------------------------------------------
-
   if((.not. restart).or.(.not. restartFront)) then
      time = 0d0
      iTimeStep = 0
   endif
+  call hello_coucou() ! 5
 end subroutine InitCondition
 !=================================================================================================
 ! function minabs
