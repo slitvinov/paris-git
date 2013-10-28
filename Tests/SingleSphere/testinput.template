@@ -13,15 +13,15 @@
 !=================================================================================================
 ! General parameters
 
-TWOPHASE  = T         ! TwoPhase: Is the flow two-phase?
-DoVOF 	  = T
+TWOPHASE  = F         ! TwoPhase: Is the flow two-phase?
+DoVOF 	  = F
 DoFront   = F
 GetPropertiesFromFront = F ! T: uses Front-Tracking data to compute mu, rho and Surface Tension. 
 		           ! F: uses VOF data to compute mu and rho. 
 
 ZeroReynolds = T
 Implicit = IMPTEMP     
-hypre    = F       ! T: uses hyprepackage, F: uses SOR solver 
+hypre    = T       ! T: uses hyprepackage, F: uses SOR solver 
 restart  = F       ! T: start the domain from a previous simulation
 restartFront = F   ! T: start the frontfrom  a previous simulation
 restartAverages = F

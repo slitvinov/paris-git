@@ -9,7 +9,7 @@ let nz=$nx
 let npx=2
 let npz=$npx
 radius=0.32
-refinement=4
+refinement=8
 dim=3D
 
 /bin/rm -fr out input reference.txt

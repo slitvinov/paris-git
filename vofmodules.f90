@@ -43,7 +43,7 @@ module module_VOF
   integer :: parameters_read=0, refinement=-1 
   integer :: cylinder_dir = 0
   logical :: test_heights = .false.  
-  logical :: normal_up = .true.
+  logical :: normal_up = .true.    ! used for the h
   logical :: test_curvature = .false.  
   logical :: cylinder_heights = .false.  
   logical :: test_curvature_2D = .false.  

@@ -24,8 +24,9 @@ echo $list
 npx=2
 let np=$npx*$npx*$npz
 
+ndepth=`head -50  ../../surface_tension.f90 |  awk -F '=' ' /NDEPTH/ {print $2}' | tr -d ' '`
 
-/bin/rm -f *.tmp
+/bin/rm -f *-$ndepth.tmp
 for level in $list; do
     echo $level
     nx=`awk -v level=$level 'BEGIN {print 2**level}'`
@@ -44,10 +45,10 @@ for level in $list; do
 	    cd out
 	    cat curvature-0000?.txt >> curvature.txt
 	    cat reference-0000?.txt >> reference.txt
-	    compare curvature.txt reference.txt 1e20 1 2 >> ../cmpout.tmp
-    echo `awk -v nx=$nx -v radius=$radius 'BEGIN {print nx * radius }'`  `compare curvature.txt reference.txt 0.1 1 2 `  >> ../paris-$dim.tmp
+#	    compare curvature.txt reference.txt 1e20 1 2 >> ../cmpout.tmp
+	    echo `awk -v nx=$nx -v radius=$radius 'BEGIN {print nx * radius }'`  `compare curvature.txt reference.txt 0.1 1 2 `  >> ../paris-$dim-$ndepth.tmp
 	    cd ..
-	    awk -v nx=$nx  -v radius=$radius '{print nx * radius, $1, $2, $3 }' mcount.tmp >> method_count.tmp
+	    awk -v nx=$nx  -v radius=$radius '{print nx * radius, $1, $2, $3 }' mcount.tmp >> method_count-$ndepth.tmp
 	else
 	    RED="\\033[1;31m"
 	    NORMAL="\\033[0m"
@@ -69,10 +70,10 @@ if [ -d out ]; then
     cd out
     cat curvature-0000?.txt >> curvature.txt
     cat reference-0000?.txt >> reference.txt
-    compare curvature.txt reference.txt 1e20 1 2 >> ../cmpout.tmp
-    echo `awk -v nx=$nx -v radius=$radius 'BEGIN {print nx * radius }'`  `compare curvature.txt reference.txt 0.1 1 2 `  >> ../paris-$dim.tmp 
+#    compare curvature.txt reference.txt 1e20 1 2 >> ../cmpout.tmp
+    echo `awk -v nx=$nx -v radius=$radius 'BEGIN {print nx * radius }'`  `compare curvature.txt reference.txt 0.1 1 2 `  >> ../paris-$dim-$ndepth.tmp
     cd ..
-    awk -v nx=$nx  -v radius=$radius '{print nx * radius, $1, $2, $3 }' mcount.tmp >> method_count.tmp
+    awk -v nx=$nx  -v radius=$radius '{print nx * radius, $1, $2, $3 }' mcount.tmp >> method_count-$ndepth.tmp
 else
     RED="\\033[1;31m"
     NORMAL="\\033[0m"

@@ -39,7 +39,7 @@ module module_surface_tension
   integer, parameter :: NDEPTH=3
   integer, parameter :: BIGINT=100
   real(8), parameter :: D_HALF_BIGINT = DBLE(BIGINT/2)
-  integer, parameter :: MAX_EXT_H = 2
+  integer, parameter :: MAX_EXT_H = 0
   integer, parameter :: NOR=6 ! number of orientations
   integer, parameter :: NPOS=NOR*27
   real(8), parameter :: EPS_GEOM = 1d-4
@@ -54,7 +54,7 @@ module module_surface_tension
   logical :: st_initialized = .false.
   logical :: recomputenormals = .true.
   logical :: debug_curvature = .false.
-  logical :: debug_ij55 = .false.
+  logical :: debug_23 = .false.
   integer, parameter :: nfound_min=6  
   integer :: method_count(3)
 contains
@@ -439,6 +439,7 @@ contains
       logical :: dirnotfound,heightnotfound
       integer :: si,sj,sk
 
+
       i = i1(0,0,1)
       j = j1(0,0,1)
       k = k1(0,0,1)
@@ -481,7 +482,7 @@ contains
               else
                  s = 1 
                  heightnotfound=.true.
-                 do while(s.le.NDEPTH.and.heightnotfound) ! search at other levels
+                 do while(s.le.Ng.and.heightnotfound) ! search at other levels
                     if (height(i1(m,n,d)+si*s,j1(m,n,d)+sj*s,k1(m,n,d)+sk*s,index).lt.1d6) then
                        hloc(m,n) = height(i1(m,n,d)+si*s,j1(m,n,d)+sj*s,k1(m,n,d)+sk*s,index) + s
                        nfound = nfound + 1
@@ -504,7 +505,7 @@ contains
                end if ! search at same level
             end do ! n
          end do ! m 
-         !            write(*,*) "GLH: end m,n: nposit,d,index,nfound ",nposit,d,index,nfound
+          !            write(*,*) "GLH: end m,n: nposit,d,index,nfound ",nposit,d,index,nfound
          if(nfound.eq.9) then
             dirnotfound = .false.
             indexfound = index
@@ -567,6 +568,7 @@ contains
       endif
       call orientation(mxyz,try)
       call get_local_heights(i1,j1,k1,mxyz,try,nfound,indexfound,h,points,nposit)
+
       kappa = 0.d0
       ! if all nine heights found 
       if ( nfound == 9 ) then
