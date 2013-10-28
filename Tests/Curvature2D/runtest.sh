@@ -16,7 +16,7 @@ dim="$d"D
 init=$1 # !!
 
 if [ $d == 2 ]; then
-list="3 4 5"
+list="3 4 5 6"
 npz=1
 nz=2  # thus cyldir=3
 cyldir=3
@@ -30,7 +30,7 @@ echo $list
 for level in $list; do
     echo $level
     nx=`awk -v level=$level 'BEGIN {print 2**level}'`
-    refinement=`awk -v init=$init 'BEGIN {print 2**init}'`
+#    refinement=`awk -v init=$init 'BEGIN {print 2**init}'`
     if [ $d == 3 ]; then
 	nz=$nx
     fi

@@ -9,6 +9,12 @@ for dir in `ls`; do
 		echo running long test in $dir
 		chmod +x longtest.sh
 		./longtest.sh 
+	    else
+		if [ -e 'run.sh' ]; then
+		    echo running short test in $dir
+		    chmod +x run.sh
+		    ./run.sh 
+		fi
 	    fi
 	    cd ..
 	fi

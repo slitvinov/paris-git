@@ -1,12 +1,14 @@
 #! /bin/bash
 #set -x
 
-./run_one_test.sh F Curvature2D T 2 0.32 4e-2 1 16
-./run_one_test.sh F Curvature2D T 3 0.32 4e-2 1 16
-./run_one_test.sh T Curvature2D F 2 0.2 3e-1 1 8
-./run_one_test.sh T Curvature2D F 3 0.2 3e-1 1 8
+./run_one_test.sh F Curvature2D T 2 0.32 4e-2 8 16
+./run_one_test.sh F Curvature2D T 3 0.32 4e-2 8 16
+./run_one_test.sh T Curvature2D F 2 0.2 3e-1 4 8
+./run_one_test.sh T Curvature2D F 3 0.2 3e-1 4 8
 echo "large mono"
-./run_one_test.sh T Curvature2D F 3 0.32 4e-2 1 16
+./run_one_test.sh T Curvature2D F 3 0.32 4e-2 4 16
+echo "convergence test"
+runtest.sh 8
 
 
 #ismono=$1

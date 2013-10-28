@@ -1,0 +1,33 @@
+Define ABS(x) (((x) > 0 ? (x) : (-x) )
+#Define CIRCLE (ellipse (-RADIUS,RADIUS,RADIUS,RADIUS))  apparently not better
+Define CIRCLE (x*x + y*y + z*z - RADIUS*RADIUS)
+
+
+1 0 GfsSimulation GfsBox GfsGEdge {} {
+  Time { iend = IEND }
+  Refine ((LEVEL+INIT))
+
+  AdvectionParams { scheme = none }
+#  VariableTracerVOFHeight T  # apparently identical in 2D
+  VariableTracerVOF T
+  VariableCurvature K T
+
+  InitFraction {} T CIRCLE
+
+  AdaptGradient { istep = 1 } { cmax = 1e-6 minlevel = ( t > 0.5 ? LEVEL : (LEVEL + INIT))  maxlevel = ( t > 0.5 ? LEVEL : (LEVEL + INIT)) } T
+
+  OutputSimulation { step = 1 }  curvature-ft-%g-LEVEL-RADIUS-D.gfs  { depth = 5 }
+  OutputSimulation { istart = 0 istep = 1 } curvature-%ld-LEVEL-RADIUS-D.gfs 
+
+  OutputScalarNorm { start = end } {  awk '{ print "L2 norm ",$7*RADIUS/2., "Linfty norm ",$9*RADIUS/2. }' } { v = ( K - (D-1)/RADIUS) }
+  OutputScalarStats { istart = 1 istep = 1 } stderr { v = K }
+}
+GfsBox {
+    left   =  Boundary   { BcDirichlet T 0 }
+    right  =  Boundary   { BcDirichlet T 0 }
+    top    =  Boundary   { BcDirichlet T 0 }
+    bottom =  Boundary   { BcDirichlet T 0 }
+#    front =  Boundary  { BcDirichlet T 0 } # uncomment for 3D runs
+#    back =   Boundary  { BcDirichlet T 0 }
+ }
+

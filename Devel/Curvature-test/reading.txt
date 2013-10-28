@@ -1,0 +1,56 @@
+variable_curvature_event
+calls
+    variable_curvature_from_fraction
+    calls
+	height_curvature
+	calls
+     	   gdouble gfs_height_curvature (FttCell * cell, GfsVariableTracerVOF * t, gdouble * kmax)
+	   calls	   
+	   	curvature_along_direction (FttCell * cell, 
+		calls
+			local_height   ! returns heights, not centroids. Fills interface[NI*FTT_D]
+			 	       ! with positions computed from height function. 
+		        calls
+				fraction
+				calls 
+			      	      gfs_vof_interpolate
+			      	      calls 
+			      	      	    gfs_vof_plane_interpolate
+	   then calls
+     	   	independent_positions (GtsVector * interface, guint n) --> decides n ? 
+     	   	gfs_vof_center	
+      		calls
+			gfs_plane_area_center
+           then calls
+     	   	parabola_fit_init
+                parabola_fit_add	
+   then ...
+   then calls
+     fit_curvature
+     calls 
+     	   gfs_fit_curvature (FttCell * cell, GfsVariableTracerVOF * t, gdouble * kmax)
+	   calls
+		parabola_fit_init
+                parabola_fit_add	
+		fit_from_fractions
+		calls	
+			add_vof_center
+			calls
+				gfs_plane_area_center
+				parabola_fit_add	
+
+		parabola_fit_solve
+		parabola_fit_curvature
+    	   
+***** NEW:
+
+gdouble gfs_height_curvature_new (FttCell * cell, GfsVariableTracerVOFHeight * t, 
+calls
+	static gboolean curvature_along_direction_new (FttCell * cell,  ! Not 3D
+calls
+	gfs_closest_height
+	curvature_from_h
+
+** AXI
+
+static void parabola_fit_axi_curvature (const ParabolaFit * p, gdouble r, gdouble h,

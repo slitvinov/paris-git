@@ -43,8 +43,8 @@ if [ $cyldir == 3 ];  then
     npz=1
     xc=`awk -F '=' ' /xyzrad\(1, 1\)/ {print $2}' < testinput.template | awk '{print $1}'`
     yc=`awk -F '=' ' /xyzrad\(2, 1\)/ {print $2}' < testinput.template | awk '{print $1}'`
-    if [ -f gridgp.template ]; then
-	sed s/XC1/$xc/g gridgp.template | sed s/XC2/$yc/g > grid.gp
+    if [ -f grid_template.gp ]; then
+	sed s/XC1/$xc/g grid_template.gp | sed s/XC2/$yc/g  | sed s/RADIUS/$radius/g  > grid.gp
     fi
 fi
 if [ $cyldir -gt 3 ]; then
@@ -80,7 +80,7 @@ else
     echo -e "$RED" "FAIL: directory 'out' not found."  "$NORMAL"
 fi
 
-if [ $setmono == mono ] && [ $cyldir == 3 ]; then
+if [ $setmono == mono ] && [ $cyldir == 3 ] && [ $nx -le 16 ]; then
 	gnuplot <<EOF
 call "../grid.gp"
 EOF

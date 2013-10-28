@@ -36,7 +36,7 @@ module module_surface_tension
   use module_VOF
 !  use module_flow ! for curvature test only ????
   implicit none
-  integer, parameter :: NDEPTH=2
+  integer, parameter :: NDEPTH=3
   integer, parameter :: BIGINT=100
   real(8), parameter :: D_HALF_BIGINT = DBLE(BIGINT/2)
   integer, parameter :: MAX_EXT_H = 2
@@ -1258,13 +1258,15 @@ end subroutine print_method
   subroutine plot_curvature()
     implicit none
     integer :: i,j,k,iem,jem,n,i0,j0,k0
-    real(8) :: centroid(3),x1,y1,xvec,yvec,kappa,a(6),xpoint(0:2),ypoint(0:2),pc(12,12,2),diff(0:2)
+    real(8) :: centroid(3),x1,y1,xvec,yvec,kappa,a(6),xpoint(0:2),ypoint(0:2),diff(0:2)
+    real(8), allocatable :: pc(:,:,:)
     integer :: indexcurv,nfound,nposit
     real(8) :: centroid_scaled(2), deltax
     k0 = (Nz+4)/2
     k = k0
     deltax=dx(nx/2)
 
+    allocate(pc(imin:imax,jmin:jmax,3))
     if(rank==0.and.cylinder_dir==3) then
       OPEN(UNIT=79,FILE=TRIM(out_path)//'/grid.txt')
       OPEN(UNIT=80,FILE=TRIM(out_path)//'/segments.txt')
@@ -1293,28 +1295,6 @@ end subroutine print_method
             write(81,'(2(E15.8,1X))') centroid_scaled(1),centroid_scaled(2) 
          endif
       enddo; enddo
-      if(test_curvature_2D.and.nx<=8.and.ny<=8.and.nz==2) then
-         write(*,*)  "I was here"
-         i0=5; j0=5
-         call get_curvature(i0,j0,k0,kappa,indexCurv,nfound,nposit,a)
-         i=i0
-         j=j0
-         xpoint(0)=0.d0
-         ypoint(0)=0.d0
-         i=i0+1; j=j0
-         xpoint(1)=pc(i,j,1) + 1 - pc(i0,j0,1)
-         ypoint(1)=pc(i,j,2) + 0 - pc(i0,j0,2)
-         i=i0; j=j0+1
-         xpoint(2)=pc(i,j,1) + 0 - pc(i0,j0,1)
-         ypoint(2)=pc(i,j,2) + 1 - pc(i0,j0,2)
-!  h  = a4 x + a1 x**2 + a6
-         do n=0,2
-            diff(n) = abs(xpoint(n) - a(4)*ypoint(n) - a(1)*ypoint(n)**2 - a(6))
-            write(*,*) n, diff(n), a, nposit
-            !         diff(n) = abs(xpoint(n) - a(5)*ypoint(n) - a(2)*ypoint(n)**2 - a(6))
-            !         write(*,*) n, diff(n), "second orientation", nposit
-         enddo
-      endif
       CLOSE(79)
       CLOSE(80)
       CLOSE(81)
@@ -1447,7 +1427,7 @@ subroutine PlotCutAreaCentroid(i,j,k,centroid,x1,y1,xvec,yvec)
         call output_heights()
         call output_curvature()
      end if
-     if(test_curvature_2D.and.nx<=16.and.ny<=16.and.nz<=16) then
+     if(test_curvature_2D.and.nx<=16.and.ny<=16.and.nz<=2) then
         call plot_curvature()
      end if
   end subroutine test_VOF_HF
