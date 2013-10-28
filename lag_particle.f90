@@ -209,7 +209,7 @@ contains
    subroutine tag_drop_all()
       include 'mpif.h'
       integer :: i,j,k
-      integer :: ierr,numaccu
+      integer :: numaccu!, ierr
 
       ! update tag_id from local to global id
       !    Note: no need to change domain 0
@@ -336,7 +336,7 @@ contains
    subroutine test_Lag_part()
       implicit none
       include 'mpif.h'
-      integer :: ierr
+!      integer :: ierr
                      
       if(test_tag) then
          call output_tag()
