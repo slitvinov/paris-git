@@ -21,7 +21,7 @@ GetPropertiesFromFront = F ! T: uses Front-Tracking data to compute mu, rho and 
 
 ZeroReynolds = T
 Implicit = IMPTEMP     
-hypre    = T       ! T: uses hyprepackage, F: uses SOR solver 
+hypre    = F       ! T: uses hyprepackage, F: uses SOR solver 
 restart  = F       ! T: start the domain from a previous simulation
 restartFront = F   ! T: start the frontfrom  a previous simulation
 restartAverages = F
