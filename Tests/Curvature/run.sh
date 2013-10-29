@@ -1,36 +1,39 @@
 #!/bin/bash
 #set -x
 
-#!/bin/bash
-#set -x
-
 let nx=32
+#let nx=16
 let nz=$nx
 let npx=2
 let npz=$npx
 radius=0.32
+#radius=0.2
 refinement=8
 dim=3D
+precision=4e-2
+
 
 /bin/rm -fr out input reference.txt
-let npstart=$npx*$npx*$npz
+
 if [ $# -gt 0 ]; then
     if [ $1 == mono ]; then
 	echo "mono"
 	let npstart=1
-	ln -s testinput.mono input
-	precision=5e-2
+	precision=0.11
+	npx=1; npz=1
+	radius=0.25
     else
 	echo "unknown option" $1 
 	exit 1
     fi
-else
-    sed s/NXTEMP/$nx/g testinput.template | sed s/NZTEMP/$nz/g | sed s/NPXTEMP/$npx/g  | sed s/NPZTEMP/$npz/g > testinput
-    sed s/RADIUSTEMP/$radius/g testinput > testinput-$dim-$nx-$radius 
-    ln -s testinput-$dim-$nx-$radius input
-    sed s/REFINEMENTTEMP/$refinement/g inputvof.template > inputvof
-    precision=4e-2
 fi
+
+let npstart=$npx*$npx*$npz
+
+sed s/NXTEMP/$nx/g testinput.template | sed s/NZTEMP/$nz/g | sed s/NPXTEMP/$npx/g  | sed s/NPZTEMP/$npz/g > testinput
+sed s/RADIUSTEMP/$radius/g testinput > testinput-$dim-$nx-$radius 
+ln -s testinput-$dim-$nx-$radius input
+sed s/REFINEMENTTEMP/$refinement/g inputvof.template > inputvof
 
 mpirun -np $npstart paris > tmpout 2>&1
 echo `awk ' /Step:/ { cpu = $8 } END { print "cpu = " cpu } ' < tmpout`

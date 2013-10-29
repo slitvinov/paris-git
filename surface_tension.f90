@@ -591,8 +591,9 @@ contains
       else 
          nfound = - ind_pos(points,nposit) 
       endif ! nfound == 9
-! *** determine the origin. 
-! fixme: index not treated as it should (no reference to normal)
+
+      ! *** determine the origin. 
+      ! fixme: index not treated as it should (no reference to normal)
       height_found=.false.
       index=1
       do while(index<=6.and..not.height_found)
@@ -1224,7 +1225,7 @@ end subroutine print_method
      implicit none
      integer :: ind_pos
      integer, intent(in) :: n
-     real(8), intent(in) :: points(n,3)
+     real(8), intent(in) :: points(NPOS,3)
      integer :: i,j,ni,c
      real(8) :: d2
      logical :: depends
@@ -1244,7 +1245,7 @@ end subroutine print_method
               do c=1,3
                  d2 = d2 + (points(i,c) - points(j,c))**2
               enddo
-              depends = (d2 < 0.5**2)
+              depends = (d2 < 0.5d0**2)
            endif
         enddo
         if(.not.depends) ni = ni + 1
