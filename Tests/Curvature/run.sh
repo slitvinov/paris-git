@@ -1,14 +1,40 @@
 #!/bin/bash
 #set -x
 
+d=2
+dim=$d'D'
+
+echo "dimension" $d
 precision=4e-2
+run_one_test.sh F Curvature_test F 2 0.32 4e-2 8 32 0.5 0.5 0.5 3
+echo `awk ' /Step:/ { cpu = $8 } END { print "cpu = " cpu } ' < tmpout`
+cd out
+compare curvature.txt reference.txt $precision 1 1
+cd ..
 
-run_one_test.sh 32 8 0.32 0.5 0.5 0.5
 
+d=3
+dim=$d'D'
+
+echo "dimension" $d
+precision=4e-2
+run_one_test.sh F Curvature2D F 2 0.32 4e-2 8 16 0.5 0.5 0.5 2
+echo `awk ' /Step:/ { cpu = $8 } END { print "cpu = " cpu } ' < tmpout`
 cd out
 compare curvature.txt reference.txt $precision 1 1
 cd ..
 
 
 
+#ismono=$1
+#type=$2
+#normup=$3
+#cyldir=$4
+#radius=$5
 
+#refinement=$7
+#nx=$8
+#xc=$9
+#yc=$10
+#zc=$11
+#d=$12

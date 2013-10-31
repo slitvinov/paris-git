@@ -59,7 +59,7 @@ test:  install compare parisdeconv
 	@cd Tests; chmod +x ./runtests.sh; ./runtests.sh
 
 longtest:  install compare parisdeconv
-	@echo "This test takes approximately 1 minute on a 4-core intel i7 MacBookPro"
+	@echo "This test takes approximately 15 minutes on a 4-core intel i7 MacBookPro"
 	@cd Tests; chmod +x ./runlongtests.sh; ./runlongtests.sh
 
 # single processor test

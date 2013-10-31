@@ -114,7 +114,7 @@ contains
        test_heights = .false.
     else if(test_type=='height_test') then
        test_heights = .true.
-    else if(test_type=='curvature_test') then
+    else if(test_type=='Curvature_test') then
        test_curvature = .true.
     else if(test_type=='Curvature2D') then
        test_curvature_2D = .true.
