@@ -12,7 +12,7 @@ int main (int argc, char * argv[])
       printf("compare: error: not enough command line arguments.\n\n"
              "Usage: compare FILE1 FILE2 TOLERANCE [RELATIVE=0] [OUTPUT=0]\n"
              "FILE1 and FILE2 should contain two columns each.\n"
-             "The norm of the difference of the second columns is computed.\n"
+             "The L2 AND L_\\infty norms of the difference of the second columns are computed.\n"
 	     "If RELATIVE=1 the relative error is computed.\n"
 	     "If OUTPUT=1 the relative error is printed even if the test passes.\n"
 	     "\n");
@@ -24,6 +24,9 @@ int main (int argc, char * argv[])
   if(argc >= 5)  sscanf(argv[4],"%d",&relative);
   int output=0;
   if(argc >= 6)  sscanf(argv[5],"%d",&output);
+
+  float errmax = 0.;
+  float error;
 
   FILE * fd1;FILE * fd2;
   float * x1 = ( float *) malloc(MAXLINES*sizeof(float));
@@ -66,6 +69,8 @@ int main (int argc, char * argv[])
 	}
       //      printf("%g %g %g %g\n",*x1,*y1,*x2,*y2);
       scaling = (1. - relative) + relative * *y2 * *y2;
+      error = sqrt((*y1-*y2)*(*y1-*y2)/scaling);
+      if(error > errmax) errmax = error;
       diff += (*y1-*y2)*(*y1-*y2)/scaling;
       x1++;
       y1++;
@@ -78,21 +83,21 @@ int main (int argc, char * argv[])
       if(output < 2) 
 	{
 	  printf("\033[32;1m PASS\033[0m");
-	  if(output) printf(" L2 relative error norm = %g",diff);
+	  if(output) printf(" L2 relative error norm = %g  L_\\infty relative error norm = %g",diff,errmax);
 	  printf("\n");
 	}
       else
-	printf(" %g\n",diff);
+	printf(" %g %g\n",diff,errmax);
     }
   else
     {
       if(output < 2) 
 	{
-	  printf("\033[31;1m FAIL\033[0m error=%g \n",diff);
+	  printf("\033[31;1m FAIL\033[0m L2 error=%g Linf error = %g \n",diff,errmax);
 	}
       else
 	{
-	  printf("%g \n",diff);
+	  printf("%g %g \n",diff,errmax);
 	}
     }
   return 0;

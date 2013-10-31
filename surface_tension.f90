@@ -34,7 +34,6 @@ module module_surface_tension
   use module_tmpvar
   use module_2phase
   use module_VOF
-!  use module_flow ! for curvature test only ????
   implicit none
   integer, parameter :: NDEPTH=3
   integer, parameter :: BIGINT=100
@@ -55,7 +54,7 @@ module module_surface_tension
   logical :: recomputenormals = .true.
   logical :: debug_curvature = .false.
   logical :: debug_23 = .false.
-  integer, parameter :: nfound_min=6  
+  integer, parameter :: nfound_min=200 ! 6
   integer :: method_count(3)
 contains
 !=================================================================================================
@@ -252,7 +251,6 @@ contains
                      c(d) = cb
                      if(ha<D_HALF_BIGINT) then ! height already found above
                         height(c(1),c(2),c(3),index) = ha + sign
-!                        call check_all(c(1),c(2),c(3),index)
                      else if(ha>D_HALF_BIGINT.and.ha<1d6) then ! try to match
                         sbelow = FLOOR(REAL(hb + D_HALF_BIGINT)/REAL(BIGINT)) 
                         hb = hb - BIGINT*sbelow  ! above, below in direction of sign
@@ -272,10 +270,9 @@ contains
                            ! bottom is at 
                            c0   = cb - (sbelow-1)*sign  
                            c1   = c0 + ndepth*sign
-                           c(d) = cb + 2*sign  ! ???fixme: this neglects possible full heights higher above. ??? no. 
+                           c(d) = cb + 2*sign 
                            do while (c(d)/=(c0-sign)) 
                               height(c(1),c(2),c(3),index) = ha + hb + c1 - c(d)
-!                              call check_all(c(1),c(2),c(3),index)
                               c(d) = c(d) - sign ! go back to c0 
                            enddo
                         endif ! not over stack height
@@ -289,7 +286,6 @@ contains
       do index = 2*(d-1) + 1, 2*(d-1) + 2  ! for both indexes. 
          do k=kmin,kmax;do j=jmin,jmax;do i=imin,imax
             if(height(i,j,k,index)>D_HALF_BIGINT) height(i,j,k,index)=2d6
-!            call check_all(i,j,k,index)
          enddo;enddo;enddo
       enddo
          
@@ -308,8 +304,8 @@ contains
         if(vof_flag(i,j,k)/2==0) then
            ! loop over search directions
            do sign=-1,1,2; 
-              ! do index=2*(d-1) + 1, 2*(d-1) + 2
-              ! Opposite of search direction in pass 1 so negative normal orientation if vof_flag=1 and sign = +, etc...
+              ! Opposite of search direction in pass 1 so 
+              ! negative normal orientation if vof_flag=1 and sign = +, etc...
               oppnormalsign = - (2*vof_flag(i,j,k)-1) * sign
               index = 2*(d-1) + 1 + (-oppnormalsign+1)/2
               if(height(i,j,k,index)<D_HALF_BIGINT) then ! flag is 0 or 1
@@ -317,12 +313,11 @@ contains
                  c(1) = i; c(2) = j; c(3) = k
                  c0 = c(d)
                  c(d) = c0 + sign ! start of region to be filled
-                 limit_not_found=.not.(c0==climitp2) ! ??
+                 limit_not_found=.not.(c0==climitp2) 
                  do while (limit_not_found) 
                     limit_not_found = .not.(vof_flag(c(1),c(2),c(3))==2 &
                          .or.c(d)==climitp2.or.abs(c(d)-c0).ge.MAX_EXT_H)
                     height(c(1),c(2),c(3),index) = height(i,j,k,index) + c0 - c(d)
-                    !                           call check_all(c(1),c(2),c(3),index)
                     c(d) = c(d) + sign 
                  enddo
               endif
@@ -422,16 +417,17 @@ contains
 !=======================================================================================================
 !   Check if we find nine heights in the neighboring cells, if not collect all heights in all directions
 !=======================================================================================================
-   subroutine get_local_heights(i1,j1,k1,mxyz,try,nfound,indexfound,hloc,points,nposit)
+   subroutine get_local_heights(i1,j1,k1,mxyz,try,nfound,hloc,points,nposit)
       implicit none
-      integer, intent(in) :: i1(-1:1,-1:1,3), j1(-1:1,-1:1,3), k1(-1:1,-1:1,3)  ! i1(:,:,d) 3x3 plane rotated in direction d
-      integer, intent(out) :: nfound, indexfound
+      integer, intent(in) :: i1(-1:1,-1:1,3), j1(-1:1,-1:1,3), k1(-1:1,-1:1,3)  
+      ! i1(:,:,d) 3x3 plane rotated in direction d
+      integer, intent(out) :: nfound
       real(8), intent(in)  :: mxyz(3)
       real(8), intent(out) :: hloc(-1:1,-1:1)   
       real(8), intent(out) :: points(NPOS,3)
       integer, intent(out) :: nposit
       integer, intent(inout) :: try(3)
-!      integer :: i0,j0,k0
+      !      integer :: i0,j0,k0
       real(8) :: deltax
       integer :: d,s
       integer :: i,j,k,m,n,l
@@ -448,7 +444,6 @@ contains
 ! 
       points = 0.d0
       hloc = 2d6
-      indexfound = -1
       nposit = 0 
       l=0
       dirnotfound=.true.
@@ -505,12 +500,9 @@ contains
                end if ! search at same level
             end do ! n
          end do ! m 
-          !            write(*,*) "GLH: end m,n: nposit,d,index,nfound ",nposit,d,index,nfound
          if(nfound.eq.9) then
             dirnotfound = .false.
-            indexfound = index
             ! on exit, redefine try() so that try(1) be the h direction found
-!            if(d/=try(1)) write(*,*) "@@ reordering try directions"
             m=1
             n=2
             do while (m.le.3)
@@ -521,25 +513,20 @@ contains
                m=m+1
             enddo
             try(1)=d  ! then exit
-            !               write(*,*) "GLH: 9F: i,j,k,try,nposit,nfound ",i,j,k,try,nposit,nfound
             return
          end if ! nfound = 9
       end do ! d and dirnotfound
-      indexfound =  2*(try(1)-1)+2 ! fixme: did we really find an index ? 
-      if(mxyz(try(1)).gt.0.d0) indexfound = 2*(try(1)-1)+1
       if(nposit.gt.NPOS) call pariserror("GLH: nposit")
-      !      write(*,*) "GLH: not F:i,j,k, try,nposit,nfound ",i,j,k,try,nposit,nfound
-      
     end subroutine get_local_heights
     !
-    subroutine get_curvature(i0,j0,k0,kappa,indexCurv,nfound,nposit,a)
+    subroutine get_curvature(i0,j0,k0,kappa,nfound,nposit,a)
       implicit none
       integer, intent(in) :: i0,j0,k0
       real(8), intent(out) :: kappa,a(6)  
-      integer, intent(out) :: indexCurv, nfound
+      integer, intent(out) :: nfound
       integer, intent(out) :: nposit
 
-      integer :: indexfound,index,d
+      integer :: index,d,normalsign
       real(8) :: h(-1:1,-1:1)
 !      integer :: nCentroids
 
@@ -567,7 +554,7 @@ contains
          mxyz(3) = n3(i0,j0,k0)
       endif
       call orientation(mxyz,try)
-      call get_local_heights(i1,j1,k1,mxyz,try,nfound,indexfound,h,points,nposit)
+      call get_local_heights(i1,j1,k1,mxyz,try,nfound,h,points,nposit)
 
       kappa = 0.d0
       ! if all nine heights found 
@@ -583,34 +570,16 @@ contains
          kappa = 2.d0*(a(1)*(1.d0+a(5)*a(5)) + a(2)*(1.d0+a(4)*a(4)) - a(3)*a(4)*a(5)) &
                /(1.d0+a(4)*a(4)+a(5)*a(5))**(1.5d0)
          kappa = sign(1.d0,mxyz(try(1)))*kappa
-         indexCurv = indexfound
-         ! This stops the code in case kappa becomes NaN.
-!--debug         if(kappa.ne.kappa) call pariserror("HF9: Invalid Curvature")               
-         ! if more than six independent heights found in all directions 
          return
       else 
          nfound = - ind_pos(points,nposit) 
       endif ! nfound == 9
-
       ! *** determine the origin. 
-      ! fixme: index not treated as it should (no reference to normal)
-      height_found=.false.
-      index=1
-      do while(index<=6.and..not.height_found)
-         if(height(i0,j0,k0,index) < 1d6) then   !  Use height if it exists
-            height_found=.true.
-            d = (index+1)/2
-            origin=0.d0
-            origin(d) = height(i0,j0,k0,index) 
-         endif
-         index=index+1
-      enddo
-      if(.not.height_found) then
          call FindCutAreaCentroid(i0,j0,k0,centroid)
          do n=1,3
             origin(n) = centroid(n)
          enddo
-      endif
+      ! *** determine curvature from centroids
       if ( (-nfound) > nfound_min )  then  ! more than 6 points to avoid special 2D degeneracy. 
          xfit=points(:,try(2)) - origin(try(2))
          yfit=points(:,try(3)) - origin(try(3))
@@ -620,17 +589,12 @@ contains
          if(.not.fit_success) call pariserror("no fit success after mixed heights")
          kappa = 2.d0*(a(1)*(1.d0+a(5)*a(5)) + a(2)*(1.d0+a(4)*a(4)) - a(3)*a(4)*a(5)) &
                /(1.d0+a(4)*a(4)+a(5)*a(5))**(1.5d0)
-         indexCurv = indexfound
          kappa = sign(1.d0,mxyz(try(1)))*kappa
-         ! This stops the code in case kappa becomes NaN.
-!--debu         if(kappa.ne.kappa) call pariserror("HF6: Invalid Curvature")
-         nposit=0
          return
       else  ! ind_pos <= nfound_min
          ! Find all centroids in 3**3
          ! use direction closest to normal
          nfound = -100 + nfound  ! encode number of independent positions into nfound
-         indexcurv=indexfound
          nposit=0
          do m=-1,1; do n=-1,1; do l=-1,1
             i=i0+m
@@ -679,17 +643,12 @@ contains
          kappa = 2.d0*(a(1)*(1.d0+a(5)*a(5)) + a(2)*(1.d0+a(4)*a(4)) - a(3)*a(4)*a(5)) &
              /sqrt(1.d0+a(4)*a(4)+a(5)*a(5))**3
          kappa = sign(1.d0,mxyz(try(1)))*kappa
-         ! This stops the code in case kappa becomes NaN.
-!--debu         if(kappa.ne.kappa) then
-!           if(rank==0) write(*,*) "PF6: kappa,try,dmx,nposit ",kappa,try,dmx,nposit
-!--debu            call pariserror("PF6: Invalid Curvature")  
-!--debu         endif
-      end if ! -nfound > 5
+      end if ! -nfound > nfound_min
    end subroutine get_curvature
 
    subroutine output_curvature()
       implicit none      
-      integer :: i,j,k,indexCurv ! ,l,m,n
+      integer :: i,j,k! ,l,m,n
       integer :: ib 
       real(8) :: kappa,a(6)
       real(8) :: angle 
@@ -719,7 +678,7 @@ contains
          do i=is,ie; do j=js,je; do k=ks,ke
             ! find curvature only for cut cells
             if (vof_flag(i,j,k) == 2 ) then 
-               call get_curvature(i,j,k,kappa,indexCurv,nfound,nposit,a)
+               call get_curvature(i,j,k,kappa,nfound,nposit,a)
                if(nfound > 0) then
                   method_count(1) = method_count(1) + 1
                else if( -nfound < 50) then
@@ -738,7 +697,7 @@ contains
                write(90,*) angle,kappa_exact
                err_K = ABS(ABS(kappa)-kappa_exact)/kappa_exact
                if ( err_K > 0.1d0 ) &
-                    write(91,'(4(I3,1X),2(E15.8,1X),I4)') i,j,k,indexCurv,kappa,kappa_exact,nfound
+                    write(91,'(3(I3,1X),2(E15.8,1X),I4)') i,j,k,kappa,kappa_exact,nfound
             end if ! cvof(i,j,k)
          end do; end do; end do
       else if ( test_curvature_2D) then 
@@ -746,7 +705,7 @@ contains
          kappa_exact = - 1.d0/rad(ib)
           do i=is,ie; do j=js,je
             if (vof_flag(i,j,k) == 2) then 
-               call get_curvature(i,j,k,kappa,indexCurv,nfound,nposit,a)
+               call get_curvature(i,j,k,kappa,nfound,nposit,a)
                if(nfound > 0) then
                   method_count(1) = method_count(1) + 1
                else if( -nfound < 50) then
@@ -1263,7 +1222,7 @@ end subroutine print_method
     integer :: i,j,k,iem,jem,n,i0,j0,k0
     real(8) :: centroid(3),x1,y1,xvec,yvec,kappa,a(6),xpoint(0:2),ypoint(0:2),diff(0:2)
     real(8), allocatable :: pc(:,:,:)
-    integer :: indexcurv,nfound,nposit
+    integer :: nfound,nposit
     real(8) :: centroid_scaled(2), deltax
     k0 = (Nz+4)/2
     k = k0

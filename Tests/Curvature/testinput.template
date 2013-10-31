@@ -118,9 +118,9 @@ SIGMA    = 0.0
 NumBubble =  1
                    ! number of bubbles
 
-xyzrad(1, 1)  = 0.5 
-xyzrad(2, 1)  = 0.5 
-xyzrad(3, 1)  = 0.5 
+xyzrad(1, 1)  = XCTEMP
+xyzrad(2, 1)  = YCTEMP
+xyzrad(3, 1)  = ZCTEMP
 xyzrad(4, 1)  = RADIUSTEMP
 
                    ! Initial bubble size and location : x,y,z,radius
