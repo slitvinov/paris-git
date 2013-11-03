@@ -110,7 +110,7 @@ contains
     allocate(cvof(imin:imax,jmin:jmax,kmin:kmax),vof_flag(imin:imax,jmin:jmax,kmin:kmax))
     cvof = 0.D0
     vof_flag = 3
-    if(test_type=='uniform_advection') then
+    if(test_type=='droplet') then
        test_heights = .false.
     else if(test_type=='height_test') then
        test_heights = .true.
@@ -181,7 +181,7 @@ contains
     else if(NumBubble>0) then
        ipar=0 ! spheres: default
        if(test_curvature_2D.or.cylinder_heights) ipar=-cylinder_dir
-       ! cylinder in -ipar direction otherwise spheres
+       ! one cylinder in -ipar direction otherwise spheres
        call levelset2vof(shapes2ls,ipar)
     else
        write(*,*) "IVOF: Warning: Nothing set. cylinder_dir=0 set to 2"
@@ -626,7 +626,7 @@ module module_output_vof
 contains
   subroutine append_VOF_visit_file(rootname)
     implicit none
-    character(len=30) :: rootname
+    character(*) :: rootname
     integer prank
     if(rank.ne.0) call pariserror('rank.ne.0 in append_VOF')
     if(vof_opened==0) then

@@ -3,7 +3,7 @@
 VOFBDRY_COND = 'periodic' 'periodic' 'periodic' 
                    ! Type of VOF boundary condition in x,y,z direction: 'wet', '90deg','periodic'
 
-TEST_TYPE = 'uniform_advection'
+TEST_TYPE = 'droplet'
 VOF_ADVECT = 'Dick_Yue'
 !=================================================================================================
 

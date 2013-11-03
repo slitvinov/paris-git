@@ -56,6 +56,7 @@ Program paris
   use module_output_vof
   use module_hello
   use module_surface_tension
+  use module_st_testing
   use module_lag_part
 
   implicit none
@@ -976,6 +977,7 @@ subroutine InitCondition
   use module_IO
   use module_vof
   use module_surface_tension
+  use module_st_testing
   use module_lag_part
   implicit none
   include 'mpif.h'

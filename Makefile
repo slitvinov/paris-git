@@ -2,7 +2,7 @@
 
 # babbage
 
-OMPI_FC=gfortran44
+#OMPI_FC=gfortran44
 
 FC = mpif90
 
@@ -34,12 +34,12 @@ HYPRE_LIBS =  -L$(HYPRE_DIR)/lib -lHYPRE
 #------------------------No changes needed beyond this line----------------------------------------------
 
 
-OBJ = paris.o solids.o modules.o vofmodules.o front.o surface_tension.o lag_particle.o # uzawa.o
+OBJ = paris.o solids.o modules.o vofmodules.o front.o surface_tension.o lag_particle.o st_testing.o
 SRC = $(wildcard  *.f90) 
 
 install: $(OBJ)
 #	@echo compiler is FC = $(FC), mpi override is OMPI_FC = $(OMPI_FC)
-	$(FC) -o paris $(FOPTS) $(OBJ) $(FOBJ) $(HYPRE_LIBS) 
+	$(FC) -o paris $(FOPTS) $(OBJ) $(HYPRE_LIBS) 
 	@if [ ! -d $(BINDIR) ] ; then echo "directory bin does not exist creating it" ; mkdir $(BINDIR) ; fi 
 	mv paris $(BINDIR)/paris
 	@find .  -name "*.sh" -exec chmod +x  {} \; 
@@ -50,6 +50,7 @@ clean:
 	@rm -fR *.o *.mod paris stats *~ track out* errftc tmp* *.tmp fort.* *.visit core.* statsbub
 	@cd Tests; sh ./clean.sh; cd ..
 	@cd Documentation; make clean; cd ..
+	@find . -type l -exec /bin/rm {} \;
 
 distclean: clean
 	@rm -fR  session* *.xml TAGS tags input
@@ -73,7 +74,7 @@ tags:	$(SRC)
 # @SZ On MacOS tags and TAGS are identical ! 
 # @SZ	ctags paris.f90 
 
-paris.o:  paris.f90 solids.o modules.o vofmodules.o front.o surface_tension.o lag_particle.o
+paris.o:  paris.f90 solids.o modules.o vofmodules.o front.o surface_tension.o lag_particle.o st_testing.o
 	$(FC) -c  $(FFLAGS) $<
 
 vofmodules.o: vofmodules.f90 modules.o
@@ -85,14 +86,14 @@ lag_particle.o: lag_particle.f90 vofmodules.o modules.o
 surface_tension.o: surface_tension.f90 vofmodules.o modules.o
 	$(FC) -c  $(FFLAGS) $<
 
+st_testing.o: st_testing.f90 vofmodules.o modules.o surface_tension.o
+	$(FC) -c  $(FFLAGS) $<
+
 solids.o:  solids.f90 modules.o
 	$(FC) -c   $(FFLAGS) $<
 
 front.o:  front.f90 modules.o
 	$(FC) -c   $(FFLAGS) $<
-
-#uzawa.o:  uzawa.f90 modules.o
-#	$(FC) -c   $(FFLAGS) $<
 
 %.o : %.f90
 	$(FC) -c  $(FFLAGS) $<

@@ -5,7 +5,7 @@ VOFBDRY_COND = 'periodic' 'periodic' 'periodic'
 
 TEST_TYPE = 'Curvature2D'
 VOF_ADVECT = 'Dick_Yue'
-REFINEMENT = 16
+REFINEMENT = 8
 CYLINDER_DIR = 2
 NORMAL_UP = F
 
