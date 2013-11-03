@@ -127,7 +127,6 @@ Program paris
   if(HYPRE .and. rank==0) write(*  ,*)'hypre initialized'
   
   call InitCondition
-  if(U_init == 0.) stop "missing U_init"
   if(rank<nPdomain) then
 !-------------------------------------------------------------------------------------------------
 !------------------------------------------Begin domain-------------------------------------------
@@ -189,33 +188,22 @@ Program paris
              call linfunc(rho,rho1,rho2)
              call linfunc(mu,mu1,mu2)
            endif
-
            ! Receive front from master of front
            if(DoFront) call GetFront('recv')
-
-           !           if(Implicit.and.ZeroReynolds.and..not.DoFront.and..not.Hypre) then ! Uzawa
-           !------------------------------------VOF STUFF -------------------------------------------------
-           !              if(DoVOF) call vofsweeps(itimestep)
-           !------------------------------------END VOF STUFF---------------------------------------------- 
-           !               call uzawa(u,v,w,rho,mu,du,dv,dw,p,umask,vmask,wmask,A,dt,beta,maxit,rho1,rho2,dpdx,dpdy,dpdz,BuoyancyCase,fx,fy,fz,gx,gy,gz,rho_ave)
-           !           else  ! not Uzawa
-
-              if(Implicit) then
-                 if(Twophase) then 
-                    call momentumDiffusion(u,v,w,rho,mu,du,dv,dw)  
-                 else
-                    du = 0d0; dv = 0d0; dw = 0d0
-                 endif
+           if(Implicit) then
+              if(Twophase) then 
+                 call momentumDiffusion(u,v,w,rho,mu,du,dv,dw)  
               else
-                 call explicitMomDiff(u,v,w,rho,mu,du,dv,dw)
+                 du = 0d0; dv = 0d0; dw = 0d0
               endif
-              if(.not.ZeroReynolds) call momentumConvection(u,v,w,du,dv,dw)
-           
-           ! reset the surface tension force on the fixed grid
+           else
+              call explicitMomDiff(u,v,w,rho,mu,du,dv,dw)
+           endif
+           if(.not.ZeroReynolds) call momentumConvection(u,v,w,du,dv,dw)
+           ! reset the surface tension force on the fixed grid (when surface tension from front)
            fx = 0d0;    dIdx=0d0
            fy = 0d0;    dIdy=0d0
            fz = 0d0;    dIdz=0d0
-
            ! Wait to finish receiving front
            if(DoFront) then
               call GetFront('wait')
@@ -226,7 +214,11 @@ Program paris
               call GetFront('send')
            endif
 !------------------------------------VOF STUFF ---------------------------------------------------
-           if(DoVOF) call vofsweeps(itimestep)
+           if(DoVOF) then 
+              call vofsweeps(itimestep)
+              call get_all_heights()
+              call surfaceForce(fx,fy,fz,du,dv,dw)
+           endif
 !------------------------------------END VOF STUFF------------------------------------------------ 
            call volumeForce(rho,rho1,rho2,dpdx,dpdy,dpdz,BuoyancyCase,fx,fy,fz,gx,gy,gz,du,dv,dw, &
                 rho_ave)
@@ -824,6 +816,77 @@ subroutine volumeForce(rho,rho1,rho2,dpdx,dpdy,dpdz,BuoyancyCase,fx,fy,fz,gx,gy,
 end subroutine volumeForce
 !=================================================================================================
 !=================================================================================================
+!=================================================================================================
+! Calculates the surface force in the momentum equations and adds them to du,dv,dw
+!-------------------------------------------------------------------------------------------------
+subroutine surfaceForce(fx,fy,fz,du,dv,dw)
+!  use module_solid
+  use module_grid
+  use module_vof
+  use module_2phase
+  use module_surface_tension
+  use module_tmpvar
+  implicit none
+  real(8) :: kappa,afit(6),deltax
+  integer :: nfound,nposit
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: du, dv, dw, fx,fy,fz
+  integer :: i,j,k,n
+  deltax=dx(nx/2)
+  call get_all_curvatures(tmp)
+  do k=ks,ke;  do j=js,je; do i=is,ieu
+     if(abs(cvof(i+1,j,k)-cvof(i,j,k))>EPSC/1d1) then  ! there is a non-zero grad H (H Heaviside function) 
+        n=0
+        kappa=0d0
+        if(tmp(i+1,j,k).lt.1e6) then
+           kappa=kappa+tmp(i+1,j,k)
+           n=n+1
+        endif
+        if(tmp(i,j,k).lt.1e6) then
+           kappa=kappa+tmp(i,j,k)
+           n=n+1
+        endif
+        kappa=kappa/(deltax*n)
+        du(i,j,k)=du(i,j,k)  - kappa*sigma*(cvof(i+1,j,k)-cvof(i,j,k))
+     endif
+  enddo; enddo; enddo
+  
+  do k=ks,ke;  do j=js,jev; do i=is,ie
+     if(abs(cvof(i,j+1,k)-cvof(i,j,k))>EPSC/1d1) then  ! there is a non-zero grad H (H Heaviside function) 
+        n=0
+        kappa=0d0
+        if(tmp(i,j+1,k).lt.1e6) then
+           kappa=kappa+tmp(i,j+1,k)
+           n=n+1
+        endif
+        if(tmp(i,j,k).lt.1e6) then
+           kappa=kappa+tmp(i,j,k)
+           n=n+1
+        endif
+        kappa=kappa/(deltax*n)
+        dv(i,j,k)=dv(i,j,k)  - kappa*sigma*(cvof(i,j+1,k)-cvof(i,j,k))
+     endif
+  enddo; enddo; enddo
+
+  do k=ks,kew;  do j=js,je; do i=is,ie
+     if(abs(cvof(i,j,k+1)-cvof(i,j,k))>EPSC/1d1) then  ! there is a non-zero grad H (H Heaviside function) 
+        n=0
+        kappa=0d0
+        if(tmp(i,j,k+1).lt.1e6) then
+           kappa=kappa+tmp(i,j,k+1)
+           n=n+1
+        endif
+        if(tmp(i,j,k).lt.1e6) then
+           kappa=kappa+tmp(i,j,k)
+           n=n+1
+        endif
+        kappa=kappa/(deltax*n)
+        dw(i,j,k)=dw(i,j,k)  - kappa*sigma*(cvof(i,j,k+1)-cvof(i,j,k))
+     endif
+  enddo; enddo; enddo
+
+end subroutine surfaceForce
+!=================================================================================================
+!=================================================================================================
 ! subroutine initialize
 !   Initializes the flow solver
 !   called in:    program paris
@@ -1001,6 +1064,7 @@ subroutine InitCondition
         color = 0.; u = U_init;  v = 0;  w = 0.
         if(DoVOF) then
            call initconditions_VOF()
+           call get_all_heights()
         endif
         du = 0d0
      endif
@@ -1144,7 +1208,7 @@ subroutine ReadParameters
                         y_file,        z_file,        restart,       nBackup,       NumBubble,   &
                         xyzrad,        hypre,         dtFlag,        ICOut,         WallVel,     &
                         maxErrorVol,   restartFront,  nstats,        WallShear,     ZeroReynolds,&
-                        restartAverages, termout
+                        restartAverages, termout, excentricity
   in=1
   out=2
 
@@ -1224,6 +1288,7 @@ subroutine check_stability()
   use module_IO
   use module_front
   use module_hello
+  use module_2phase
   implicit none
   include 'mpif.h'
   real(8) von_neumann
@@ -1232,6 +1297,12 @@ subroutine check_stability()
      von_neumann = dx(ng)**2*rho1/(dt*mu1)
      if(rank==0) print *, "dx**2*rho/(dt*mu) = ", von_neumann
      if(von_neumann < 6d0.and..not.Implicit) call pariserror("time step too large for viscous terms")
+  endif
+
+  if(dt*sigma /= 0) then 
+     von_neumann = dx(ng)**3*rho1/(dt**2*sigma)
+     if(rank==0) print *, "dx**3*rho/(dt**2*sigma) = ", von_neumann
+     if(von_neumann < 4d0) call pariserror("time step too large for ST terms")
   endif
 
 end subroutine check_stability

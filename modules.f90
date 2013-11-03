@@ -151,6 +151,7 @@ end module module_tmpvar
 !-------------------------------------------------------------------------------------------------
 module module_2phase
   real(8), dimension( : ), allocatable :: rad, xc, yc, zc, vol
+  real(8) :: excentricity(3)
   real(8) :: sigma
   integer :: NumBubble
 end module module_2phase

@@ -31,7 +31,7 @@ module module_surface_tension
   use module_grid
   use module_BC
   use module_IO
-  use module_tmpvar
+!  use module_tmpvar
   use module_2phase
   use module_VOF
   implicit none
@@ -430,6 +430,37 @@ contains
       if(nposit.gt.NPOS) call pariserror("GLH: nposit")
     end subroutine get_local_heights
     !
+!=================================================================================================
+!
+! the core of HF computation
+!
+!=================================================================================================
+   subroutine get_all_curvatures(kapparray)
+     implicit none
+     include 'mpif.h'
+     real(8), intent(inout) :: kapparray(imin:imax,jmin:jmax,kmin:kmax)
+     real(8) :: afit(6), kappa
+     integer :: ierr, i,j,k, nfound, nposit
+     integer :: req(24),sta(MPI_STATUS_SIZE,24)
+     if(.not.st_initialized) call initialize_surface_tension()
+
+     !*** Initialize
+     kapparray=2d6
+
+     do k=ks,ke; do j=js,je; do i=is,ie
+        if (vof_flag(i,j,k) == 2 ) then 
+           call get_curvature(i,j,k,kappa,nfound,nposit,afit)
+           kapparray(i,j,k) = kappa
+        endif
+     enddo;enddo;enddo
+
+     call ghost_x(kapparray(:,:,:),2,req(1:4))
+     call ghost_y(kapparray(:,:,:),2,req(5:8))
+     call ghost_z(kapparray(:,:,:),2,req(9:12))
+     call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
+
+   end subroutine get_all_curvatures
+
     subroutine get_curvature(i0,j0,k0,kappa,nfound,nposit,a)
       implicit none
       integer, intent(in) :: i0,j0,k0
@@ -534,7 +565,9 @@ contains
          kappa = 2.d0*(a(1)*(1.d0+a(5)*a(5)) + a(2)*(1.d0+a(4)*a(4)) - a(3)*a(4)*a(5)) &
              /sqrt(1.d0+a(4)*a(4)+a(5)*a(5))**3
          kappa = sign(1.d0,mxyz(try(1)))*kappa
+         return
       end if ! -nfound > nfound_min
+      call pariserror("Curvature not found")
    end subroutine get_curvature
 
    subroutine parabola_fit(xfit,yfit,hfit,nposit,a,fit_success)

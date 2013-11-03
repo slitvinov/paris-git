@@ -39,13 +39,14 @@ module module_VOF
 
   real(8), parameter  :: A_h = 2d0  ! For initialisation of height test
   real(8), parameter  :: TINY = 1d-50
+  real(8), parameter  :: EPSC = 1.d-12
+
   character(20) :: vofbdry_cond(3),test_type,vof_advect
   integer :: parameters_read=0, refinement=-1 
   integer :: cylinder_dir = 0
   logical :: test_heights = .false.  
   logical :: normal_up = .true.    ! used for the h
   logical :: test_curvature = .false.  
-  logical :: cylinder_heights = .false.  
   logical :: test_curvature_2D = .false.  
   logical :: test_HF = .false.
   logical :: test_LP = .false.
@@ -108,7 +109,7 @@ contains
        endif
     endif
     allocate(cvof(imin:imax,jmin:jmax,kmin:kmax),vof_flag(imin:imax,jmin:jmax,kmin:kmax))
-    cvof = 0.D0
+    cvof = 0.d0
     vof_flag = 3
     if(test_type=='droplet') then
        test_heights = .false.
@@ -118,8 +119,6 @@ contains
        test_curvature = .true.
     else if(test_type=='Curvature2D') then
        test_curvature_2D = .true.
-    else if(test_type=='cylinder_heights') then
-       cylinder_heights = .true.
     else if(test_type=='tag_test') then
        test_tag = .true.
     else if(test_type=='D2P_test') then
@@ -127,30 +126,31 @@ contains
     else
        stop 'unknown initialization'
     endif
-    test_HF = test_heights .or. test_curvature .or. test_curvature_2D &
-         .or. cylinder_heights
+    test_HF = test_heights .or. test_curvature .or. test_curvature_2D
     test_LP = test_tag .or. test_D2P
   end subroutine initialize_VOF
 !=================================================================================================
 !   a hack to get the flags quickly (temporary)
 !=================================================================================================
-  subroutine get_flags()
+  subroutine get_flags_and_clip()
     integer :: i,j,k
     if(ng.lt.2) stop "wrong ng"
     do k=kmin,kmax
        do j=jmin,jmax
           do i=imin,imax
-             if(cvof(i,j,k).le.0.d0) then
+             if(cvof(i,j,k).le.EPSC) then
                 vof_flag(i,j,k) = 0
-             else if(cvof(i,j,k).ge.1.d0) then
+                cvof(i,j,k)=0.d0
+             else if(cvof(i,j,k).ge.1.d0-EPSC) then
                 vof_flag(i,j,k) = 1
+                cvof(i,j,k) = 1.d0
              else
                 vof_flag(i,j,k) = 2
              endif
           enddo
        enddo
     enddo
-  end subroutine get_flags
+  end subroutine get_flags_and_clip
   !=================================================================================================
   !  Initialize vof field and flags
   !=================================================================================================
@@ -180,7 +180,7 @@ contains
        call levelset2vof(wave2ls,ipar)
     else if(NumBubble>0) then
        ipar=0 ! spheres: default
-       if(test_curvature_2D.or.cylinder_heights) ipar=-cylinder_dir
+       if(test_curvature_2D) ipar=-cylinder_dir
        ! one cylinder in -ipar direction otherwise spheres
        call levelset2vof(shapes2ls,ipar)
     else
@@ -227,7 +227,7 @@ contains
     integer ib
 
     if(.not.(-3<=ipar.and.ipar<=0)) call pariserror("S: invalid ipar")
-    cdir = 1.d0
+    cdir(1:3) = 1.d0/(1.d0 + excentricity(1:3))
     cdir(-ipar) = 0.d0
     shapes2ls = -2.d6
     ! ipar < 0 cylinder case
@@ -706,6 +706,7 @@ subroutine swp(us,c,vof1,vof2,vof3,f,d)
   else
      call pariserror("*** unknown vof scheme")
   endif
+  call get_flags_and_clip()
 end subroutine swp
 !
 !  Implements the CIAM (Lagrangian Explicit, onto square)
@@ -884,7 +885,7 @@ SUBROUTINE swpr(us,c,vof1,cg,vof3,f,dir)
     integer, dimension(imin:imax,jmin:jmax,kmin:kmax),  intent(inout) :: f
     REAL(8), TARGET :: dmx,dmy,dmz,dxyz
     REAL(8), POINTER :: dm1,dm2,dm3
-    REAL(8) :: EPSC,a1,a2,alpha,AL3D,FL3D
+    REAL(8) :: a1,a2,alpha,AL3D,FL3D
     real(8) :: mxyz(3),stencil3x3(-1:1,-1:1,-1:1)
     INTRINSIC DMAX1,DMIN1
 !
@@ -897,7 +898,6 @@ SUBROUTINE swpr(us,c,vof1,cg,vof3,f,dir)
   else if (dir == 3) then
      kk=1; dm1 => dmz;  dm2 => dmx;  dm3 => dmy 
   endif
-  EPSC = 1.d-12
   dxyz = dxh(is)
   if(dyh(js).ne.dxyz.or.dzh(ks).ne.dxyz) call pariserror("non-cubic cells")
 
