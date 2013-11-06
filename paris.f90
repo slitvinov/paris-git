@@ -44,6 +44,7 @@
 Program paris
   use module_flow
   use module_grid
+  use module_timer
   use module_BC
   use module_tmpvar
   use module_2phase
@@ -62,8 +63,8 @@ Program paris
   implicit none
   include 'mpif.h'
   integer :: ierr, icolor
-  ! Locals for marching and timing
-  real(8) :: start_time, end_time=0.d0
+  ! Locals for marching and timing are now in module_timer
+  ! real(8) :: start_time, end_time=0.d0
   integer :: req(48),sta(MPI_STATUS_SIZE,48)
   INTEGER :: irank, ii, i, j, k
   real(8) :: residual
@@ -149,8 +150,10 @@ Program paris
            write(out,'("Step:",I9," Iterations:",I9," cpu(s):",f10.2)')-1,0,end_time-start_time
            write(*,'("Step:",I6," dt=",es16.5e2," time=",es16.5e2," cpu(s):",f11.3)')   &
                 0,0.d0,0.d0,end_time-start_time
+           itimestep=0; ii=0
         endif
      endif
+     call my_timer(1,itimestep,ii)
 
      if(test_HF.or.test_LP) then
         ! Exit MPI gracefully
@@ -162,6 +165,7 @@ Program paris
  
 
 !-----------------------------------------MAIN TIME LOOP------------------------------------------
+     call initialize_timer()
      do while(time<EndTime .and. itimestep<nstep)
         if(dtFlag==2)call TimeStepSize(dt)
         time=time+dt
@@ -183,13 +187,15 @@ Program paris
         endif
  !------------------------------------ADVECTION & DIFFUSION----------------------------------------
         do ii=1, itime_scheme
-
            if(TwoPhase.and.(.not.Getpropertiesfromfront)) then
              call linfunc(rho,rho1,rho2)
              call linfunc(mu,mu1,mu2)
            endif
+           call my_timer(2,itimestep,ii)
+
            ! Receive front from master of front
            if(DoFront) call GetFront('recv')
+           call my_timer(13,itimestep,ii)
            if(Implicit) then
               if(Twophase) then 
                  call momentumDiffusion(u,v,w,rho,mu,du,dv,dw)  
@@ -199,7 +205,11 @@ Program paris
            else
               call explicitMomDiff(u,v,w,rho,mu,du,dv,dw)
            endif
+           call my_timer(3,itimestep,ii)
+
            if(.not.ZeroReynolds) call momentumConvection(u,v,w,du,dv,dw)
+           call my_timer(9,itimestep,ii)
+
            ! reset the surface tension force on the fixed grid (when surface tension from front)
            fx = 0d0;    dIdx=0d0
            fy = 0d0;    dIdy=0d0
@@ -213,18 +223,25 @@ Program paris
               ! Send the updated front back
               call GetFront('send')
            endif
+           call my_timer(13,itimestep,ii)
+
 !------------------------------------VOF STUFF ---------------------------------------------------
            if(DoVOF) then 
               call vofsweeps(itimestep)
+              call my_timer(4,itimestep,ii)
               call get_all_heights()
+              call my_timer(5,itimestep,ii)
               call surfaceForce(fx,fy,fz,du,dv,dw)
+              call my_timer(8,itimestep,ii)
            endif
+
 !------------------------------------END VOF STUFF------------------------------------------------ 
            call volumeForce(rho,rho1,rho2,dpdx,dpdy,dpdz,BuoyancyCase,fx,fy,fz,gx,gy,gz,du,dv,dw, &
                 rho_ave)
            if(dosolids) then
               du = du*umask; dv = dv*vmask; dw = dw*wmask
            endif
+           call my_timer(2,itimestep,ii)
            if(Implicit) then   
               call SetupUvel(u,du,rho,mu,rho1,mu1,dt,A)
               if(hypre)then
@@ -260,6 +277,7 @@ Program paris
               v = v + dt * dv
               w = w + dt * dw
            endif
+           call my_timer(3,itimestep,ii)
            call SetVelocityBC(u,v,w,umask,vmask,wmask)
 
            call ghost_x(u  ,2,req( 1: 4));  call ghost_x(v,2,req( 5: 8)); call ghost_x(w,2,req( 9:12)) 
@@ -268,6 +286,7 @@ Program paris
            call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
            call ghost_z(u  ,2,req( 1: 4));  call ghost_z(v,2,req( 5: 8)); call ghost_z(w,2,req( 9:12))
            call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
+           call my_timer(2,itimestep,ii)
 
 !-----------------------------------------PROJECTION STEP-----------------------------------------
            call SetPressureBC(umask,vmask,wmask)
@@ -298,8 +317,7 @@ Program paris
            do k=ks,kew;  do j=js,je; do i=is,ie;   ! CORRECT THE w-velocity
               w(i,j,k)=w(i,j,k)-dt*(2.0/dzh(k))*(p(i,j,k+1)-p(i,j,k))/(rho(i,j,k+1)+rho(i,j,k))
            enddo; enddo; enddo
-
-!        endif  ! end "Uzawa" if 
+           call my_timer(10,itimestep,ii)
            !--------------------------------------UPDATE COLOR---------------------------------------------
            if (DoFront) then
                  call SetupDensity(dIdx,dIdy,dIdz,A,color)
@@ -317,16 +335,15 @@ Program paris
                     color(i,j,k)=max(color(i,j,k),0d0)
                  enddo; enddo; enddo
            endif
-
+           call my_timer(13,itimestep,ii)
            call SetVelocityBC(u,v,w,umask,vmask,wmask)
-
            call ghost_x(u  ,2,req( 1: 4));  call ghost_x(v,2,req( 5: 8)); call ghost_x(w,2,req( 9:12)); 
            call ghost_x(color,1,req(13:16));  call MPI_WAITALL(16,req(1:16),sta(:,1:16),ierr)
            call ghost_y(u  ,2,req( 1: 4));  call ghost_y(v,2,req( 5: 8)); call ghost_y(w,2,req( 9:12)); 
            call ghost_y(color,1,req(13:16));  call MPI_WAITALL(16,req(1:16),sta(:,1:16),ierr)
            call ghost_z(u  ,2,req( 1: 4));  call ghost_z(v,2,req( 5: 8)); call ghost_z(w,2,req( 9:12)); 
            call ghost_z(color,1,req(13:16));  call MPI_WAITALL(16,req(1:16),sta(:,1:16),ierr)
-           
+
 !--------------------------------------UPDATE DENSITY/VISCOSITY------------------------------------
            if(TwoPhase) then
               if(GetPropertiesFromFront) then
@@ -339,12 +356,12 @@ Program paris
 !------------------------------------END VOF STUFF------------------------------------------------
               endif
            endif
+           call my_timer(2,itimestep,ii)
 
            ! Wait for front to be sent back
            if(DoFront)call GetFront('wait')
-           
+           call my_timer(13,itimestep,ii)
         enddo !itime_scheme
-        
         if(itime_scheme==2) then
            u = 0.5*(u+uold)
            v = 0.5*(v+vold)
@@ -352,10 +369,8 @@ Program paris
            rho = 0.5*(rho+rhoo)
            mu  = 0.5*(mu +muold)
         endif
-        
 !--------------------------------------------OUTPUT-----------------------------------------------
         call calcStats
-
         if(mod(itimestep,nbackup)==0)call backup_write
         if(mod(itimestep,nout)==0) then 
            call write_vec_gnuplot(u,v,itimestep)
@@ -365,6 +380,7 @@ Program paris
               end_time =  MPI_WTIME()
               write(out,'("Step:",I9," Iterations:",I9," cpu(s):",f10.2)')itimestep,it,end_time-start_time
            endif
+           call my_timer(11,itimestep,ii)
         endif
         if(nstats==0) STOP " *** Main: nstats = 0"
         if(mod(itimestep,nstats)==0.and.rank==0)then
@@ -376,11 +392,12 @@ Program paris
            write(121,'(20es14.6e2)')time,stats(1:12),dpdx,(stats(8)-stats(9))/dt,end_time-start_time
            close(121)
         endif
+        call my_timer(2,itimestep,ii)
      enddo
      !-------------------------------------------------------------------------------------------------
      !--------------------------------------------End domain-------------------------------------------
      !-------------------------------------------------------------------------------------------------
-     elseif((rank==nPdomain).and.DoFront)then !front tracking process (rank=nPdomain)
+     elseif((rank==nPdomain).and.DoFront) then !front tracking process (rank=nPdomain)
      !-------------------------------------------------------------------------------------------------
      !--------------------------------------------Begin front------------------------------------------
      !-------------------------------------------------------------------------------------------------
@@ -432,6 +449,7 @@ Program paris
   endif
 !-------------------------------------------------------------------------------------------------
 !--------------- END OF MAIN TIME LOOP ----------------------------------------------------------
+  call wrap_up_timer()
   if(rank==0) then 
      if(output_format==2) call close_visit_file()
      if(DoVOF) call close_VOF_visit_file()
@@ -826,13 +844,15 @@ subroutine surfaceForce(fx,fy,fz,du,dv,dw)
   use module_2phase
   use module_surface_tension
   use module_tmpvar
+  use module_timer
   implicit none
   real(8) :: kappa,afit(6),deltax
   integer :: nfound,nposit
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: du, dv, dw, fx,fy,fz
-  integer :: i,j,k,n
+  integer :: i,j,k,n,ii,itimestep
   deltax=dx(nx/2)
   call get_all_curvatures(tmp)
+  call my_timer(7,itimestep,ii)
   do k=ks,ke;  do j=js,je; do i=is,ieu
      if(abs(cvof(i+1,j,k)-cvof(i,j,k))>EPSC/1d1) then  ! there is a non-zero grad H (H Heaviside function) 
         n=0
@@ -846,7 +866,7 @@ subroutine surfaceForce(fx,fy,fz,du,dv,dw)
            n=n+1
         endif
         kappa=kappa/(deltax*n)
-        du(i,j,k)=du(i,j,k)  - kappa*sigma*(cvof(i+1,j,k)-cvof(i,j,k))
+        du(i,j,k) = du(i,j,k) - kappa*sigma*(cvof(i+1,j,k)-cvof(i,j,k))
      endif
   enddo; enddo; enddo
   
@@ -863,7 +883,7 @@ subroutine surfaceForce(fx,fy,fz,du,dv,dw)
            n=n+1
         endif
         kappa=kappa/(deltax*n)
-        dv(i,j,k)=dv(i,j,k)  - kappa*sigma*(cvof(i,j+1,k)-cvof(i,j,k))
+        dv(i,j,k)=dv(i,j,k) - kappa*sigma*(cvof(i,j+1,k)-cvof(i,j,k))
      endif
   enddo; enddo; enddo
 

@@ -109,10 +109,89 @@ subroutine hello_coucou
 end subroutine hello_coucou
 end module module_hello
 !=================================================================================================
+! module_timer: 
+!-------------------------------------------------------------------------------------------------
+module module_timer
+  implicit none
+  save
+  integer, parameter :: components=13, steps=1000
+  real(8) :: times(components), percentage(components), tmp_time, this_time
+  real(8) :: start_time, end_time=0.d0
+  integer :: ierr2
+  character(25) :: timer_component(components)
+  logical :: timer_initialized = .false.
+contains
+  subroutine initialize_timer
+    use module_grid
+    implicit none
+    include 'mpif.h'
+    !                     1234567890123456789012345
+    timer_component(1) = 'Initialisation'
+    timer_component(2) = 'Miscellaneous'
+    timer_component(3) = 'Viscous terms'
+    timer_component(4) = 'VOF advection'
+    timer_component(5) = 'Heights'
+    !                     1234567890123456789012345
+    timer_component(6) = 'Heights communications'
+    timer_component(7) = 'Curvature'
+    timer_component(8) = 'Surface tension'
+    timer_component(9) = 'Advection'
+    timer_component(10) = 'Poisson for pressure'
+    timer_component(11) = 'Output to file'
+    timer_component(12) = 'Lagrangian particles'
+    timer_component(13) = 'Front Tracking'
+    times=0d0
+    this_time =  MPI_WTIME(ierr2)
+    tmp_time = this_time
+    timer_initialized=.true.
+    if(rank>0) return
+    open(unit=122,file='timer_stats')
+    write(122,'("Timer initialised at time",es16.2e2)') this_time - start_time
+    close(122)
+  end subroutine initialize_timer
+  subroutine my_timer(n,itimestep,ii)
+    use module_grid
+    implicit none
+    include 'mpif.h'
+    integer, intent(in) :: n,itimestep,ii
+    integer :: ierr
+    real(8) :: elapsed_time
+    if(rank>0) return
+    if(n>components) call pariserror("n>components")
+    if(.not.timer_initialized) call initialize_timer()
+!    open(unit=122,file='timer_stats',access='append')
+    this_time = MPI_WTIME(ierr2)
+    elapsed_time =  this_time - tmp_time
+    tmp_time = this_time
+    times(n) = times(n) + elapsed_time
+!    write(122,'("rank ",I2," Component: ",(A),". time ",es16.2e2," time step ",I4," subtimestep ",I1)') &
+!         rank,TRIM(timer_component(n)),times(n),itimestep,ii
+!    close(122)
+  end subroutine my_timer
+  subroutine wrap_up_timer
+    use module_grid
+    implicit none
+    include 'mpif.h'
+    integer :: n
+    real(8) :: totaltime
+    if(rank>0) return
+    do n=2,components
+       totaltime = totaltime + times(n)
+    end do
+    percentage = 1d2*times/totaltime
+    open(unit=123,file='aggregate_timer_stats')
+    write(123,'("Timer initialised at time",es16.5e2)') this_time - start_time
+    do n=2,components
+       write(123,'((A)T26," ",f5.1," %")') TRIM(timer_component(n)),percentage(n)
+    enddo
+    close(123)
+  end subroutine wrap_up_timer
+end module module_timer
+!=================================================================================================
 !=================================================================================================
 ! module_flow: Contains definition of variables for the flow solver.
 !-------------------------------------------------------------------------------------------------
-module module_flow
+    module module_flow
   implicit none
   save
   real(8), dimension(:,:,:), allocatable :: u, v, w, uold, vold, wold, fx, fy, fz, color

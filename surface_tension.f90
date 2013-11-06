@@ -108,9 +108,10 @@ contains
 !
 !=================================================================================================
    subroutine get_all_heights
+     use module_timer
      implicit none
      include 'mpif.h'
-     integer :: direction, ierr, i
+     integer :: direction, ierr, i,itimestep,ii
      integer :: req(24),sta(MPI_STATUS_SIZE,24)
      if(.not.st_initialized) call initialize_surface_tension()
 
@@ -120,6 +121,7 @@ contains
      do direction=1,3
         call get_heights_pass1(direction)
      enddo
+     call my_timer(5,itimestep,ii)
 
      do i=1,6
         call ghost_x(height(:,:,:,i),2,req(4*(i-1)+1:4*i))
@@ -133,6 +135,7 @@ contains
         call ghost_z(height(:,:,:,i),2,req(4*(i-1)+1:4*i))
      enddo
      call MPI_WAITALL(24,req(1:24),sta(:,1:24),ierr)
+     call my_timer(6,itimestep,ii)
      do direction=1,3
         call get_heights_pass2(direction)
         call get_heights_pass3(direction)

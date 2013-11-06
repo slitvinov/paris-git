@@ -443,7 +443,7 @@ contains
           end if
        endif
     enddo; enddo; enddo
-    IF(N1>1) write(*,*) "proportion refined ",100.*count/(nx*ny*nz),"%"
+!    IF(N1>1) write(*,*) "proportion refined ",100.*count/(nx*ny*nz),"%"
     return
   end subroutine ls2vof_refined
   !=================================================================================================
