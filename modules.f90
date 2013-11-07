@@ -1545,7 +1545,7 @@ subroutine LinearSolver1(A,u,umask,maxError,beta,maxit,it,ierr)
 end subroutine LinearSolver1
 !=================================================================================================
 !=================================================================================================
-! Returns the residual
+! Returns the residual. L2 norm of the new divergence. 
 !-------------------------------------------------------------------------------------------------
 subroutine calcResidual(A,p, Residual)
   use module_grid

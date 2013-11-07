@@ -291,14 +291,15 @@ Program paris
 !-----------------------------------------PROJECTION STEP-----------------------------------------
            call SetPressureBC(umask,vmask,wmask)
            call SetupPoisson(u,v,w,umask,vmask,wmask,rho,dt,A)
+           ! (div u)*dt < epsilon => div u < epsilon/dt => maxresidual : maxerror/dt 
            if(HYPRE)then
-              call poi_solve(A,p(is:ie,js:je,ks:ke),maxError,maxit,it)
+              call poi_solve(A,p(is:ie,js:je,ks:ke),maxError/dt,maxit,it)
               call ghost_x(p,1,req(1:4 ))
               call ghost_y(p,1,req(5:8 ))
               call ghost_z(p,1,req(9:12)) 
               call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
            else
-              call LinearSolver(A,p,maxError/2d0/dt,beta,maxit,it,ierr)
+              call LinearSolver(A,p,maxError/dt,beta,maxit,it,ierr)
            endif
            if(mod(itimestep,termout)==0) then
               call calcresidual(A,p,residual)
