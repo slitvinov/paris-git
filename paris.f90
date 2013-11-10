@@ -153,8 +153,6 @@ Program paris
            itimestep=0; ii=0
         endif
      endif
-     call my_timer(1,itimestep,ii)
-
      if(test_HF.or.test_LP) then
         ! Exit MPI gracefully
         close(out)
@@ -286,7 +284,7 @@ Program paris
            call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
            call ghost_z(u  ,2,req( 1: 4));  call ghost_z(v,2,req( 5: 8)); call ghost_z(w,2,req( 9:12))
            call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
-           call my_timer(2,itimestep,ii)
+           call my_timer(1,itimestep,ii)
 
 !-----------------------------------------PROJECTION STEP-----------------------------------------
            call SetPressureBC(umask,vmask,wmask)
@@ -303,8 +301,8 @@ Program paris
            endif
            if(mod(itimestep,termout)==0) then
               call calcresidual(A,p,residual)
-              if(rank==0)          write(*  ,    '("              pressure residual  :   ",e7.1)') residual
-              if(rank==0.and..not.hypre) write(*,'("              pressure iterations:",I9)')it
+              if(rank==0)          write(*  ,    '("              pressure residual*dt:   ",e7.1)') residual*dt
+              if(rank==0.and..not.hypre) write(*,'("              pressure iterations :",I9)')it
            endif
            
            do k=ks,ke;  do j=js,je; do i=is,ieu;    ! CORRECT THE u-velocity 
@@ -344,6 +342,8 @@ Program paris
            call ghost_y(color,1,req(13:16));  call MPI_WAITALL(16,req(1:16),sta(:,1:16),ierr)
            call ghost_z(u  ,2,req( 1: 4));  call ghost_z(v,2,req( 5: 8)); call ghost_z(w,2,req( 9:12)); 
            call ghost_z(color,1,req(13:16));  call MPI_WAITALL(16,req(1:16),sta(:,1:16),ierr)
+           call my_timer(1,itimestep,ii)
+
 
 !--------------------------------------UPDATE DENSITY/VISCOSITY------------------------------------
            if(TwoPhase) then
@@ -370,6 +370,8 @@ Program paris
            rho = 0.5*(rho+rhoo)
            mu  = 0.5*(mu +muold)
         endif
+        call my_timer(2,itimestep,ii)
+
 !--------------------------------------------OUTPUT-----------------------------------------------
         call calcStats
         if(mod(itimestep,nbackup)==0)call backup_write
@@ -393,7 +395,7 @@ Program paris
            write(121,'(20es14.6e2)')time,stats(1:12),dpdx,(stats(8)-stats(9))/dt,end_time-start_time
            close(121)
         endif
-        call my_timer(2,itimestep,ii)
+        call my_timer(11,itimestep,ii)
      enddo
      !-------------------------------------------------------------------------------------------------
      !--------------------------------------------End domain-------------------------------------------
@@ -450,7 +452,7 @@ Program paris
   endif
 !-------------------------------------------------------------------------------------------------
 !--------------- END OF MAIN TIME LOOP ----------------------------------------------------------
-  call wrap_up_timer()
+  call wrap_up_timer(itimestep)
   if(rank==0) then 
      if(output_format==2) call close_visit_file()
      if(DoVOF) call close_VOF_visit_file()

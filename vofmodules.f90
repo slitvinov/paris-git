@@ -30,7 +30,7 @@ module module_VOF
   use module_IO
   use module_tmpvar
   implicit none
-  real(8), dimension(:,:,:), allocatable :: cvof ! VOF tracer variable
+  real(8), dimension(:,:,:), allocatable, target :: cvof ! VOF tracer variable
   integer, dimension(:,:,:), allocatable :: vof_flag ! 
   !   0 empty
   !   1 full
@@ -52,15 +52,69 @@ module module_VOF
   logical :: test_LP = .false.
   logical :: test_tag = .false.
   logical :: test_D2P = .false.
+  logical :: linfunc_initialized = .false.
+  real(8) :: b1,b2,b3,b4
+  integer :: filter=0
 contains
 !=================================================================================================
 !=================================================================================================
+!__|__|__|__|
+!__|__|_2.5_|    Maximum possible filter value
+!__|__|_1.5_|
+!__|__|_x|__|
+!__|1.9__|__|
+!2.9__|__|__|
+!
+  subroutine initialize_linfunc()
+    implicit none
+    real(8), parameter :: filterdist=1.4
+    real(8) :: dist_to_face=0.5,dist_to_edge=0.5d0*dsqrt(2d0),dist_to_vertex=dsqrt(3d0)
+    ! dist_to_face=0.5d0
+    ! dist_to_edge=0.5d0*dsqrt(2d0)
+    ! dist_to_vertex=0.5d0*dsqrt(3d0)
+    filter = 1
+    b1=0d0;b2=0d0;b3=0d0;b4=0d0
+    if(filterdist < dist_to_face) then
+       filter = 0
+    else if(filterdist < dist_to_edge) then
+       b1=0.5d0
+       b2=(1-b1)/6d0
+    else if(filterdist < dist_to_vertex) then
+       b1=0.5
+       b2=(1-b1)/12d0
+       b3=(1 - b1 - 6d0*b2)/12d0
+    else
+       b1=0.5
+       b2=(1-b1)/12d0
+       b3=(1 - b1 - 6d0*b2)/24d0
+       b4=(1 - b1 - 6d0*b2 - 12d0*b3)/8d0
+    endif
+    write(6,'((f1.4," "))') b1,b2,b3,b4
+    linfunc_initialized = .true.
+  end subroutine initialize_linfunc
 !------------------------------------------------------------------------
   subroutine linfunc(field,a1,a2)
     implicit none
     real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(out) :: field
-    real(8) :: a1,a2
-    field = cvof*(a2-a1)+a1
+    real(8) :: cfiltered
+    real(8), intent(in) :: a1,a2
+    integer :: i,j,k
+    if(.not.linfunc_initialized) call initialize_linfunc
+    if(filter==0) then
+       field = cvof*(a2-a1)+a1
+    else if (filter==1) then
+       do k=ks-1,ke+1; do j=js-1,je+1; do i=is-1,ie+1
+          cfiltered = b1*cvof(i,j,k) + & 
+               b2*( cvof(i-1,j,k) + cvof(i,j-1,k) + cvof(i,j,k-1) + &
+                    cvof(i+1,j,k) + cvof(i,j+1,k) + cvof(i,j,k+1) ) + &
+               b3*( cvof(i+1,j+1,k) + cvof(i+1,j-1,k) + cvof(i-1,j+1,k) + cvof(i-1,j-1,k) + &
+                    cvof(i+1,j,k+1) + cvof(i+1,j,k-1) + cvof(i-1,j,k+1) + cvof(i-1,j,k-1) + &
+                    cvof(i,j+1,k+1) + cvof(i,j+1,k-1) + cvof(i,j-1,k+1) + cvof(i,j-1,k-1) ) + &
+               b4*( cvof(i+1,j+1,k+1) + cvof(i+1,j+1,k-1) + cvof(i+1,j-1,k+1) + cvof(i+1,j-1,k-1) +  &
+                    cvof(i-1,j+1,k+1) + cvof(i-1,j+1,k-1) + cvof(i-1,j-1,k+1) + cvof(i-1,j-1,k-1) )
+          field(i,j,k) = cfiltered*(a2-a1)+a1
+       enddo; enddo; enddo
+    endif
   end subroutine linfunc
 !=================================================================================================
 
@@ -548,68 +602,55 @@ contains
 !=================================================================================================
 ! subroutine SetVOFBC: Sets the VOF fraction boundary condition
 !-------------------------------------------------------------------------------------------------
-  subroutine SetVOFBC(c,f)
+  subroutine SetVOFBC(cv,fl)
     use module_grid
     implicit none
     include 'mpif.h'
-    real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: c
-    integer, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: f
-    integer :: fb(3),i
+    real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: cv  ! cvof
+    integer, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: fl  ! vof_flag
+    integer :: fb(3),d,l,m,n,c(3),try(3),sign
     
-    do i=1,3
-       if(vofbdry_cond(i)=='wet') then
-          fb(i)=1
-       else if(vofbdry_cond(i)=='dry') then
-          fb(i)=0
-       else if(vofbdry_cond(i)=='periodic') then
-          fb(i) = 3 ! ghostxxx will take care of this, skip this case
+    do d=1,3
+       if(vofbdry_cond(d)=='wet') then
+          fb(d)=1
+       else if(vofbdry_cond(d)=='dry') then
+          fb(d)=0
+       else if(vofbdry_cond(d)=='periodic') then
+          fb(d) = 3 ! ghostxxx will take care of this, skip this case
+       else if(vofbdry_cond(d)=='inflow_outflow') then
+          fb(d) = 4
        else
           call pariserror("this vofbc not implemented")
        endif
     enddo
-
-    if(fb(1)/=3) then
-       if(coords(1)==0    ) then
-          c(is-1,:,:)=real(fb(1))
-          c(is-2,:,:)=real(fb(1))
-          f(is-1,:,:)=fb(1)
-          f(is-2,:,:)=fb(1)
+    do d=1,3
+       m=1
+       n=2   ! try(n=1) = d
+       do while (m.le.3)
+          if(m.ne.d) then
+             try(n) = m
+             n=n+1
+          endif
+          m=m+1
+       enddo
+       if(fb(d)<2) then
+          do sign=-1,1,2
+             if(coords(d)==proclimit(d,sign)) then
+                do l=coordstart(try(2))-Ng,coordend(try(2))+Ng
+                   do m=coordstart(try(3))-Ng,coordend(try(3))+Ng
+                      c(try(2)) = l; c(try(3)) = m
+                      c(d)=coordlimit(d,sign) + sign
+                      cv(c(1),c(2),c(3))=dble(fb(d))
+                      fl(c(1),c(2),c(3))=fb(d)
+                      c(d) = c(d) + sign
+                      cv(c(1),c(2),c(3))=dble(fb(d))
+                      fl(c(1),c(2),c(3))=fb(d)
+                   enddo
+                enddo
+             endif
+          enddo
        endif
-       if(coords(1)==nPx-1) then
-          c(ie+1,:,:)=real(fb(1))
-          c(ie+2,:,:)=real(fb(1))
-          f(ie+1,:,:)=fb(1)
-          f(ie+2,:,:)=fb(1)
-       endif
-    endif
-    if(fb(2)/=3) then
-       if(coords(2)==0    ) then
-          c(:,js-1,:)=real(fb(2))
-          c(:,js-2,:)=real(fb(2))
-          f(:,js-1,:)=fb(2)
-          f(:,js-2,:)=fb(2)
-       endif
-       if(coords(2)==nPy-1) then
-          c(:,je+1,:)=real(fb(2))
-          c(:,je+2,:)=real(fb(2))
-          f(:,je+1,:)=fb(2)
-          f(:,je+2,:)=fb(2)
-       endif
-    endif
-    if(fb(3)/=3) then
-       if(coords(3)==0    ) then
-          c(:,:,ks-1)=real(fb(3))
-          c(:,:,ks-2)=real(fb(3))
-          f(:,:,ks-1)=fb(3)
-          f(:,:,ks-2)=fb(3)
-       endif
-       if(coords(3)==nPz-1) then
-          c(:,:,ke+1)=real(fb(3))
-          c(:,:,ke+2)=real(fb(3))
-          f(:,:,ke+1)=fb(3)
-          f(:,:,ke+2)=fb(3)
-       endif
-    endif
+    enddo
   end subroutine SetVOFBC
 !=================================================================================================
 end module module_vof

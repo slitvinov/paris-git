@@ -51,6 +51,30 @@ module module_grid
   integer :: imin, imax, jmin, jmax, kmin, kmax
 ! added by SZ
   contains
+    function EndProc(d)
+      integer, intent(in) :: d
+      integer EndProc
+      if      (d==1) then
+         EndProc = nPx-1
+      else if (d==2)then
+         EndProc = nPy-1
+      else if (d==3) then
+         EndProc = nPz-1
+      else
+         call pariserror("EndProc: wrong d.")
+      endif
+  end function EndProc
+  function proclimit(d,sign)
+    integer, intent(in) :: d,sign
+    integer :: proclimit
+    if(sign==-1) then
+       proclimit=0
+    else if(sign==1) then
+       proclimit = EndProc(d)
+    else
+       call pariserror("proclimit: wrong sign")
+    endif
+  end function proclimit
   function coordstart(d)
     integer, intent(in) :: d
     integer :: coordstart
@@ -117,6 +141,7 @@ module module_timer
   integer, parameter :: components=13, steps=1000
   real(8) :: times(components), percentage(components), tmp_time, this_time
   real(8) :: start_time, end_time=0.d0
+  real(8) :: start_loop, end_loop
   integer :: ierr2
   character(25) :: timer_component(components)
   logical :: timer_initialized = .false.
@@ -126,7 +151,7 @@ contains
     implicit none
     include 'mpif.h'
     !                     1234567890123456789012345
-    timer_component(1) = 'Initialisation'
+    timer_component(1) = 'Advection communications'
     timer_component(2) = 'Miscellaneous'
     timer_component(3) = 'Viscous terms'
     timer_component(4) = 'VOF advection'
@@ -143,11 +168,12 @@ contains
     times=0d0
     this_time =  MPI_WTIME(ierr2)
     tmp_time = this_time
+    start_loop = this_time
     timer_initialized=.true.
-    if(rank>0) return
-    open(unit=122,file='timer_stats')
-    write(122,'("Timer initialised at time",es16.2e2)') this_time - start_time
-    close(122)
+!    if(rank>0) return
+!    open(unit=122,file='timer_stats')
+!    write(122,'("Timer initialised at time",es16.2e2)') this_time - start_time
+!    close(122)
   end subroutine initialize_timer
   subroutine my_timer(n,itimestep,ii)
     use module_grid
@@ -168,22 +194,26 @@ contains
 !         rank,TRIM(timer_component(n)),times(n),itimestep,ii
 !    close(122)
   end subroutine my_timer
-  subroutine wrap_up_timer
+  subroutine wrap_up_timer(itimestep)
     use module_grid
     implicit none
     include 'mpif.h'
-    integer :: n
-    real(8) :: totaltime
+    integer :: n,ierr2,itimestep
+    real(8) :: totaltime, ZZ
     if(rank>0) return
-    do n=2,components
+    end_loop = MPI_WTIME(ierr2)
+    ZZ = nx*ny*nz/npx/npy/npz*itimestep/(end_loop-start_loop)
+    totaltime=0d0
+    do n=1,components
        totaltime = totaltime + times(n)
     end do
     percentage = 1d2*times/totaltime
     open(unit=123,file='aggregate_timer_stats')
-    write(123,'("Timer initialised at time",es16.5e2)') this_time - start_time
-    do n=2,components
+    do n=1,components
        write(123,'((A)T26," ",f5.1," %")') TRIM(timer_component(n)),percentage(n)
     enddo
+    write(123,*) "   "
+    write(123,'("Overall speed Z"T24,es16.5e2)') ZZ
     close(123)
   end subroutine wrap_up_timer
 end module module_timer
@@ -220,7 +250,7 @@ end module module_flow
 !-------------------------------------------------------------------------------------------------
 module module_tmpvar
   real(8), dimension(:,:,:,:), allocatable :: work, A
-  real(8), dimension(:,:,:), allocatable :: tmp
+  real(8), dimension(:,:,:), allocatable, target :: tmp
   real(8) :: tcpu(100),t0
 end module module_tmpvar
 
