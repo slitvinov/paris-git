@@ -115,7 +115,7 @@ RHO2    = 1.0
 MU2     = 0.0
                    ! rho2, mu2 : properties of the drop
 SIGMA    = 0.0
-NumBubble =  3
+NumBubble =  4
                    ! number of bubbles
 
 xyzrad(1, 1)  = 0.25     
@@ -123,15 +123,20 @@ xyzrad(2, 1)  = 0.25
 xyzrad(3, 1)  = 0.5
 xyzrad(4, 1)  = 0.1
 
-xyzrad(1, 2)  = 0.45     
+xyzrad(1, 2)  = 0.25     
 xyzrad(2, 2)  = 0.75
 xyzrad(3, 2)  = 0.5
 xyzrad(4, 2)  = 0.15
 
 xyzrad(1, 3)  = 0.75     
 xyzrad(2, 3)  = 0.75
-xyzrad(3, 3)  = 0.35
+xyzrad(3, 3)  = 0.5
 xyzrad(4, 3)  = 0.10
+
+xyzrad(1, 4)  = 0.75     
+xyzrad(2, 4)  = 0.25
+xyzrad(3, 4)  = 0.5
+xyzrad(4, 4)  = 0.10
 
                    ! Initial bubble size and location : x,y,z,radius
 

@@ -227,15 +227,23 @@ contains
 
     implicit none
     include 'mpif.h'
-    integer :: ierr, req(12),sta(MPI_STATUS_SIZE,12)
+    integer :: ierr, req(12),sta(MPI_STATUS_SIZE,12),MPI_Comm
     integer , parameter :: ngh=2
     integer :: ipar
+    integer, parameter :: root_rank = 0
     
     if( test_D2P) then 
-      call random_bubbles
+       if ( rank == root_rank ) call random_bubbles
+       call MPI_BCAST(rad, NumBubble, MPI_REAL8, &
+                      root_rank, MPI_Comm_Cart, ierr)
+       call MPI_BCAST(xc , NumBubble, MPI_REAL8, &
+                      root_rank, MPI_Comm_Cart, ierr)
+       call MPI_BCAST(yc , NumBubble, MPI_REAL8, &
+                      root_rank, MPI_Comm_Cart, ierr)
+       call MPI_BCAST(zc , NumBubble, MPI_REAL8, &
+                      root_rank, MPI_Comm_Cart, ierr)
     end if ! test_D2P
 
- 
     if(test_heights) then 
        if(cylinder_dir==0) then
           write(*,*) "IVOF: Warning: cylinder_dir=0 set to 2"
@@ -247,7 +255,7 @@ contains
        ipar=0 ! spheres: default
        if(test_curvature_2D) ipar=-cylinder_dir
        ! one cylinder in -ipar direction otherwise spheres
-       call levelset2vof(shapes2ls,ipar)
+      call levelset2vof(shapes2ls,ipar)
     else
        write(*,*) "IVOF: Warning: Nothing set. cylinder_dir=0 set to 2"
        cvof=0.d0
@@ -270,7 +278,7 @@ contains
     implicit none
     integer ib
 
-    if(NumBubble>1) then 
+    if(NumBubble>2) then 
       do ib=1,NumBubble
          rad(ib) = 0.02 + rand()*0.04
          xc(ib)  = 0.15 + rand()*0.7
@@ -355,10 +363,12 @@ contains
     include 'mpif.h'
     integer :: ierr, req(12),sta(MPI_STATUS_SIZE,12)
     integer , parameter :: ngh=2
+
     call ls2vof_refined(lsfunction,ipar,1)
     call ighost_x(vof_flag,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
     call ighost_y(vof_flag,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
     call ighost_z(vof_flag,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+
     call ghost_x(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
     call ghost_y(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
     call ghost_z(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)

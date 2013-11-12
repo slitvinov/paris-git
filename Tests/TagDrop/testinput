@@ -52,7 +52,7 @@ U_init   = 1.d0
 termout  = 1
 ICOut    = T        ! output initial condition
 NOUT     = 2        ! write the solution to file every nout time steps
-output_format = 2   ! 1:tecplot 2:vtk
+output_format = 1   ! 1:tecplot 2:vtk
 out_path = 'out'    ! name of the output directory
 
 nstats   = 20       ! number of time steps between flow statistics calculations
@@ -65,9 +65,9 @@ npy      = 2
 npz      = 2
                    ! number of processors in x,y,z direction
 
-Nx      = 128 
-Ny      = 128
-Nz      = 128
+Nx      = 32 
+Ny      = 32
+Nz      = 32
 Ng      = 2
                    ! grid size in x,y,z direction and number of ghost cells
 
@@ -115,13 +115,48 @@ RHO2    = 1.0
 MU2     = 0.0
                    ! rho2, mu2 : properties of the drop
 SIGMA    = 0.0
-NumBubble =  1
+NumBubble =  8
                    ! number of bubbles
 
-xyzrad(1, 1)  = 0.5 
-xyzrad(2, 1)  = 0.5 
-xyzrad(3, 1)  = 0.5 
-xyzrad(4, 1)  = 0.25
+xyzrad(1, 1)  = 0.5     
+xyzrad(2, 1)  = 0.5
+xyzrad(3, 1)  = 0.5
+xyzrad(4, 1)  = 0.15
+
+xyzrad(1, 2)  = 0.25     
+xyzrad(2, 2)  = 0.75
+xyzrad(3, 2)  = 0.25
+xyzrad(4, 2)  = 0.08
+
+xyzrad(1, 3)  = 0.75     
+xyzrad(2, 3)  = 0.25
+xyzrad(3, 3)  = 0.25
+xyzrad(4, 3)  = 0.08
+
+xyzrad(1, 4)  = 0.82     
+xyzrad(2, 4)  = 0.5
+xyzrad(3, 4)  = 0.25
+xyzrad(4, 4)  = 0.08
+
+xyzrad(1, 5)  = 0.25     
+xyzrad(2, 5)  = 0.25
+xyzrad(3, 5)  = 0.5
+xyzrad(4, 5)  = 0.05
+
+xyzrad(1, 6)  = 0.25     
+xyzrad(2, 6)  = 0.75
+xyzrad(3, 6)  = 0.75
+xyzrad(4, 6)  = 0.08
+
+xyzrad(1, 7)  = 0.75     
+xyzrad(2, 7)  = 0.25
+xyzrad(3, 7)  = 0.75
+xyzrad(4, 7)  = 0.08
+
+xyzrad(1, 8)  = 0.82     
+xyzrad(2, 8)  = 0.5
+xyzrad(3, 8)  = 0.75
+xyzrad(4, 8)  = 0.05
 
                    ! Initial bubble size and location : x,y,z,radius
 

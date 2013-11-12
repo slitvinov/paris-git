@@ -15,19 +15,21 @@ FC = mpif90
 #FFLAGS = -g -Wall -ffpe-trap=invalid,zero,overflow # -g -gstabs # -O3 #
 #FOPTS =  -g -Wall -ffpe-trap=invalid,zero,overflow # -g -gstabs # -O3 #
 
-FFLAGS = -O3 # -g -fimplicit-none -fbounds-check
+FFLAGS = -g -fimplicit-none -fbounds-check
 
 CFLAGS = -O # -g -gstabs
 BINDIR = $(HOME)/bin
 
 # select option for hypre
 # default hypre installation without root privileges:
-HYPRE_DIR = $(HOME)/hypre-2.8.0b-babel/src
+# HYPRE_DIR = $(HOME)/hypre-2.8.0b-babel/src
 # Macport installation in /opt 
 # HYPRE_DIR = /opt/hypre
 # babbage
 # HYPRE_DIR = /share/apps/hypre
-
+# Local
+HYPRE_DIR = $(HOME)/cfd/libs/hypre-2.9.0b/src
+# HYPRE_DIR = /usr/local/hypre
 HYPRE_LIBS =  -L$(HYPRE_DIR)/lib -lHYPRE 
 
 
