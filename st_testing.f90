@@ -40,10 +40,12 @@ module module_st_testing
 contains
    subroutine test_VOF_HF()
      implicit none
-     integer :: calc_imax
-     if(calc_imax(vof_flag)/=2) then
-        write(*,*) calc_imax(vof_flag), "expecting maximum flag = 2"
-        call pariserror("bad flags")
+     integer :: calc_imax_prank0
+     if(rank==0) then
+        if(calc_imax_prank0(vof_flag)/=2) then
+           write(*,*) calc_imax_prank0(vof_flag), "expecting maximum flag = 2"
+           call pariserror("bad flags")
+        endif
      endif
      call get_all_heights()
      if(test_heights) then

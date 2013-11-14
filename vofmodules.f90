@@ -68,7 +68,7 @@ contains
   subroutine initialize_linfunc()
     implicit none
     real(8), parameter :: filterdist=1.4
-    real(8) :: dist_to_face=0.5,dist_to_edge=0.5d0*dsqrt(2d0),dist_to_vertex=dsqrt(3d0)
+    real(8) :: dist_to_face=0.5,dist_to_edge=0.5d0*dsqrt(2d0),dist_to_vertex=0.5*dsqrt(3d0)
     ! dist_to_face=0.5d0
     ! dist_to_edge=0.5d0*dsqrt(2d0)
     ! dist_to_vertex=0.5d0*dsqrt(3d0)
@@ -89,9 +89,26 @@ contains
        b3=(1 - b1 - 6d0*b2)/24d0
        b4=(1 - b1 - 6d0*b2 - 12d0*b3)/8d0
     endif
-    write(6,'((f1.4," "))') b1,b2,b3,b4
+!    write(6,'((es16.2e2," "))') b1,b2,b3,b4
     linfunc_initialized = .true.
+
+! Gerris method
+! Each vertex averages 8 cells  --> 1/8
+! Each Cell averages 8 vertices --> 1/8
+! 8 vertex cells belong to only one vertex ->1/64
+! 12 edge cells belong to 2 vertices -> 2/64
+! 6 face cells belong to 4 vertices -> 4/64
+! 8/4 + 6*4/64 + 12*2/64 + 8/64 = 1
+
+!       b1=8D0/64
+!       b2=4D0/64
+!       b3=2D0/64
+!       b4=1D0/64
+!       PRINT *, " "
+!       write(6,'((es16.2e2," "))') b1,b2,b3,b4
+
   end subroutine initialize_linfunc
+
 !------------------------------------------------------------------------
   subroutine linfunc(field,a1,a2)
     implicit none
@@ -420,8 +437,8 @@ contains
     integer :: i1(-1:1,-1:1,3), j1(-1:1,-1:1,3), k1(-1:1,-1:1,3)
     logical :: refinethis 
     real(8) :: count
-    integer :: calc_imax
-    integer :: dirselect(0:3), d, is2D
+    integer :: calc_imax_prank0
+    integer :: dirselect(0:3), d, is2D,max_flag
 
 ! initialization
     count=0.d0
@@ -433,10 +450,17 @@ contains
     dirselect(d)=0
 
 !    Some error checking
-    if(d>3.and.rank==0) call pariserror("wrong ipar")
-    if(n1>1.and.calc_imax(vof_flag)/=2.and.A_h>1d-16) then
-       if(min(min(nx,ny),nz)<2) call pariserror("minimum dimension nx ny nz too small")
-       write(*,*) "ls2vof_refined: maximum vof_flag = ", calc_imax(vof_flag), "but expecting maximum flag = 2"
+    max_flag=calc_imax(vof_flag)
+    if(d>3) call pariserror("wrong ipar")
+    if(min(min(nx,ny),nz)<2) call pariserror("minimum dimension nx ny nz too small")
+    if(n1>1.and.max_flag/=2.and.A_h>1d-16) then
+       if(rank==0) then
+          if(max_flag==0) then
+             write(*,*) "ls2vof_refined: error: single phase flow ? Nothing to initialize ?!"
+          else
+             write(*,*) "ls2vof_refined: maximum vof_flag = ", max_flag, "but expecting maximum flag = 2"
+          endif
+       endif
        call pariserror("bad flag")
     endif
  

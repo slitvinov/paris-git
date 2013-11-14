@@ -1679,20 +1679,25 @@ subroutine calcsum_shift(p,porosity,sx,sy,sz)
 end subroutine calcsum_shift
 !-------------------------------------------------------------------------------------------------
 
-function calc_imax(f)
+function calc_imax_prank0(f)
   use module_grid
-  integer calc_imax
+  implicit none
+  include 'mpif.h'
+  integer calc_imax_prank0,ierr,imax_loc,imax_all
   integer, dimension(imin:imax,jmin:jmax,kmin:kmax),  intent(in) :: f
   integer :: i,j,k
-  calc_imax=-2147483647
+  imax_loc=-2147483647
   do k=kmin,kmax
      do j=jmin,jmax
         do i=imin,imax
-           calc_imax = max(calc_imax,f(i,j,k))
+           imax_loc = max(imax_loc,f(i,j,k))
         enddo
      enddo
   enddo
-  end function calc_imax
+  imax_all = 0
+  call MPI_ALLREDUCE(imax_loc, imax_all, 1, MPI_INTEGER, MPI_MAX, MPI_Comm_Cart, ierr)
+  calc_imax_prank0=imax_all
+  end function calc_imax_prank0
  
   subroutine THRESHOLD(z)
     implicit none

@@ -29,11 +29,11 @@ restartAverages = F
 nBackup  = 200000      ! number of time steps between  backups are kept.
 
 NSTEP   = 30000       ! maximum number of time steps
-EndTime = 5.0   ! When to stop simulation
+EndTime = 5d-3   ! When to stop simulation
 
 MaxDt   = 1e-1     ! maximum size of time step
 dtFlag  = 1        ! 1: fixed dt;  2: fixed CFL
-dt      = 2.5e-3     ! dt in case of dtFlag=1
+dt      = 2.5e-6     ! dt in case of dtFlag=1
 CFL     = 0.25
 MAXERROR= 1d-3     ! Residual for Poisson solver
 MAXERRORVOL = 1d-6 ! Tolerance for Front Tracking
@@ -120,10 +120,10 @@ excentricity = 0.75 0. 0.
 
                    ! number of bubbles
 
-xyzrad(1, 1)  = 0.5 
-xyzrad(2, 1)  = 0.5 
-xyzrad(3, 1)  = 0.5 
-xyzrad(4, 1)  = 0.3
+xyzrad(1, 1)  = 2.5d-3
+xyzrad(2, 1)  = 2.5d-3
+xyzrad(3, 1)  = 2.5d-3
+xyzrad(4, 1)  = 1.5d-3
 
                    ! Initial bubble size and location : x,y,z,radius
 
