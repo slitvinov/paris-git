@@ -145,7 +145,15 @@ module module_timer
   integer :: ierr2
   character(25) :: timer_component(components)
   logical :: timer_initialized = .false.
+
+  real(8) :: alloc_size=0
 contains
+  subroutine add_2_my_sizer(n)
+    use module_grid
+    implicit none
+    integer n
+    alloc_size=alloc_size + dble(n*(nx/npx)*(ny/npy)*(nz/npz))*8d0*1d-9
+  end subroutine add_2_my_sizer
   subroutine initialize_timer
     use module_grid
     implicit none
@@ -214,6 +222,8 @@ contains
     enddo
     write(123,*) "   "
     write(123,'("Overall speed Z"T24,es16.5e2)') ZZ
+    write(123,*) "   "
+    write(123,'("Allocated/proc "T24,es16.5e2,"Gbytes")') alloc_size
     close(123)
   end subroutine wrap_up_timer
 end module module_timer
@@ -1679,11 +1689,11 @@ subroutine calcsum_shift(p,porosity,sx,sy,sz)
 end subroutine calcsum_shift
 !-------------------------------------------------------------------------------------------------
 
-function calc_imax_prank0(f)
+function calc_imax(f)
   use module_grid
   implicit none
   include 'mpif.h'
-  integer calc_imax_prank0,ierr,imax_loc,imax_all
+  integer calc_imax,ierr,imax_loc,imax_all
   integer, dimension(imin:imax,jmin:jmax,kmin:kmax),  intent(in) :: f
   integer :: i,j,k
   imax_loc=-2147483647
@@ -1696,8 +1706,8 @@ function calc_imax_prank0(f)
   enddo
   imax_all = 0
   call MPI_ALLREDUCE(imax_loc, imax_all, 1, MPI_INTEGER, MPI_MAX, MPI_Comm_Cart, ierr)
-  calc_imax_prank0=imax_all
-  end function calc_imax_prank0
+  calc_imax=imax_all
+  end function calc_imax
  
   subroutine THRESHOLD(z)
     implicit none

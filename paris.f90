@@ -455,7 +455,6 @@ Program paris
   call wrap_up_timer(itimestep)
   if(rank==0) then 
      if(output_format==2) call close_visit_file()
-     if(DoVOF) call close_VOF_visit_file()
   endif
 
   if(rank<nPdomain)  call output_at_location()
@@ -1293,13 +1292,14 @@ subroutine pariserror(message)
   include 'mpif.h'
   integer ierr
   character(*) :: message
-  if(rank==0) write(*,*) "Step: last message . . . . ParisExecutionError"
-!  if(rank==0) write(*,*) "ERROR *** ",message, " *** STOP "
+  print *, "rank = ",rank
   write(*,*) "ERROR *** ",message, " *** STOP "
   ! Exit MPI gracefully
   close(out)
-  call MPI_BARRIER(MPI_COMM_WORLD, ierr)
-  call MPI_finalize(ierr)
+!   call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+!   call MPI_finalize(ierr)
+  if(rank==0) write(*,*) "Step: last message . . . . ParisExecutionError"
+!  if(rank==0) write(*,*) "ERROR *** ",message, " *** STOP "
   stop 
 end subroutine pariserror
 

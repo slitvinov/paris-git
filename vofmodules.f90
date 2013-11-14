@@ -39,7 +39,8 @@ module module_VOF
 
   real(8), parameter  :: A_h = 2d0  ! For initialisation of height test
   real(8), parameter  :: TINY = 1d-50
-  real(8), parameter  :: EPSC = 1.d-12
+  real(8), parameter  :: EPSC = 1.d-12  ! for clipping vof and setting flags
+  real(8), parameter  :: EPSDP = 1d-16  ! assumed precision of double precision computations
 
   character(20) :: vofbdry_cond(3),test_type,vof_advect
   integer :: parameters_read=0, refinement=-1 
@@ -437,7 +438,7 @@ contains
     integer :: i1(-1:1,-1:1,3), j1(-1:1,-1:1,3), k1(-1:1,-1:1,3)
     logical :: refinethis 
     real(8) :: count
-    integer :: calc_imax_prank0
+    integer :: calc_imax
     integer :: dirselect(0:3), d, is2D,max_flag
 
 ! initialization
@@ -450,13 +451,13 @@ contains
     dirselect(d)=0
 
 !    Some error checking
-    max_flag=calc_imax(vof_flag)
     if(d>3) call pariserror("wrong ipar")
     if(min(min(nx,ny),nz)<2) call pariserror("minimum dimension nx ny nz too small")
+    max_flag=calc_imax(vof_flag)
     if(n1>1.and.max_flag/=2.and.A_h>1d-16) then
        if(rank==0) then
           if(max_flag==0) then
-             write(*,*) "ls2vof_refined: error: single phase flow ? Nothing to initialize ?!"
+             write(*,*) "ls2vof_refined: error: single phase flow ? Nothing to initialize !?"
           else
              write(*,*) "ls2vof_refined: maximum vof_flag = ", max_flag, "but expecting maximum flag = 2"
           endif
@@ -677,6 +678,13 @@ contains
     enddo
   end subroutine SetVOFBC
 !=================================================================================================
+  subroutine test_cell_size()
+    implicit none
+    if(dabs(dyh(js)-dxh(is))*1d14/dxh(is)>1d0.or.dabs(dzh(ks)-dxh(is))*1d14/dxh(is)>1d0) then
+       print *, "non-cubic cells"
+       stop
+    endif
+  end subroutine test_cell_size
 end module module_vof
 !=================================================================================================
 !-------------------------------------------------------------------------------------------------
@@ -699,17 +707,15 @@ contains
        write(88,10) nPdomain
 10     format('!NBLOCKS ',I4)
        vof_opened=1
+    else
+       OPEN(UNIT=88,FILE='vof.visit',access='append')
     endif
-
     do prank=0,NpDomain-1
        write(88,11) rootname//TRIM(int2text(prank,padding))//'.vtk'
- 11 format(A)
+11     format(A)
     enddo
-  end subroutine  append_VOF_visit_file
-!=================================================================================================
-  subroutine close_VOF_visit_file()
     close(88)
-  end subroutine close_VOF_visit_file
+  end subroutine  append_VOF_visit_file
 !=================================================================================================
   subroutine output_VOF(nf,i1,i2,j1,j2,k1,k2)
     implicit none
@@ -942,7 +948,8 @@ SUBROUTINE swpr(us,c,vof1,cg,vof3,f,dir)
     USE module_vof
     use module_hello
     IMPLICIT NONE
-    INTEGER :: i,j,k
+    include 'mpif.h'
+    INTEGER :: i,j,k,ierr
     INTEGER :: invx,invy,invz,ii,jj,kk,i0,j0,k0
     INTEGER, INTENT(IN) :: dir
     REAL (8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), INTENT(IN) :: us,cg
@@ -964,7 +971,7 @@ SUBROUTINE swpr(us,c,vof1,cg,vof3,f,dir)
      kk=1; dm1 => dmz;  dm2 => dmx;  dm3 => dmy 
   endif
   dxyz = dxh(is)
-  if(dyh(js).ne.dxyz.or.dzh(ks).ne.dxyz) call pariserror("non-cubic cells")
+  call test_cell_size()
 
   do k=ks-1,ke+1
      do j=js-1,je+1
