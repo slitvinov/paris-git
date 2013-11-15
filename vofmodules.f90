@@ -55,7 +55,7 @@ module module_VOF
   logical :: test_D2P = .false.
   logical :: linfunc_initialized = .false.
   real(8) :: b1,b2,b3,b4
-  integer :: filter=0
+  integer :: nfilter=0
 contains
 !=================================================================================================
 !=================================================================================================
@@ -68,31 +68,6 @@ contains
 !
   subroutine initialize_linfunc()
     implicit none
-    real(8), parameter :: filterdist=1.4
-    real(8) :: dist_to_face=0.5,dist_to_edge=0.5d0*dsqrt(2d0),dist_to_vertex=0.5*dsqrt(3d0)
-    ! dist_to_face=0.5d0
-    ! dist_to_edge=0.5d0*dsqrt(2d0)
-    ! dist_to_vertex=0.5d0*dsqrt(3d0)
-    filter = 1
-    b1=0d0;b2=0d0;b3=0d0;b4=0d0
-    if(filterdist < dist_to_face) then
-       filter = 0
-    else if(filterdist < dist_to_edge) then
-       b1=0.5d0
-       b2=(1-b1)/6d0
-    else if(filterdist < dist_to_vertex) then
-       b1=0.5
-       b2=(1-b1)/12d0
-       b3=(1 - b1 - 6d0*b2)/12d0
-    else
-       b1=0.5
-       b2=(1-b1)/12d0
-       b3=(1 - b1 - 6d0*b2)/24d0
-       b4=(1 - b1 - 6d0*b2 - 12d0*b3)/8d0
-    endif
-!    write(6,'((es16.2e2," "))') b1,b2,b3,b4
-    linfunc_initialized = .true.
-
 ! Gerris method
 ! Each vertex averages 8 cells  --> 1/8
 ! Each Cell averages 8 vertices --> 1/8
@@ -100,16 +75,34 @@ contains
 ! 12 edge cells belong to 2 vertices -> 2/64
 ! 6 face cells belong to 4 vertices -> 4/64
 ! 8/4 + 6*4/64 + 12*2/64 + 8/64 = 1
-
-!       b1=8D0/64
-!       b2=4D0/64
-!       b3=2D0/64
-!       b4=1D0/64
-!       PRINT *, " "
-!       write(6,'((es16.2e2," "))') b1,b2,b3,b4
-
+    b1=8D0/64
+    b2=4D0/64
+    b3=2D0/64
+    b4=1D0/64
+    linfunc_initialized = .true.
   end subroutine initialize_linfunc
-
+!------------------------------------------------------------------------
+  subroutine filter(field)
+    use module_tmpvar
+    implicit none
+    real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(out) :: field
+    integer :: i,j,k,n
+    field=cvof
+    do n=1,nfilter
+       do k=ks-1,ke+1; do j=js-1,je+1; do i=is-1,ie+1
+          tmp(i,j,k) = b1*field(i,j,k) + & 
+               b2*( field(i-1,j,k) + field(i,j-1,k) + field(i,j,k-1) + &
+                    field(i+1,j,k) + field(i,j+1,k) + field(i,j,k+1) ) + &
+               b3*( field(i+1,j+1,k) + field(i+1,j-1,k) + field(i-1,j+1,k) + field(i-1,j-1,k) + &
+                    field(i+1,j,k+1) + field(i+1,j,k-1) + field(i-1,j,k+1) + field(i-1,j,k-1) + &
+                    field(i,j+1,k+1) + field(i,j+1,k-1) + field(i,j-1,k+1) + field(i,j-1,k-1) ) + &
+               b4*( field(i+1,j+1,k+1) + field(i+1,j+1,k-1) + field(i+1,j-1,k+1) + field(i+1,j-1,k-1) +  &
+                    field(i-1,j+1,k+1) + field(i-1,j+1,k-1) + field(i-1,j-1,k+1) + field(i-1,j-1,k-1) )
+! fixme: ghostx missing
+       enddo; enddo; enddo
+       field=tmp
+    enddo
+  end subroutine filter
 !------------------------------------------------------------------------
   subroutine linfunc(field,a1,a2)
     implicit none
@@ -118,9 +111,9 @@ contains
     real(8), intent(in) :: a1,a2
     integer :: i,j,k
     if(.not.linfunc_initialized) call initialize_linfunc
-    if(filter==0) then
+    if(nfilter==0) then
        field = cvof*(a2-a1)+a1
-    else if (filter==1) then
+    else if (nfilter==1) then
        do k=ks-1,ke+1; do j=js-1,je+1; do i=is-1,ie+1
           cfiltered = b1*cvof(i,j,k) + & 
                b2*( cvof(i-1,j,k) + cvof(i,j-1,k) + cvof(i,j,k-1) + &

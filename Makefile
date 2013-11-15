@@ -56,7 +56,7 @@ distclean: clean
 	@rm -fR  session* *.xml TAGS tags input
 
 test:  install compare parisdeconv
-	@echo "This test takes approximately 1 minute on a 4-core intel i7 MacBookPro"
+	@echo "The tests suite takes approximately 7 minutes on a 4-core intel i7 MacBookPro"
 	@cd Tests; chmod +x ./runtests.sh; ./runtests.sh
 
 longtest:  install compare parisdeconv

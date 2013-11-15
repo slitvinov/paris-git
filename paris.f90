@@ -21,6 +21,7 @@
 !                  The density is advected by a QUICK scheme.
 !
 ! Paris version 0.2 Implicit momentum diffusion, VOF and Front-Tracking independent of each other. 
+!                   The density is not advected but deduced from VOF or Front Tracking. 
 !
 ! This program is free software; you can redistribute it and/or
 ! modify it under the terms of the GNU General Public License as
@@ -229,7 +230,8 @@ Program paris
               call my_timer(4,itimestep,ii)
               call get_all_heights()
               call my_timer(5,itimestep,ii)
-              call surfaceForce(fx,fy,fz,du,dv,dw)
+              call linfunc(rho,rho1,rho2)
+              call surfaceForce(fx,fy,fz,du,dv,dw,rho)
               call my_timer(8,itimestep,ii)
            endif
 
@@ -839,7 +841,7 @@ end subroutine volumeForce
 !=================================================================================================
 ! Calculates the surface force in the momentum equations and adds them to du,dv,dw
 !-------------------------------------------------------------------------------------------------
-subroutine surfaceForce(fx,fy,fz,du,dv,dw)
+subroutine surfaceForce(fx,fy,fz,du,dv,dw,rho)
 !  use module_solid
   use module_grid
   use module_vof
@@ -850,7 +852,7 @@ subroutine surfaceForce(fx,fy,fz,du,dv,dw)
   implicit none
   real(8) :: kappa,afit(6),deltax
   integer :: nfound,nposit
-  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: du, dv, dw, fx,fy,fz
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: du, dv, dw, fx,fy,fz, rho
   integer :: i,j,k,n,ii,itimestep
   deltax=dx(nx/2)
   call get_all_curvatures(tmp)
@@ -868,7 +870,7 @@ subroutine surfaceForce(fx,fy,fz,du,dv,dw)
            n=n+1
         endif
         kappa=kappa/(deltax*n)
-        du(i,j,k) = du(i,j,k) - kappa*sigma*(cvof(i+1,j,k)-cvof(i,j,k))
+        du(i,j,k) = du(i,j,k) - kappa*sigma*(2.0/dxh(i))*(cvof(i+1,j,k)-cvof(i,j,k))/(rho(i+1,j,k)+rho(i,j,k))
      endif
   enddo; enddo; enddo
   
@@ -885,12 +887,12 @@ subroutine surfaceForce(fx,fy,fz,du,dv,dw)
            n=n+1
         endif
         kappa=kappa/(deltax*n)
-        dv(i,j,k)=dv(i,j,k) - kappa*sigma*(cvof(i,j+1,k)-cvof(i,j,k))
+        dv(i,j,k)=dv(i,j,k) - kappa*sigma*(2.0/dyh(j))*(cvof(i,j+1,k)-cvof(i,j,k))/(rho(i,j+1,k)+rho(i,j,k))
      endif
   enddo; enddo; enddo
 
   do k=ks,kew;  do j=js,je; do i=is,ie
-     if(abs(cvof(i,j,k+1)-cvof(i,j,k))>EPSC/1d1) then  ! there is a non-zero grad H (H Heaviside function) 
+     if(abs(cvof(i,j,k+1) - cvof(i,j,k))>EPSC/1d1) then  ! there is a non-zero grad H (H Heaviside function) 
         n=0
         kappa=0d0
         if(tmp(i,j,k+1).lt.1e6) then
@@ -902,7 +904,7 @@ subroutine surfaceForce(fx,fy,fz,du,dv,dw)
            n=n+1
         endif
         kappa=kappa/(deltax*n)
-        dw(i,j,k)=dw(i,j,k)  - kappa*sigma*(cvof(i,j,k+1)-cvof(i,j,k))
+        dw(i,j,k)=dw(i,j,k) - kappa*sigma*(2.0/dzh(k))*(cvof(i,j,k+1)-cvof(i,j,k))/(rho(i,j,k+1)+rho(i,j,k))
      endif
   enddo; enddo; enddo
 
