@@ -29,7 +29,7 @@ restartAverages = F
 nBackup  = 200000      ! number of time steps between  backups are kept.
 
 NSTEP   = 100000       ! maximum number of time steps
-EndTime = 1d3   ! When to stop simulation
+EndTime = 1d2   ! When to stop simulation
 
 MaxDt   = 0.1d0    ! maximum size of time step
 dtFlag  = 1        ! 1: fixed dt;  2: fixed CFL
@@ -49,13 +49,13 @@ U_init   = 0.d0
 !=================================================================================================
 ! Output parameters
 
-termout  = 100
+termout  = 200
 ICOut    = T        ! output initial condition
-NOUT     = 50        ! write the solution to file every nout time steps
+NOUT     = 200        ! write the solution to file every nout time steps
 output_format = 2   ! 1:tecplot 2:vtk
 out_path = 'out'    ! name of the output directory
 
-nstats   = 20      ! number of time steps between flow statistics calculations
+nstats   = 200      ! number of time steps between flow statistics output
 
 !=================================================================================================
 ! Grid parameters

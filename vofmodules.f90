@@ -626,7 +626,8 @@ contains
     include 'mpif.h'
     real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: cv  ! cvof
     integer, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: fl  ! vof_flag
-    integer :: fb(3),d,l,m,n,c(3),try(3),sign
+    integer :: fb(3),d,l,m,n,c(3),try(2:3),sign
+    real(8) :: xi,eta
     
     do d=1,3
        if(vofbdry_cond(d)=='wet') then
@@ -634,16 +635,18 @@ contains
        else if(vofbdry_cond(d)=='dry') then
           fb(d)=0
        else if(vofbdry_cond(d)=='periodic') then
-          fb(d) = 3 ! ghostxxx will take care of this, skip this case
-       else if(vofbdry_cond(d)=='inflow_outflow') then
-          fb(d) = 4
+          fb(d) = 3
+       else if(vofbdry_cond(d)=='jet') then
+          fb(d) = 2
        else
           call pariserror("this vofbc not implemented")
        endif
     enddo
+! 
     do d=1,3
+! sort directions 
        m=1
-       n=2   ! try(n=1) = d
+       n=2  
        do while (m.le.3)
           if(m.ne.d) then
              try(n) = m
@@ -651,24 +654,56 @@ contains
           endif
           m=m+1
        enddo
-       if(fb(d)<2) then
-          do sign=-1,1,2
-             if(coords(d)==proclimit(d,sign)) then
-                do l=coordstart(try(2))-Ng,coordend(try(2))+Ng
-                   do m=coordstart(try(3))-Ng,coordend(try(3))+Ng
-                      c(try(2)) = l; c(try(3)) = m
-                      c(d)=coordlimit(d,sign) + sign
+       do sign=-1,1,2
+          if(coords(d)==proclimit(d,sign)) then
+             do l=coordstart(try(2))-Ng,coordend(try(2))+Ng
+                do m=coordstart(try(3))-Ng,coordend(try(3))+Ng
+                   c(try(2)) = l; c(try(3)) = m
+                   c(d)=coordlimit(d,sign) + sign
+                   if(fb(d)<2) then
                       cv(c(1),c(2),c(3))=dble(fb(d))
                       fl(c(1),c(2),c(3))=fb(d)
                       c(d) = c(d) + sign
                       cv(c(1),c(2),c(3))=dble(fb(d))
                       fl(c(1),c(2),c(3))=fb(d)
-                   enddo
+                   elseif(fb(d)==2) then
+                      xi = xcoord(try(2),l) 
+                      eta = xcoord(try(3),m)
+                      cv(c(1),c(2),c(3))=jetfunc_vof(xi,eta)
+                      fl(c(1),c(2),c(3))=jetfunc_flag(xi,eta)
+                   endif
                 enddo
-             endif
-          enddo
-       endif
+             enddo
+          endif
+       enddo
     enddo
+  contains
+    function jetfunc_vof(xi,eta)
+      implicit none
+      real(8) :: jetfunc_vof
+      real(8), intent(in) :: xi,eta
+      jetfunc_vof=1d0
+    end function jetfunc_vof
+    !
+    function jetfunc_flag(xi,eta)
+      implicit none
+      integer :: jetfunc_flag
+      real(8), intent(in) :: xi,eta
+      jetfunc_flag=1d0
+    end function jetfunc_flag
+    !
+    function xcoord(d,i)
+      implicit none
+      real(8) :: xcoord
+      integer, intent(in) :: d,i
+      if(d==1) then
+         xcoord = x(i)
+      else if(d==2) then
+         xcoord = y(i)
+      else
+         xcoord = z(i)
+      endif
+    end function xcoord
   end subroutine SetVOFBC
 !=================================================================================================
   subroutine test_cell_size()

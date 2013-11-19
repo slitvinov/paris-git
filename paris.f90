@@ -372,10 +372,9 @@ Program paris
            rho = 0.5*(rho+rhoo)
            mu  = 0.5*(mu +muold)
         endif
-        call my_timer(2,itimestep,ii)
-
 !--------------------------------------------OUTPUT-----------------------------------------------
         call calcStats
+        call my_timer(2,itimestep,ii)
         if(mod(itimestep,nbackup)==0)call backup_write
         if(mod(itimestep,nout)==0) then 
            call write_vec_gnuplot(u,v,itimestep)
@@ -385,7 +384,6 @@ Program paris
               end_time =  MPI_WTIME()
               write(out,'("Step:",I9," Iterations:",I9," cpu(s):",f10.2)')itimestep,it,end_time-start_time
            endif
-           call my_timer(11,itimestep,ii)
         endif
         if(nstats==0) STOP " *** Main: nstats = 0"
         if(mod(itimestep,nstats)==0.and.rank==0)then
