@@ -138,7 +138,7 @@ Program paris
      ! if(rank==0) start_time = MPI_WTIME()
      if(ICOut .and. rank<nPdomain) then
         call output(0,is,ie+1,js,je+1,ks,ke+1)
-!        call output_VOF(0,imin,imax,jmin,jmax,kmin,kmax)
+        call output_VOF(0,imin,imax,jmin,jmax,kmin,kmax)
         call setvelocityBC(u,v,w,umask,vmask,wmask)
         call write_vec_gnuplot(u,v,itimestep)
         call calcstats
@@ -183,6 +183,7 @@ Program paris
            wold = w
            rhoo = rho
            muold  = mu
+           if ( DoVOF .and. DoLPP ) call StoreOldPartSol()
         endif
  !------------------------------------ADVECTION & DIFFUSION----------------------------------------
         do ii=1, itime_scheme
@@ -225,7 +226,11 @@ Program paris
            call my_timer(13,itimestep,ii)
 
 !------------------------------------VOF STUFF ---------------------------------------------------
-           if(DoVOF) then 
+           if(DoVOF) then
+              if (DoLPP) then 
+                 call lppsweeps(itimestep)   ! XXX Note: need to update particles somewhere
+                 call my_timer(12,itimestep,ii)
+              end if ! DoLPP
               call vofsweeps(itimestep)
               call my_timer(4,itimestep,ii)
               call get_all_heights()
@@ -371,6 +376,7 @@ Program paris
            w = 0.5*(w+wold)
            rho = 0.5*(rho+rhoo)
            mu  = 0.5*(mu +muold)
+           if ( DoVOF .and. DoLPP ) call AveragePartSol()
         endif
 !--------------------------------------------OUTPUT-----------------------------------------------
         call calcStats

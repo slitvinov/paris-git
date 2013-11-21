@@ -53,6 +53,7 @@ module module_VOF
   logical :: test_LP = .false.
   logical :: test_tag = .false.
   logical :: test_D2P = .false.
+  logical :: test_bubbles = .false.
   logical :: linfunc_initialized = .false.
   real(8) :: b1,b2,b3,b4
   integer :: nfilter=0
@@ -188,11 +189,14 @@ contains
        test_tag = .true.
     else if(test_type=='D2P_test') then
        test_D2P = .true.
+    else if(test_type=='bubbles_test') then
+       test_bubbles = .true.
     else
+       write(*,*) test_type, rank
        stop 'unknown initialization'
     endif
     test_HF = test_heights .or. test_curvature .or. test_curvature_2D
-    test_LP = test_tag .or. test_D2P
+    test_LP = test_tag .or. test_D2P 
   end subroutine initialize_VOF
 !=================================================================================================
 !   a hack to get the flags quickly (temporary)
