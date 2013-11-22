@@ -116,6 +116,7 @@ Program paris
   call check_stability
 
   if(DoVOF.and.rank<nPdomain) call initialize_VOF
+  if(DoVOF.and.DoLPP) call initialize_LPP
 
   if(rank<nPdomain) call initialize_solids
 

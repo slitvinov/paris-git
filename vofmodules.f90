@@ -57,6 +57,8 @@ module module_VOF
   logical :: linfunc_initialized = .false.
   real(8) :: b1,b2,b3,b4
   integer :: nfilter=0
+
+  logical :: DoLPP = .false.
 contains
 !=================================================================================================
 !=================================================================================================
@@ -138,7 +140,7 @@ contains
     integer ierr,in
     logical file_is_there
     namelist /vofparameters/ vofbdry_cond,test_type,VOF_advect,refinement, &
-         cylinder_dir, normal_up
+       cylinder_dir, normal_up, DoLPP
     in=31
 
     call MPI_COMM_RANK(MPI_COMM_WORLD, rank, ierr)
