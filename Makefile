@@ -15,7 +15,7 @@ FC = mpif90
 #FFLAGS = -g -Wall -ffpe-trap=invalid,zero,overflow # -g -gstabs # -O3 #
 #FOPTS =  -g -Wall -ffpe-trap=invalid,zero,overflow # -g -gstabs # -O3 #
 
-FFLAGS = -O3 # -g -fimplicit-none -fbounds-check
+FFLAGS = -g -fimplicit-none -fbounds-check
 
 CFLAGS = -O # -g -gstabs
 BINDIR = $(HOME)/bin

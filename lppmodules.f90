@@ -49,7 +49,6 @@
    integer,parameter :: max_num_drop = 10000
    integer,parameter :: maxnum_cell_drop = 2000
    integer,parameter :: maxnum_diff_tag  = 7   ! ignore cases droplet spread over more than 1 block
-   integer,parameter :: ntimesteptag = 1
    integer :: total_num_tag,totalnum_drop,totalnum_drop_indep,num_new_drop
    integer, dimension(:), allocatable :: num_drop
    integer, dimension(:), allocatable :: num_drop_merge
@@ -62,8 +61,8 @@
    integer, dimension(:), allocatable :: new_drop_id
 
    type element 
-      integer :: id 
       real(8) :: xc,yc,zc,uc,vc,wc,vol
+      integer :: id 
    end type element
    type (element), dimension(:,:), allocatable :: element_stat
 
@@ -109,8 +108,11 @@
    real(8) :: vol_cut, y_cut   ! Note: convert to input parameter later
    real(8), parameter :: PI = 3.14159265359d0
 
-   logical :: DoDropStatistics = .false.
-   integer :: dragmodel = 1
+   logical :: DoDropStatistics 
+   logical :: DoConvertVOF2LPP 
+   logical :: DoConvertLPP2VOF 
+   integer :: dragmodel 
+   integer :: ntimesteptag 
 
 contains
 !=================================================================================================
@@ -136,16 +138,27 @@ contains
       num_drop = 0
       num_drop_merge = 0
       num_element = 0
+   
+      LPP_initialized = .true.
    end subroutine initialize_LPP
 
    subroutine ReadLPPParameters
 
+      use module_flow
+      use module_BC
+      implicit none
       include 'mpif.h'
+
       integer ierr,in
       logical file_is_there
-      namelist /lppparameters/ DoDropStatistics, dragmodel 
+      namelist /lppparameters/ DoDropStatistics, dragmodel, nTimeStepTag, &
+         DoConvertVOF2LPP,DoConvertLPP2VOF
       in=32
 
+      ! Set default values 
+      DoDropStatistics = .false. 
+      dragmodel    = 1
+      nTimeStepTag = 1 
       call MPI_COMM_RANK(MPI_COMM_WORLD, rank, ierr)
       inquire(file='inputlpp',exist=file_is_there)
       open(unit=in, file='inputlpp', status='old', action='read', iostat=ierr)
@@ -175,9 +188,9 @@ contains
          end if ! nPdomain
 
          if ( DoDropStatistics ) call drop_statistics(tswap) 
-
-         call convertDrop2Part()
-!         call convertPart2Drop()   ! TBA
+         
+         if ( DoConvertVOF2LPP ) call convertDrop2Part()
+!         if ( DoConvertLPP2VOF ) call convertPart2Drop()   ! TBA
       end if ! tswap
       call ComputePartForce(tswap)
       call UpdatePartSol(tswap)
@@ -525,11 +538,7 @@ contains
       integer :: MPI_element_type, oldtypes(0:1), blockcounts(0:1), & 
                  offsets(0:1), extent,r8extent 
       integer :: maxnum_tag 
-      integer :: irank, idrop, ielement
-
-! DEBUG
-      call pariserror("drop-statisitics called!")
-! END DEBUG
+      integer :: irank, idrop, ielement, ielem_plot
 
       maxnum_tag = maxval(num_tag)
       allocate( element_stat(maxnum_tag,0:nPdomain-1) )
@@ -594,6 +603,11 @@ contains
       end if ! num_drop(rank)
  
       ! Send all droplet pieces to rank 0
+!      call MPI_GATHER(num_element(rank), 1, MPI_INTEGER, &
+!                      num_element(rank), 1, MPI_INTEGER, 0, MPI_Comm_World, ierr)
+      call MPI_ALLGATHER(num_element(rank), 1, MPI_INTEGER, &
+                         num_element(rank), 1, MPI_INTEGER, MPI_Comm_World, ierr)
+
       if ( rank > 0 ) then
          if ( num_element(rank) > 0 ) then 
             call MPI_ISEND(element_stat(1:num_element(rank),rank),num_element(rank), & 
@@ -606,27 +620,34 @@ contains
                call MPI_IRECV(element_stat(1:num_element(irank),irank),num_element(irank), & 
                               MPI_element_type, irank, 14, MPI_COMM_WORLD, req(2), ierr)
                call MPI_WAIT(req(2),sta(:,2),ierr)
-            end if ! num_drop_merge(irank)
+            end if ! num_element(irank)
          end do ! irank
       end if ! rank
 
       ! Statisitcs or other operation at rank 0 
-      if ( rank == 0 ) then 
-         do irank = 1,nPdomain-1
-            do ielement = 1, num_element(irank) 
-               write(200+ielement,*) tswap,  element_stat(ielement,irank)%xc, & 
-                                             element_stat(ielement,irank)%yc, &
-                                             element_stat(ielement,irank)%yc, &
-                                             element_stat(ielement,irank)%uc, &
-                                             element_stat(ielement,irank)%vc, &
-                                             element_stat(ielement,irank)%wc, &
-                                             element_stat(ielement,irank)%vol
-            end do ! ielement
+      if ( rank == 0 ) then
+         ielem_plot = 0 
+         do irank = 0,nPdomain-1
+            if ( num_element(irank) > 0 ) then 
+               do ielement = 1, num_element(irank) 
+                  ielem_plot = ielem_plot + 1 
+                  OPEN(UNIT=200+ielem_plot,FILE=TRIM(out_path)//'/element-'//TRIM(int2text(ielem_plot,padding))//'.dat')
+                  write(200+ielem_plot,*) tswap,element_stat(ielement,irank)%xc, & 
+                                                element_stat(ielement,irank)%yc, &
+                                                element_stat(ielement,irank)%yc, &
+                                                element_stat(ielement,irank)%uc, &
+                                                element_stat(ielement,irank)%vc, &
+                                                element_stat(ielement,irank)%wc, &
+                                                element_stat(ielement,irank)%vol
+!                  CLOSE(UNIT=200+ielem_plot)
+               end do ! ielement
+            end if ! num_element_irank) 
          end do ! irank
       end if ! rank
 
       ! finalize
       call MPI_TYPE_FREE(MPI_element_type, ierr)
+      deallocate( element_stat )
 
    end subroutine drop_statistics
 
@@ -1040,8 +1061,8 @@ contains
       if ( test_D2P ) then 
          vol_cut = 4.0d0*0.6d0**3.d0*PI/3.d0
       else if ( test_bubbles ) then 
-         vol_cut = 4.0d0*0.05d-1**3.d0*PI/3.d0
-         y_cut   = 0.3d-1
+         vol_cut = 4.0d0*0.09d-2**3.d0*PI/3.d0
+         y_cut   = 0.3d-2
       end if ! test_type
 
       do idrop = 1,num_drop(rank)
@@ -1113,8 +1134,12 @@ contains
       integer, parameter :: drag_model_SN = 2     ! Schiller & Nauman
       integer, parameter :: drag_model_CG = 3     ! Clift & Gauvin
 
+      real(8), parameter :: Cm = 0.5d0
+
       real(8) :: relvel(4), partforce(3)
-      real(8) :: dp, Rep, muf, phi, rhof, rhop, taup, up,vp,wp, uf,vf,wf
+      real(8) :: dp, Rep, muf, phi, rhof, rhop, taup
+      real(8) :: up,vp,wp, uf,vf,wf, DufDt,DvfDt,DwfDt
+      real(8) :: fhx,fhy,fhz
 
       integer :: ipart
       if ( num_part(rank) > 0 ) then
@@ -1126,7 +1151,7 @@ contains
             call GetFluidProp(parts(ipart,rank)%element%xc, &
                               parts(ipart,rank)%element%yc, &
                               parts(ipart,rank)%element%zc, & 
-                              uf,vf,wf)
+                              uf,vf,wf,DufDt,DvfDt,DwfDt)
 
             relvel(1) = uf - up
             relvel(2) = vf - vp
@@ -1153,10 +1178,18 @@ contains
                   call pariserror("wrong quasi-steady drag model!")
             end select ! dragmodel
 
-            partforce(1) = relvel(1)/taup*phi + (1.d0-rhof/rhop)*Gx   
-            partforce(2) = relvel(2)/taup*phi + (1.d0-rhof/rhop)*Gy  
-            partforce(3) = relvel(3)/taup*phi + (1.d0-rhof/rhop)*Gz  
-            ! XXX: include other forces later
+            ! Note: set history to be zero for now
+            fhx=0.d0; fhy=0.d0; fhz=0.d0
+
+            partforce(1) =(relvel(1)/taup*phi + (1.d0-rhof/rhop)*Gx  &   
+                         + (1.d0+Cm)*rhof/rhop*DufDt                 &  
+                         + fhx )/(1.d0+Cm*rhof/rhop)
+            partforce(2) =(relvel(2)/taup*phi + (1.d0-rhof/rhop)*Gy  &
+                         + (1.d0+Cm)*rhof/rhop*DvfDt                 &
+                         + fhy )/(1.d0+Cm*rhof/rhop)
+            partforce(3) =(relvel(3)/taup*phi + (1.d0-rhof/rhop)*Gz  &
+                         + (1.d0+Cm)*rhof/rhop*DwfDt                 &
+                         + fhz )/(1.d0+Cm*rhof/rhop)
 
             parts(ipart,rank)%fx = partforce(1)
             parts(ipart,rank)%fy = partforce(2)
@@ -1165,14 +1198,17 @@ contains
       end if ! num_part(rank) 
    end subroutine ComputePartForce
 
-   subroutine GetFluidProp(xp,yp,zp,uf,vf,wf) 
+   subroutine GetFluidProp(xp,yp,zp,uf,vf,wf,DufDt,DvfDt,DwfDt) 
       real(8), intent(in) :: xp,yp,zp 
-      real(8), intent(out) :: uf,vf,wf
+      real(8), intent(out) :: uf,vf,wf,DufDt,DvfDt,DwfDt
 
 ! TEMPORARY
       uf = 0.d0 
       vf = 0.d0
       wf = 0.d0
+      DufDt = 0.d0 
+      DvfDt = 0.d0
+      DwfDt = 0.d0
 ! END TEMPORARY
    end subroutine GetFluidProp
 
@@ -1194,12 +1230,6 @@ contains
                                                    parts(1:num_part(rank),rank)%fy*dt 
          parts(1:num_part(rank),rank)%element%wc = parts(1:num_part(rank),rank)%element%wc +&
                                                    parts(1:num_part(rank),rank)%fz*dt
-! DEBUG
-         write(101,*) tswap, & 
-         parts(1,rank)%element%xc,parts(1,rank)%element%yc,parts(1,rank)%element%zc, &
-         parts(1,rank)%element%uc,parts(1,rank)%element%vc,parts(1,rank)%element%wc, & 
-         parts(1,rank)%fx,parts(1,rank)%fy,parts(1,rank)%fz
-! END DEBUG
       end if ! num_part(rank)
    end subroutine UPdatePartSol
 
