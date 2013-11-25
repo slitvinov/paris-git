@@ -44,15 +44,18 @@ contains
   subroutine open_bitmap()
     use module_tmpvar
     implicit none
+    include 'mpif.h'
     integer bit,i,j,k
-    open(unit=89,file='bitmap.txt')
+    open(unit=89,file='bitmap-'//trim(int2text(rank,padding))//'.txt')
     do i=is,ie; do j=js,je; do k=ks,ke; 
        read(89,'(I1)') bit
        if(bit<0.or.bit>1) then
           call pariserror("wrong bit")
        endif
+       bit = 1 - bit
        tmp(i,j,k) = dble(bit)
     enddo;enddo;enddo
+    close(89)
   end subroutine open_bitmap
 !=================================================================================================
   function read_bitmap(i,j,k)
@@ -128,7 +131,7 @@ contains
                 s1 = MAX(s1, sphere_func(x2,y2,z2,x0,y0,z0,radius))
              enddo
           else if (solid_type == 'BitMap') then
-             s1 = MAX(s1,read_bitmap(i,j,k))
+             s1 = read_bitmap(i,j,k)
           else
              stop 'invalid type'
           endif
@@ -155,34 +158,33 @@ contains
        call printpor(solids)
        call calcpor(solids,0)
    endif
-
-  END SUBROUTINE initialize_solids
-
+  end subroutine initialize_solids
+!============================================================================================================
   subroutine printpor(solids)
     implicit none
     include 'mpif.h'
     real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: solids
     integer i,j,k
-    if(rank==0) then
-       OPEN(UNIT=105,FILE=trim(out_path)//'/rockcube.txt',status='new',action='write')
-       do i=is,ie
-          do j=js,je; 
-             do k=ks,ke; 
-                if(solids(i,j,k) <= 0.5d0) then   ! free space
-                   write(105,'(" 0")',advance='no') 
-                else
-                   write(105,'(" 1")',advance='no') 
-                endif
-             enddo
-             write(105,'(" ")')
+    open(unit=105,file=trim(out_path)//'/bitmap-'//trim(int2text(rank,padding))//'.txt',&
+         status='new',action='write')
+    do i=is,ie
+       do j=js,je; 
+          do k=ks,ke; 
+             if(solids(i,j,k) <= 0.5d0) then   ! free space
+                write(105,'("1")') ! 1 is free (fluid) space
+             else
+                write(105,'("0")') 
+             endif
           enddo
-          write(105,'(" ")')
        enddo
-       close(105)
-    endif
+    enddo
+    close(105)
   end subroutine printpor
-
-  ! sphere definition function 
+  !============================================================================================================
+!
+! sphere definition function 
+!
+!============================================================================================================
   FUNCTION sphere_func(x1,y1,z1,x0,y0,z0,radius)
     !***
     implicit none

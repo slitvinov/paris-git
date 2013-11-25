@@ -311,21 +311,21 @@ module module_IO
 !=================================================================================================
 subroutine write_vec_gnuplot(u,v,iout)
   use module_grid
+  use module_tmpvar
   implicit none
+  include 'mpif.h'
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: u, v
   integer, intent(in) :: iout
-  integer :: i,j,k
-  real(8) :: norm=0.d0, coeff
+  integer :: i,j,k,ierr
+  real(8) :: norm=0.d0, coeff, vmax
   intrinsic dsqrt
   OPEN(UNIT=89,FILE=TRIM(out_path)//'/UV-'//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout,padding))//'.txt')
   norm=0.d0
   k=nz/2+ng
-  do i=imin,imax; do j=jmin,jmax
-     norm = norm + u(i,j,k)**2 + v(i,j,k)**2
-  enddo; enddo
-  norm = dsqrt(norm/((jmax-jmin+1)*(imax-imin+1)))
+  vmax = maxval(sqrt(u(is:ie,js:je,ks:ke)**2 + v(is:ie,js:je,ks:ke)**2))
+  call MPI_ALLREDUCE(vmax, norm, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_Cart, ierr)  
   coeff = 0.8/norm
-  ! print *," norm, rank ",norm,rank
+  print *," norm, rank ",norm,rank
   do i=is,ie; do j=js,je
      write(89,310) x(i),y(j),coeff*dx(i)*u(i,j,k),coeff*dx(i)*v(i,j,k)
      ! write(89,311) i,j,k, u(i,j,k),v(i,j,k)

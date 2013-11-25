@@ -957,6 +957,9 @@ subroutine initialize
     call MPI_Cart_Coords(MPI_Comm_Cart,rank,ndim,coords,ierr)
     if (ierr /= 0) STOP '*** Grid: unsuccessful in getting topology coordinates'
 
+!     print *, "rank",rank,"coords",coords
+!     stop
+
     is=coords(1)*Mx+1+Ng; ie=coords(1)*Mx+Mx+Ng; imin=is-Ng; imax=ie+Ng
     js=coords(2)*My+1+Ng; je=coords(2)*My+My+Ng; jmin=js-Ng; jmax=je+Ng
     ks=coords(3)*Mz+1+Ng; ke=coords(3)*Mz+Mz+Ng; kmin=ks-Ng; kmax=ke+Ng

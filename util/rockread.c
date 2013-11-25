@@ -51,8 +51,9 @@ int main (int argc, char * argv[])
   if(argc < 2) 
     {
       printf("%s: error: not enough command line arguments.\n\n"
-	     "Usage: %s size\n"
+	     "Usage: %s size [nPx] \n"
              "size is the integer length of a cube edge\n"
+	     "nPx is the number of processes per direction (optional)\n"
              "various rock statistics are computed\n"
 	     "\n",argv[0],argv[0]);
       exit(1);
@@ -62,14 +63,6 @@ int main (int argc, char * argv[])
   // exit(1);
   point_t currentp;
   int x,y,z;
-
-  if(argc==3)
-    {
-      int nx=cubesize;
-      int npx;
-      sscanf(argv[2],"%d",&npx);
-      split_print(nx,npx);
-    }
 
   size=cubesize+2;
   max=cubesize+1;
@@ -82,7 +75,16 @@ int main (int argc, char * argv[])
 
   fd=stdin;
   double totalporosity=read_data();
-  printf("\n\nFile read. porosity=%f %% \n\n",totalporosity*100.);
+
+  if(argc==3)
+    {
+      int nx=cubesize;
+      int npx;
+      sscanf(argv[2],"%d",&npx);
+      split_print(nx,npx);
+    }
+
+  printf("\n\nFile read and written.\nPorosity=%f %% \n\n",totalporosity*100.);
   printrock(0);
   printf("\n------\n");
   x=max-1;
@@ -410,23 +412,30 @@ void split_print(int nx, int npx)
   ny=nz=nx;
   npy=npz=npx;
   rank=0;
-  char filename[14];
-  char crank[6];
-  // xyz style
-
+  char filename[17];
+  // xyz style of processor ordering
   mx=nx/npx;my=ny/npy;mz=nz/npz;
-  for(coords3=1;coords3<=npz;coords3++)
-    for(coords2=1;coords2<=npy;coords2++)
-      for(coords1=1;coords1<=npx;coords1++)
+  for(coords1=0;coords1<npx;coords1++)
+    for(coords2=0;coords2<npy;coords2++)
+      for(coords3=0;coords3<npz;coords3++)
 	{
 	  is=coords1*mx+1; ie=coords1*mx+mx;
 	  js=coords2*my+1; je=coords2*my+my;
 	  ks=coords3*mz+1; ke=coords3*mz+mz;
-	  snprintf(crank,6,"%05d",rank);
-	  strcpy(filename,"bitmap-");
-	  strcat(filename,crank);
-	  printf("Writing to %s\n",filename);
+	  //if(npx*npy*npz>1) 
+	  snprintf(filename,17,"bitmap-%05d.txt",rank);
+	    //else
+	    //strcpy(filename,"bitmap.txt");
+	  //printf("Writing to %s\n",filename);
 	  FILE * bitmapfd = fopen(filename,"w");
+	  int value;
+	  for(i=is;i<=ie;i++)
+	    for(j=js;j<=je;j++)
+	      for(k=ks;k<=ke;k++)
+		{
+		  value = *(bigrock + i*size*size + j*size + k); 
+		  fprintf(bitmapfd,"%d\n",value);
+		}
 	  rank++;
 	  fclose(bitmapfd);
 	}

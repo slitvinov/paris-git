@@ -28,7 +28,7 @@ restartAverages = F
 nBackup = 90000   ! number of time steps between  backups are kept.
 
 NSTEP   = 80000       ! maximum number of time steps
-EndTime = 0.4       ! When to stop simulation
+EndTime = 0.05       ! When to stop simulation
 
 MaxDt   = 0.1  ! maximum size of time step
 dtFlag  = 1        ! 1: fixed dt;  2: fixed CFL
@@ -88,8 +88,11 @@ ZLENGTH  = ZLTEMP
 !=================================================================================================
 ! Flow parameters
 
-U_init = 1d-12
-GX      = 1.0
+WallVel(1,1)  = 0.011 ! can set inflow velocities here
+WallShear(4,1) = 0.0
+
+U_init = 1d0
+GX      = 0.0
 GY      = 0.0
 GZ      = 0.0
                    ! Components of the gravity in x,y,z direction
@@ -99,7 +102,7 @@ dPdY      = 0.0
 dPdZ      = 0.0
                    ! Px, Py, Pz: pressure gradients in case of pressure driven channel flow
                    ! Px = (P(xLength)-P(0))/xLength
-BDRY_COND = 1  1    1   1   1   1
+BDRY_COND = 3  1    1   4   1   1
                    !Type of boundary condition in x,y,z direction: 0:wall  1:periodic  2:shear
                    !x- y- z- x+ y+ z+
 
