@@ -1,9 +1,9 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 
 #define COLORED 2
 #define IS_COLOREDP(x) ( *(x) == COLORED ) 
-
 #define max_size_for_print 6
 
 typedef enum
@@ -42,34 +42,34 @@ void   error_exit              (char * message);
 double read_data               ();
 int    max_X                   (double * fraction);
 void   ghost_face              (Directions face);
+void   split_print             (int nx, int npx);
 
 int main (int argc, char * argv[])
 {
-  if(argc < 1) 
+  //  if(1) printf("1\n"); if(0) printf("0\n"); exit(0);
+	  
+  if(argc < 2) 
     {
       printf("%s: error: not enough command line arguments.\n\n"
-             "Usage: %s size\n"
+	     "Usage: %s size\n"
              "size is the integer length of a cube edge\n"
              "various rock statistics are computed\n"
 	     "\n",argv[0],argv[0]);
       exit(1);
     }
-  else if(argv[1] == NULL) 
-    {
-      printf("%s: error: command line argument is NULL\n"
-             "Usage: %s size < FILE\n"
-             "size is the integer length of a cube edge\n"
-	     "FILE contains solid location data\n"
-             "various rock statistics are computed\n"
-	     "\n",argv[0],argv[0]);
-      exit(1);
-    }
-
   sscanf(argv[1],"%d",&cubesize);
   //  printf(" argc = %d, argv[1] = %s\n",argc,argv[1]);
   // exit(1);
   point_t currentp;
   int x,y,z;
+
+  if(argc==3)
+    {
+      int nx=cubesize;
+      int npx;
+      sscanf(argv[2],"%d",&npx);
+      split_print(nx,npx);
+    }
 
   size=cubesize+2;
   max=cubesize+1;
@@ -85,6 +85,18 @@ int main (int argc, char * argv[])
   printf("\n\nFile read. porosity=%f %% \n\n",totalporosity*100.);
   printrock(0);
   printf("\n------\n");
+  x=max-1;
+    printf("\n");
+  for(y=1;y<max;y++)
+    {
+    for(z=1;z<max;z++)
+      {
+	printf("%d",*makept(&currentp,x,y,z));
+      }
+    printf("\n");
+    }
+    printf("\n");
+
 
   // fill the ghost layers
 
@@ -170,7 +182,8 @@ int * makept(point_t * currentp,int x,int y,int z)
   currentp->xcoord[2] = z;
   for(i=0;i<3;i++)
     if(currentp->xcoord[i] < 0 || currentp->xcoord[i] > max) error_exit("out of bounds");
-  return currentp->paddress = bigrock + x*size*size + y*size + z;
+  currentp->paddress = bigrock + x*size*size + y*size + z; 
+  return currentp->paddress; 
 }
 
 int pt_is_on_any_face(point_t * currentp)
@@ -293,14 +306,19 @@ double read_data()
 		printf("FAILED TO READ AT x y z %d %d %d\n",x,y,z);
 		exit(1);
 	      }
-	    if(*p == 2) *p=1;// asume label 2 is a rock also (perhaps it is water on grains ?)
+	    // if(*p == 2) *p=1;// asume label 2 is a rock also (perhaps it is water on grains ?)
+	    if(*p == 2) 
+	      {
+		fprintf(stderr,"\n wrong value: *p == 2\n");
+		exit(0);
+	      }
 	    if(*p>1 || *p<0) 
 	      {
 		printf("wrong value x y z %d %d %d *p=%d",x,y,z,*p);
 		exit(1);
 	      }
-	    *p = 1 - *p;  // before 0 is fluid 1 is solid 
-	    // now 1 is fluid,  0 is solid
+	    // comment out the following because of reversal made by Bertrand
+	    //	    *p = 1 - *p;  
 	    porosity += *p;
 	    n_voids += *p;
 	  }
@@ -380,3 +398,37 @@ void ghost_face(Directions dir)
 	     *makept(&ghostpt,xg[0],xg[1],xg[2]) = *makept(&bulkpt,xb[0],xb[1],xb[2]);
 	   }
 }       
+void split_print(int nx, int npx)
+{
+  int i,j,k,rank;
+  int is,js,ks,ie,je,ke;
+  int coords1,coords2,coords3;
+  int ny,nz;
+  int npy,npz;
+  int mx,my,mz;
+  int Ng=2;
+  ny=nz=nx;
+  npy=npz=npx;
+  rank=0;
+  char filename[14];
+  char crank[6];
+  // xyz style
+
+  mx=nx/npx;my=ny/npy;mz=nz/npz;
+  for(coords3=1;coords3<=npz;coords3++)
+    for(coords2=1;coords2<=npy;coords2++)
+      for(coords1=1;coords1<=npx;coords1++)
+	{
+	  is=coords1*mx+1; ie=coords1*mx+mx;
+	  js=coords2*my+1; je=coords2*my+my;
+	  ks=coords3*mz+1; ke=coords3*mz+mz;
+	  snprintf(crank,6,"%05d",rank);
+	  strcpy(filename,"bitmap-");
+	  strcat(filename,crank);
+	  printf("Writing to %s\n",filename);
+	  FILE * bitmapfd = fopen(filename,"w");
+	  rank++;
+	  fclose(bitmapfd);
+	}
+}
+	

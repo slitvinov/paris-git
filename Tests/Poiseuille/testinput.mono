@@ -14,16 +14,16 @@
 !=================================================================================================
 ! General parameters
 
-TWOPHASE = T         ! TwoPhase: Is the flow two phase?
-DoVOF 	  = T
-DoFront   = T
+TWOPHASE = F         ! TwoPhase: Is the flow two phase?
+DoVOF 	  = F
+DoFront   = F
 GetPropertiesFromFront = T ! T: uses Front-Tracking data to compute mu, rho and Surface Tension. 
 		           ! F: uses VOF data to compute mu and rho. 
 
 Implicit = T     
 hypre    = T       ! T: uses hyprepackage, F: uses SOR solver 
 restart  = F       ! T: start the domain from a previous simulation
-restartFront = F   ! T: start the frontfrom  a previous simulation
+restartFront = F   ! T: start the front from  a previous simulation
 restartAverages = F
 nBackup = 100000   ! number of time steps between  backups are kept.
 
@@ -34,13 +34,13 @@ MaxDt   = 0.1  ! maximum size of time step
 dtFlag  = 1        ! 1: fixed dt;  2: fixed CFL
 dt      = 1.     ! dt in case of dtFlag=1
 CFL     = 0.9
-MAXERROR= 1d-4     ! Residual for Poisson solver
+MAXERROR= 1d-6     ! Residual for Poisson solver
 MAXERRORVOL = 1d-4
                    ! Numerical parameters
 
 ITIME_SCHEME = 1   ! time scheme: 1:first order Euler, 2: second order quasi Crank-Nicolson
                    ! Should use first order Euler for Stokes flow ! ! ! 
-MAXIT    = 20
+MAXIT    = 200
 BETA     = 1.2
                     ! parameters for linear solver
 U_init   = 1.d0
@@ -48,6 +48,7 @@ U_init   = 1.d0
 !=================================================================================================
 ! Output parameters
 
+termout  = 1
 ICOut    = F        ! output initial condition
 NOUT     = 100      ! write the solution to file every nout time steps
 output_format = 2   ! 1:tecplot 2:vtk
@@ -64,15 +65,16 @@ npz      = 1
                    ! number of processors in x,y,z direction
                    ! Total number of processes should be at least npx*npy*npz+1 since one process
                    ! is dedicated to the front. Any extra processes will be idle.
-Nx       = 1
-Ny       = 4
-Nz       = 1
+Nx       = 8
+Ny       = 8
+Nz       = 8
 Ng       = 2
                    ! total grid size in x,y,z direction and number of ghost cells
 
 read_x   = F       ! read the grid file for x-grid; If true xLength and xform are neglected
 read_y   = F
 read_z   = F
+
 x_file   = 'xh.dat'	! input file for xh (Nx+1 points)
 y_file   = 'yh.dat'
 z_file   = 'zh.dat'
@@ -90,12 +92,12 @@ ZLENGTH  = 1.0
 !=================================================================================================
 ! Flow parameters
 
-GX      = 0.0
+GX      = 1.0
 GY      = 0.0
 GZ      = 0.0
                    ! Components of the gravity in x,y,z direction
 
-dPdX      = -1.0
+dPdX      = 0.0
 dPdY      = 0.0
 dPdZ      = 0.0
                    ! Px, Py, Pz: pressure gradients in case of pressure driven channel flow

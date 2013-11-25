@@ -233,7 +233,7 @@ contains
 
     implicit none
     include 'mpif.h'
-    integer :: ierr, req(12),sta(MPI_STATUS_SIZE,12),MPI_Comm
+    integer :: ierr, req(12),sta(MPI_STATUS_SIZE,12)
     integer , parameter :: ngh=2
     integer :: ipar
     integer, parameter :: root_rank = 0
@@ -993,7 +993,7 @@ SUBROUTINE swpr(us,c,vof1,cg,vof3,f,dir)
     use module_hello
     IMPLICIT NONE
     include 'mpif.h'
-    INTEGER :: i,j,k,ierr
+    INTEGER :: i,j,k
     INTEGER :: invx,invy,invz,ii,jj,kk,i0,j0,k0
     INTEGER, INTENT(IN) :: dir
     REAL (8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), INTENT(IN) :: us,cg

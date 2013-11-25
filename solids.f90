@@ -33,13 +33,39 @@ module module_solid
   real(8), dimension(:,:,:), allocatable :: solids
   real(8) :: solid_radius
   character(20) :: solid_type
-  integer il,ih,jl,jh,kl,kh
+  integer :: il,ih,jl,jh,kl,kh
   integer :: solid_opened=0 
   real(8) :: sxyzrad(4,10000)
-  integer NumSpheres
+  integer :: NumSpheres
+  logical :: bitmap_opened=.false.
 !***********************************************************************
 contains
 !***********************************************************************
+  subroutine open_bitmap()
+    use module_tmpvar
+    implicit none
+    integer bit,i,j,k
+    open(unit=89,file='bitmap.txt')
+    do i=is,ie; do j=js,je; do k=ks,ke; 
+       read(89,'(I1)') bit
+       if(bit<0.or.bit>1) then
+          call pariserror("wrong bit")
+       endif
+       tmp(i,j,k) = dble(bit)
+    enddo;enddo;enddo
+  end subroutine open_bitmap
+!=================================================================================================
+  function read_bitmap(i,j,k)
+    use module_tmpvar
+    implicit none
+    integer, intent(in) :: i,j,k
+    real(8) read_bitmap
+    if(.not.bitmap_opened) then 
+       call open_bitmap()
+       bitmap_opened=.true.
+    endif
+    read_bitmap=tmp(i,j,k)
+  end function read_bitmap
 !=================================================================================================
   SUBROUTINE append_solid_visit_file(rootname)
     implicit none
@@ -101,7 +127,9 @@ contains
                 radius = sxyzrad(4,index)/xlength
                 s1 = MAX(s1, sphere_func(x2,y2,z2,x0,y0,z0,radius))
              enddo
-           else
+          else if (solid_type == 'BitMap') then
+             s1 = MAX(s1,read_bitmap(i,j,k))
+          else
              stop 'invalid type'
           endif
           if(s1 > 0.) then

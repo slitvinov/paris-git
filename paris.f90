@@ -113,6 +113,7 @@ Program paris
   endif
 
   call initialize
+  call check_sanity_in_depth()
   call check_stability
 
   if(DoVOF.and.rank<nPdomain) call initialize_VOF
@@ -139,7 +140,7 @@ Program paris
      ! if(rank==0) start_time = MPI_WTIME()
      if(ICOut .and. rank<nPdomain) then
         call output(0,is,ie+1,js,je+1,ks,ke+1)
-        call output_VOF(0,imin,imax,jmin,jmax,kmin,kmax)
+!        if(DoVOF) call output_VOF(0,imin,imax,jmin,jmax,kmin,kmax)
         call setvelocityBC(u,v,w,umask,vmask,wmask)
         call write_vec_gnuplot(u,v,itimestep)
         call calcstats
@@ -188,7 +189,7 @@ Program paris
         endif
  !------------------------------------ADVECTION & DIFFUSION----------------------------------------
         do ii=1, itime_scheme
-           if(TwoPhase.and.(.not.Getpropertiesfromfront)) then
+           if(TwoPhase.and.(.not.GetPropertiesFromFront)) then
              call linfunc(rho,rho1,rho2)
              call linfunc(mu,mu1,mu2)
            endif
@@ -237,7 +238,7 @@ Program paris
               call get_all_heights()
               call my_timer(5,itimestep,ii)
               call linfunc(rho,rho1,rho2)
-              call surfaceForce(fx,fy,fz,du,dv,dw,rho)
+              call surfaceForce(du,dv,dw,rho)
               call my_timer(8,itimestep,ii)
            endif
 
@@ -295,8 +296,8 @@ Program paris
            call my_timer(1,itimestep,ii)
 
 !-----------------------------------------PROJECTION STEP-----------------------------------------
-           call SetPressureBC(umask,vmask,wmask)
-           call SetupPoisson(u,v,w,umask,vmask,wmask,rho,dt,A)
+           call SetPressureBC(umask,vmask,wmask,tmp(is:ie,js:je,ks:ke))
+           call SetupPoisson(u,v,w,umask,vmask,wmask,rho,dt,A,tmp(is:ie,js:je,ks:ke))
            ! (div u)*dt < epsilon => div u < epsilon/dt => maxresidual : maxerror/dt 
            if(HYPRE)then
               call poi_solve(A,p(is:ie,js:je,ks:ke),maxError/dt,maxit,it)
@@ -846,7 +847,7 @@ end subroutine volumeForce
 !=================================================================================================
 ! Calculates the surface force in the momentum equations and adds them to du,dv,dw
 !-------------------------------------------------------------------------------------------------
-subroutine surfaceForce(fx,fy,fz,du,dv,dw,rho)
+subroutine surfaceForce(du,dv,dw,rho)
 !  use module_solid
   use module_grid
   use module_vof
@@ -855,11 +856,10 @@ subroutine surfaceForce(fx,fy,fz,du,dv,dw,rho)
   use module_tmpvar
   use module_timer
   implicit none
-  real(8) :: kappa,afit(6),deltax
-  integer :: nfound,nposit
-  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: du, dv, dw, fx,fy,fz, rho
+  real(8) :: kappa,deltax
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: du, dv, dw, rho
   integer :: i,j,k,n,ii,itimestep
-  deltax=dx(nx/2)
+  deltax=dx(nx)
   call get_all_curvatures(tmp)
   call my_timer(7,itimestep,ii)
   do k=ks,ke;  do j=js,je; do i=is,ieu
@@ -993,7 +993,7 @@ subroutine initialize
     is = Ng+1;  ie = Nx+Ng;  imin = 1;  imax = Nxt
     js = Ng+1;  je = Ny+Ng;  jmin = 1;  jmax = Nyt
     ks = Ng+1;  ke = Nz+Ng;  kmin = 1;  kmax = Nzt
-    ieu = ie;  if(bdry_cond(1)/=1) ieu = ie-1
+    ieu = ie;  if(bdry_cond(1)/=1) ieu = ie-1      ! only if not periodic
     jev = je;  if(bdry_cond(2)/=1) jev = je-1
     kew = ke;  if(bdry_cond(3)/=1) kew = ke-1
   endif !   if(rank<nPdomain)then
@@ -1245,6 +1245,7 @@ subroutine ReadParameters
   if (ierr .ne. 0) stop 'ReadParameters: error opening input file'
   read(UNIT=in,NML=parameters)
   close(in)
+  call check_sanity()
   if(MaxFront>10000) stop 'Error: ReadParameters: increase size of xyzrad array'
 
   if(numBubble>MaxFront) stop 'Error: ReadParameters: increase size of xyzrad array (MaxFront)'
@@ -1297,7 +1298,7 @@ subroutine pariserror(message)
   use module_grid
   implicit none
   include 'mpif.h'
-  integer ierr
+!  integer ierr
   character(*) :: message
   print *, "rank = ",rank
   write(*,*) "ERROR *** ",message, " *** STOP "

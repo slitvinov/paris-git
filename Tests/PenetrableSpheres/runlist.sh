@@ -1,4 +1,4 @@
-#!/bin/bash
+#! /bin/bash
 #set -x
 
 if [ $# -lt 2 ]; then

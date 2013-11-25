@@ -29,7 +29,7 @@ restartAverages = F
 nBackup  = 200000      ! number of time steps between  backups are kept.
 
 NSTEP   = 100000       ! maximum number of time steps
-EndTime = 1d2   ! When to stop simulation
+EndTime = 1d3   ! When to stop simulation
 
 MaxDt   = 0.1d0    ! maximum size of time step
 dtFlag  = 1        ! 1: fixed dt;  2: fixed CFL
@@ -112,7 +112,7 @@ MU1     = 1.7d-5
                    ! rho1, mu1 : density and viscosity of the matrix phase
 
 RHO2    = 1000.
-MU2     = 1d-3
+MU2     = 5d-3
                    ! rho2, mu2 : properties of the drop
 SIGMA    = 0.00036
 NumBubble =  1

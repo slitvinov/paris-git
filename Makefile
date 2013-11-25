@@ -8,7 +8,7 @@ FC = mpif90
 
 # remove funny cflags from my environment
 
-#FFLAGS = -O3 -Wall -ffpe-trap=invalid,zero,overflow,underflow,precision,denormal # -g -gstabs # -O3 #
+# FFLAGS =  -g -Wall -ffpe-trap=invalid,zero,overflow,underflow,precision,denormal # -g -gstabs # -O3 #
 
 # trap invalid to catch signaling NaN s ? 
 
@@ -22,13 +22,13 @@ BINDIR = $(HOME)/bin
 
 # select option for hypre
 # default hypre installation without root privileges:
-# HYPRE_DIR = $(HOME)/hypre-2.8.0b-babel/src
+HYPRE_DIR = $(HOME)/hypre-2.8.0b-babel/src
 # Macport installation in /opt 
 # HYPRE_DIR = /opt/hypre
 # babbage
 # HYPRE_DIR = /share/apps/hypre
 # Local
-HYPRE_DIR = $(HOME)/cfd/libs/hypre-2.9.0b/src
+# HYPRE_DIR = $(HOME)/cfd/libs/hypre-2.9.0b/src
 # HYPRE_DIR = /usr/local/hypre
 HYPRE_LIBS =  -L$(HYPRE_DIR)/lib -lHYPRE 
 

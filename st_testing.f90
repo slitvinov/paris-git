@@ -271,13 +271,11 @@ end subroutine print_method
 !=========================================================================================================
   subroutine plot_curvature()
     implicit none
-    integer :: i,j,k,iem,jem,n,i0,j0,k0
-    real(8) :: centroid(3),x1,y1,xvec,yvec,kappa,a(6),xpoint(0:2),ypoint(0:2),diff(0:2)
+    integer :: i,j,k,iem,jem,n
+    real(8) :: centroid(3),x1,y1,xvec,yvec
     real(8), allocatable :: pc(:,:,:)
-    integer :: nfound,nposit
     real(8) :: centroid_scaled(2), deltax
-    k0 = (Nz+4)/2
-    k = k0
+    k = (Nz+4)/2
     deltax=dx(nx/2)
 
     allocate(pc(imin:imax,jmin:jmax,3))

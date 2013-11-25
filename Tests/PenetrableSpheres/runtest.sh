@@ -10,12 +10,13 @@ if [ $# -lt 7 ]; then
 fi
 
 let ndt=$1
-dt0=$2
+dt0=`echo $2 | sed s/d/e/g | sed s/D/e/g`   # should always be checked ! 
 let nx0=$3
 let idt=0
 imp=$4
 precision=$5
 nrofcenters=$6
+maxerr=`awk -v dt0=$dt0 'BEGIN {print 0.1*dt0}'`
 
 dt=$dt0
 if [ $7 == "-1" ]; then
@@ -30,9 +31,9 @@ if [ $Tend == 0 ] ; then
     npx=1
 else
     npx=2
-    npy=$npx
-    npz=1
 fi
+npy=$npx
+npz=1
 
 
 if ! [ -f centers/centers_$nrofcenters.txt ]; then
@@ -53,14 +54,14 @@ while [ $idt -lt $ndt ] ; do
     rm -fr input out stats
     let nx=$nx0
     sed s/NXTEMP/$nx/g testinput.template | sed s/DTTEMP/$dt/g | sed s/IMPTEMP/$imp/g | sed s/ENDTIMETEMP/$Tend/g > testinput-$nx-$idt.tmp
-    sed s/NPXTEMP/$npx/g testinput-$nx-$idt.tmp |  sed s/NPYTEMP/$npy/g |  sed s/NPZTEMP/$npz/g > testinput-$nx-$idt
+    sed s/NPXTEMP/$npx/g testinput-$nx-$idt.tmp |  sed s/NPYTEMP/$npy/g |  sed s/NPZTEMP/$npz/g | sed s/MAXERRTEMP/$maxerr/g > testinput-$nx-$idt
     ln -s testinput-$nx-$idt input
     if [ `grep DoFront input | awk '{print $3}'` == 'T' ]; then
 	let np=$npx*$npx*$npx+1
     else
 	let np=$npx*$npx*$npx
     fi
-    mpirun -np $np paris > tmpout-$nx-$idt
+    mpirun -np $np -quiet paris > tmpout-$nx-$idt
     awk ' /Step:/ { cpu = $8 } END { print "cpu = " cpu } ' < tmpout-$nx-$idt
     awk -v dt=$dt '{ print dt " " $1 " " $2}' < out/flowrate.txt >> flowrates-IMP-$imp.txt
     dt=`awk -v dt=$dt 'BEGIN {print dt/2}'`

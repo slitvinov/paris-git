@@ -50,19 +50,37 @@ module module_grid
   integer :: MPI_Comm_Cart, MPI_Comm_Domain, MPI_Comm_Active
   integer :: imin, imax, jmin, jmax, kmin, kmax
 ! added by SZ
-  contains
-    function EndProc(d)
-      integer, intent(in) :: d
-      integer EndProc
-      if      (d==1) then
-         EndProc = nPx-1
-      else if (d==2)then
-         EndProc = nPy-1
-      else if (d==3) then
-         EndProc = nPz-1
-      else
-         call pariserror("EndProc: wrong d.")
-      endif
+contains
+  subroutine check_sanity_in_depth()
+    call check_sanity()
+    if(is < 1) stop "wrong is"
+    if(js < 1) stop "wrong js"
+    if(ks < 1) stop "wrong ks"
+  end subroutine check_sanity_in_depth
+!
+  subroutine check_sanity()
+    if(nx < 1) stop "wrong nx"
+    if(npx < 1) stop "wrong npx"
+    if(ny < 1) stop "wrong ny"
+    if(npy < 1) stop "wrong npy"
+    if(nz < 1) stop "wrong nz"
+    if(npz < 1) stop "wrong npz"
+    if(nx > 32767) stop "nx too large"
+  end subroutine check_sanity
+!
+  function EndProc(d)
+    integer, intent(in) :: d
+    integer EndProc
+    if      (d==1) then
+       EndProc = nPx-1
+    else if (d==2)then
+       EndProc = nPy-1
+    else if (d==3) then
+       EndProc = nPz-1
+    else
+       endproc=-1
+       call pariserror("EndProc: wrong d.")
+    endif
   end function EndProc
   function proclimit(d,sign)
     integer, intent(in) :: d,sign
@@ -72,6 +90,7 @@ module module_grid
     else if(sign==1) then
        proclimit = EndProc(d)
     else
+       proclimit=-1
        call pariserror("proclimit: wrong sign")
     endif
   end function proclimit
@@ -85,6 +104,7 @@ module module_grid
     else if (d==3) then
        coordstart = ks
     else
+       coordstart=-1
        call pariserror("coordstart: wrong d.")
     endif
   end function coordstart
@@ -98,6 +118,7 @@ module module_grid
     else if (d==3) then
        coordend = ke
     else
+       coordend=-1
        call pariserror("coordend: wrong d.")
     endif
   end function coordend
@@ -109,6 +130,7 @@ module module_grid
     else if(sign==-1) then
        coordlimit = coordstart(d)
     else
+       coordlimit=-1
        call pariserror("coordlimit: wrong sign")
     endif
   end function coordlimit
@@ -188,7 +210,6 @@ contains
     implicit none
     include 'mpif.h'
     integer, intent(in) :: n,itimestep,ii
-    integer :: ierr
     real(8) :: elapsed_time
     if(rank>0) return
     if(n>components) call pariserror("n>components")
@@ -538,22 +559,32 @@ module module_BC
   ! side on which the velocity in the direction of the second index is specified.
   ! The sides are in this order: -x,+x,-y,+y,-z,+z.
   ! Example: WallVel(4,3) represent the W velocity on +y side of the domain.
+  ! 
+  ! SZ: alternately may contain the velocity of the flow for inflow boundary conditions on x, side=1
   contains
 !=================================================================================================
 !=================================================================================================
 ! subroutine SetPressureBC: Sets the pressure boundary condition
 !-------------------------------------------------------------------------------------------------
-    subroutine SetPressureBC(umask,vmask,wmask)
+    subroutine SetPressureBC(umask,vmask,wmask,pmask)
     use module_grid
     implicit none
     include 'mpif.h'
     real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: umask,vmask,wmask
+    real(8), dimension(is:ie,js:je,ks:ke), intent(out) :: pmask
+
 
   ! for walls set the mask to zero
     if(bdry_cond(1)==0)then
       if(coords(1)==0    ) umask(is-1,js-1:je+1,ks-1:ke+1)=0d0
       if(coords(1)==nPx-1) umask(ie,js-1:je+1,ks-1:ke+1)=0d0
     endif
+    ! outflow boundary condition
+    pmask=1d0
+    if(bdry_cond(4)==4 .and. coords(1)==nPx-1) then
+      pmask(ie,:,:)=0d0
+    endif
+
 
     if(bdry_cond(2)==0)then
       if(coords(2)==0    ) vmask(is-1:ie+1,js-1,ks-1:ke+1)=0d0
@@ -588,12 +619,29 @@ module module_BC
         v(is-1,:,:)=2*WallVel(1,2)-v(is,:,:)
         w(is-1,:,:)=2*WallVel(1,3)-w(is,:,:)
     endif
+    ! inflow boundary condition
+    if(bdry_cond(1)==3 .and. coords(1)==0    ) then
+        u(is-1,:,:)=WallVel(1,1)
+        u(is-2,:,:)=WallVel(1,1)
+        v(is-1,:,:)=0d0
+        w(is-1,:,:)=0d0
+    endif
+
     if(bdry_cond(4)==0 .and. coords(1)==nPx-1) then
         u(ie  ,:,:)=0d0
         u(ie+1,:,:)=-u(ie-1,:,:)
         v(ie+1,:,:)=2*WallVel(2,2)-v(ie,:,:)
         w(ie+1,:,:)=2*WallVel(2,3)-w(ie,:,:)
     endif
+    ! outflow boundary condition
+    if(bdry_cond(4)==4 .and. coords(1)==nPx-1) then
+        u(ie  ,:,:)=u(ie-1,:,:)
+        u(ie+1,:,:)=-u(ie-1,:,:)
+        v(ie+1,:,:)=v(ie-1,:,:)
+        w(ie+1,:,:)=w(ie-1,:,:)
+    endif
+
+
     if(bdry_cond(2)==0 .and. coords(2)==0    ) then
         v(:,js-1,:)=0d0
         v(:,js-2,:)=-v(:,js,:)
@@ -1237,14 +1285,16 @@ end subroutine SetupDensity
 ! A7*Pijk = A1*Pi-1jk + A2*Pi+1jk + A3*Pij-1k + 
 !           A4*Pij+1k + A5*Pijk-1 + A6*Pijk+1 + A8
 !-------------------------------------------------------------------------------------------------
-subroutine SetupPoisson(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A) !,mask)
+subroutine SetupPoisson(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask)
   use module_grid
   use module_hello
   use module_BC
   implicit none
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: utmp,vtmp,wtmp,rhot
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: umask,vmask,wmask
+  real(8), dimension(is:ie,js:je,ks:ke), intent(in) :: pmask
   real(8), dimension(is:ie,js:je,ks:ke,8), intent(out) :: A
+
   real(8) :: dt
   integer :: i,j,k
   do k=ks,ke; do j=js,je; do i=is,ie;
@@ -1261,6 +1311,10 @@ subroutine SetupPoisson(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A) !,mask)
                      +(wtmp(i,j,k)-wtmp(i,j,k-1))/dz(k) )
 !    endif
   enddo; enddo; enddo
+! pressure 0 where pmask=0
+  do i=1,6; A(:,:,:,i) = pmask*A(:,:,:,i); enddo
+  A(:,:,:,7) = 1d0 - pmask + pmask*A(:,:,:,7) 
+  A(:,:,:,8) = pmask*A(:,:,:,8) 
 end subroutine SetupPoisson
 !=================================================================================================
 !=================================================================================================

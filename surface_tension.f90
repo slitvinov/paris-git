@@ -471,13 +471,9 @@ contains
       integer, intent(out) :: nfound
       integer, intent(out) :: nposit
 
-      integer :: index,d,normalsign
       real(8) :: h(-1:1,-1:1)
-!      integer :: nCentroids
-
       integer :: m,n,l,i,j,k
       logical :: fit_success = .false.
-      logical :: height_found
       integer :: i1(-1:1,-1:1,3), j1(-1:1,-1:1,3), k1(-1:1,-1:1,3),try(3)
       integer :: s,c(3)
       
