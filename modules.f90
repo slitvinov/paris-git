@@ -321,7 +321,7 @@ subroutine write_vec_gnuplot(u,v,iout)
   intrinsic dsqrt
   OPEN(UNIT=89,FILE=TRIM(out_path)//'/UV-'//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout,padding))//'.txt')
   norm=0.d0
-  k=nz/2+ng
+  k=(ks+ke)/2
   vmax = maxval(sqrt(u(is:ie,js:je,ks:ke)**2 + v(is:ie,js:je,ks:ke)**2))
   call MPI_ALLREDUCE(vmax, norm, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_Cart, ierr)  
   coeff = 0.8/norm
