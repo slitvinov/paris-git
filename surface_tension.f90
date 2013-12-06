@@ -451,7 +451,7 @@ contains
      kapparray=2d6
 
      do k=ks,ke; do j=js,je; do i=is,ie
-        if (vof_flag(i,j,k) == 2 ) then 
+        if (vof_flag(i,j,k) == 2 ) then
            call get_curvature(i,j,k,kappa,nfound,nposit,afit)
            kapparray(i,j,k) = kappa
         endif
