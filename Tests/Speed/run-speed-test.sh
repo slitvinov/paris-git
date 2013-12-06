@@ -7,8 +7,8 @@ if [ $# -lt 1 ]; then
 fi
 
 # input size of your machine here
-let maxcores=4
-let base=16
+let maxcores=32
+let base=64
 # mono64-1  to mono64-512  run in less than 30 seconds on babbage cluster
 for rootsize in $* ; do
     rm -fr input out

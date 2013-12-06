@@ -242,7 +242,7 @@ contains
        write(123,'((A)T26," ",f5.1," %")') TRIM(timer_component(n)),percentage(n)
     enddo
     write(123,*) "   "
-    write(123,'("Overall speed Z"T24,es16.5e2)') ZZ
+    write(123,'("Overall speed Z/np"T24,es16.5e2)') ZZ
     write(123,*) "   "
     write(123,'("Allocated/proc "T24,es16.5e2,"Gbytes")') alloc_size
     close(123)

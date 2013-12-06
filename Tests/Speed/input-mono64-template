@@ -34,7 +34,7 @@ EndTime = 1000.0     ! When to stop simulation
 
 MaxDt   = 0.1  ! maximum size of time step
 dtFlag  = 1        ! 1: fixed dt;  2: fixed CFL
-dt      = 0.1d-4    ! dt in case of dtFlag=1
+dt      = 0.1d-5    ! dt in case of dtFlag=1
 CFL     = 0.9
 MAXERROR= 1d-6     ! Residual for Poisson solver
 MAXERRORVOL = 1d-4
