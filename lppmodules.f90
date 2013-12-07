@@ -209,8 +209,6 @@ contains
 
          if ( DoDropStatistics ) call drop_statistics(tswap) 
 
-         if ( CheckSmallDrop ) call MarkSmallDrop(tswap) 
-         
          if ( DoConvertVOF2LPP ) call ConvertDrop2Part()
 !         if ( DoConvertLPP2VOF ) call ConvertPart2Drop()   ! TBA
       end if ! tswap
