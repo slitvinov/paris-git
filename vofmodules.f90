@@ -42,7 +42,7 @@ module module_VOF
   real(8), parameter  :: EPSC = 1.d-12  ! for clipping vof and setting flags
   real(8), parameter  :: EPSDP = 1d-16  ! assumed precision of double precision computations
 
-  character(20) :: vofbdry_cond(3),test_type,vof_advect
+  character(20) :: vofbdry_cond(6),test_type,vof_advect,cond
   integer :: parameters_read=0, refinement=-1 
   integer :: cylinder_dir = 0
   logical :: test_heights = .false.  
@@ -258,12 +258,12 @@ contains
        ipar=cylinder_dir
        call levelset2vof(wave2ls,ipar)
     else if(NumBubble>0) then
-       ipar=0 ! spheres: default
-       if(test_curvature_2D) ipar=-cylinder_dir
-       ! one cylinder in -ipar direction otherwise spheres
+       ! one cylinder in -ipar>0 direction otherwise spheres
+       ipar=-cylinder_dir
       call levelset2vof(shapes2ls,ipar)
-    else
-       write(*,*) "IVOF: Warning: Nothing set. cylinder_dir=0 set to 2"
+    else 
+       if(bdry_cond(1) /= 3 ) write(*,*) &
+            "IVOF: Warning: Nothing set. cylinder_dir=0 set to 2"
        cvof=0.d0
        vof_flag=0
     endif
@@ -638,29 +638,57 @@ contains
 !-------------------------------------------------------------------------------------------------
   subroutine SetVOFBC(cv,fl)
     use module_grid
+    use module_BC
     implicit none
     include 'mpif.h'
     real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: cv  ! cvof
     integer, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: fl  ! vof_flag
-    integer :: fb(3),d,l,m,n,c(3),try(2:3),sign
+    integer :: fb(6),d,l,m,n,c(3),try(2:3),sign,orientation,flag,dir
+
     real(8) :: xi,eta
-    
-    do d=1,3
-       if(vofbdry_cond(d)=='wet') then
-          fb(d)=1
-       else if(vofbdry_cond(d)=='dry') then
-          fb(d)=0
-       else if(vofbdry_cond(d)=='periodic') then
-          fb(d) = 3
-       else if(vofbdry_cond(d)=='jet') then
-          fb(d) = 2
+    ! orientation order:    
+    ! x- y- z- x+ y+ z+
+
+    do orientation=1,6
+       cond = vofbdry_cond(orientation)
+       dir = orientation
+       if(orientation>3) dir = orientation-3
+       if(iachar(cond(1:1))==0) then
+          if(orientation<=3) stop "missing vof bdry condition"
+          ! mirror the color or periodicity except if outflow is set
+          vofbdry_cond(orientation) = vofbdry_cond(dir)
+          if(bdry_cond(orientation)==4) vofbdry_cond(orientation) = 'outflow'   ! outflow +
+       endif
+    enddo
+
+    do orientation=1,6
+       cond = vofbdry_cond(orientation)
+       if(cond=='wet') then
+          fb(orientation)=1
+       else if(cond=='dry') then
+          fb(orientation)=0
+       else if(cond=='periodic') then
+          fb(orientation) = 3
+       else if(cond=='outflow') then
+          fb(orientation) = 4 
+!        else if(cond=='jet') then
+!           fb(orientation) = 2
        else
           call pariserror("this vofbc not implemented")
        endif
     enddo
 ! 
-    do d=1,3
-! sort directions 
+    do orientation=1,6
+    ! orientation order:    
+    ! x- y- z- x+ y+ z+
+       d = orientation
+       sign=-1
+       if(orientation>3) then
+          d = orientation-3
+          sign=1
+       endif
+       flag=fb(d)
+! sort directions so that try(1) = d and try(2),try(3) are any other two directions. 
        m=1
        n=2  
        do while (m.le.3)
@@ -670,30 +698,54 @@ contains
           endif
           m=m+1
        enddo
-       do sign=-1,1,2
-          if(coords(d)==proclimit(d,sign)) then
-             do l=coordstart(try(2))-Ng,coordend(try(2))+Ng
-                do m=coordstart(try(3))-Ng,coordend(try(3))+Ng
-                   c(try(2)) = l; c(try(3)) = m
-                   c(d)=coordlimit(d,sign) + sign
-                   if(fb(d)<2) then
-                      cv(c(1),c(2),c(3))=dble(fb(d))
-                      fl(c(1),c(2),c(3))=fb(d)
+! end sort
+       if(coords(d)==proclimit(d,sign)) then
+          do l=coordstart(try(2))-Ng,coordend(try(2))+Ng
+             do m=coordstart(try(3))-Ng,coordend(try(3))+Ng
+                c(try(2)) = l; c(try(3)) = m
+                c(d)=coordlimit(d,sign) + sign
+                if(flag<2) then
+                      cv(c(1),c(2),c(3))=dble(flag)
+                      fl(c(1),c(2),c(3))=flag
                       c(d) = c(d) + sign
-                      cv(c(1),c(2),c(3))=dble(fb(d))
-                      fl(c(1),c(2),c(3))=fb(d)
-                   elseif(fb(d)==2) then
+                      cv(c(1),c(2),c(3))=dble(flag)
+                      fl(c(1),c(2),c(3))=flag
+                   elseif(flag==2) then
                       xi = xcoord(try(2),l) 
                       eta = xcoord(try(3),m)
                       cv(c(1),c(2),c(3))=jetfunc_vof(xi,eta)
                       fl(c(1),c(2),c(3))=jetfunc_flag(xi,eta)
+                   elseif(flag==4) then
+                      
                    endif
                 enddo
              enddo
           endif
        enddo
-    enddo
   contains
+! two functions that set the faces with opposite wetting properties
+! A quick hack to allow for inflow/outflow.
+    function setbcvof(flag,sign)
+      implicit none
+      real(8) :: setbcvof
+      integer, intent(in) :: flag,sign
+      if(sign==-1) then
+         setbcvof=dble(flag)
+      else
+         setbcvof=1-dble(flag)
+      endif
+    end function setbcvof
+    function isetbcvof(flag,sign)
+      implicit none
+      integer :: isetbcvof
+      integer, intent(in) :: flag,sign
+      if(sign==-1) then
+         isetbcvof=flag
+      else
+         isetbcvof=1-flag
+      endif
+    end function isetbcvof
+! end two functions 
     function jetfunc_vof(xi,eta)
       implicit none
       real(8) :: jetfunc_vof

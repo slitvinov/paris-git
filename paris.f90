@@ -68,7 +68,7 @@ Program paris
   ! real(8) :: start_time, end_time=0.d0
   integer :: req(48),sta(MPI_STATUS_SIZE,48)
   INTEGER :: irank, ii, i, j, k
-  real(8) :: residual
+  real(8) :: residual,cflmax,get_cfl
 
 
 !---------------------------------------INITIALIZATION--------------------------------------------
@@ -174,9 +174,13 @@ Program paris
 
         if(mod(itimestep,termout)==0) then
            end_time =  MPI_WTIME()
-           if(rank==0)write(out,'("Step: ",I10," dt=",es16.5e2," time=",es16.5e2)')itimestep,dt,time
-           if(rank==0)write(*,'("Step:",I6," dt=",es16.5e2," time=",es16.5e2," cpu(s):",f11.3)')   &
-                itimestep,dt,time,end_time-start_time
+           cflmax = get_cfl(dt)
+           if(rank==0) &
+                write(out,'("Step: ",I10," dt=",es16.5e2," time=",es16.5e2," cfl="   ,es16.5e2)                 ') &
+                itimestep,dt,time                    ,cflmax
+           if(rank==0) &
+                write(*,  '("Step: ", I6," dt=",es16.5e2," time=",es16.5e2," cpu(s):",f11.3   ," cfl=",es16.5e2)') &
+                itimestep,dt,time,end_time-start_time,cflmax
         endif
 
         if(itime_scheme==2) then
@@ -499,6 +503,19 @@ subroutine TimeStepSize(deltaT)
 
 end subroutine TimeStepSize
 !=================================================================================================
+function get_cfl(deltaT)
+  use module_grid
+  use module_flow
+  implicit none
+  include 'mpif.h'
+  integer :: ierr
+  real(8) :: get_cfl,vmax,norm,inbox_cfl,deltaT,h
+  vmax = maxval(sqrt(u(is:ie,js:je,ks:ke)**2 + v(is:ie,js:je,ks:ke)**2 + w(is:ie,js:je,ks:ke)**2))
+  h  = minval(dx)
+  inbox_cfl=vmax*deltaT/h
+  call MPI_ALLREDUCE(inbox_cfl, get_cfl, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_Cart, ierr)  
+end function get_cfl
+
 !=================================================================================================
 ! subroutine calcStats
 !-------------------------------------------------------------------------------------------------
@@ -1249,6 +1266,7 @@ subroutine ReadParameters
   read(UNIT=in,NML=parameters)
   close(in)
   call check_sanity()
+  bdry_read=.true.
   if(MaxFront>10000) stop 'Error: ReadParameters: increase size of xyzrad array'
 
   if(numBubble>MaxFront) stop 'Error: ReadParameters: increase size of xyzrad array (MaxFront)'

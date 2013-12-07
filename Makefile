@@ -15,7 +15,7 @@ FC = mpif90
 #FFLAGS = -g -Wall -ffpe-trap=invalid,zero,overflow # -g -gstabs # -O3 #
 #FOPTS =  -g -Wall -ffpe-trap=invalid,zero,overflow # -g -gstabs # -O3 #
 
-FFLAGS =  -g -fimplicit-none -fbounds-check
+FFLAGS = -O3 # -g -fimplicit-none -fbounds-check
 
 CFLAGS = -O # -g -gstabs
 BINDIR = $(HOME)/bin
@@ -58,7 +58,7 @@ distclean: clean
 	@rm -fR  session* *.xml TAGS tags input
 
 test:  install compare parisdeconv
-	@echo "The test suite takes less than one minute on a 4-core intel i7 MacBookPro"
+	@echo "The test suite takes less than 4 minutes on a 4-core intel i7 MacBookPro"
 	@cd Tests; chmod +x ./runtests.sh; ./runtests.sh
 
 longtest:  install compare parisdeconv

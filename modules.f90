@@ -325,14 +325,11 @@ subroutine write_vec_gnuplot(u,v,iout)
   vmax = maxval(sqrt(u(is:ie,js:je,ks:ke)**2 + v(is:ie,js:je,ks:ke)**2))
   call MPI_ALLREDUCE(vmax, norm, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_Cart, ierr)  
   coeff = 0.8/norm
-  print *," norm, rank ",norm,rank
   do i=is,ie; do j=js,je
      write(89,310) x(i),y(j),coeff*dx(i)*u(i,j,k),coeff*dx(i)*v(i,j,k)
-     ! write(89,311) i,j,k, u(i,j,k),v(i,j,k)
   enddo; enddo
   close(unit=89)
 310 format(e14.5,e14.5,e14.5,e14.5)
-! 311 format(I2,I2,I2,e14.5,e14.5)
 end subroutine  write_vec_gnuplot
 !=================================================================================================
 ! append
@@ -552,6 +549,7 @@ module module_BC
   use module_hello
   implicit none
   integer :: bdry_cond(6)
+  logical :: bdry_read=.false.
   ! bdry_cond(i) = is the type if boundary condition in i'th direction
   ! 0:wall;  1:periodic
   real(8) :: WallVel(6,3), WallShear(6,3)
