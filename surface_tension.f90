@@ -35,6 +35,8 @@ module module_surface_tension
   use module_2phase
   use module_VOF
   implicit none
+  real(8), parameter :: kappamax = 2.d0
+
   integer, parameter :: NDEPTH=3
   integer, parameter :: BIGINT=100
   real(8), parameter :: D_HALF_BIGINT = DBLE(BIGINT/2)
@@ -443,7 +445,7 @@ contains
      include 'mpif.h'
      real(8), intent(inout) :: kapparray(imin:imax,jmin:jmax,kmin:kmax)
      real(8) :: afit(6), kappa
-     integer :: ierr, i,j,k, nfound, nposit
+     integer :: ierr, i,j,k, nfound, nposit, sum_flag, n_pure_faces
      integer :: req(24),sta(MPI_STATUS_SIZE,24)
      if(.not.st_initialized) call initialize_surface_tension()
 
@@ -451,31 +453,78 @@ contains
      kapparray=2d6
 
      do k=ks,ke; do j=js,je; do i=is,ie
-        if (vof_flag(i,j,k) == 2 ) then
-           call get_curvature(i,j,k,kappa,nfound,nposit,afit)
-           kapparray(i,j,k) = kappa
+        if (vof_flag(i,j,k) == 2 ) then  ! mixed cell
+           call get_curvature(i,j,k,kappa,nfound,nposit,afit,.false.)
+        else if(.not.bulk_cell(i,j,k)) then
+           call get_curvature(i,j,k,kappa,nfound,nposit,afit,.true.)
         endif
+        if(kappa>kappamax) then
+           print *, "WARNING: large kappa = ",kappa,"at ",i,j,k
+        endif
+        kapparray(i,j,k) = max(kappa,kappamax)
      enddo;enddo;enddo
 
      call ghost_x(kapparray(:,:,:),2,req(1:4))
      call ghost_y(kapparray(:,:,:),2,req(5:8))
      call ghost_z(kapparray(:,:,:),2,req(9:12))
      call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
+     contains
+       function bulk_cell(i,j,k)
+         implicit none
+         integer :: i,j,k, n_mass
+         logical :: bulk_cell
+         n_mass = vof_flag(i,j,k+1) + vof_flag(i,j,k-1) + &
+                 vof_flag(i,j-1,k) + vof_flag(i,j+1,k) + &
+                 vof_flag(i-1,j,k) + vof_flag(i+1,j,k) 
 
+         bulk_cell = (vof_flag(i,j,k+1)/2 + vof_flag(i,j,k-1)/2 + &
+                 vof_flag(i,j-1,k)/2 + vof_flag(i,j+1,k)/2 + &
+                 vof_flag(i-1,j,k)/2 + vof_flag(i+1,j,k)/2 == 0).and. &
+                 ((n_mass == 6.and.vof_flag(i,j,k)==1).or. &
+                 (n_mass == 0 .and.vof_flag(i,j,k)==0))
+       end function bulk_cell
+
+! contains
+! count flags if all faces pure
+!            sum_flag = (vof_flag(i,j,k+1)/2 + vof_flag(i,j,k-1)/2 + &
+!                 vof_flag(i,j-1,k)/2 + vof_flag(i,j+1,k)/2 + &
+!                 vof_flag(i-1,j,k)/2 + vof_flag(i+1,j,k)/2)
+!            if(vof_flag(i,j,k) == 1) then
+!               if(sum_flag==0) then
+!                  n_pure_faces = 
+!                  if(n_pure_faces/=6) then
+!                     ! 6 - n_pure_faces = number of pure faces
+!                     call get_curvature(i,j,k,kappa,nfound,nposit,afit,6-n_pure_faces)
+!                     kapparray(i,j,k) = kappa
+!                  endif
+!               endif
+!            else if(vof_flag(i,j,k) == 0) then
+!               if(sum_flag==0) then
+!                  n_pure_faces = vof_flag(i,j,k+1) + vof_flag(i,j,k-1) + &
+!                       vof_flag(i,j-1,k) + vof_flag(i,j+1,k) + vof_flag(i-1,j,k) + vof_flag(i+1,j,k)
+!                  if(n_pure_faces /= 0 ) then
+!                     call get_curvature(i,j,k,kappa,nfound,nposit,afit,n_pure_faces)
+!                     kapparray(i,j,k) = kappa
+!                  endif
+!               endif
+!           else
+! end count
    end subroutine get_all_curvatures
 
-    subroutine get_curvature(i0,j0,k0,kappa,nfound,nposit,a)
+    subroutine get_curvature(i0,j0,k0,kappa,nfound,nposit,a,pure_non_bulk)
       implicit none
       integer, intent(in) :: i0,j0,k0
       real(8), intent(out) :: kappa,a(6)  
       integer, intent(out) :: nfound
       integer, intent(out) :: nposit
+      logical, intent(in) :: pure_non_bulk
 
+      integer :: n_pure_faces
       real(8) :: h(-1:1,-1:1)
       integer :: m,n,l,i,j,k
       logical :: fit_success = .false.
       integer :: i1(-1:1,-1:1,3), j1(-1:1,-1:1,3), k1(-1:1,-1:1,3),try(3)
-      integer :: s,c(3)
+      integer :: s,c(3),d,central,neighbor,esign
       
       real(8) :: points(NPOS,3),origin(3)
       real(8) :: xfit(NPOS),yfit(NPOS),hfit(NPOS),fit(NPOS,3)
@@ -554,16 +603,78 @@ contains
          enddo; enddo; enddo ! do m,n,l
          ! arrange coordinates so height direction is closest to normal
          ! try(:) array contains direction closest to normal first
-
+         
          xfit=fit(:,try(2)) - origin(try(2))
          yfit=fit(:,try(3)) - origin(try(3))
          hfit=fit(:,try(1)) - origin(try(1))
          if(nposit.gt.NPOS) call pariserror("GLH: nposit")
+         if(nposit<6) then
+            if(.not.pure_non_bulk) then 
+               print *, "small mixed cell cluster, deal with it"
+            else ! if not bulk cell has at least one non-mixed first neighbor of opposite kind
+               n_pure_faces = 0
+               central=vof_flag(i0,j0,k0)
+               if(central/2/=0) stop "unexpected central mixed cell"
+               c(1)=i0
+               c(2)=j0
+               c(3)=k0
+               do d=1,3
+                  do esign=-1,1,2
+                     c(d)=c(d)+esign
+                     neighbor = vof_flag(c(1),c(2),c(3))
+                     c(d)=c(d)-esign
+                     ! test whether neighbor is a pure cell of opposite kind
+                     if(neighbor/2/=0 .and. neighbor+central==1) then  
+                        nposit = nposit + 1
+                        n_pure_faces = n_pure_faces + 1
+                        do s=1,3
+                           if(s/=d) then
+                              fit(nposit,s) = 0d0
+                           endif
+                        enddo
+                        fit(nposit,d) = dble(esign)*0.5d0
+                     endif
+                  enddo
+               enddo
+               if(n_pure_faces >= 3) then
+                  print *, "Warning: ",n_pure_faces, " pure faces at x =",x(i0),&
+                       ", y = ",y(j0), ", z = ",z(k0)
+               endif
+               if(nposit <6) then
+                  print *,"WARNING nposit = ",nposit," n_pure_faces = ",n_pure_faces," at",i0,j0,k0
+!                  stop "unsufficient nposit"
+               endif
+            endif
+         endif
          call parabola_fit(xfit,yfit,hfit,nposit,a,fit_success)
-         if(.not.fit_success) call pariserror("no fit success after centroids")
-         kappa = 2.d0*(a(1)*(1.d0+a(5)*a(5)) + a(2)*(1.d0+a(4)*a(4)) - a(3)*a(4)*a(5)) &
-             /sqrt(1.d0+a(4)*a(4)+a(5)*a(5))**3
-         kappa = sign(1.d0,mxyz(try(1)))*kappa
+         if(.not.fit_success) then
+            if(nposit < 6) then
+               print *,"WARNING: parabola fit failed with less than 6 points."
+            else
+               print *,"WARNING: fit failed with 6 points."
+               print *, "missing curvature at x y z", x(i0), y(j0), z(k0)
+               print *, "cvof()"
+               do l=-1,1
+               print *, " "
+                  do  m=-1,1
+                     print *, cvof(i0-1:i0+1,j0+m,k0+l)
+                  enddo
+               enddo
+               print *, " "
+               print *, "flags"
+               do l=-1,1
+               print *, " "
+                  do  m=-1,1
+                     print *, vof_flag(i0-1:i0+1,j0+m,k0+l)
+                  enddo
+               enddo
+               print *, " "
+            endif
+         else
+            kappa = 2.d0*(a(1)*(1.d0+a(5)*a(5)) + a(2)*(1.d0+a(4)*a(4)) - a(3)*a(4)*a(5)) &
+                 /sqrt(1.d0+a(4)*a(4)+a(5)*a(5))**3
+            kappa = sign(1.d0,mxyz(try(1)))*kappa
+         endif
          return
       end if ! -nfound > nfound_min
       call pariserror("Curvature not found")
@@ -653,6 +764,7 @@ contains
 !
    SUBROUTINE FindInverseMatrix(matrix,inverse,n,inverse_success)
       implicit none
+      include 'mpif.h'
 
          !---Declarations
         INTEGER, INTENT(IN ) :: n
@@ -693,7 +805,7 @@ contains
           END DO
         END DO
                 
-        !Reduce augmented matrix to upper traingular form
+        !Reduce augmented matrix to upper triangular form
         DO k =1, n-1
           DO j = k+1, n
             m = augmatrix(j,k)/augmatrix(k,k)
@@ -709,6 +821,9 @@ contains
             write(*,*) "ERROR-Matrix is non-invertible"
             inverse = 0.d0
             inverse_success = .false.
+!            do i=1,n
+!               print *,"rank ",rank,i,matrix(i,1:n)
+!            enddo
             return
           ENDIF
         END DO
@@ -853,7 +968,10 @@ contains
         return
      endif
 
-     if (alpha < 0.d0 .or. alpha > 1.d0) call pariserror("PAC: invalid alpha")
+     if (alpha < 0.d0 .or. alpha > 1.d0) then
+        print *, "alpha =", alpha
+        call pariserror("PAC: invalid alpha")
+     endif
 
      area = alpha*alpha
      px = area*alpha
@@ -921,7 +1039,13 @@ contains
      real(8), intent(in) :: dmx,dmy,alpha
      real(8), intent(out) :: px,py
       
-     if (alpha <= 0.d0 .or. alpha >= 1.d0) call pariserror("LC: invalid alpha")
+     !  if (alpha <= 0.d0 .or. alpha >= 1.d0) 
+     ! call pariserror("LC: invalid alpha")
+
+     if (alpha < 0.d0 .or. alpha > 1.d0) then
+        print *, "alpha =", alpha
+        call pariserror("LC: invalid alpha")
+     endif
 
      if (dmx < EPS_GEOM) then
         px = 0.5

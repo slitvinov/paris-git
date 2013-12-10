@@ -551,14 +551,16 @@ module module_BC
   integer :: bdry_cond(6)
   logical :: bdry_read=.false.
   ! bdry_cond(i) = is the type if boundary condition in i'th direction
-  ! 0:wall;  1:periodic
+  ! explicits the boundary condition codes
+  !                                   12345678    12345678    12345678    12345678    12345678
+  character(len=8) :: expl(0:4) = (/ "wall    ", "periodic", "shear   ", "inflow  ", "outflow " /)
   real(8) :: WallVel(6,3), WallShear(6,3)
   ! Tangential velocities on the surfaces of domain. First index represent the 
   ! side on which the velocity in the direction of the second index is specified.
   ! The sides are in this order: -x,+x,-y,+y,-z,+z.
   ! Example: WallVel(4,3) represent the W velocity on +y side of the domain.
   ! 
-  ! SZ: alternately may contain the velocity of the flow for inflow boundary conditions on x, side=1
+  ! SZ: alternately may contain the velocity of the flow for inflow boundary conditions on x+
   contains
 !=================================================================================================
 !=================================================================================================

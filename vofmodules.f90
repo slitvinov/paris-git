@@ -164,9 +164,12 @@ contains
   end subroutine ReadVOFParameters
 !
   subroutine initialize_VOF
+    use module_grid
+    use module_BC
     implicit none
     include 'mpif.h'
-    integer :: ierr
+    integer :: ierr,dir,orientation
+    character :: dc(3) = (/ "x","y","z" /)
     call ReadVOFParameters
 ! Check grid
     if(read_x.or.read_y.or.read_z) then
@@ -199,6 +202,31 @@ contains
     endif
     test_HF = test_heights .or. test_curvature .or. test_curvature_2D
     test_LP = test_tag .or. test_D2P 
+
+! Post-read initialization of boundary conditions
+    ! orientation order:    
+    ! x- y- z- x+ y+ z+
+
+    if(.not.bdry_read) stop "bdry not read"
+    do orientation=1,6
+       cond = vofbdry_cond(orientation)
+       dir = orientation
+       if(orientation>3) dir = orientation-3
+       if(iachar(cond(1:1))==0) then
+          if(orientation<=3) stop "missing vof bdry condition"
+          ! mirror the color or periodicity except if outflow is set
+          vofbdry_cond(orientation) = vofbdry_cond(dir)
+          if(bdry_cond(orientation)==4) vofbdry_cond(orientation) = 'outflow'   ! outflow +
+       endif
+    enddo
+
+    if(rank==0) then
+       do dir=1,3
+          write(6,'(A1,"-: ",(A)," / ",(A)T32," ",A1,"+: ",(A)," / ",(A))') &
+               dc(dir),TRIM(expl(bdry_cond(dir))),TRIM(vofbdry_cond(dir)), &
+               dc(dir),TRIM(expl(bdry_cond(dir+3))),TRIM(vofbdry_cond(dir+3)) ! ,rank
+       enddo
+    endif
   end subroutine initialize_VOF
 !=================================================================================================
 !   a hack to get the flags quickly (temporary)
@@ -643,23 +671,8 @@ contains
     include 'mpif.h'
     real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: cv  ! cvof
     integer, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: fl  ! vof_flag
-    integer :: fb(6),d,l,m,n,c(3),try(2:3),sign,orientation,flag,dir
-
-    real(8) :: xi,eta
-    ! orientation order:    
-    ! x- y- z- x+ y+ z+
-
-    do orientation=1,6
-       cond = vofbdry_cond(orientation)
-       dir = orientation
-       if(orientation>3) dir = orientation-3
-       if(iachar(cond(1:1))==0) then
-          if(orientation<=3) stop "missing vof bdry condition"
-          ! mirror the color or periodicity except if outflow is set
-          vofbdry_cond(orientation) = vofbdry_cond(dir)
-          if(bdry_cond(orientation)==4) vofbdry_cond(orientation) = 'outflow'   ! outflow +
-       endif
-    enddo
+    integer :: fb(6),d,l,m,n,c(3),try(2:3),sign,orientation,flag,flhere
+    real(8) :: xi,eta,cvhere
 
     do orientation=1,6
        cond = vofbdry_cond(orientation)
@@ -687,7 +700,7 @@ contains
           d = orientation-3
           sign=1
        endif
-       flag=fb(d)
+       flag=fb(orientation)
 ! sort directions so that try(1) = d and try(2),try(3) are any other two directions. 
        m=1
        n=2  
@@ -716,7 +729,15 @@ contains
                       cv(c(1),c(2),c(3))=jetfunc_vof(xi,eta)
                       fl(c(1),c(2),c(3))=jetfunc_flag(xi,eta)
                    elseif(flag==4) then
-                      
+                      c(d)=coordlimit(d,sign)
+                      cvhere=cv(c(1),c(2),c(3))
+                      flhere=fl(c(1),c(2),c(3))
+                      c(d) = c(d) + sign
+                      cv(c(1),c(2),c(3))=cvhere
+                      fl(c(1),c(2),c(3))=flhere
+                      c(d) = c(d) + sign
+                      cv(c(1),c(2),c(3))=cvhere
+                      fl(c(1),c(2),c(3))=flhere
                    endif
                 enddo
              enddo

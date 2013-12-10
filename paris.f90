@@ -509,7 +509,7 @@ function get_cfl(deltaT)
   implicit none
   include 'mpif.h'
   integer :: ierr
-  real(8) :: get_cfl,vmax,norm,inbox_cfl,deltaT,h
+  real(8) :: get_cfl,vmax,inbox_cfl,deltaT,h
   vmax = maxval(sqrt(u(is:ie,js:je,ks:ke)**2 + v(is:ie,js:je,ks:ke)**2 + w(is:ie,js:je,ks:ke)**2))
   h  = minval(dx)
   inbox_cfl=vmax*deltaT/h
@@ -875,7 +875,7 @@ subroutine surfaceForce(du,dv,dw,rho)
   implicit none
   real(8) :: kappa,deltax
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: du, dv, dw, rho
-  integer :: i,j,k,n,ii,itimestep
+  integer :: i,j,k,l,m,n,ii,itimestep
   deltax=dx(nx)
   call get_all_curvatures(tmp)
   call my_timer(7,itimestep,ii)
@@ -893,7 +893,27 @@ subroutine surfaceForce(du,dv,dw,rho)
         endif
         kappa=kappa/(deltax*n)
         du(i,j,k) = du(i,j,k) - kappa*sigma*(2.0/dxh(i))*(cvof(i+1,j,k)-cvof(i,j,k))/(rho(i+1,j,k)+rho(i,j,k))
+        if(n==0) then  ! @ temporary debugging
+           print *, "missing curvatures at i j k i'", i,j,k,i+1
+           print *, "missing curvatures at x y z", x(i), y(j), z(k)
+           print *, "missing curvatures at x' y z", x(i+1), y(j), z(k)
+           print *, "cvof()"
+            do l=-1,1
+               do  m=-1,1
+                  print *, cvof(i-1:i+1,j+m,k+l)
+               enddo
+            enddo
+            print *, "flags"
+            do l=-1,1
+               do  m=-1,1
+                  print *, vof_flag(i-1:i+1,j+m,k+l)
+               enddo
+            enddo
+           print *, " "
+           stop
+        endif
      endif
+
   enddo; enddo; enddo
   
   do k=ks,ke;  do j=js,jev; do i=is,ie
@@ -910,6 +930,25 @@ subroutine surfaceForce(du,dv,dw,rho)
         endif
         kappa=kappa/(deltax*n)
         dv(i,j,k)=dv(i,j,k) - kappa*sigma*(2.0/dyh(j))*(cvof(i,j+1,k)-cvof(i,j,k))/(rho(i,j+1,k)+rho(i,j,k))
+         if(n==0) then  ! @ temporary debugging
+           print *, "missing curvatures at i j k j'", i,j,k,j+1
+           print *, "missing curvatures at x y z", x(i), y(j), z(k)
+           print *, "missing curvatures at x y' z", x(i), y(j+1), z(k+1)
+           print *, "cvof()"
+            do l=-1,1
+               do  m=-1,1
+                  print *, cvof(i-1:i+1,j+m,k+l)
+               enddo
+            enddo
+            print *, "flags"
+            do l=-1,1
+               do  m=-1,1
+                  print *, vof_flag(i-1:i+1,j+m,k+l)
+               enddo
+            enddo
+           print *, " "
+           stop
+        endif
      endif
   enddo; enddo; enddo
 
@@ -924,6 +963,27 @@ subroutine surfaceForce(du,dv,dw,rho)
         if(tmp(i,j,k).lt.1e6) then
            kappa=kappa+tmp(i,j,k)
            n=n+1
+        endif
+        if(n==0) then  ! @ temporary debugging
+           print *, "missing curvatures at i j k k'", i,j,k,k+1
+           print *, "missing curvatures at x y z", x(i), y(j), z(k)
+           print *, "missing curvatures at x y z'", x(i), y(j), z(k+1)
+           print *, "cvof()"
+            do l=-1,1
+               do  m=-1,1
+                  print *, cvof(i-1:i+1,j+m,k+l)
+               enddo
+            enddo
+            print *, "flags"
+            do l=-1,1
+               do  m=-1,1
+                  print *, vof_flag(i-1:i+1,j+m,k+l)
+               enddo
+            enddo
+           print *, " "
+           print *, "cvof(z) cvof(z') ",cvof(i,j,k), cvof(i,j,k+1)
+           print *, "vof_flag(z) vof_flag(z') ",vof_flag(i,j,k), vof_flag(i,j,k+1)
+           stop
         endif
         kappa=kappa/(deltax*n)
         dw(i,j,k)=dw(i,j,k) - kappa*sigma*(2.0/dzh(k))*(cvof(i,j,k+1)-cvof(i,j,k))/(rho(i,j,k+1)+rho(i,j,k))

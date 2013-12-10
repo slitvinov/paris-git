@@ -179,7 +179,7 @@ contains
          do i=is,ie; do j=js,je; do k=ks,ke
             ! find curvature only for cut cells
             if (vof_flag(i,j,k) == 2 ) then 
-               call get_curvature(i,j,k,kappa,nfound,nposit,a)
+               call get_curvature(i,j,k,kappa,nfound,nposit,a,.false.)
                if(nfound > 0) then
                   method_count(1) = method_count(1) + 1
                else if( -nfound < 50) then
@@ -206,7 +206,7 @@ contains
          kappa_exact = - 1.d0/rad(ib)
           do i=is,ie; do j=js,je
             if (vof_flag(i,j,k) == 2) then 
-               call get_curvature(i,j,k,kappa,nfound,nposit,a)
+               call get_curvature(i,j,k,kappa,nfound,nposit,a,.false.)
                if(nfound > 0) then
                   method_count(1) = method_count(1) + 1
                else if( -nfound < 50) then
