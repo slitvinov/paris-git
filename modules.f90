@@ -1571,7 +1571,7 @@ subroutine LinearSolver(A,p,maxError,beta,maxit,it,ierr)
     call MPI_ALLREDUCE(res, totalres, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr)
     if (.not.(totalres<1e10)) then
       ierr=1 !stop '***** solution has diverged *****'
-      if(rank==0) print*,'Solver 0 diverged after',it,'iterations.'
+      if(rank==0) print*,'Pressure solver diverged after',it,'iterations.'
       return
     endif
     if (totalres<maxError) exit
@@ -1630,7 +1630,7 @@ subroutine LinearSolver1(A,u,umask,maxError,beta,maxit,it,ierr)
     call MPI_ALLREDUCE(res, totalres, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr)
     if (.not.(totalres<1e10)) then
       ierr=1 !stop '***** solution has diverged *****'
-      if(rank==0) print*,'Solver 1 diverged after',it,'iterations.'
+      if(rank==0) print*,'Viscous solver diverged after',it,'iterations.'
       return
     endif
     if (totalres<maxError) exit
