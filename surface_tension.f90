@@ -36,6 +36,7 @@ module module_surface_tension
   use module_VOF
   implicit none
   real(8), parameter :: kappamax = 2.d0
+!  integer, parameter :: nfound_min=200 ! 6 ! Bypass the mixed height step as tests show it is less accurate
 
   integer, parameter :: NDEPTH=3
   integer, parameter :: BIGINT=100
@@ -56,8 +57,16 @@ module module_surface_tension
   logical :: recomputenormals = .true.
   logical :: debug_curvature = .false.
   logical :: debug_23 = .false.
-  integer, parameter :: nfound_min=200 ! 6
   integer :: method_count(3)
+  integer, parameter :: ngc=20
+  integer :: geom_case_count(ngc)
+
+!  type geom_case
+!     character(10) :: name
+!     integer :: count
+!  end type geom_case
+!  type (geom_case) :: geom_case_list(10) = (/ ("mixed",0),("full",0),("empty",1) /)
+
 contains
 !=================================================================================================
   subroutine initialize_surface_tension()
@@ -67,14 +76,56 @@ contains
                n3(imin:imax,jmin:jmax,kmin:kmax))
     endif
     allocate(height(imin:imax,jmin:jmax,kmin:kmax,6))
-      if(nx.ge.500000.or.ny.gt.500000.or.nz.gt.500000) call pariserror("nx too large")
-      if(NDEPTH.gt.20) call pariserror("ndepth too large")
-      if(NDEPTH>BIGINT/2-2) call pariserror("BIGINT too small")
-      if(MAX_EXT_H>BIGINT/2-2) call pariserror("MAX_EXT not > BIGINT/2")
-      if(MAX_EXT_H>nx/2) call pariserror("MAX_EXT not > nx/2")
-      height = 2.d6
-      st_initialized=.true.
+    if(nx.ge.500000.or.ny.gt.500000.or.nz.gt.500000) call pariserror("nx too large")
+    if(NDEPTH.gt.20) call pariserror("ndepth too large")
+    if(NDEPTH>BIGINT/2-2) call pariserror("BIGINT too small")
+    if(MAX_EXT_H>BIGINT/2-2) call pariserror("MAX_EXT > BIGINT/2")
+    if(MAX_EXT_H>nx/2) call pariserror("MAX_EXT > nx/2")
+!    allocate(geom_case_list(10))
+    geom_case_count = 0
+    height = 2.d6
+    st_initialized=.true.
    end subroutine initialize_surface_tension
+!
+   subroutine print_st_stats()
+     use module_BC
+     implicit none
+     include 'mpif.h'
+     integer :: ierr,i
+     integer :: glob_count(ngc)
+     character(len=85) :: glob_desc(ngc)
+     if(st_initialized) then
+        call MPI_ALLREDUCE(geom_case_count, glob_count, ngc, MPI_INTEGER, MPI_SUM, MPI_COMM_Cart, ierr)  
+        if(rank==0) then
+           open(unit=101, file=trim(out_path)//'/st_stats', action='write', iostat=ierr)
+           glob_desc(1)="mixed w/less than 3 mixed neighbors (quasi-isolated mixed, unfittable by sphere)"
+           glob_desc(2)="mixed w/less than 5 mixed neighbors (quasi-isolated mixed, unfittable by paraboloid)"
+           glob_desc(3)="pure cells w/more than 2 other color pure neighbors (grid-aligned interfaces)"
+           glob_desc(4)="non-bulk pure cells w 0 valid neighbors"
+           glob_desc(5)="                      1  " 
+           glob_desc(6)="                      2  " 
+           glob_desc(7)="                      3  " 
+           glob_desc(8)="                      4  "
+           glob_desc(9)="                      5 valid neighbors (unfittable by paraboloid)"
+           glob_desc(10)="no fit success with 0 valid centroids "
+           glob_desc(11)="                    1  " 
+           glob_desc(12)="                    2  " 
+           glob_desc(13)="                    3  " 
+           glob_desc(14)="                    4  " 
+           glob_desc(15)="                    5 valid centroids"
+           glob_desc(16)="                    6 or more valid centroids (impossible)"
+           glob_desc(17)="large kappa"
+           glob_desc(18)="no surface tension force in x direction"
+           glob_desc(19)="no surface tension force in y direction"
+           glob_desc(20)="no surface tension force in z direction"
+           do i=1,ngc
+              print *,geom_case_count(i), glob_desc(i)
+           enddo
+           close(101)
+        endif
+     endif
+   end subroutine print_st_stats
+        
 !=================================================================================================
 ! 
 !  Put normals in a common array. Absolutely not sure this is efficient
@@ -440,6 +491,30 @@ contains
 ! the core of HF computation
 !
 !=================================================================================================
+    subroutine print_cvof_3x3x3(i0,j0,k0)
+      implicit none
+      integer, intent(in) :: i0,j0,k0
+      integer :: l,m
+      print *, "vof 3^3 cube at i j k ", i0,j0,k0
+      print *, "                x y z ", x(i0), y(j0), z(k0)
+      print *, "cvof()"
+      do l=-1,1
+         print *, " "
+         do  m=-1,1
+            print *, cvof(i0-1:i0+1,j0+m,k0+l)
+         enddo
+      enddo
+      print *, " "
+      print *, "flags"
+      do l=-1,1
+         print *, " "
+         do  m=-1,1
+            print *, vof_flag(i0-1:i0+1,j0+m,k0+l)
+         enddo
+      enddo
+      print *, " "
+    end subroutine print_cvof_3x3x3
+!
    subroutine get_all_curvatures(kapparray)
      implicit none
      include 'mpif.h'
@@ -455,11 +530,13 @@ contains
      do k=ks,ke; do j=js,je; do i=is,ie
         if (vof_flag(i,j,k) == 2 ) then  ! mixed cell
            call get_curvature(i,j,k,kappa,nfound,nposit,afit,.false.)
-        else if(.not.bulk_cell(i,j,k)) then
+        else if (vof_flag(i,j,k) > 2 ) then
+           call pariserror("inconsistent vof_flag > 3")
+        else if(.not.bulk_cell(i,j,k)) then !  non-bulk pure cell
            call get_curvature(i,j,k,kappa,nfound,nposit,afit,.true.)
         endif
         if(kappa>kappamax) then
-           print *, "WARNING: large kappa = ",kappa,"at ",i,j,k
+           geom_case_count(17) = geom_case_count(17) + 1
         endif
         kapparray(i,j,k) = max(kappa,kappamax)
      enddo;enddo;enddo
@@ -530,6 +607,7 @@ contains
       real(8) :: xfit(NPOS),yfit(NPOS),hfit(NPOS),fit(NPOS,3)
       real(8) :: centroid(3),mxyz(3),stencil3x3(-1:1,-1:1,-1:1)
 
+      central=vof_flag(i0,j0,k0)
       call map3x3in2x2(i1,j1,k1,i0,j0,k0)
 !   define in which order directions will be tried 
 !   direction closest to normal first
@@ -565,12 +643,13 @@ contains
          nfound = - ind_pos(points,nposit) 
       endif ! nfound == 9
       ! *** determine the origin. 
-         call FindCutAreaCentroid(i0,j0,k0,centroid)
-         do n=1,3
-            origin(n) = centroid(n)
-         enddo
+      call FindCutAreaCentroid(i0,j0,k0,centroid)
+      do n=1,3
+         origin(n) = centroid(n)
+      enddo
       ! *** determine curvature from centroids
-      if ( (-nfound) > nfound_min )  then  ! more than 6 points to avoid special 2D degeneracy. 
+      !      if ( (-nfound) > nfound_min )  then  ! more than 6 points to avoid special 2D degeneracy. 
+      if(1==0)  then ! Bypass the mixed height step as tests show it is less accurate
          xfit=points(:,try(2)) - origin(try(2))
          yfit=points(:,try(3)) - origin(try(3))
          hfit=points(:,try(1)) - origin(try(1))
@@ -581,103 +660,92 @@ contains
                /(1.d0+a(4)*a(4)+a(5)*a(5))**(1.5d0)
          kappa = sign(1.d0,mxyz(try(1)))*kappa
          return
-      else  ! ind_pos <= nfound_min
-         ! Find all centroids in 3**3
-         ! use direction closest to normal
-         nfound = -100 + nfound  ! encode number of independent positions into nfound
-         nposit=0
-         do m=-1,1; do n=-1,1; do l=-1,1
-            i=i0+m
-            j=j0+n
-            k=k0+l
-            c(1)=m
-            c(2)=n
-            c(3)=l
-            if(vof_flag(i,j,k) == 2) then
-               nposit = nposit + 1
-               call FindCutAreaCentroid(i,j,k,centroid)
-               do s=1,3 
-                  fit(nposit,s) = centroid(s) + c(s)
-               end do
-            endif ! vof_flag
-         enddo; enddo; enddo ! do m,n,l
-         ! arrange coordinates so height direction is closest to normal
-         ! try(:) array contains direction closest to normal first
-         
-         xfit=fit(:,try(2)) - origin(try(2))
-         yfit=fit(:,try(3)) - origin(try(3))
-         hfit=fit(:,try(1)) - origin(try(1))
-         if(nposit.gt.NPOS) call pariserror("GLH: nposit")
-         if(nposit<6) then
-            if(.not.pure_non_bulk) then 
-               print *, "small mixed cell cluster, deal with it"
-            else ! if not bulk cell has at least one non-mixed first neighbor of opposite kind
-               n_pure_faces = 0
-               central=vof_flag(i0,j0,k0)
-               if(central/2/=0) stop "unexpected central mixed cell"
-               c(1)=i0
-               c(2)=j0
-               c(3)=k0
-               do d=1,3
-                  do esign=-1,1,2
-                     c(d)=c(d)+esign
-                     neighbor = vof_flag(c(1),c(2),c(3))
-                     c(d)=c(d)-esign
-                     ! test whether neighbor is a pure cell of opposite kind
-                     if(neighbor/2/=0 .and. neighbor+central==1) then  
-                        nposit = nposit + 1
-                        n_pure_faces = n_pure_faces + 1
-                        do s=1,3
-                           if(s/=d) then
-                              fit(nposit,s) = 0d0
-                           endif
-                        enddo
-                        fit(nposit,d) = dble(esign)*0.5d0
-                     endif
-                  enddo
+      endif  ! 1==0 ! ind_pos <= nfound_min
+      ! Find all centroids in 3**3
+      ! use direction closest to normal
+      nfound = -100 + nfound  ! encode number of independent positions into nfound
+      nposit=0
+      do m=-1,1; do n=-1,1; do l=-1,1
+         i=i0+m
+         j=j0+n
+         k=k0+l
+         c(1)=m
+         c(2)=n
+         c(3)=l
+         if(vof_flag(i,j,k) == 2) then
+            nposit = nposit + 1
+            call FindCutAreaCentroid(i,j,k,centroid)
+            do s=1,3 
+               fit(nposit,s) = centroid(s) + c(s)
+            end do
+         endif ! vof_flag
+      enddo; enddo; enddo ! do m,n,l
+      ! arrange coordinates so height direction is closest to normal
+      ! try(:) array contains direction closest to normal first
+
+      xfit=fit(:,try(2)) - origin(try(2))
+      yfit=fit(:,try(3)) - origin(try(3))
+      hfit=fit(:,try(1)) - origin(try(1))
+      if(nposit.gt.NPOS) call pariserror("GLH: nposit")
+      if(nposit<6) then
+         if(.not.pure_non_bulk) then ! mixed cell
+            if(central/=2) call pariserror("unexpected non-mixed central flag")
+            if(nposit<4) then
+               geom_case_count(1) = geom_case_count(1) + 1
+            endif
+            geom_case_count(2) = geom_case_count(2) + 1
+         else !  pure non-bulk cell
+            if(central/2/=0) call pariserror("unexpected central flag")
+            n_pure_faces = 0
+            c(1)=i0
+            c(2)=j0
+            c(3)=k0
+            do d=1,3
+               do esign=-1,1,2
+                  c(d)=c(d)+esign
+                  neighbor = vof_flag(c(1),c(2),c(3))
+                  c(d)=c(d)-esign
+                  ! test whether neighbor is a pure cell of opposite kind
+                  if(neighbor/=2 .and. neighbor+central==1) then  
+                     nposit = nposit + 1
+                     n_pure_faces = n_pure_faces + 1
+                     do s=1,3
+                        if(s/=d) then
+                           fit(nposit,s) = 0d0
+                        endif
+                     enddo
+                     fit(nposit,d) = dble(esign)*0.5d0
+                  endif
                enddo
-               if(n_pure_faces >= 3) then
-                  print *, "Warning: ",n_pure_faces, " pure faces at x =",x(i0),&
-                       ", y = ",y(j0), ", z = ",z(k0)
-               endif
-               if(nposit <6) then
-                  print *,"WARNING nposit = ",nposit," n_pure_faces = ",n_pure_faces," at",i0,j0,k0
-!                  stop "unsufficient nposit"
-               endif
+            enddo
+            if(n_pure_faces >= 3) then
+               !                  print *, "Warning: ",n_pure_faces, " pure faces at x =",x(i0),&
+               !                       ", y = ",y(j0), ", z = ",z(k0)
+               geom_case_count(3) = geom_case_count(3) + 1
+            endif
+            if(nposit <6) then
+               !        print *,"WARNING nposit = ",nposit," n_pure_faces = ",n_pure_faces," at",i0,j0,k0
+               !        if(nposit==0) then
+               !           call print_cvof_3x3x3(i0,j0,k0)
+               !           call pariserror("unsufficient nposit")
+               !        endif
+               geom_case_count(nposit+4) = geom_case_count(nposit+4) + 1
             endif
          endif
-         call parabola_fit(xfit,yfit,hfit,nposit,a,fit_success)
-         if(.not.fit_success) then
-            if(nposit < 6) then
-               print *,"WARNING: parabola fit failed with less than 6 points."
-            else
-               print *,"WARNING: fit failed with 6 points."
-               print *, "missing curvature at x y z", x(i0), y(j0), z(k0)
-               print *, "cvof()"
-               do l=-1,1
-               print *, " "
-                  do  m=-1,1
-                     print *, cvof(i0-1:i0+1,j0+m,k0+l)
-                  enddo
-               enddo
-               print *, " "
-               print *, "flags"
-               do l=-1,1
-               print *, " "
-                  do  m=-1,1
-                     print *, vof_flag(i0-1:i0+1,j0+m,k0+l)
-                  enddo
-               enddo
-               print *, " "
-            endif
+      endif
+      call parabola_fit(xfit,yfit,hfit,nposit,a,fit_success)
+      if(.not.fit_success) then
+         if(nposit < 6) then
+            geom_case_count(nposit+10) = geom_case_count(nposit+10) + 1
          else
-            kappa = 2.d0*(a(1)*(1.d0+a(5)*a(5)) + a(2)*(1.d0+a(4)*a(4)) - a(3)*a(4)*a(5)) &
-                 /sqrt(1.d0+a(4)*a(4)+a(5)*a(5))**3
-            kappa = sign(1.d0,mxyz(try(1)))*kappa
+!            call print_cvof_3x3x3(i0,j0,k0)
+            geom_case_count(16) = geom_case_count(16) + 1
          endif
-         return
-      end if ! -nfound > nfound_min
-      call pariserror("Curvature not found")
+      else
+         kappa = 2.d0*(a(1)*(1.d0+a(5)*a(5)) + a(2)*(1.d0+a(4)*a(4)) - a(3)*a(4)*a(5)) &
+              /sqrt(1.d0+a(4)*a(4)+a(5)*a(5))**3
+         kappa = sign(1.d0,mxyz(try(1)))*kappa
+      endif
    end subroutine get_curvature
 
    subroutine parabola_fit(xfit,yfit,hfit,nposit,a,fit_success)
@@ -818,7 +886,7 @@ contains
         !Test for invertibility
         DO i = 1, n
           IF (augmatrix(i,i) == 0) THEN
-            write(*,*) "ERROR-Matrix is non-invertible"
+!            write(*,*) "ERROR-Matrix is non-invertible"
             inverse = 0.d0
             inverse_success = .false.
 !            do i=1,n

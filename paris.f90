@@ -472,6 +472,7 @@ Program paris
   if(rank<nPdomain)  call output_at_location()
   if(rank==0)  call final_output(stats(2))
   if(HYPRE) call poi_finalize
+  call print_st_stats()
   call MPI_BARRIER(MPI_COMM_WORLD, ierr)
   call MPI_FINALIZE(ierr)
   stop
@@ -891,29 +892,14 @@ subroutine surfaceForce(du,dv,dw,rho)
            kappa=kappa+tmp(i,j,k)
            n=n+1
         endif
-        kappa=kappa/(deltax*n)
-        du(i,j,k) = du(i,j,k) - kappa*sigma*(2.0/dxh(i))*(cvof(i+1,j,k)-cvof(i,j,k))/(rho(i+1,j,k)+rho(i,j,k))
-        if(n==0) then  ! @ temporary debugging
-           print *, "missing curvatures at i j k i'", i,j,k,i+1
-           print *, "missing curvatures at x y z", x(i), y(j), z(k)
-           print *, "missing curvatures at x' y z", x(i+1), y(j), z(k)
-           print *, "cvof()"
-            do l=-1,1
-               do  m=-1,1
-                  print *, cvof(i-1:i+1,j+m,k+l)
-               enddo
-            enddo
-            print *, "flags"
-            do l=-1,1
-               do  m=-1,1
-                  print *, vof_flag(i-1:i+1,j+m,k+l)
-               enddo
-            enddo
-           print *, " "
-           stop
+        if(n==0) then 
+           geom_case_count(18) = geom_case_count(18) + 1
+           ! call print_cvof_3x3x3(i,j,k)
+        else
+           kappa=kappa/(deltax*n)
+           du(i,j,k) = du(i,j,k) - kappa*sigma*(2.0/dxh(i))*(cvof(i+1,j,k)-cvof(i,j,k))/(rho(i+1,j,k)+rho(i,j,k))
         endif
      endif
-
   enddo; enddo; enddo
   
   do k=ks,ke;  do j=js,jev; do i=is,ie
@@ -928,26 +914,12 @@ subroutine surfaceForce(du,dv,dw,rho)
            kappa=kappa+tmp(i,j,k)
            n=n+1
         endif
-        kappa=kappa/(deltax*n)
-        dv(i,j,k)=dv(i,j,k) - kappa*sigma*(2.0/dyh(j))*(cvof(i,j+1,k)-cvof(i,j,k))/(rho(i,j+1,k)+rho(i,j,k))
-         if(n==0) then  ! @ temporary debugging
-           print *, "missing curvatures at i j k j'", i,j,k,j+1
-           print *, "missing curvatures at x y z", x(i), y(j), z(k)
-           print *, "missing curvatures at x y' z", x(i), y(j+1), z(k+1)
-           print *, "cvof()"
-            do l=-1,1
-               do  m=-1,1
-                  print *, cvof(i-1:i+1,j+m,k+l)
-               enddo
-            enddo
-            print *, "flags"
-            do l=-1,1
-               do  m=-1,1
-                  print *, vof_flag(i-1:i+1,j+m,k+l)
-               enddo
-            enddo
-           print *, " "
-           stop
+        if(n==0) then 
+           geom_case_count(19) = geom_case_count(19) + 1
+           ! call print_cvof_3x3x3(i,j,k)
+        else
+           kappa=kappa/(deltax*n)
+           dv(i,j,k)=dv(i,j,k) - kappa*sigma*(2.0/dyh(j))*(cvof(i,j+1,k)-cvof(i,j,k))/(rho(i,j+1,k)+rho(i,j,k))
         endif
      endif
   enddo; enddo; enddo
@@ -964,29 +936,13 @@ subroutine surfaceForce(du,dv,dw,rho)
            kappa=kappa+tmp(i,j,k)
            n=n+1
         endif
-        if(n==0) then  ! @ temporary debugging
-           print *, "missing curvatures at i j k k'", i,j,k,k+1
-           print *, "missing curvatures at x y z", x(i), y(j), z(k)
-           print *, "missing curvatures at x y z'", x(i), y(j), z(k+1)
-           print *, "cvof()"
-            do l=-1,1
-               do  m=-1,1
-                  print *, cvof(i-1:i+1,j+m,k+l)
-               enddo
-            enddo
-            print *, "flags"
-            do l=-1,1
-               do  m=-1,1
-                  print *, vof_flag(i-1:i+1,j+m,k+l)
-               enddo
-            enddo
-           print *, " "
-           print *, "cvof(z) cvof(z') ",cvof(i,j,k), cvof(i,j,k+1)
-           print *, "vof_flag(z) vof_flag(z') ",vof_flag(i,j,k), vof_flag(i,j,k+1)
-           stop
+        if(n==0) then  
+           geom_case_count(20) = geom_case_count(20) + 1
+           ! call print_cvof_3x3x3(i,j,k)
+        else
+           kappa=kappa/(deltax*n)
+           dw(i,j,k)=dw(i,j,k) - kappa*sigma*(2.0/dzh(k))*(cvof(i,j,k+1)-cvof(i,j,k))/(rho(i,j,k+1)+rho(i,j,k))
         endif
-        kappa=kappa/(deltax*n)
-        dw(i,j,k)=dw(i,j,k) - kappa*sigma*(2.0/dzh(k))*(cvof(i,j,k+1)-cvof(i,j,k))/(rho(i,j,k+1)+rho(i,j,k))
      endif
   enddo; enddo; enddo
 
