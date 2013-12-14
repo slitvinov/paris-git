@@ -38,6 +38,7 @@ module module_solid
   real(8) :: sxyzrad(4,10000)
   integer :: NumSpheres
   logical :: bitmap_opened=.false.
+  integer :: remove_layers=0
 !***********************************************************************
 contains
 !***********************************************************************
@@ -59,15 +60,17 @@ contains
   end subroutine open_bitmap
 !=================================================================================================
   function read_bitmap(i,j,k)
+    use module_grid
     use module_tmpvar
     implicit none
     integer, intent(in) :: i,j,k
     real(8) read_bitmap
     if(.not.bitmap_opened) then 
-       call open_bitmap()
+       call open_bitmap
        bitmap_opened=.true.
     endif
     read_bitmap=tmp(i,j,k)
+    if(i<remove_layers+Ng) read_bitmap=0d0
   end function read_bitmap
 !=================================================================================================
   SUBROUTINE append_solid_visit_file(rootname)
@@ -104,7 +107,6 @@ contains
     real(8) :: x0,y0,z0,radius,x2,y2,z2
 
     call ReadSolidParameters
-
     if(dosolids) then
        allocate(solids(imin:imax,jmin:jmax,kmin:kmax))
        solids=0d0
@@ -295,7 +297,8 @@ contains
       include 'mpif.h'
       integer ierr,in
       logical file_is_there
-      namelist /solidparameters/ dosolids, solid_type, solid_radius,NumSpheres,sxyzrad
+      namelist /solidparameters/ dosolids, solid_type, solid_radius,NumSpheres,sxyzrad, &
+           remove_layers
       in=1
       call MPI_COMM_RANK(MPI_COMM_WORLD, rank, ierr)
       inquire(file='inputsolids',exist=file_is_there)
