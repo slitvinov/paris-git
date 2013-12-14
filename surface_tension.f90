@@ -119,7 +119,7 @@ contains
            glob_desc(19)="no surface tension force in y direction"
            glob_desc(20)="no surface tension force in z direction"
            do i=1,ngc
-              print *,geom_case_count(i), glob_desc(i)
+              write(101,'(I10," ",A85)') geom_case_count(i), glob_desc(i)
            enddo
            close(101)
         endif
