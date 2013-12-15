@@ -600,13 +600,15 @@ module module_BC
 !=================================================================================================
 ! subroutine SetVelocityBC: Sets the velocity boundary condition
 !-------------------------------------------------------------------------------------------------
-  subroutine SetVelocityBC(u,v,w,umask,vmask,wmask)
+  subroutine SetVelocityBC(u,v,w,umask,vmask,wmask,t)
     use module_grid
     use module_hello
     implicit none
     include 'mpif.h'
     real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: u, v, w
     real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: umask,vmask,wmask
+    real(8) :: t! ,uinject
+    integer :: j,k
     ! solid obstacles
     u = u*umask
     v = v*vmask
@@ -621,10 +623,14 @@ module module_BC
     endif
     ! inflow boundary condition
     if(bdry_cond(1)==3 .and. coords(1)==0    ) then
-        u(is-1,:,:)=WallVel(1,1)
-        u(is-2,:,:)=WallVel(1,1)
-        v(is-1,:,:)=0d0
-        w(is-1,:,:)=0d0
+       do j=jmin,jmax
+          do k=kmin,kmax
+             u(is-1,j,k)=WallVel(1,1)*uinject(j,k,t)
+             u(is-2,j,k)=WallVel(1,1)*uinject(j,k,t)
+             v(is-1,j,k)=0d0
+             w(is-1,j,k)=0d0
+          enddo
+       enddo
     endif
 
     if(bdry_cond(4)==0 .and. coords(1)==nPx-1) then
@@ -691,6 +697,16 @@ module module_BC
         u(:,:,ke+1) = dzh(ke)*WallShear(6,1)+u(:,:,ke)
         v(:,:,ke+1) = dzh(ke)*WallShear(6,2)+v(:,:,ke)
     endif
+  contains
+    function uinject(j,k,t)
+      use module_grid
+      implicit none
+      integer :: j,k
+      real(8) :: t
+      real(8) :: uinject
+      uinject=0d0
+      if((y(j) - 0.5d0)**2 + (z(k) - 0.5d0)**2.lt.0.25d0*0.25d0) uinject=1D0
+    end function uinject
   end subroutine SetVelocityBC
 !=================================================================================================
 !=================================================================================================
@@ -1556,7 +1572,7 @@ subroutine LinearSolver(A,p,maxError,beta,maxit,it,ierr)
       res=res+abs(-p(i,j,k) * A(i,j,k,7) +                             &
         A(i,j,k,1) * p(i-1,j,k) + A(i,j,k,2) * p(i+1,j,k) +            &
         A(i,j,k,3) * p(i,j-1,k) + A(i,j,k,4) * p(i,j+1,k) +            &
-        A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8) )
+        A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8) )**2
     enddo; enddo; enddo
     call MPI_WAITALL(12,req,sta,ierr)
     mask=.true.
@@ -1565,10 +1581,11 @@ subroutine LinearSolver(A,p,maxError,beta,maxit,it,ierr)
       if(mask(i,j,k))res=res+abs(-p(i,j,k) * A(i,j,k,7) +              &
         A(i,j,k,1) * p(i-1,j,k) + A(i,j,k,2) * p(i+1,j,k) +            &
         A(i,j,k,3) * p(i,j-1,k) + A(i,j,k,4) * p(i,j+1,k) +            &
-        A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8) )
+        A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8) )**2
     enddo; enddo; enddo
     res = res/float(Nx*Ny*Nz)
     call MPI_ALLREDUCE(res, totalres, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr)
+    totalres=sqrt(totalres)
     if (.not.(totalres<1e10)) then
       ierr=1 !stop '***** solution has diverged *****'
       if(rank==0) print*,'Pressure solver diverged after',it,'iterations.'
@@ -1615,7 +1632,7 @@ subroutine LinearSolver1(A,u,umask,maxError,beta,maxit,it,ierr)
       res=res+ umask(i,j,k)*abs(-u(i,j,k) * A(i,j,k,7) +                             &
         A(i,j,k,1) * u(i-1,j,k) + A(i,j,k,2) * u(i+1,j,k) +            &
         A(i,j,k,3) * u(i,j-1,k) + A(i,j,k,4) * u(i,j+1,k) +            &
-        A(i,j,k,5) * u(i,j,k-1) + A(i,j,k,6) * u(i,j,k+1) + A(i,j,k,8) )
+        A(i,j,k,5) * u(i,j,k-1) + A(i,j,k,6) * u(i,j,k+1) + A(i,j,k,8) )**2
     enddo; enddo; enddo
     call MPI_WAITALL(12,req,sta,ierr)
     mask=.true.
@@ -1624,10 +1641,11 @@ subroutine LinearSolver1(A,u,umask,maxError,beta,maxit,it,ierr)
       if(mask(i,j,k))res=res+umask(i,j,k)*abs(-u(i,j,k) * A(i,j,k,7) +              &
         A(i,j,k,1) * u(i-1,j,k) + A(i,j,k,2) * u(i+1,j,k) +            &
         A(i,j,k,3) * u(i,j-1,k) + A(i,j,k,4) * u(i,j+1,k) +            &
-        A(i,j,k,5) * u(i,j,k-1) + A(i,j,k,6) * u(i,j,k+1) + A(i,j,k,8) )
+        A(i,j,k,5) * u(i,j,k-1) + A(i,j,k,6) * u(i,j,k+1) + A(i,j,k,8) )**2
     enddo; enddo; enddo
     res = res/float(Nx*Ny*Nz)
     call MPI_ALLREDUCE(res, totalres, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr)
+    totalres=sqrt(totalres)
     if (.not.(totalres<1e10)) then
       ierr=1 !stop '***** solution has diverged *****'
       if(rank==0) print*,'Viscous solver diverged after',it,'iterations.'

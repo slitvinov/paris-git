@@ -141,7 +141,7 @@ Program paris
      if(ICOut .and. rank<nPdomain) then
         call output(0,is,ie+1,js,je+1,ks,ke+1)
 !        if(DoVOF) call output_VOF(0,imin,imax,jmin,jmax,kmin,kmax)
-        call setvelocityBC(u,v,w,umask,vmask,wmask)
+        call setvelocityBC(u,v,w,umask,vmask,wmask,time)
         call write_vec_gnuplot(u,v,itimestep)
         call calcstats
 
@@ -289,7 +289,7 @@ Program paris
               w = w + dt * dw
            endif
            call my_timer(3,itimestep,ii)
-           call SetVelocityBC(u,v,w,umask,vmask,wmask)
+           call SetVelocityBC(u,v,w,umask,vmask,wmask,time)
 
            call ghost_x(u  ,2,req( 1: 4));  call ghost_x(v,2,req( 5: 8)); call ghost_x(w,2,req( 9:12)) 
            call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
@@ -314,7 +314,8 @@ Program paris
            endif
            if(mod(itimestep,termout)==0) then
               call calcresidual(A,p,residual)
-              if(rank==0)          write(*  ,    '("              pressure residual*dt:   ",e7.1)') residual*dt
+              if(rank==0)          write(*  ,    '("              pressure residual*dt:   ",e7.1,&
+                   &" maxerrror: ",e7.1)') residual*dt,maxerror
               if(rank==0.and..not.hypre) write(*,'("              pressure iterations :",I9)')it
            endif
            
@@ -348,7 +349,7 @@ Program paris
                  enddo; enddo; enddo
            endif
            call my_timer(13,itimestep,ii)
-           call SetVelocityBC(u,v,w,umask,vmask,wmask)
+           call SetVelocityBC(u,v,w,umask,vmask,wmask,time)
            call ghost_x(u  ,2,req( 1: 4));  call ghost_x(v,2,req( 5: 8)); call ghost_x(w,2,req( 9:12)); 
            call ghost_x(color,1,req(13:16));  call MPI_WAITALL(16,req(1:16),sta(:,1:16),ierr)
            call ghost_y(u  ,2,req( 1: 4));  call ghost_y(v,2,req( 5: 8)); call ghost_y(w,2,req( 9:12)); 
@@ -1115,7 +1116,7 @@ subroutine InitCondition
   if(rank<nPdomain)then
      if(restart)then
         call backup_read
-        call SetVelocityBC(u,v,w,umask,vmask,wmask)
+        call SetVelocityBC(u,v,w,umask,vmask,wmask,time)
         call ghost_x(u,2,req( 1: 4)); call ghost_x(v,2,req( 5: 8)); call ghost_x(w,2,req( 9:12))
         call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
         call ghost_y(u,2,req( 1: 4)); call ghost_y(v,2,req( 5: 8)); call ghost_y(w,2,req( 9:12))

@@ -684,8 +684,9 @@ contains
           fb(orientation) = 3
        else if(cond=='outflow') then
           fb(orientation) = 4 
-!        else if(cond=='jet') then
-!           fb(orientation) = 2
+        else if(cond=='jet') then
+           if(orientation /= 1) stop "jet only at x-"
+           fb(orientation) = 2
        else
           call pariserror("this vofbc not implemented")
        endif
@@ -723,11 +724,9 @@ contains
                       c(d) = c(d) + sign
                       cv(c(1),c(2),c(3))=dble(flag)
                       fl(c(1),c(2),c(3))=flag
-                   elseif(flag==2) then
-                      xi = xcoord(try(2),l) 
-                      eta = xcoord(try(3),m)
-                      cv(c(1),c(2),c(3))=jetfunc_vof(xi,eta)
-                      fl(c(1),c(2),c(3))=jetfunc_flag(xi,eta)
+                   elseif(flag==2) then  ! jet
+                      cv(c(1),c(2),c(3))=dble(inject(c(2),c(3)))
+                      fl(c(1),c(2),c(3))=inject(c(2),c(3))
                    elseif(flag==4) then
                       c(d)=coordlimit(d,sign)
                       cvhere=cv(c(1),c(2),c(3))
@@ -744,44 +743,16 @@ contains
           endif
        enddo
   contains
-! two functions that set the faces with opposite wetting properties
-! A quick hack to allow for inflow/outflow.
-    function setbcvof(flag,sign)
-      implicit none
-      real(8) :: setbcvof
-      integer, intent(in) :: flag,sign
-      if(sign==-1) then
-         setbcvof=dble(flag)
-      else
-         setbcvof=1-dble(flag)
-      endif
-    end function setbcvof
-    function isetbcvof(flag,sign)
-      implicit none
-      integer :: isetbcvof
-      integer, intent(in) :: flag,sign
-      if(sign==-1) then
-         isetbcvof=flag
-      else
-         isetbcvof=1-flag
-      endif
-    end function isetbcvof
-! end two functions 
-    function jetfunc_vof(xi,eta)
-      implicit none
-      real(8) :: jetfunc_vof
-      real(8), intent(in) :: xi,eta
-      jetfunc_vof=1d0
-    end function jetfunc_vof
-    !
-    function jetfunc_flag(xi,eta)
-      implicit none
-      integer :: jetfunc_flag
-      real(8), intent(in) :: xi,eta
-      jetfunc_flag=1d0
-    end function jetfunc_flag
-    !
-    function xcoord(d,i)
+  function inject(j,k)
+    use module_grid
+    implicit none
+    integer :: j,k
+    integer :: inject
+    inject=0d0
+    if((y(j) - 0.5d0)**2 + (z(k) - 0.5d0)**2.lt.0.25d0*0.25d0) inject=1
+  end function inject
+!
+   function xcoord(d,i)
       implicit none
       real(8) :: xcoord
       integer, intent(in) :: d,i

@@ -1,0 +1,13 @@
+&VOFPARAMETERS
+
+VOFBDRY_COND = 'jet' 'periodic' 'periodic' 
+                   
+! Type of VOF boundary condition in x,y,z direction: 'wet', 'dry', '90deg','periodic', 'jet'
+
+TEST_TYPE = 'droplet'
+VOF_ADVECT = 'CIAM'
+DoLPP = F
+!=================================================================================================
+
+&end
+! end of the namelist
