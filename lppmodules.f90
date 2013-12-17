@@ -297,9 +297,9 @@ contains
                      c_queue(nc_queue,1) = isq+i0
                      c_queue(nc_queue,2) = jsq+j0
                      c_queue(nc_queue,3) = ksq+k0
-                  else                                               ! ghost cells
-                     ! XXX Note: need to distinguish block ghost cells and domain
-                     ! ghost cells!
+                  else if ( isq+i0 >= Ng+1 .and. isq+i0 <= Ng+Nx .and. &     ! block ghost cells 
+                            jsq+j0 >= Ng+1 .and. jsq+j0 <= Ng+Ny .and. & 
+                            ksq+k0 >= Ng+1 .and. ksq+k0 <= Ng+Nz ) then
                      tag_flag(isq+i0,jsq+j0,ksq+k0) = 5
                      if ( merge_drop .eqv. .false.) then 
                         merge_drop = .true.
@@ -314,7 +314,9 @@ contains
                      else
                         call pariserror('Number of ghost cells of droplet is larger than the maxinum value!')
                      end if ! drops_merge(num_drop_merge(rank),rank)%num_gcell
-                  end if ! isq+i0 > is
+                  else                                                        ! domain ghost cells 
+                     ! Note: periodic bdry cond, to be added later
+                  end if ! isq+i0, jsq+j0, ksq+k0
               end if 
             enddo;enddo;enddo ! i0,j0,k0
             tag_flag(isq,jsq,ksq) = 1 !unmark S node and marked as tagged

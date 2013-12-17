@@ -22,6 +22,8 @@ fi
 mpirun -np $npstart paris > tmpout 2>&1
 echo `awk ' /Step:/ { cpu = $8 } END { print "cpu = " cpu } ' < tmpout`
 
+echo -e "$GREEN" "Check results using Visit/Tecplot."  "$NORMAL"
+
 #if [ -d out ]; then
 #    cd out
 ## assume that curvature.txt was written by paris
