@@ -292,6 +292,7 @@ end module module_tmpvar
 module module_2phase
   real(8), dimension( : ), allocatable :: rad, xc, yc, zc, vol
   real(8) :: excentricity(3)
+  real(8) :: jetradius = 1d100
   real(8) :: sigma
   integer :: NumBubble
 end module module_2phase
@@ -602,6 +603,7 @@ module module_BC
 !-------------------------------------------------------------------------------------------------
   subroutine SetVelocityBC(u,v,w,umask,vmask,wmask,t)
     use module_grid
+    use module_2phase
     use module_hello
     implicit none
     include 'mpif.h'
@@ -705,7 +707,7 @@ module module_BC
       real(8) :: t
       real(8) :: uinject
       uinject=0d0
-      if((y(j) - 0.5d0)**2 + (z(k) - 0.5d0)**2.lt.0.25d0*0.25d0) uinject=1D0
+      if((y(j) - 0.5d0)**2 + (z(k) - 0.5d0)**2.lt.jetradius**2) uinject=1D0
     end function uinject
   end subroutine SetVelocityBC
 !=================================================================================================

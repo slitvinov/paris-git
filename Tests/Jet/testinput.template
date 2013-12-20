@@ -24,7 +24,7 @@ restartFront = F   ! T: start the frontfrom  a previous simulation
 restartAverages = F
 nBackup = 10000    ! number of time steps between  backups are kept.
 
-NSTEP   = 10000    ! maximum number of time steps
+NSTEP   = 500  ! maximum number of time steps
 EndTime = 2.0      ! When to stop simulation
 
 MaxDt   = 0.1      ! maximum size of time step
@@ -38,14 +38,14 @@ MAXERRORVOL = 1d-4
 ITIME_SCHEME = 1   ! time scheme: 1:first order Euler, 2: second order quasi Crank-Nicolson
                    ! Should use first order Euler for Stokes flow ! ! ! 
 MAXIT    = 1000
-BETA     = 0.9     ! parameters for linear solver
+BETA     = 1.3     ! parameters for linear solver
 
 !=================================================================================================
 ! Output parameters
 
 termout  = 10
 ICOut    = T        ! output initial condition
-NOUT     = 50      ! write the solution to file every nout time steps
+NOUT     = 200      ! write the solution to file every nout time steps
 output_format = 2   ! 1:tecplot 2:vtk
 out_path = 'out'    ! name of the output directory
 
@@ -89,7 +89,7 @@ ZLENGTH  = 1.0
 WallVel(1,1)  = 1. ! can set inflow velocities here
 WallShear(4,1) = 0.0
 
-U_init =  0d0
+U_init =  1d0
 GX      = 0.0
 GY      = 0.0
 GZ      = 0.0
@@ -111,7 +111,7 @@ MU1      = 1.0d-3
 
 RHO2     = 0.1
 MU2      = 2.0d-5
-SIGMA    = 0.002    ! rho2, mu2, sigma : properties of the drop and surface tension
+SIGMA    = 0.0005   ! rho2, mu2, sigma : properties of the drop and surface tension
                    
 
 NumBubble = 0       ! number of bubbles

@@ -7,6 +7,7 @@ VOFBDRY_COND = 'jet' 'periodic' 'periodic'
 TEST_TYPE = 'droplet'
 VOF_ADVECT = 'CIAM'
 DoLPP = F
+jetradius = 0.1d0
 !=================================================================================================
 
 &end

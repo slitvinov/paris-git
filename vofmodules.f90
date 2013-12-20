@@ -135,12 +135,14 @@ contains
   subroutine ReadVOFParameters
     use module_flow
     use module_BC
+    use module_2phase
+    use module_IO
     implicit none
     include 'mpif.h'
     integer ierr,in
     logical file_is_there
     namelist /vofparameters/ vofbdry_cond,test_type,VOF_advect,refinement, &
-       cylinder_dir, normal_up, DoLPP
+       cylinder_dir, normal_up, DoLPP, jetradius
     in=31
 
     call MPI_COMM_RANK(MPI_COMM_WORLD, rank, ierr)
@@ -161,6 +163,10 @@ contains
        refinement=8
        if(rank==0) write(*,*) "using default value for refinement"
     endif
+     open(unit=out, file=trim(out_path)//'/output', action='write', iostat=ierr)
+     if (ierr .ne. 0) stop 'ReadParameters: error opening output file'
+     write(UNIT=out,NML=vofparameters)
+
   end subroutine ReadVOFParameters
 !
   subroutine initialize_VOF
@@ -667,6 +673,7 @@ contains
   subroutine SetVOFBC(cv,fl)
     use module_grid
     use module_BC
+    use module_2phase
     implicit none
     include 'mpif.h'
     real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: cv  ! cvof
@@ -749,7 +756,7 @@ contains
     integer :: j,k
     integer :: inject
     inject=0d0
-    if((y(j) - 0.5d0)**2 + (z(k) - 0.5d0)**2.lt.0.25d0*0.25d0) inject=1
+    if((y(j) - 0.5d0)**2 + (z(k) - 0.5d0)**2.lt.jetradius**2) inject=1
   end function inject
 !
    function xcoord(d,i)

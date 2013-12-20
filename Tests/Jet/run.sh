@@ -1,5 +1,5 @@
 #!/bin/bash
 #set -x
 
-./runtest.sh 1e-3 64 F 
+./runtest.sh 3e-4 128 F 
 

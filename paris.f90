@@ -315,7 +315,7 @@ Program paris
            if(mod(itimestep,termout)==0) then
               call calcresidual(A,p,residual)
               if(rank==0)          write(*  ,    '("              pressure residual*dt:   ",e7.1,&
-                   &" maxerrror: ",e7.1)') residual*dt,maxerror
+                   &" maxerror: ",e7.1)') residual*dt,maxerror
               if(rank==0.and..not.hypre) write(*,'("              pressure iterations :",I9)')it
            endif
            
@@ -1127,7 +1127,10 @@ subroutine InitCondition
         ! Set velocities and the color function. 
         ! The color function is used for density and viscosity in the domain 
         ! when set by Front-Tracking.
-        color = 0.; u = U_init;  v = 0;  w = 0.
+        color = 0.;  v = 0;  w = 0.
+        u = 0.d0;
+        if((y(j) - ylength*0.5d0)**2 + (z(k) - zlength*0.5d0)**2.lt.jetradius**2)  u = U_init
+
         if(DoVOF) then
            call initconditions_VOF()
            call get_all_heights()
