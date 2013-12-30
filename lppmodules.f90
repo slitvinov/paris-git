@@ -99,7 +99,10 @@
       type(element) :: element
       real(8) :: fx,fy,fz
       real(8) :: xcOld,ycOld,zcOld,ucOld,vcOld,wcOld
-      integer :: ic,jc,kc
+      integer :: ic,jc,kc,dummyint  
+      ! Note: open_mpi sometimes failed to communicate the last varialbe in 
+      !       MPI_TYPE_STRUCt correctly, dummyint is included to go around 
+      !       this bug in mpi
    end type particle 
    type (particle), dimension(:,:), allocatable :: parts
 
@@ -110,11 +113,16 @@
    real(8), parameter :: PI = 3.14159265359d0
    integer, parameter :: CRAZY_INT = 3483129 
 
+   integer, parameter :: CriteriaRectangle = 1
+   integer, parameter :: CriteriaCylinder  = 2
+   integer, parameter :: CriteriaSphere    = 3
+
    logical :: DoDropStatistics 
    logical :: DoConvertVOF2LPP 
    logical :: DoConvertLPP2VOF 
    integer :: dragmodel 
-   integer :: ntimesteptag 
+   integer :: ntimesteptag
+   integer :: CriteriaConvertCase
    real(8) :: vol_cut, xlpp_min,ylpp_min,zlpp_min, & 
                        xlpp_max,ylpp_max,zlpp_max  
 
@@ -165,8 +173,8 @@ contains
       integer ierr,in
       logical file_is_there
       namelist /lppparameters/ DoDropStatistics, dragmodel, nTimeStepTag,  &
-         DoConvertVOF2LPP,DoConvertLPP2VOF,vol_cut,xlpp_min,xlpp_max,      & 
-         ylpp_min,ylpp_max,zlpp_min,zlpp_max,                              &
+         DoConvertVOF2LPP,DoConvertLPP2VOF,CriteriaConvertCase,            & 
+         vol_cut,xlpp_min,xlpp_max,ylpp_min,ylpp_max,zlpp_min,zlpp_max,    &
          max_num_drop, maxnum_cell_drop, max_num_part, max_num_part_cross
 
       in=32
@@ -174,7 +182,8 @@ contains
       ! Set default values 
       DoDropStatistics = .false. 
       dragmodel    = 1
-      nTimeStepTag = 1 
+      nTimeStepTag = 1
+      CriteriaConvertCase = 1
       vol_cut  = 1.d-9
       xlpp_min = xh(   Ng)
       xlpp_max = xh(Nx+Ng)
@@ -217,7 +226,7 @@ contains
 
          if ( DoDropStatistics ) call drop_statistics(tswap) 
 
-         if ( DoConvertVOF2LPP ) call ConvertDrop2Part()
+         if ( DoConvertVOF2LPP ) call ConvertDrop2Part(tswap)
 !         if ( DoConvertLPP2VOF ) call ConvertPart2Drop()   ! TBA
       end if ! tswap
       call ComputePartForce(tswap)
@@ -254,7 +263,8 @@ contains
     s_queue(:,:) = 0
     num_drop(:) = 0
     num_drop_merge(:) = 0
-    do i=is,ie; do j=js,je; do k=ks,ke
+    do i=imin,imax; do j=jmin,jmax; do k=kmin,kmax
+    !do i=is,ie; do j=js,je; do k=ks,ke
       if ( cvof(i,j,k) > 0.d0 .and. tag_flag(i,j,k) == 0 ) then 
         tag_id  (i,j,k) = current_id
         tag_flag(i,j,k) = 2 ! mark as S node
@@ -285,11 +295,11 @@ contains
             ksq = s_queue(is_queue,3)
        
             do i0=-1,1; do j0=-1,1; do k0=-1,1
-              if ( cvof(isq+i0,jsq+j0,ksq+k0)      > 0.d0 .and. & 
-                   tag_flag(isq+i0,jsq+j0,ksq+k0) == 0 ) then 
-                  if (  isq+i0 >= is .and. isq+i0 <= ie .and. &     ! internal cells 
-                        jsq+j0 >= js .and. jsq+j0 <= je .and. & 
-                        ksq+k0 >= ks .and. ksq+k0 <= ke ) then
+               if ( isq+i0 >= imin .and. isq+i0 <= imax .and. & 
+                    jsq+j0 >= jmin .and. jsq+j0 <= jmax .and. &
+                    ksq+k0 >= kmin .and. ksq+k0 <= kmax ) then  
+                  if ( cvof(isq+i0,jsq+j0,ksq+k0)      > 0.d0 .and. & 
+                      tag_flag(isq+i0,jsq+j0,ksq+k0) == 0 ) then 
                      tag_id  (isq+i0,jsq+j0,ksq+k0) = current_id  ! tag node with id
                      tag_flag(isq+i0,jsq+j0,ksq+k0) = 3  ! mark as C node
                      ! put current node into C queue
@@ -297,46 +307,51 @@ contains
                      c_queue(nc_queue,1) = isq+i0
                      c_queue(nc_queue,2) = jsq+j0
                      c_queue(nc_queue,3) = ksq+k0
-                  else if ( isq+i0 >= Ng+1 .and. isq+i0 <= Ng+Nx .and. &     ! block ghost cells 
-                            jsq+j0 >= Ng+1 .and. jsq+j0 <= Ng+Ny .and. & 
-                            ksq+k0 >= Ng+1 .and. ksq+k0 <= Ng+Nz ) then
-                     tag_flag(isq+i0,jsq+j0,ksq+k0) = 5
-                     if ( merge_drop .eqv. .false.) then 
-                        merge_drop = .true.
-                        num_drop      (rank) = num_drop      (rank) - 1
-                        num_drop_merge(rank) = num_drop_merge(rank) + 1
-                     end if ! merge_drop
-                     if ( drops_merge(num_drop_merge(rank),rank)%num_gcell < maxnum_cell_drop) then 
-                        drops_merge(num_drop_merge(rank),rank)%num_gcell = drops_merge(num_drop_merge(rank),rank)%num_gcell + 1
-                        drops_merge_gcell_list(1,drops_merge(num_drop_merge(rank),rank)%num_gcell,num_drop_merge(rank)) = isq+i0
-                        drops_merge_gcell_list(2,drops_merge(num_drop_merge(rank),rank)%num_gcell,num_drop_merge(rank)) = jsq+j0
-                        drops_merge_gcell_list(3,drops_merge(num_drop_merge(rank),rank)%num_gcell,num_drop_merge(rank)) = ksq+k0
-                     else
-                        call pariserror('Number of ghost cells of droplet is larger than the maxinum value!')
-                     end if ! drops_merge(num_drop_merge(rank),rank)%num_gcell
-                  else                                                        ! domain ghost cells 
-                     ! Note: periodic bdry cond, to be added later
-                  end if ! isq+i0, jsq+j0, ksq+k0
-              end if 
+                  end if 
+               end if ! isq
             enddo;enddo;enddo ! i0,j0,k0
-            tag_flag(isq,jsq,ksq) = 1 !unmark S node and marked as tagged
+
+            if (  isq >= is .and. isq <= ie .and. &     ! internal cells 
+                  jsq >= js .and. jsq <= je .and. & 
+                  ksq >= ks .and. ksq <= ke ) then
+               tag_flag(isq,jsq,ksq) = 1 ! mark S node as tagged
+               ! perform droplet calculation
+               volcell = dx(isq)*dy(jsq)*dz(ksq) 
+               cvof_scaled = cvof(isq,jsq,ksq)*volcell
+               vol = vol + cvof_scaled
+               xc  = xc  + cvof_scaled*x(isq)
+               yc  = yc  + cvof_scaled*y(jsq)
+               zc  = zc  + cvof_scaled*z(ksq)
+               uc  = uc  + cvof_scaled*u(isq,jsq,ksq)
+               vc  = vc  + cvof_scaled*v(isq,jsq,ksq)
+               wc  = wc  + cvof_scaled*w(isq,jsq,ksq)
+               if ( num_cell_drop < maxnum_cell_drop ) then
+                  num_cell_drop = num_cell_drop + 1
+                  cell_list(1:3,num_cell_drop) = [isq,jsq,ksq]
+               else
+                  call pariserror('Number of cells of droplet is larger than the maxinum value!')
+               end if ! num_cell_drop
+            else if ( isq >= Ng+1 .and. isq <= Ng+Nx .and. &     ! block ghost cells 
+                      jsq >= Ng+1 .and. jsq <= Ng+Ny .and. & 
+                      ksq >= Ng+1 .and. ksq <= Ng+Nz ) then
+               tag_flag(isq,jsq,ksq) = 5
+               if ( merge_drop .eqv. .false.) then 
+                  merge_drop = .true.
+                  num_drop      (rank) = num_drop      (rank) - 1
+                  num_drop_merge(rank) = num_drop_merge(rank) + 1
+               end if ! merge_drop
+               if ( drops_merge(num_drop_merge(rank),rank)%num_gcell < maxnum_cell_drop) then 
+                  drops_merge(num_drop_merge(rank),rank)%num_gcell = drops_merge(num_drop_merge(rank),rank)%num_gcell + 1
+                  drops_merge_gcell_list(1,drops_merge(num_drop_merge(rank),rank)%num_gcell,num_drop_merge(rank)) = isq
+                  drops_merge_gcell_list(2,drops_merge(num_drop_merge(rank),rank)%num_gcell,num_drop_merge(rank)) = jsq
+                  drops_merge_gcell_list(3,drops_merge(num_drop_merge(rank),rank)%num_gcell,num_drop_merge(rank)) = ksq
+               else
+                  call pariserror('Number of ghost cells of droplet is larger than the maxinum value!')
+               end if ! drops_merge(num_drop_merge(rank),rank)%num_gcell
+            else                                                        ! domain ghost cells 
+               ! Note: periodic bdry cond, to be added later
+            end if ! isq, jsq, ksq
             
-            ! perform droplet calculation
-            volcell = dx(isq)*dy(jsq)*dz(ksq) 
-            cvof_scaled = cvof(isq,jsq,ksq)*volcell
-            vol = vol + cvof_scaled
-            xc  = xc  + cvof_scaled*x(isq)
-            yc  = yc  + cvof_scaled*y(jsq)
-            zc  = zc  + cvof_scaled*z(ksq)
-            uc  = uc  + cvof_scaled*u(isq,jsq,ksq)
-            vc  = vc  + cvof_scaled*v(isq,jsq,ksq)
-            wc  = wc  + cvof_scaled*w(isq,jsq,ksq)
-            if ( num_cell_drop < maxnum_cell_drop ) then
-               num_cell_drop = num_cell_drop + 1
-               cell_list(1:3,num_cell_drop) = [isq,jsq,ksq]
-            else
-               call pariserror('Number of cells of droplet is larger than the maxinum value!')
-            end if ! num_cell_drop
           end do ! is_queue
           ! mark all C nodes as S nodes
           if ( nc_queue >= 0 ) then 
@@ -562,7 +577,7 @@ contains
       element_NULL%uc = 0.d0;element_NULL%vc = 0.d0;element_NULL%wc = 0.d0
       element_NULL%vol = 0.d0;element_NULL%id = CRAZY_INT
 
-      !  Setup MPI derived type for drop_merge_comm
+      !  Setup MPI derived type for element_type 
       offsets (0) = 0 
       oldtypes(0) = MPI_REAL8 
       blockcounts(0) = 7 
@@ -909,7 +924,9 @@ contains
 ! ==============================================
 ! output droplets & particles 
 ! ==============================================
-   subroutine output_DP()
+   subroutine output_DP(tswap)
+
+      integer, intent(in) :: tswap
       integer :: i,j,k
       integer :: ib,ipart
 
@@ -953,7 +970,7 @@ contains
       end if ! rank
 
       ! convert droplets to particles
-      call ConvertDrop2Part()
+      call ConvertDrop2Part(tswap)
 
       ! output droplets & particles
       OPEN(UNIT=93,FILE=TRIM(out_path)//'/VOF_after_'//TRIM(int2text(rank,padding))//'.dat')
@@ -996,15 +1013,15 @@ contains
 ! ===============================================
 ! Testing section
 ! ===============================================
-   subroutine test_Lag_part()
-      implicit none
+   subroutine test_Lag_part(tswap)
       include 'mpif.h'
+      integer, intent(in) :: tswap
 !      integer :: ierr
                      
       if(test_tag) then
          call output_tag()
       else if ( test_D2P ) then
-         call output_DP()
+         call output_DP(tswap)
       end if
                                                                              
 !      ! Exit MPI gracefully
@@ -1071,55 +1088,46 @@ contains
     end if ! nA
    end subroutine QSort
 
-   subroutine ConvertDrop2Part()
+   subroutine ConvertDrop2Part(tswap)
 
       include 'mpif.h'
+
+      integer, intent(in) :: tswap
+
       integer :: idrop,ilist
       logical :: ConvertDropFlag,convertDoneFlag
       real(8) :: MinDistPart2CellCenter, DistPart2CellCenter
       integer :: ierr
+      real(8) :: uf,vf,wf
+      integer :: i,j,k
 
       if (.not. LPP_initialized) then 
          call initialize_LPP()
          LPP_initialized = .true.
       end if ! LPP_initialized
 
-      ! Define criteria for conversion 
-!      if ( test_D2P ) then 
-!         vol_cut = 4.0d0*0.6d0**3.d0*PI/3.d0
-!      else if ( test_bubbles ) then 
-!         vol_cut = 4.0d0*0.12d-2**3.d0*PI/3.d0
-!         ylpp_min   = 0.002d0
-!      end if ! test_type
-
       if ( num_drop(rank) > 0 ) then 
       do idrop = 1,num_drop(rank)
-         ConvertDropFlag = .false.
-!         if ( test_D2P ) then 
-!            if ( drops(idrop,rank)%element%vol < vol_cut ) then 
-!               ConvertDropFlag = .true.
-!            end if
-!         else if ( test_bubbles ) then 
-!            if ( drops(idrop,rank)%element%vol < vol_cut .and. &
-!                 drops(idrop,rank)%element%yc  > ylpp_min ) then 
-!               ConvertDropFlag = .true.
-!            end if
-         if ( drops(idrop,rank)%element%vol < vol_cut  .and. &
-              drops(idrop,rank)%element%xc  > xlpp_min .and. & 
-              drops(idrop,rank)%element%xc  < xlpp_max .and. & 
-              drops(idrop,rank)%element%yc  > ylpp_min .and. & 
-              drops(idrop,rank)%element%yc  < ylpp_max .and. & 
-              drops(idrop,rank)%element%zc  > zlpp_min .and. & 
-              drops(idrop,rank)%element%zc  > zlpp_max ) then 
-            ConvertDropFlag = .true.
-         end if !vol_cut, xlpp_min... 
+
+         call CheckConvertDropCriteria(drops(idrop,rank)%element%vol, & 
+                                       drops(idrop,rank)%element%xc,  & 
+                                       drops(idrop,rank)%element%yc,  & 
+                                       drops(idrop,rank)%element%zc,  &
+                                       ConvertDropFlag,CriteriaConvertCase)
 
          if ( ConvertDropFlag ) then
+! TEMPORARY
+            write(*,*) 'Drop is converted to particle', idrop,rank,tswap
+! END TEMPORARY
             ! transfer droplet properties to particle
             num_part(rank) = num_part(rank) + 1
             parts(num_part(rank),rank)%element = drops(idrop,rank)%element
 
             ! compute average fluid quantities
+            ! Note: XXX temporary, need to be improved later 
+            uf = drops(idrop,rank)%element%uc
+            vf = drops(idrop,rank)%element%vc
+            wf = drops(idrop,rank)%element%wc
 
             ! remove droplet vof structure
             MinDistPart2CellCenter = 1.0d10
@@ -1127,6 +1135,15 @@ contains
                cvof(drops_cell_list(1,ilist,idrop), &
                     drops_cell_list(2,ilist,idrop), &
                     drops_cell_list(3,ilist,idrop)) = 0.0
+                  u(drops_cell_list(1,ilist,idrop), &
+                    drops_cell_list(2,ilist,idrop), &
+                    drops_cell_list(3,ilist,idrop)) = uf 
+                  v(drops_cell_list(1,ilist,idrop), &
+                    drops_cell_list(2,ilist,idrop), &
+                    drops_cell_list(3,ilist,idrop)) = vf 
+                  w(drops_cell_list(1,ilist,idrop), &
+                    drops_cell_list(2,ilist,idrop), &
+                    drops_cell_list(3,ilist,idrop)) = wf 
                DistPart2CellCenter = ( drops(idrop,rank)%element%xc  & 
                            - x(drops_cell_list(1,ilist,idrop)))**2.d0 & 
                                    + ( drops(idrop,rank)%element%yc  & 
@@ -1143,45 +1160,66 @@ contains
          end if !ConvertDropFlag
       end do ! idrop
       end if ! num_drop(rank) 
-          
+      
+      if ( num_drop_merge(rank) > 0 ) then
       do idrop = 1,num_drop_merge(rank)
-!         if ( test_D2P ) then 
-!            if ( drops_merge(idrop,rank)%element%vol < vol_cut ) then 
-!               ConvertDropFlag = .true.
-!            end if
-!         else if ( test_bubbles ) then 
-!            if ( drops_merge(idrop,rank)%element%vol < vol_cut .and. &
-!                 drops_merge(idrop,rank)%element%yc  > ylpp_min ) then 
-!               ConvertDropFlag = .true.
-!            end if
-!         end if ! test_D2P
 
-         if ( (drops_merge(idrop,rank)%element%vol < vol_cut)  .and. &
-              (drops_merge(idrop,rank)%element%xc  > xlpp_min) .and. & 
-              (drops_merge(idrop,rank)%element%xc  < xlpp_max) .and. & 
-              (drops_merge(idrop,rank)%element%yc  > ylpp_min) .and. & 
-              (drops_merge(idrop,rank)%element%yc  < ylpp_max) .and. & 
-              (drops_merge(idrop,rank)%element%zc  > zlpp_min) .and. & 
-              (drops_merge(idrop,rank)%element%zc  < zlpp_max) ) then 
-            ConvertDropFlag = .true.
-         end if !vol_cut, xlpp_min... 
+         call CheckConvertDropCriteria(drops_merge(idrop,rank)%element%vol, & 
+                                       drops_merge(idrop,rank)%element%xc,  & 
+                                       drops_merge(idrop,rank)%element%yc,  & 
+                                       drops_merge(idrop,rank)%element%zc,  &
+                                       ConvertDropFlag,CriteriaConvertCase)
 
          if ( ConvertDropFlag ) then
+! TEMPORARY
+            write(*,*) 'Drop_merge is converted to particle', idrop,rank,tswap
+! END TEMPORARY
+
             ! compute average fluid quantities
+            ! Note: XXX temporary, need to be improved later 
+            uf = drops_merge(idrop,rank)%element%uc
+            vf = drops_merge(idrop,rank)%element%vc
+            wf = drops_merge(idrop,rank)%element%wc
 
             ! remove droplet vof structure
             do ilist = 1,drops_merge(idrop,rank)%num_cell_drop
                cvof(drops_merge_cell_list(1,ilist,idrop), &
                     drops_merge_cell_list(2,ilist,idrop), &
                     drops_merge_cell_list(3,ilist,idrop)) = 0.0
+                  u(drops_merge_cell_list(1,ilist,idrop), &
+                    drops_merge_cell_list(2,ilist,idrop), &
+                    drops_merge_cell_list(3,ilist,idrop)) = uf
+                  v(drops_merge_cell_list(1,ilist,idrop), &
+                    drops_merge_cell_list(2,ilist,idrop), &
+                    drops_merge_cell_list(3,ilist,idrop)) = vf
+                  w(drops_merge_cell_list(1,ilist,idrop), &
+                    drops_merge_cell_list(2,ilist,idrop), &
+                    drops_merge_cell_list(3,ilist,idrop)) = wf
             end do ! ilist
       
+            ! remove droplet vof structure
+            do ilist = 1,drops_merge(idrop,rank)%num_gcell
+               cvof(drops_merge_gcell_list(1,ilist,idrop), &
+                    drops_merge_gcell_list(2,ilist,idrop), &
+                    drops_merge_gcell_list(3,ilist,idrop)) = 0.0
+                  u(drops_merge_cell_list(1,ilist,idrop), &
+                    drops_merge_cell_list(2,ilist,idrop), &
+                    drops_merge_cell_list(3,ilist,idrop)) = uf
+                  v(drops_merge_cell_list(1,ilist,idrop), &
+                    drops_merge_cell_list(2,ilist,idrop), &
+                    drops_merge_cell_list(3,ilist,idrop)) = vf
+                  w(drops_merge_cell_list(1,ilist,idrop), &
+                    drops_merge_cell_list(2,ilist,idrop), &
+                    drops_merge_cell_list(3,ilist,idrop)) = wf
+            end do ! ilist
+
             ! transfer droplet properties to particle if center of mass located
             ! in this droplet piece
             if ( drops_merge(idrop,rank)%flag_center_mass == 1 ) then 
                num_part(rank) = num_part(rank) + 1
                parts(num_part(rank),rank)%element = drops_merge(idrop,rank)%element
-
+            
+               ! Find particle location cell
                MinDistPart2CellCenter = 1.0d10
                do ilist = 1,drops_merge(idrop,rank)%num_cell_drop
                   DistPart2CellCenter = ( drops_merge(idrop,rank)%element%xc  & 
@@ -1201,6 +1239,7 @@ contains
 
          end if !ConvertDropFlag
       end do ! idrop
+      end if ! num_drop_merge(rank) 
 
       ! Update num_part to all ranks. Note: no need for num_drop &
       ! num_drop_merge since they will be regenerated next step  
@@ -1208,6 +1247,43 @@ contains
                          num_part(:)   , 1, MPI_INTEGER, MPI_Comm_World, ierr)
 
    end subroutine ConvertDrop2Part
+
+   subroutine CheckConvertDropCriteria(vol,xc,yc,zc,ConvertDropFlag,CriteriaConvertCase)
+
+      real(8), intent(in ) :: vol,xc,yc,zc
+      integer, intent(in ) :: CriteriaConvertCase
+      logical, intent(out) :: ConvertDropFlag
+
+      select case (CriteriaConvertCase) 
+         case (CriteriaRectangle)
+            if ( (vol < vol_cut)  .and. &
+                 (xc  > xlpp_min) .and. (xc  < xlpp_max) .and. & 
+                 (yc  > ylpp_min) .and. (yc  < ylpp_max) .and. & 
+                 (zc  > zlpp_min) .and. (zc  < zlpp_max) ) then 
+               ConvertDropFlag = .true.
+            else 
+               ConvertDropFlag = .false.
+            end if !vol_cut, xlpp_min...
+         case (CriteriaCylinder )   ! Note: assuming axis along x-direction
+                                    ! radius indicated by ylpp_min & ylpp_max
+            if ( (  vol < vol_cut)                          .and. &
+                 ( (yc**2.d0 + zc**2.d0) > ylpp_min**2.d0)  .and. & 
+                 ( (yc**2.d0 + zc**2.d0) < ylpp_max**2.d0) ) then 
+               ConvertDropFlag = .true.
+            else 
+               ConvertDropFlag = .false.
+            end if !vol_cut, xlpp_min... 
+         case (CriteriaSphere   )   ! radius indicated by ylpp_min & ylpp_max 
+            if ( (  vol < vol_cut)                                      .and. &
+                 ( (xc**2.d0 + yc**2.d0 + zc**2.d0) > ylpp_min**2.d0)   .and. & 
+                 ( (xc**2.d0 + yc**2.d0 + zc**2.d0) < ylpp_max**2.d0) ) then 
+               ConvertDropFlag = .true.
+            else 
+               ConvertDropFlag = .false.
+            end if !vol_cut, xlpp_min... 
+      end select
+      
+   end subroutine CheckConvertDropCriteria
 
    subroutine ComputePartForce(tswap)
 
@@ -1261,7 +1337,9 @@ contains
                case default
                   call pariserror("wrong quasi-steady drag model!")
             end select ! dragmodel
-
+! TEMPORARY 
+!            phi = phi * (1.d0+2.d0*0.03351)/(1.d0-0.03351)**2.d0
+! END TEMPORARY 
             ! Note: set history to be zero for now
             fhx=0.d0; fhy=0.d0; fhz=0.d0
 
@@ -1375,7 +1453,7 @@ contains
                 ABS(x(i)-xp) > (0.5d0*(x(i+1)+x(i+2))-x(i)) ) .or. & 
               ( parts(ipart,rank)%element%uc < 0.d0 .and. &
                 ABS(x(i)-xp) > (x(i)-0.5d0*(x(i-1)+x(i-2))) )) then
-            call pariserror("Particles move more than a cell size in dt!")
+            call pariserror("Particles move more than dx in dt!")
          else if ( parts(ipart,rank)%element%uc > 0.d0 .and. &
                     ABS(x(i)-xp) > ABS(x(i+1)-xp) ) then 
             i = i+1
@@ -1391,7 +1469,7 @@ contains
                 ABS(y(j)-yp) > (0.5d0*(y(j+1)+y(j+2))-y(j)) ) .or. & 
               ( parts(ipart,rank)%element%vc < 0.d0 .and. &
                 ABS(y(j)-yp) > (y(j)-0.5d0*(y(j-1)+y(j-2))) )) then
-            call pariserror("Particles move more than a cell size in dt!")
+            call pariserror("Particles move more than dy in dt!")
          else if ( parts(ipart,rank)%element%vc > 0.d0 .and. &
                     ABS(y(j)-yp) > ABS(y(j+1)-yp) ) then 
             j = j+1
@@ -1526,11 +1604,15 @@ contains
       blockcounts(2) = 9
       offsets    (3) = offsets(2) + blockcounts(2)*r8extent 
       oldtypes   (3) = MPI_INTEGER  
-      blockcounts(3) = 3  
+      blockcounts(3) = 4  
 
       call MPI_TYPE_STRUCT(4, blockcounts, offsets, oldtypes, & 
                            MPI_particle_type, ierr) 
       call MPI_TYPE_COMMIT(MPI_particle_type, ierr)
+! DEBUG
+      call MPI_TYPE_EXTENT(MPI_particle_type, partextent, ierr) 
+      write(*,*) r8extent,intextent,partextent 
+! END DEBUG
 
       do irank = 0,nPdomain-1
          if ( num_part_cross(irank) > 0 ) then

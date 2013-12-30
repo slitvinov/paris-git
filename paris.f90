@@ -1141,7 +1141,7 @@ subroutine InitCondition
      if(test_HF) then
         call test_VOF_HF()
      else if (test_LP) then 
-        call test_Lag_part()
+        call test_Lag_part(itimestep)
      endif
      if(DoFront) then
         call GetFront('recv')
