@@ -391,7 +391,7 @@ contains
     enddo; enddo; enddo
 
     num_tag(rank) = num_drop(rank) + num_drop_merge(rank)
-  end subroutine tag_drop
+   end subroutine tag_drop
 
    subroutine tag_drop_all()
       include 'mpif.h'
@@ -1485,7 +1485,7 @@ contains
                 ABS(z(k)-zp) > (0.5d0*(z(k+1)+z(k+2))-z(k)) ) .or. & 
               ( parts(ipart,rank)%element%wc < 0.d0 .and. &
                 ABS(z(k)-zp) > (z(k)-0.5d0*(z(k-1)+z(k-2))) )) then
-            call pariserror("Particles move more than a cell size in dt!")
+             call pariserror("Particles move more than dz in dt!")
          else if ( parts(ipart,rank)%element%wc > 0.d0 .and. &
                     ABS(z(k)-zp) > ABS(z(k+1)-zp) ) then 
             k = k+1
@@ -1609,10 +1609,6 @@ contains
       call MPI_TYPE_STRUCT(4, blockcounts, offsets, oldtypes, & 
                            MPI_particle_type, ierr) 
       call MPI_TYPE_COMMIT(MPI_particle_type, ierr)
-! DEBUG
-      call MPI_TYPE_EXTENT(MPI_particle_type, partextent, ierr) 
-      write(*,*) r8extent,intextent,partextent 
-! END DEBUG
 
       do irank = 0,nPdomain-1
          if ( num_part_cross(irank) > 0 ) then
