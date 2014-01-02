@@ -1129,7 +1129,7 @@ subroutine InitCondition
         ! when set by Front-Tracking.
         color = 0.;  v = 0;  w = 0.
         u = 0.d0;
-        if((y(j) - ylength*0.5d0)**2 + (z(k) - zlength*0.5d0)**2.lt.jetradius**2)  u = U_init
+!        if((y(j) - ylength*0.5d0)**2 + (z(k) - zlength*0.5d0)**2.lt.jetradius**2)  u = U_init
 
         if(DoVOF) then
            call initconditions_VOF()

@@ -1310,6 +1310,9 @@ contains
             call GetFluidProp(parts(ipart,rank)%ic, &
                               parts(ipart,rank)%jc, &
                               parts(ipart,rank)%kc, & 
+                              parts(ipart,rank)%element%xc, & 
+                              parts(ipart,rank)%element%yc, & 
+                              parts(ipart,rank)%element%zc, & 
                               uf,vf,wf,DufDt,DvfDt,DwfDt,   & 
                               parts(ipart,rank)%element%vol)
 
@@ -1360,14 +1363,48 @@ contains
       end if ! num_part(rank) 
    end subroutine ComputePartForce
 
-   subroutine GetFluidProp(ip,jp,kp,uf,vf,wf,DufDt,DvfDt,DwfDt,volp) 
+   subroutine GetFluidProp(ip,jp,kp,xp,yp,zp,uf,vf,wf,DufDt,DvfDt,DwfDt,volp) 
 
       integer, intent(in)  :: ip,jp,kp
+      real(8), intent(in)  :: xp,yp,zp 
       real(8), intent(in)  :: volp 
       real(8), intent(out) :: uf,vf,wf,DufDt,DvfDt,DwfDt
       
       real(8) :: dp, dx,dy,dz,max_gridsize,min_gridsize
+      real(8) :: Lx,Ly,Lz
 
+      dp = (6.d0*volp/PI)**(1.d0/3.d0)
+      dx = xh(ip)-xh(ip-1)
+      dy = yh(jp)-yh(jp-1)
+      dz = zh(kp)-zh(kp-1)
+      max_gridsize = max(dx,dy,dz)
+      min_gridsize = min(dx,dy,dz)
+
+      if ( dp < min_gridsize ) then ! Interploation
+         call TrilinearIntrplFluidVel(xp,yp,zp,ip,jp,kp,uf,1)
+         call TrilinearIntrplFluidVel(xp,yp,zp,ip,jp,kp,vf,2)
+         call TrilinearIntrplFluidVel(xp,yp,zp,ip,jp,kp,wf,3)
+      else if ( dp > max_gridsize ) then  ! Check flow scale scale
+         Lx = dx*(u(ip-1,jp,kp)+u(ip,jp,kp))/(u(ip,jp,kp)-u(ip-1,jp,kp))
+         Ly = dy*(v(ip,jp-1,kp)+v(ip,jp,kp))/(v(ip,jp,kp)-v(ip,jp-1,kp))
+         Lz = dz*(w(ip,jp,kp-1)+w(ip,jp,kp))/(w(ip,jp,kp)-w(ip,jp,kp-1))
+         if ( Lx > dp ) then 
+            call TrilinearIntrplFluidVel(xp,yp,zp,ip,jp,kp,uf,1)
+         else 
+            !ComputeAveFluidVel
+         end if ! Lx
+         if ( Ly > dp ) then 
+            call TrilinearIntrplFluidVel(xp,yp,zp,ip,jp,kp,vf,2)
+         else 
+            !ComputeAveFluidVel
+         end if ! Lx
+         if ( Lz > dp ) then 
+            call TrilinearIntrplFluidVel(xp,yp,zp,ip,jp,kp,wf,3)
+         else 
+            !ComputeAveFluidVel
+         end if ! Lz
+      else ! interploation & averaging
+      end if ! dp 
 ! TEMPORARY
       uf = 0.d0 
       vf = 0.d0
@@ -1376,19 +1413,6 @@ contains
       DvfDt = 0.d0
       DwfDt = 0.d0
 ! END TEMPORARY
-
-      dp = (6.d0*volp/PI)**(1.d0/3.d0)
-      dx = xh(ip)-xh(ip-1)
-      dy = yh(ip)-yh(ip-1)
-      dz = zh(ip)-zh(ip-1)
-      max_gridsize = max(dx,dy,dz)
-      min_gridsize = min(dx,dy,dz)
-
-      if ( dp < min_gridsize ) then 
-         ! interpolation
-      else 
-         ! averaging
-      end if ! dp 
 
    end subroutine GetFluidProp
 
@@ -1705,4 +1729,97 @@ contains
       end if ! d
 
    end subroutine PartBC_periodic
+
+   subroutine LinearIntrpl(x,x0,x1,f0,f1,f)
+      real(8), intent (in) :: x,x0,x1,f0,f1
+      real(8), intent(out) :: f      
+      real(8) :: xl,xr
+
+      xl = (x-x0)/(x1-x0)
+      xr = 1.d0 - xl
+      f  = f0*xr + f1*xl
+   end subroutine LinearIntrpl
+
+   subroutine BilinearIntrpl(x,y,x0,y0,x1,y1,f00,f01,f10,f11,f)
+      real(8), intent (in) :: x,y,x0,y0,x1,y1,f00,f01,f10,f11
+      real(8), intent(out) :: f      
+      real(8) :: f0,f1
+
+      call LinearIntrpl(x,x0,x1,f00,f10,f0)
+      call LinearIntrpl(x,x0,x1,f01,f11,f1)
+      call LinearIntrpl(y,y0,y1,f0 ,f1 ,f)
+   end subroutine BilinearIntrpl
+
+   subroutine TrilinearIntrpl(x,y,z,x0,y0,z0,x1,y1,z1,f000,f001,f010,f011,f100,f101,f110,f111,f)
+      real(8), intent (in) :: x,y,z,x0,y0,z0,x1,y1,z1, & 
+                              f000,f001,f010,f011,f100,f101,f110,f111
+      real(8), intent(out) :: f      
+      real(8) :: f0,f1,f00,f01,f10,f11
+
+      call LinearIntrpl(x,x0,x1,f000,f100,f00)
+      call LinearIntrpl(x,x0,x1,f010,f110,f10)
+      call LinearIntrpl(x,x0,x1,f001,f101,f01)
+      call LinearIntrpl(x,x0,x1,f011,f111,f11)
+      call LinearIntrpl(y,y0,y1,f00,f10,f0)
+      call LinearIntrpl(y,y0,y1,f01,f11,f1)
+      call LinearIntrpl(z,z0,z1,f0 ,f1 ,f)
+   end subroutine TrilinearIntrpl
+
+   subroutine TrilinearIntrplFluidVel(xp,yp,zp,ip,jp,kp,vel,dir)
+      real(8), intent (in) :: xp,yp,zp
+      integer, intent (in) :: ip,jp,kp,dir
+      real(8), intent(out) :: vel
+
+      integer :: si,sj,sk
+
+      if ( dir == 1 ) then 
+         ! Trilinear interpolation for u
+         si = -1;sj = -1;sk = -1 
+         if ( yp > y(jp) ) sj =  0 
+         if ( zp > z(kp) ) sk =  0
+         call TrilinearIntrpl(xp,yp,zp,xh(ip  +si),yh(jp  +sj),zh(kp  +sk),        & 
+                                       xh(ip+1+si),yh(jp+1+sj),zh(kp+1+sk),        &
+                                       u(ip  +si,jp  +sj,kp  +sk), & 
+                                       u(ip  +si,jp  +sj,kp+1+sk), & 
+                                       u(ip  +si,jp+1+sj,kp  +sk), & 
+                                       u(ip  +si,jp+1+sj,kp+1+sk), & 
+                                       u(ip+1+si,jp  +sj,kp  +sk), & 
+                                       u(ip+1+si,jp  +sj,kp+1+sk), & 
+                                       u(ip+1+si,jp+1+sj,kp  +sk), & 
+                                       u(ip+1+si,jp+1+sj,kp+1+sk), vel)
+      else if ( dir == 2 ) then 
+         ! Trilinear interpolation for v
+         si = -1;sj = -1;sk = -1 
+         if ( xp > x(ip) ) si =  0 
+         if ( zp > z(kp) ) sk =  0
+         call TrilinearIntrpl(xp,yp,zp,xh(ip  +si),yh(jp  +sj),zh(kp  +sk),        & 
+                                       xh(ip+1+si),yh(jp+1+sj),zh(kp+1+sk),        &
+                                       v(ip  +si,jp  +sj,kp  +sk), & 
+                                       v(ip  +si,jp  +sj,kp+1+sk), & 
+                                       v(ip  +si,jp+1+sj,kp  +sk), & 
+                                       v(ip  +si,jp+1+sj,kp+1+sk), & 
+                                       v(ip+1+si,jp  +sj,kp  +sk), & 
+                                       v(ip+1+si,jp  +sj,kp+1+sk), & 
+                                       v(ip+1+si,jp+1+sj,kp  +sk), & 
+                                       v(ip+1+si,jp+1+sj,kp+1+sk), vel)
+      else if ( dir == 3 ) then 
+         ! Trilinear interpolation for w
+         si = -1;sj = -1;sk = -1 
+         if ( xp > x(ip) ) si =  0 
+         if ( yp > y(jp) ) sj =  0
+         call TrilinearIntrpl(xp,yp,zp,xh(ip  +si),yh(jp  +sj),zh(kp  +sk),        & 
+                                       xh(ip+1+si),yh(jp+1+sj),zh(kp+1+sk),        &
+                                       w(ip  +si,jp  +sj,kp  +sk), & 
+                                       w(ip  +si,jp  +sj,kp+1+sk), & 
+                                       w(ip  +si,jp+1+sj,kp  +sk), & 
+                                       w(ip  +si,jp+1+sj,kp+1+sk), & 
+                                       w(ip+1+si,jp  +sj,kp  +sk), & 
+                                       w(ip+1+si,jp  +sj,kp+1+sk), & 
+                                       w(ip+1+si,jp+1+sj,kp  +sk), & 
+                                       w(ip+1+si,jp+1+sj,kp+1+sk), vel)
+      else 
+         call pariserror("Wrong direction in velocity interploation!")
+      end if ! dir 
+   end subroutine TrilinearIntrplFluidVel
+
 end module module_Lag_part
