@@ -27,6 +27,11 @@
 !=================================================================================================
 ! module_lag_particle: Contains definition of variables for Lagrangian particle  
 !   model and conversion between VOF and Lagrangian particle model
+! Note: 1, Continuous phase is refered as fluid, and dispersed phase is refered
+! as droplets or particles.
+!       2, Droplets refered to dispersed phase resolved with Volume-of-Fluid
+!       method (VOF); while Particles refered to dispersed phase represented by
+!       Lagrangian Point-Particle Model (LPP).
 !-------------------------------------------------------------------------------------------------
    module module_Lag_part
    use module_grid
@@ -110,6 +115,9 @@
    integer, dimension(:,:), allocatable :: parts_cross_newrank
    integer, dimension(:), allocatable :: num_part_cross
 
+   ! substantial derivative of fluid velocity, used for unsteady force calulation
+   real(8), dimension(:,:,:), allocatable :: sdu,sdv,sdw
+
    real(8), parameter :: PI = 3.14159265359d0
    integer, parameter :: CRAZY_INT = 3483129 
 
@@ -126,10 +134,10 @@
    real(8) :: vol_cut, xlpp_min,ylpp_min,zlpp_min, & 
                        xlpp_max,ylpp_max,zlpp_max  
 
-   integer :: max_num_drop = 10000
-   integer :: maxnum_cell_drop = 10000
-   integer :: max_num_part = 10000
-   integer :: max_num_part_cross = 100
+   integer :: max_num_drop 
+   integer :: maxnum_cell_drop
+   integer :: max_num_part
+   integer :: max_num_part_cross
 contains
 !=================================================================================================
    subroutine initialize_LPP()
@@ -151,6 +159,9 @@ contains
       allocate( drops_cell_list(3,maxnum_cell_drop,max_num_drop) )
       allocate( drops_merge_cell_list(3,maxnum_cell_drop,max_num_drop) )
       allocate( drops_merge_gcell_list(3,maxnum_cell_drop,max_num_drop) )
+      allocate( sdu(imin:imax,jmin:jmax,kmin:kmax), & 
+                sdv(imin:imax,jmin:jmax,kmin:kmax), &
+                sdw(imin:imax,jmin:jmax,kmin:kmax) )
 
       ! set default values
       num_tag  = 0
@@ -160,6 +171,8 @@ contains
       num_element = 0
 
       LPP_initialized = .true.
+
+      sdu = 0.d0; sdv = 0.d0; sdw =0.d0
 
    end subroutine initialize_LPP
 
@@ -229,6 +242,7 @@ contains
          if ( DoConvertVOF2LPP ) call ConvertDrop2Part(tswap)
 !         if ( DoConvertLPP2VOF ) call ConvertPart2Drop()   ! TBA
       end if ! tswap
+      call ComputeFluidAccel()
       call ComputePartForce(tswap)
       call UpdatePartSol(tswap)
    end subroutine lppsweeps
@@ -1381,39 +1395,30 @@ contains
       min_gridsize = min(dx,dy,dz)
 
       if ( dp < min_gridsize ) then ! Interploation
-         call TrilinearIntrplFluidVel(xp,yp,zp,ip,jp,kp,uf,1)
-         call TrilinearIntrplFluidVel(xp,yp,zp,ip,jp,kp,vf,2)
-         call TrilinearIntrplFluidVel(xp,yp,zp,ip,jp,kp,wf,3)
+         call TrilinearIntrplFluidVel(xp,yp,zp,ip,jp,kp,uf,DufDt,1)
+         call TrilinearIntrplFluidVel(xp,yp,zp,ip,jp,kp,vf,DvfDt,2)
+         call TrilinearIntrplFluidVel(xp,yp,zp,ip,jp,kp,wf,DwfDt,3)
       else if ( dp > max_gridsize ) then  ! Check flow scale scale
          Lx = dx*(u(ip-1,jp,kp)+u(ip,jp,kp))/(u(ip,jp,kp)-u(ip-1,jp,kp))
          Ly = dy*(v(ip,jp-1,kp)+v(ip,jp,kp))/(v(ip,jp,kp)-v(ip,jp-1,kp))
          Lz = dz*(w(ip,jp,kp-1)+w(ip,jp,kp))/(w(ip,jp,kp)-w(ip,jp,kp-1))
          if ( Lx > dp ) then 
-            call TrilinearIntrplFluidVel(xp,yp,zp,ip,jp,kp,uf,1)
+            call TrilinearIntrplFluidVel(xp,yp,zp,ip,jp,kp,uf,DufDt,1)
          else 
             !ComputeAveFluidVel
          end if ! Lx
          if ( Ly > dp ) then 
-            call TrilinearIntrplFluidVel(xp,yp,zp,ip,jp,kp,vf,2)
+            call TrilinearIntrplFluidVel(xp,yp,zp,ip,jp,kp,vf,DvfDt,2)
          else 
             !ComputeAveFluidVel
          end if ! Lx
          if ( Lz > dp ) then 
-            call TrilinearIntrplFluidVel(xp,yp,zp,ip,jp,kp,wf,3)
+            call TrilinearIntrplFluidVel(xp,yp,zp,ip,jp,kp,wf,DwfDt,3)
          else 
             !ComputeAveFluidVel
          end if ! Lz
       else ! interploation & averaging
       end if ! dp 
-! TEMPORARY
-      uf = 0.d0 
-      vf = 0.d0
-      wf = 0.d0
-      DufDt = 0.d0 
-      DvfDt = 0.d0
-      DwfDt = 0.d0
-! END TEMPORARY
-
    end subroutine GetFluidProp
 
    subroutine UpdatePartSol(tswap)
@@ -1765,15 +1770,14 @@ contains
       call LinearIntrpl(z,z0,z1,f0 ,f1 ,f)
    end subroutine TrilinearIntrpl
 
-   subroutine TrilinearIntrplFluidVel(xp,yp,zp,ip,jp,kp,vel,dir)
+   subroutine TrilinearIntrplFluidVel(xp,yp,zp,ip,jp,kp,vel,sdvel,dir)
       real(8), intent (in) :: xp,yp,zp
       integer, intent (in) :: ip,jp,kp,dir
-      real(8), intent(out) :: vel
+      real(8), intent(out) :: vel,sdvel
 
       integer :: si,sj,sk
 
-      if ( dir == 1 ) then 
-         ! Trilinear interpolation for u
+      if ( dir == 1 ) then ! Trilinear interpolation for u
          si = -1;sj = -1;sk = -1 
          if ( yp > y(jp) ) sj =  0 
          if ( zp > z(kp) ) sk =  0
@@ -1787,8 +1791,17 @@ contains
                                        u(ip+1+si,jp  +sj,kp+1+sk), & 
                                        u(ip+1+si,jp+1+sj,kp  +sk), & 
                                        u(ip+1+si,jp+1+sj,kp+1+sk), vel)
-      else if ( dir == 2 ) then 
-         ! Trilinear interpolation for v
+         call TrilinearIntrpl(xp,yp,zp,xh(ip  +si),yh(jp  +sj),zh(kp  +sk),        & 
+                                       xh(ip+1+si),yh(jp+1+sj),zh(kp+1+sk),        &
+                                       sdu(ip  +si,jp  +sj,kp  +sk), & 
+                                       sdu(ip  +si,jp  +sj,kp+1+sk), & 
+                                       sdu(ip  +si,jp+1+sj,kp  +sk), & 
+                                       sdu(ip  +si,jp+1+sj,kp+1+sk), & 
+                                       sdu(ip+1+si,jp  +sj,kp  +sk), & 
+                                       sdu(ip+1+si,jp  +sj,kp+1+sk), & 
+                                       sdu(ip+1+si,jp+1+sj,kp  +sk), & 
+                                       sdu(ip+1+si,jp+1+sj,kp+1+sk), sdvel)
+      else if ( dir == 2 ) then ! Trilinear interpolation for v
          si = -1;sj = -1;sk = -1 
          if ( xp > x(ip) ) si =  0 
          if ( zp > z(kp) ) sk =  0
@@ -1802,8 +1815,17 @@ contains
                                        v(ip+1+si,jp  +sj,kp+1+sk), & 
                                        v(ip+1+si,jp+1+sj,kp  +sk), & 
                                        v(ip+1+si,jp+1+sj,kp+1+sk), vel)
-      else if ( dir == 3 ) then 
-         ! Trilinear interpolation for w
+         call TrilinearIntrpl(xp,yp,zp,xh(ip  +si),yh(jp  +sj),zh(kp  +sk),        & 
+                                       xh(ip+1+si),yh(jp+1+sj),zh(kp+1+sk),        &
+                                       sdv(ip  +si,jp  +sj,kp  +sk), & 
+                                       sdv(ip  +si,jp  +sj,kp+1+sk), & 
+                                       sdv(ip  +si,jp+1+sj,kp  +sk), & 
+                                       sdv(ip  +si,jp+1+sj,kp+1+sk), & 
+                                       sdv(ip+1+si,jp  +sj,kp  +sk), & 
+                                       sdv(ip+1+si,jp  +sj,kp+1+sk), & 
+                                       sdv(ip+1+si,jp+1+sj,kp  +sk), & 
+                                       sdv(ip+1+si,jp+1+sj,kp+1+sk), sdvel)
+      else if ( dir == 3 ) then ! Trilinear interpolation for w
          si = -1;sj = -1;sk = -1 
          if ( xp > x(ip) ) si =  0 
          if ( yp > y(jp) ) sj =  0
@@ -1817,9 +1839,46 @@ contains
                                        w(ip+1+si,jp  +sj,kp+1+sk), & 
                                        w(ip+1+si,jp+1+sj,kp  +sk), & 
                                        w(ip+1+si,jp+1+sj,kp+1+sk), vel)
+         call TrilinearIntrpl(xp,yp,zp,xh(ip  +si),yh(jp  +sj),zh(kp  +sk),        & 
+                                       xh(ip+1+si),yh(jp+1+sj),zh(kp+1+sk),        &
+                                       sdw(ip  +si,jp  +sj,kp  +sk), & 
+                                       sdw(ip  +si,jp  +sj,kp+1+sk), & 
+                                       sdw(ip  +si,jp+1+sj,kp  +sk), & 
+                                       sdw(ip  +si,jp+1+sj,kp+1+sk), & 
+                                       sdw(ip+1+si,jp  +sj,kp  +sk), & 
+                                       sdw(ip+1+si,jp  +sj,kp+1+sk), & 
+                                       sdw(ip+1+si,jp+1+sj,kp  +sk), & 
+                                       sdw(ip+1+si,jp+1+sj,kp+1+sk), sdvel)
       else 
          call pariserror("Wrong direction in velocity interploation!")
       end if ! dir 
    end subroutine TrilinearIntrplFluidVel
+
+   subroutine StoreDiffusionTerms()
+      sdu = du
+      sdv = dv
+      sdw = dw
+   end subroutine StoreDiffusionTerms
+
+   subroutine ComputeFluidAccel()
+
+      integer :: i,j,k
+      real(8) :: dpdx,dpdy,dpdz
+
+      ! Compute substantial derivatives of fluid velocity (fluid acceleration)
+      ! Note: only needed in fluid phase
+      do i=is,ie; do j=js,je; do k=ks,ke
+         if ( cvof (i,j,k) == 0.d0 ) then 
+            dpdx = (p(i,j,k) - p(i-1,j,k))/(x(i)-x(i-1))
+            dpdy = (p(i,j,k) - p(i,j-1,k))/(y(j)-y(j-1))
+            dpdz = (p(i,j,k) - p(i,j,k-1))/(z(k)-z(k-1))
+            
+            sdu(i,j,k) = sdu(i,j,k)-dpdx/rho1
+            sdv(i,j,k) = sdv(i,j,k)-dpdy/rho1
+            sdw(i,j,k) = sdw(i,j,k)-dpdz/rho1
+         end if ! cvof 
+      end do; end do; end do ! i,j,k
+
+   end subroutine ComputeFluidAccel
 
 end module module_Lag_part

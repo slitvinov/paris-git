@@ -212,6 +212,7 @@ Program paris
               call explicitMomDiff(u,v,w,rho,mu,du,dv,dw)
            endif
            call my_timer(3,itimestep,ii)
+           if( DoLPP ) call StoreDiffusionTerms()
 
            if(.not.ZeroReynolds) call momentumConvection(u,v,w,du,dv,dw)
            call my_timer(9,itimestep,ii)
