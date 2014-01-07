@@ -125,7 +125,7 @@
    integer, parameter :: CriteriaCylinder  = 2
    integer, parameter :: CriteriaSphere    = 3
 
-   logical :: DoDropStatistics 
+   integer :: DropStatisticsMethod 
    logical :: DoConvertVOF2LPP 
    logical :: DoConvertLPP2VOF 
    integer :: dragmodel 
@@ -185,7 +185,7 @@ contains
 
       integer ierr,in
       logical file_is_there
-      namelist /lppparameters/ DoDropStatistics, dragmodel, nTimeStepTag,  &
+      namelist /lppparameters/ DropStatisticsMethod, dragmodel, nTimeStepTag,  &
          DoConvertVOF2LPP,DoConvertLPP2VOF,CriteriaConvertCase,            & 
          vol_cut,xlpp_min,xlpp_max,ylpp_min,ylpp_max,zlpp_min,zlpp_max,    &
          max_num_drop, maxnum_cell_drop, max_num_part, max_num_part_cross
@@ -193,7 +193,7 @@ contains
       in=32
 
       ! Set default values 
-      DoDropStatistics = .false. 
+      DropStatisticsMethod = 0 
       dragmodel    = 1
       nTimeStepTag = 1
       CriteriaConvertCase = 1
@@ -223,6 +223,9 @@ contains
          if (rank == 0) STOP "ReadLPPParameters: no 'inputlpp' file."
       endif
       close(in)
+      if (rank == 0) then
+         write(UNIT=out,NML=lppparameters)
+      end if ! rank 
    end subroutine ReadLPPParameters
 
 
@@ -237,7 +240,7 @@ contains
             call merge_drop_pieces 
          end if ! nPdomain
 
-         if ( DoDropStatistics ) call drop_statistics(tswap) 
+         if ( DropStatisticsMethod > 0 ) call drop_statistics(tswap) 
 
          if ( DoConvertVOF2LPP ) call ConvertDrop2Part(tswap)
 !         if ( DoConvertLPP2VOF ) call ConvertPart2Drop()   ! TBA
@@ -343,7 +346,7 @@ contains
                   num_cell_drop = num_cell_drop + 1
                   cell_list(1:3,num_cell_drop) = [isq,jsq,ksq]
                else
-                  call pariserror('Number of cells of droplet is larger than the maxinum value!')
+                  write(*,*) 'Warning: cell number of tag',current_id,'at rank',rank,'reaches max value!'
                end if ! num_cell_drop
             else if ( isq >= Ng+1 .and. isq <= Ng+Nx .and. &     ! block ghost cells 
                       jsq >= Ng+1 .and. jsq <= Ng+Ny .and. & 
@@ -360,7 +363,7 @@ contains
                   drops_merge_gcell_list(2,drops_merge(num_drop_merge(rank),rank)%num_gcell,num_drop_merge(rank)) = jsq
                   drops_merge_gcell_list(3,drops_merge(num_drop_merge(rank),rank)%num_gcell,num_drop_merge(rank)) = ksq
                else
-                  call pariserror('Number of ghost cells of droplet is larger than the maxinum value!')
+                  write(*,*) 'Warning: ghost cell number of tag',current_id,'at rank',rank,'reaches max value!'
                end if ! drops_merge(num_drop_merge(rank),rank)%num_gcell
             else                                                        ! domain ghost cells 
                ! Note: periodic bdry cond, to be added later
@@ -374,8 +377,8 @@ contains
           end if ! nc_queue
         end do ! ns_queue>0
 
-        if ( vol <= 0.d0 ) call pariserror("zero or negative droplet volume!")
-        if ( merge_drop ) then 
+        if ( vol > 0.d0 ) then  
+          if ( merge_drop ) then
             drops_merge(num_drop_merge(rank),rank)%element%id  = current_id
             drops_merge(num_drop_merge(rank),rank)%element%vol = vol 
             drops_merge(num_drop_merge(rank),rank)%element%xc  = xc/vol 
@@ -386,7 +389,7 @@ contains
             drops_merge(num_drop_merge(rank),rank)%element%wc  = wc/vol
             drops_merge(num_drop_merge(rank),rank)%num_cell_drop = num_cell_drop
             drops_merge_cell_list(:,:,num_drop_merge(rank)) = cell_list
-         else 
+          else 
             drops(num_drop(rank),rank)%element%id  = current_id
             drops(num_drop(rank),rank)%element%vol = vol 
             drops(num_drop(rank),rank)%element%xc  = xc/vol
@@ -397,8 +400,16 @@ contains
             drops(num_drop(rank),rank)%element%wc  = wc/vol
             drops(num_drop(rank),rank)%num_cell_drop = num_cell_drop
             drops_cell_list(:,:,num_drop(rank)) = cell_list
-         end if ! merge_drop
-         current_id = current_id+1
+          end if ! merge_drop
+          current_id = current_id+1
+        else ! no need to merge droplet piece only contains ghost cells  
+          if ( merge_drop ) then
+             drops_merge(num_drop_merge(rank),rank)%num_gcell = 0
+             num_drop_merge(rank) = num_drop_merge(rank) - 1
+          else 
+             num_drop      (rank) = num_drop      (rank) - 1
+          end if ! merge_drop
+        end if ! vol
       else if ( cvof(i,j,k) == 0.d0 .and. tag_flag(i,j,k) == 0 ) then 
          tag_flag(i,j,k) = 4
       end if ! cvof(i,j,k)
@@ -583,6 +594,13 @@ contains
       integer :: num_element_estimate(0:nPdomain-1)
       type(element) :: element_NULL
 
+      integer, parameter :: DropStatistics_PlotElement = 1
+      integer, parameter :: DropStatistics_ElementSizePDF = 2
+      
+      integer, parameter :: num_gaps = 1000
+      real(8) :: gap,dmax,d
+      integer :: igap,count_element(num_gaps)
+
       num_element_estimate = num_drop+num_drop_merge+num_part
       maxnum_element = maxval(num_element_estimate) 
       allocate( element_stat(maxnum_element,0:nPdomain-1) )
@@ -671,23 +689,50 @@ contains
 
       ! Statisitcs or other operation at rank 0 
       if ( rank == 0 ) then
-         ielem_plot = 0 
-         do irank = 0,nPdomain-1
-            if ( num_element(irank) > 0 ) then 
-               do ielement = 1, num_element(irank) 
-                  ielem_plot = ielem_plot + 1 
-                  OPEN(UNIT=200+ielem_plot,FILE=TRIM(out_path)//'/element-'//TRIM(int2text(ielem_plot,padding))//'.dat')
-                  write(200+ielem_plot,*) tswap,element_stat(ielement,irank)%xc, & 
-                                                element_stat(ielement,irank)%yc, &
-                                                element_stat(ielement,irank)%yc, &
-                                                element_stat(ielement,irank)%uc, &
-                                                element_stat(ielement,irank)%vc, &
-                                                element_stat(ielement,irank)%wc, &
-                                                element_stat(ielement,irank)%vol
-!                  CLOSE(UNIT=200+ielem_plot)
-               end do ! ielement
-            end if ! num_element_irank) 
-         end do ! irank
+         select case(DropStatisticsMethod) 
+            ! Plot each dispersed element
+            case(DropStatistics_PlotElement)
+               ielem_plot = 0 
+               do irank = 0,nPdomain-1
+                  if ( num_element(irank) > 0 ) then 
+                     do ielement = 1, num_element(irank) 
+                        ielem_plot = ielem_plot + 1 
+                        OPEN(UNIT=200+ielem_plot,FILE=TRIM(out_path)//'/element-'//TRIM(int2text(ielem_plot,padding))//'.dat')
+                        write(200+ielem_plot,*) tswap,element_stat(ielement,irank)%xc, & 
+                                                      element_stat(ielement,irank)%yc, &
+                                                      element_stat(ielement,irank)%yc, &
+                                                      element_stat(ielement,irank)%uc, &
+                                                      element_stat(ielement,irank)%vc, &
+                                                      element_stat(ielement,irank)%wc, &
+                                                      element_stat(ielement,irank)%vol
+                     end do ! ielement
+                  end if ! num_element_irank) 
+               end do ! irank
+            ! compute element size pdf
+            case(DropStatistics_ElementSizePDF)
+               gap = 1.d-3
+               dmax = dble(num_gaps)*gap
+               count_element(:) = 0
+               do irank = 0,nPdomain-1
+                  if ( num_element(irank) > 0 ) then 
+                     do ielement = 1, num_element(irank)
+                        ! sum particles 
+                        d = (element_stat(ielement,irank)%vol*6.d0/PI)**(1.d0/3.d0)
+                        if ( d < dmax ) then 
+                           igap = int(d/gap)+1
+                           count_element(igap) = count_element(igap) + 1
+                        end if ! d
+                     end do ! ielement
+                  end if ! num_element(irank)
+               end do ! irank
+               open(unit=101,file=TRIM(out_path)//'/element-size-pdf.dat')
+               do igap = 1,num_gaps
+                  write(101,*) (dble(igap)-0.5d0)*gap,count_element(igap)
+               end do ! igap
+               close(101)
+            case default
+               call pariserror("unknown drop statistics method!")
+         end select 
       end if ! rank
 
       ! finalize
@@ -896,14 +941,9 @@ contains
          call tag_drop_all()
          call merge_drop_pieces 
       end if ! nPdomain
+      if ( DropStatisticsMethod > 0 ) call drop_statistics(0) 
 
-!      OPEN(UNIT=89,FILE=TRIM(out_path)//'/tag-'//TRIM(int2text(rank,padding))//'.txt')
       OPEN(UNIT=90,FILE=TRIM(out_path)//'/tag-tecplot'//TRIM(int2text(rank,padding))//'.dat')
-
-!      do j=jmax,jmin,-1
-!         write(89,'(36(I5,1X))') tag_id(imin:imax,j,Nz/4+Ng)
-!      end do ! j
-!      CLOSE(89)
 
       write(90,*) 'title= " 3d tag "'
       write(90,*) 'variables = "x", "y", "z", "tag", "c" '
@@ -916,23 +956,6 @@ contains
          end do ! j
       end do ! k
 
-!      write(90,*) 'title= " 2d tag "'
-!      write(90,*) 'variables = "x", "y", "tag", "c" '
-!      write(90,*) 'zone i=,',Nx/nPx+Ng*2, 'j=',Ny/nPy+Ng*2, 'f=point'
-!      k = Nz/4+Ng
-!         do j=jmin,jmax
-!            do i=imin,imax 
-!               write(90,'(2(E15.8,1X),(I5,1X),(E15.8))') x(i),y(j),tag_id(i,j,k),cvof(i,j,k)
-!            end do ! i
-!        end do ! j
-!      CLOSE(90)
-!      if ( kmin < k .and. kmax > k ) then 
-!      write(*,*) ' ************************ ', rank
-!      do j = jmax,jmin,-1
-!         write(*,'(20(I2,1X))') tag_id(imin:imax,j,k)
-!      end do ! j
-!      write(*,*) ' ************************ '
-!      end if ! k 
    end subroutine output_tag
 
 ! ==============================================

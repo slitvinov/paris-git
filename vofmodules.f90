@@ -274,7 +274,7 @@ contains
     integer :: ipar
     integer, parameter :: root_rank = 0
     
-    if( test_D2P) then 
+    if( test_D2P .or. test_tag ) then 
        if ( rank == root_rank ) call random_bubbles
        call MPI_BCAST(rad, NumBubble, MPI_REAL8, &
                       root_rank, MPI_Comm_Cart, ierr)
@@ -322,7 +322,7 @@ contains
 
     if(NumBubble>2) then 
       do ib=1,NumBubble
-         rad(ib) = 0.02 + rand()*0.04
+         rad(ib) = 0.02 + rand()*0.03
          xc(ib)  = 0.15 + rand()*0.7
          yc(ib)  = 0.15 + rand()*0.7
          zc(ib)  = 0.15 + rand()*0.7

@@ -5,9 +5,6 @@ VOFBDRY_COND = 'periodic' 'periodic' 'periodic'
 
 TEST_TYPE = 'tag_test'
 VOF_ADVECT = 'Dick_Yue'
-REFINEMENT = 1
-CYLINDER_DIR = 2
-NORMAL_UP = F
 DoLPP     = T
 !=================================================================================================
 

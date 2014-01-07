@@ -1,6 +1,6 @@
 &LPPPARAMETERS
 
-DoDropStatistics = T
+DropStatisticsMethod = 1
 DRAGMODEL = 2
 nTimeStepTag = 10
 DoConvertVOF2LPP = ForT 
