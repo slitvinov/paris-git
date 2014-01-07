@@ -163,9 +163,11 @@ contains
        refinement=8
        if(rank==0) write(*,*) "using default value for refinement"
     endif
-     open(unit=out, file=trim(out_path)//'/output', action='write', iostat=ierr)
-     if (ierr .ne. 0) stop 'ReadParameters: error opening output file'
+    if (rank == 0) then 
+     !open(unit=out, file=trim(out_path)//'/output', action='write', iostat=ierr)
+     !if (ierr .ne. 0) stop 'ReadParameters: error opening output file'
      write(UNIT=out,NML=vofparameters)
+    end if ! rank 
 
   end subroutine ReadVOFParameters
 !

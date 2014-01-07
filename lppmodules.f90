@@ -1216,15 +1216,15 @@ contains
                cvof(drops_merge_gcell_list(1,ilist,idrop), &
                     drops_merge_gcell_list(2,ilist,idrop), &
                     drops_merge_gcell_list(3,ilist,idrop)) = 0.0
-                  u(drops_merge_cell_list(1,ilist,idrop), &
-                    drops_merge_cell_list(2,ilist,idrop), &
-                    drops_merge_cell_list(3,ilist,idrop)) = uf
-                  v(drops_merge_cell_list(1,ilist,idrop), &
-                    drops_merge_cell_list(2,ilist,idrop), &
-                    drops_merge_cell_list(3,ilist,idrop)) = vf
-                  w(drops_merge_cell_list(1,ilist,idrop), &
-                    drops_merge_cell_list(2,ilist,idrop), &
-                    drops_merge_cell_list(3,ilist,idrop)) = wf
+                  u(drops_merge_gcell_list(1,ilist,idrop), &
+                    drops_merge_gcell_list(2,ilist,idrop), &
+                    drops_merge_gcell_list(3,ilist,idrop)) = uf
+                  v(drops_merge_gcell_list(1,ilist,idrop), &
+                    drops_merge_gcell_list(2,ilist,idrop), &
+                    drops_merge_gcell_list(3,ilist,idrop)) = vf
+                  w(drops_merge_gcell_list(1,ilist,idrop), &
+                    drops_merge_gcell_list(2,ilist,idrop), &
+                    drops_merge_gcell_list(3,ilist,idrop)) = wf
             end do ! ilist
 
             ! transfer droplet properties to particle if center of mass located

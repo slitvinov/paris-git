@@ -140,7 +140,7 @@ Program paris
      ! if(rank==0) start_time = MPI_WTIME()
      if(ICOut .and. rank<nPdomain) then
         call output(0,is,ie+1,js,je+1,ks,ke+1)
-!        if(DoVOF) call output_VOF(0,imin,imax,jmin,jmax,kmin,kmax)
+        if(DoVOF) call output_VOF(0,imin,imax,jmin,jmax,kmin,kmax)
         call setvelocityBC(u,v,w,umask,vmask,wmask,time)
         call write_vec_gnuplot(u,v,itimestep)
         call calcstats
