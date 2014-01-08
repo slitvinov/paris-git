@@ -706,8 +706,11 @@ module module_BC
       integer :: j,k
       real(8) :: t
       real(8) :: uinject
+      real(8), parameter :: PI = 3.14159265359d0
       uinject=0d0
-      if((y(j) - 0.5d0)**2 + (z(k) - 0.5d0)**2.lt.jetradius**2) uinject=1D0
+      !if((y(j) - 0.5d0)**2 + (z(k) - 0.5d0)**2.lt.jetradius**2) uinject=1D0
+      if((y(j) - 0.5d0)**2 + (z(k) - 0.5d0)**2.lt.jetradius**2) & 
+      uinject=1.d0+0.05d0*SIN(10.d0*2.d0*PI*t)
     end function uinject
   end subroutine SetVelocityBC
 !=================================================================================================
