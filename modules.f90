@@ -707,10 +707,16 @@ module module_BC
       real(8) :: t
       real(8) :: uinject
       real(8), parameter :: PI = 3.14159265359d0
+      real(8), parameter :: tshift = 1.d0-2 
       uinject=0d0
       !if((y(j) - 0.5d0)**2 + (z(k) - 0.5d0)**2.lt.jetradius**2) uinject=1D0
-      if((y(j) - 0.5d0)**2 + (z(k) - 0.5d0)**2.lt.jetradius**2) & 
-      uinject=1.d0+0.05d0*SIN(10.d0*2.d0*PI*t)
+      if((y(j) - 0.5d0)**2 + (z(k) - 0.5d0)**2.lt.jetradius**2 ) then 
+         if ( t<=tshift ) then  
+            uinject=1.d0
+         else 
+            uinject=1.d0+0.05d0*SIN(10.d0*2.d0*PI*(t-tshift))
+         end if ! t
+      end if ! y(j), z(k)
     end function uinject
   end subroutine SetVelocityBC
 !=================================================================================================

@@ -51,7 +51,8 @@
       ! 3 marked as C node
       ! 4 marked as reference fluid 
       ! 5 marked as ghost layer
-   integer,parameter :: maxnum_diff_tag  = 7   ! ignore cases droplet spread over more than 1 block
+   !integer,parameter :: maxnum_diff_tag  = 7   ! ignore cases droplet spread over more than 1 block
+   integer,parameter :: maxnum_diff_tag  = 21   ! temporary increase max number of diff tag
    integer :: total_num_tag,totalnum_drop,totalnum_drop_indep,num_new_drop
    integer, dimension(:), allocatable :: num_drop
    integer, dimension(:), allocatable :: num_drop_merge
@@ -484,6 +485,10 @@ contains
                if ( idiff_tag == drops_merge(idrop,rank)%num_diff_tag + 1 ) then 
                   drops_merge(idrop,rank)%num_diff_tag = &
                   drops_merge(idrop,rank)%num_diff_tag + 1
+! TEMPOARY 
+                  if ( drops_merge(idrop,rank)%num_diff_tag > maxnum_diff_tag ) & 
+                     call pariserror("Number of different tags of a droplet pieces exceeds the max number!") 
+! END TEMPORARY 
                   drops_merge(idrop,rank)%diff_tag_list(drops_merge(idrop,rank)%num_diff_tag) &
                   = tag_id(drops_merge_gcell_list(1,iCell,idrop), &
                            drops_merge_gcell_list(2,iCell,idrop), &
@@ -725,7 +730,8 @@ contains
                      end do ! ielement
                   end if ! num_element(irank)
                end do ! irank
-               open(unit=101,file=TRIM(out_path)//'/element-size-pdf.dat')
+               open(unit=101,file=TRIM(out_path)//'/element-size-pdf_'//TRIM(int2text(tswap,padding))//'.dat')
+
                do igap = 1,num_gaps
                   write(101,*) (dble(igap)-0.5d0)*gap,count_element(igap)
                end do ! igap
@@ -1304,8 +1310,8 @@ contains
          case (CriteriaCylinder )   ! Note: assuming axis along x-direction
                                     ! radius indicated by ylpp_min & ylpp_max
             if ( (  vol < vol_cut)                          .and. &
-                 ( (yc**2.d0 + zc**2.d0) > ylpp_min**2.d0)  .and. & 
-                 ( (yc**2.d0 + zc**2.d0) < ylpp_max**2.d0) ) then 
+                 ( (yc-0.5d0)**2.d0 + (zc-0.5d0)**2.d0 > ylpp_min**2.d0)  .and. & 
+                 ( (yc-0.5d0)**2.d0 + (zc-0.5d0)**2.d0 < ylpp_max**2.d0) ) then 
                ConvertDropFlag = .true.
             else 
                ConvertDropFlag = .false.
