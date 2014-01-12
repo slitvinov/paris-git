@@ -60,6 +60,7 @@ Program paris
   use module_surface_tension
   use module_st_testing
   use module_lag_part
+  use module_output_LPP
 
   implicit none
   include 'mpif.h'
@@ -141,6 +142,7 @@ Program paris
      if(ICOut .and. rank<nPdomain) then
         call output(0,is,ie+1,js,je+1,ks,ke+1)
         if(DoVOF) call output_VOF(0,imin,imax,jmin,jmax,kmin,kmax)
+        if(DoVOF .and. DoLPP) call output_LPP(0)
         call setvelocityBC(u,v,w,umask,vmask,wmask,time)
         call write_vec_gnuplot(u,v,itimestep)
         call calcstats
@@ -394,6 +396,7 @@ Program paris
            call write_vec_gnuplot(u,v,itimestep)
            call output(ITIMESTEP/nout,is,ie+1,js,je+1,ks,ke+1)
            if(DoVOF) call output_VOF(ITIMESTEP/nout,imin,imax,jmin,jmax,kmin,kmax)
+           if(DoVOF .and. DoLPP) call output_LPP(ITIMESTEP/nout)
            if(rank==0)then
               end_time =  MPI_WTIME()
               write(out,'("Step:",I9," Iterations:",I9," cpu(s):",f10.2)')itimestep,it,end_time-start_time

@@ -206,7 +206,7 @@ contains
       zlpp_min = zh(   Ng)
       zlpp_max = zh(Nz+Ng)
       max_num_drop = 10
-      maxnum_cell_drop = 10000
+      maxnum_cell_drop = 100000
       max_num_part = 100
       max_num_part_cross = 10
 
@@ -287,6 +287,8 @@ contains
         tag_id  (i,j,k) = current_id
         tag_flag(i,j,k) = 2 ! mark as S node
         num_drop(rank) = num_drop(rank) + 1
+        if ( num_drop(rank) > max_num_drop ) & 
+           call pariserror("Drop number exceeds maximum number!") 
         ! put the present node into S queue
         ns_queue = ns_queue + 1 
         s_queue(ns_queue,1) = i
@@ -357,6 +359,8 @@ contains
                   merge_drop = .true.
                   num_drop      (rank) = num_drop      (rank) - 1
                   num_drop_merge(rank) = num_drop_merge(rank) + 1
+                  if ( num_drop_merge(rank) > max_num_drop ) & 
+                     call pariserror("Drop merge number exceeds maximum number!") 
                end if ! merge_drop
                if ( drops_merge(num_drop_merge(rank),rank)%num_gcell < maxnum_cell_drop) then 
                   drops_merge(num_drop_merge(rank),rank)%num_gcell = drops_merge(num_drop_merge(rank),rank)%num_gcell + 1
@@ -1168,9 +1172,9 @@ contains
 
             ! compute average fluid quantities
             ! Note: XXX temporary, need to be improved later 
-            uf = drops(idrop,rank)%element%uc
-            vf = drops(idrop,rank)%element%vc
-            wf = drops(idrop,rank)%element%wc
+            uf = 0.d0 !drops(idrop,rank)%element%uc
+            vf = 0.d0 !drops(idrop,rank)%element%vc
+            wf = 0.d0 !drops(idrop,rank)%element%wc
 
             ! remove droplet vof structure
             MinDistPart2CellCenter = 1.0d10
@@ -1220,9 +1224,9 @@ contains
 
             ! compute average fluid quantities
             ! Note: XXX temporary, need to be improved later 
-            uf = drops_merge(idrop,rank)%element%uc
-            vf = drops_merge(idrop,rank)%element%vc
-            wf = drops_merge(idrop,rank)%element%wc
+            uf = 0.d0 !drops_merge(idrop,rank)%element%uc
+            vf = 0.d0 !drops_merge(idrop,rank)%element%vc
+            wf = 0.d0 !drops_merge(idrop,rank)%element%wc
 
             ! remove droplet vof structure
             do ilist = 1,drops_merge(idrop,rank)%num_cell_drop
@@ -1910,4 +1914,61 @@ contains
 
    end subroutine ComputeFluidAccel
 
+
 end module module_Lag_part
+
+module module_output_lpp
+   use module_IO
+   use module_Lag_part
+   implicit none
+   integer :: lpp_opened=0;
+
+   contains
+
+   subroutine append_LPP_visit_file(rootname)
+      implicit none
+      character(*) :: rootname
+      integer prank
+      if(rank.ne.0) call pariserror('rank.ne.0 in append_LPP')
+      if(lpp_opened==0) then
+         OPEN(UNIT=88,FILE='lpp.visit')
+         write(88,10) nPdomain
+10       format('!NBLOCKS ',I4)
+         vof_opened=1
+      else
+         OPEN(UNIT=88,FILE='lpp.visit',access='append')
+      endif
+      do prank=0,NpDomain-1
+         write(88,11) rootname//TRIM(int2text(prank,padding))//'.vtk'
+11       format(A)
+      enddo
+      close(88)
+   end subroutine  append_LPP_visit_file
+
+   subroutine output_LPP(nf)
+      integer,intent(in)  :: nf
+      character(len=30) :: rootname
+      integer :: ipart
+
+      rootname=trim(out_path)//'/VTK/LPP'//TRIM(int2text(nf,padding))//'-'
+      if(rank==0) call append_LPP_visit_file(TRIM(rootname))
+
+      OPEN(UNIT=8,FILE=TRIM(rootname)//TRIM(int2text(rank,padding))//'.3D')
+      write(8,10)
+      write(8,11)
+10    format('# plot3D data file')
+11    format('x,y,z,vol')
+
+      if ( num_part(rank) > 0 ) then 
+         do ipart = 1,num_part(rank) 
+            write(8,320) parts(ipart,rank)%element%xc,& 
+            parts(ipart,rank)%element%yc, & 
+            parts(ipart,rank)%element%zc, &  
+            parts(ipart,rank)%element%vol
+         enddo
+      end if ! num_part(rank)
+320   format(e14.5,e14.5,e14.5,e14.5)
+      close(8)
+   end subroutine output_LPP
+end module module_output_LPP
+
