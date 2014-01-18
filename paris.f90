@@ -1346,8 +1346,9 @@ subroutine pariserror(message)
   include 'mpif.h'
 !  integer ierr
   character(*) :: message
-  print *, "rank = ",rank
-  write(*,*) "ERROR *** ",message, " *** STOP "
+! remove next line for jobs on large numbers of processors. reinstate if needed for debugging
+!  print *, "rank = ",rank
+  if(rank==0) write(*,*) "ERROR *** ",message, " *** STOP "
   ! Exit MPI gracefully
   close(out)
 !   call MPI_BARRIER(MPI_COMM_WORLD, ierr)

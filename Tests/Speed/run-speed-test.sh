@@ -3,11 +3,12 @@
 
 if [ $# -lt 1 ]; then
     echo "missing list of np"
+    echo "typically $0 1 2 4 8 16 to test up to 4096 procs"
     exit
 fi
 
 # input size of your machine here
-let maxcores=32
+let maxcores=64
 let base=64
 # mono64-1  to mono64-512  run in less than 30 seconds on babbage cluster
 for rootsize in $* ; do

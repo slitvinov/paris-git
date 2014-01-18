@@ -317,6 +317,7 @@ contains
   !=================================================================================================
   subroutine random_bubbles()
     use module_2phase
+!    use IFPORT
     implicit none
     integer ib
 
@@ -867,9 +868,9 @@ subroutine swp(us,c,vof1,vof2,vof3,f,d)
   integer, intent(in) :: d
   real (8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: c,vof1,vof2,vof3
   integer, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: f
-  if (VOF_advect=='Dick_Yue') then
-     call swpr(us,c,vof1,vof2,vof3,f,d)
-  elseif (VOF_advect=='CIAM') then
+  if (VOF_advect=='Dick_Yue') then  ! Yue-Weymouth = Eulerian Implicit + central cell stuff
+     call swpr(us,c,vof1,vof2,vof3,f,d)  
+  elseif (VOF_advect=='CIAM') then  ! CIAM == Lagrangian Explicit
      call swpz(us,c,vof1,vof2,vof3,f,d)
   else
      call pariserror("*** unknown vof scheme")
