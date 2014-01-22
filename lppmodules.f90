@@ -230,9 +230,10 @@ contains
    end subroutine ReadLPPParameters
 
 
-   subroutine lppsweeps(tswap)
+   subroutine lppsweeps(tswap,time)
     
       integer, intent(in) :: tswap
+      real(8), intent(in) :: time
       ! Only do tagging and conversion in specific time steps
       if ( MOD(tswap,ntimestepTag) == 0 ) then 
          call tag_drop()
@@ -241,7 +242,7 @@ contains
             call merge_drop_pieces 
          end if ! nPdomain
 
-         if ( DropStatisticsMethod > 0 ) call drop_statistics(tswap) 
+         if ( DropStatisticsMethod > 0 ) call drop_statistics(tswap,time) 
 
          if ( DoConvertVOF2LPP ) call ConvertDrop2Part(tswap)
 !         if ( DoConvertLPP2VOF ) call ConvertPart2Drop()   ! TBA
@@ -591,10 +592,11 @@ contains
 
    end subroutine merge_drop_pieces
 
-   subroutine drop_statistics(tswap)
+   subroutine drop_statistics(tswap,time)
       
       include 'mpif.h'
       integer, intent(in) :: tswap
+      real(8), intent(in) :: time
       integer :: req(2),sta(MPI_STATUS_SIZE,2),MPI_Comm,ireq,ierr
       integer :: MPI_element_type, oldtypes(0:1), blockcounts(0:1), & 
                  offsets(0:1), extent,r8extent, MPI_element_row 
@@ -707,7 +709,7 @@ contains
                      do ielement = 1, num_element(irank) 
                         ielem_plot = ielem_plot + 1 
                         OPEN(UNIT=200+ielem_plot,FILE=TRIM(out_path)//'/element-'//TRIM(int2text(ielem_plot,padding))//'.dat')
-                        write(200+ielem_plot,*) tswap,element_stat(ielement,irank)%xc, & 
+                        write(200+ielem_plot,*) time,element_stat(ielement,irank)%xc, & 
                                                       element_stat(ielement,irank)%yc, &
                                                       element_stat(ielement,irank)%yc, &
                                                       element_stat(ielement,irank)%uc, &
@@ -951,7 +953,7 @@ contains
          call tag_drop_all()
          call merge_drop_pieces 
       end if ! nPdomain
-      if ( DropStatisticsMethod > 0 ) call drop_statistics(0) 
+      if ( DropStatisticsMethod > 0 ) call drop_statistics(0,0.d0) 
 
       OPEN(UNIT=90,FILE=TRIM(out_path)//'/tag-tecplot'//TRIM(int2text(rank,padding))//'.dat')
 
@@ -1934,12 +1936,12 @@ module module_output_lpp
          OPEN(UNIT=88,FILE='lpp.visit')
          write(88,10) nPdomain
 10       format('!NBLOCKS ',I4)
-         vof_opened=1
+         lpp_opened=1
       else
          OPEN(UNIT=88,FILE='lpp.visit',access='append')
       endif
       do prank=0,NpDomain-1
-         write(88,11) rootname//TRIM(int2text(prank,padding))//'.vtk'
+         write(88,11) rootname//TRIM(int2text(prank,padding))//'.3D'
 11       format(A)
       enddo
       close(88)
@@ -1957,7 +1959,7 @@ module module_output_lpp
       write(8,10)
       write(8,11)
 10    format('# plot3D data file')
-11    format('x,y,z,vol')
+11    format('x y z vol')
 
       if ( num_part(rank) > 0 ) then 
          do ipart = 1,num_part(rank) 

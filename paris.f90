@@ -237,7 +237,7 @@ Program paris
 !------------------------------------VOF STUFF ---------------------------------------------------
            if(DoVOF) then
               if (DoLPP) then
-                 call lppsweeps(itimestep)   ! XXX Note: need to update particles somewhere
+                 call lppsweeps(itimestep,time)   ! XXX Note: need to update particles somewhere
                  call my_timer(12,itimestep,ii)
               end if ! DoLPP
               call vofsweeps(itimestep)
