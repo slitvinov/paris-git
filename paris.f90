@@ -85,11 +85,12 @@ Program paris
 
   !Check consistency of options
   if(rank==0) then
-     if(TwoPhase) then
+     if(TwoPhase.or.FreeSurface) then
         if((.not.DoFront).and.(.not.DoVOF)) stop 'need a phase tracking for two-phase'
         if(GetPropertiesFromFront.and.(.not.DoFront)) stop 'need Front to get properties from'
         if((.not.GetPropertiesFromFront).and.(.not.DoVOF)) stop 'need VOF to get properties from'
      endif
+     if(TwoPhase.and.FreeSurface) stop 'cannnot be both TwoPhase and FreeSurface'
   endif
 
   ! check number of processors

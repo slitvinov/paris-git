@@ -1,0 +1,9 @@
+&SOLIDPARAMETERS
+
+dosolids = F
+solid_type ='BitMap'
+solid_radius=0.3
+!=================================================================================================
+
+&end
+! end of the namelist

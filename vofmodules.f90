@@ -142,7 +142,7 @@ contains
     integer ierr,in
     logical file_is_there
     namelist /vofparameters/ vofbdry_cond,test_type,VOF_advect,refinement, &
-       cylinder_dir, normal_up, DoLPP, jetradius
+       cylinder_dir, normal_up, DoLPP, jetradius, FreeSurface
     in=31
 
     call MPI_COMM_RANK(MPI_COMM_WORLD, rank, ierr)

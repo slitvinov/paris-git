@@ -295,6 +295,7 @@ module module_2phase
   real(8) :: jetradius = 1d100
   real(8) :: sigma
   integer :: NumBubble
+  logical :: FreeSurface
 end module module_2phase
 !=================================================================================================
 !=================================================================================================
@@ -1312,14 +1313,16 @@ end subroutine SetupDensity
 ! A7*Pijk = A1*Pi-1jk + A2*Pi+1jk + A3*Pij-1k + 
 !           A4*Pij+1k + A5*Pijk-1 + A6*Pijk+1 + A8
 !-------------------------------------------------------------------------------------------------
-subroutine SetupPoisson(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask)
+subroutine SetupPoisson(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask,cvof)
   use module_grid
   use module_hello
   use module_BC
+  use module_2phase
   implicit none
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: utmp,vtmp,wtmp,rhot
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: umask,vmask,wmask
-  real(8), dimension(is:ie,js:je,ks:ke), intent(in) :: pmask
+  real(8), dimension(is:ie,js:je,ks:ke), intent(inout) :: pmask
+  real(8), dimension(is:ie,js:je,ks:ke), intent(in) :: cvof
   real(8), dimension(is:ie,js:je,ks:ke,8), intent(out) :: A
 
   real(8) :: dt
@@ -1338,6 +1341,14 @@ subroutine SetupPoisson(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask)
                      +(wtmp(i,j,k)-wtmp(i,j,k-1))/dz(k) )
 !    endif
   enddo; enddo; enddo
+
+  if(FreeSurface) then
+     do k=ks,ke; do j=js,je; do i=is,ie;
+        if(cvof(i,j,k) > 0.5d0) then 
+           pmask(i,j,k) = 0.d0
+        endif
+     enddo;enddo;enddo
+  endif
 ! pressure 0 where pmask=0
   do i=1,6; A(:,:,:,i) = pmask*A(:,:,:,i); enddo
   A(:,:,:,7) = 1d0 - pmask + pmask*A(:,:,:,7) 
