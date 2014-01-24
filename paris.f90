@@ -145,7 +145,7 @@ Program paris
         if(DoVOF) call output_VOF(0,imin,imax,jmin,jmax,kmin,kmax)
         if(DoVOF .and. DoLPP) call output_LPP(0)
         call setvelocityBC(u,v,w,umask,vmask,wmask,time)
-        call write_vec_gnuplot(u,v,itimestep)
+        call write_vec_gnuplot(u,v,cvof,p,itimestep)
         call calcstats
 
         if(rank==0) then
@@ -395,7 +395,7 @@ Program paris
         if(mod(itimestep,nbackup)==0)call backup_write
 !        if(mod(itimestep,noutuv)==0) then 
         if(mod(itimestep,nout)==0) then 
-           ! call write_vec_gnuplot(u,v,itimestep)
+           call write_vec_gnuplot(u,v,cvof,p,itimestep)
            ! call output(ITIMESTEP/nout,is,ie+1,js,je+1,ks,ke+1)
            if(DoVOF) call output_VOF(ITIMESTEP/nout,imin,imax,jmin,jmax,kmin,kmax)
            if(DoVOF .and. DoLPP) call output_LPP(ITIMESTEP/nout)

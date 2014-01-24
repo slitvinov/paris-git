@@ -311,12 +311,12 @@ module module_IO
   logical :: read_x, read_y, read_z, restart, ICOut, restartFront, restartAverages
   contains
 !=================================================================================================
-subroutine write_vec_gnuplot(u,v,iout)
+subroutine write_vec_gnuplot(u,v,cvof,p,iout)
   use module_grid
   use module_tmpvar
   implicit none
   include 'mpif.h'
-  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: u, v
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: u, v, cvof, p
   integer, intent(in) :: iout
   integer :: i,j,k,ierr
   real(8) :: norm=0.d0, coeff, vmax
@@ -1344,7 +1344,7 @@ subroutine SetupPoisson(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask,cvof)
 
   if(FreeSurface) then
      do k=ks,ke; do j=js,je; do i=is,ie;
-        if(cvof(i,j,k) > 0.5d0) then 
+        if(cvof(i,j,k) > 0.5d0) then ! pressure 0 in the cvof=1 phase. 
            pmask(i,j,k) = 0.d0
         endif
      enddo;enddo;enddo

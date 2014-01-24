@@ -55,8 +55,8 @@ nstats   = 10      ! number of time steps between flow statistics calculations
 
 !=================================================================================================
 !Grid parameters
-npx     = 2
-npy     = 2
+npx     = 1
+npy     = 1
 npz     = 1
                    ! number of processors in x,y,z direction
                    ! Total number of processes should be at least npx*npy*npz+1 since one process
@@ -88,7 +88,7 @@ ZLENGTH  = ZLTEMP
 !=================================================================================================
 ! Flow parameters
 
-WallVel(1,1)  = -0.011 ! can set inflow velocities here
+!WallVel(1,1)  = -0.011 ! can set inflow velocities here
 
 U_init = 1d0
 GX      = 0.0
@@ -114,7 +114,12 @@ MU2      = 1.0
 SIGMA    = 0.033       ! rho2, mu2, sigma : properties of the drop and surface tension
                    
 
-NumBubble = 0      !number of bubbles
+NumBubble = 1      !number of bubbles
+ 
+ xyzrad(1, 1)  = 0.5 ! Initial bubble size and location : x,y,z,radius
+ xyzrad(2, 1)  = 0.5 
+ xyzrad(3, 1)  = 0.5 
+ xyzrad(4, 1)  = 0.2
 
 MaxPoint = 2000000
 MaxElem  = 4000000
