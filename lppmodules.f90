@@ -143,6 +143,7 @@ contains
 !=================================================================================================
    subroutine initialize_LPP()
 
+      implicit none
       call ReadLPPParameters
 
       allocate( parts(max_num_part,0:nPdomain-1) )
@@ -206,7 +207,7 @@ contains
       zlpp_min = zh(   Ng)
       zlpp_max = zh(Nz+Ng)
       max_num_drop = 10
-      maxnum_cell_drop = 100000
+      maxnum_cell_drop = 1000000
       max_num_part = 100
       max_num_part_cross = 10
 
@@ -231,12 +232,13 @@ contains
 
 
    subroutine lppsweeps(tswap,time)
+      implicit none
     
       integer, intent(in) :: tswap
       real(8), intent(in) :: time
       ! Only do tagging and conversion in specific time steps
       if ( MOD(tswap,ntimestepTag) == 0 ) then 
-         call tag_drop()
+         call tag_drop(tswap)
          if ( nPdomain > 1 ) then 
             call tag_drop_all
             call merge_drop_pieces 
@@ -252,8 +254,10 @@ contains
       call UpdatePartSol(tswap)
    end subroutine lppsweeps
 
-  subroutine tag_drop()
+  subroutine tag_drop(tswap)
+    implicit none
     include 'mpif.h'
+    integer, intent(in) :: tswap
     integer :: i,j,k, i0,j0,k0
     integer :: isq,jsq,ksq
     integer :: current_id
@@ -425,6 +429,7 @@ contains
    end subroutine tag_drop
 
    subroutine tag_drop_all()
+      implicit none
       include 'mpif.h'
       integer :: i,j,k
       integer :: ierr,irank,num_tag_accu
@@ -447,7 +452,7 @@ contains
       end do ! irank
 
       ! update tag_id from local to global id (Note: no need to change domain 0)
-      if ( nPdomain > 1 .and. rank > 0 ) then 
+      if ( rank > 0 ) then 
          num_tag_accu = sum(num_drop(0:rank-1),1) + sum(num_drop_merge(0:rank-1),1)
          do i=is,ie; do j=js,je; do k=ks,ke
             if ( tag_id(i,j,k) > 0 ) tag_id(i,j,k)=tag_id(i,j,k)+num_tag_accu
@@ -461,6 +466,7 @@ contains
    end subroutine tag_drop_all
 
    subroutine merge_drop_pieces
+      implicit none
 
       integer :: idrop,iCell,idrop1
       integer :: idiff_tag,tag,tag1
@@ -593,6 +599,7 @@ contains
    end subroutine merge_drop_pieces
 
    subroutine drop_statistics(tswap,time)
+      implicit none
       
       include 'mpif.h'
       integer, intent(in) :: tswap
@@ -711,7 +718,7 @@ contains
                         OPEN(UNIT=200+ielem_plot,FILE=TRIM(out_path)//'/element-'//TRIM(int2text(ielem_plot,padding))//'.dat')
                         write(200+ielem_plot,*) time,element_stat(ielement,irank)%xc, & 
                                                       element_stat(ielement,irank)%yc, &
-                                                      element_stat(ielement,irank)%yc, &
+                                                      element_stat(ielement,irank)%zc, &
                                                       element_stat(ielement,irank)%uc, &
                                                       element_stat(ielement,irank)%vc, &
                                                       element_stat(ielement,irank)%wc, &
@@ -754,6 +761,7 @@ contains
    end subroutine drop_statistics
 
    subroutine CollectDropMerge
+      implicit none
 
       include 'mpif.h'
       integer :: req(2),sta(MPI_STATUS_SIZE,2),MPI_Comm,ireq,ierr
@@ -817,6 +825,7 @@ contains
    end subroutine CollectDropMerge
    
    subroutine DistributeDropMerge
+      implicit none
 
       include 'mpif.h'
       integer :: irank,idrop
@@ -874,6 +883,7 @@ contains
    end subroutine DistributeDropMerge
 
    subroutine CreateTag2DropTable
+      implicit none
 
       include 'mpif.h'
       integer :: req(6),sta(MPI_STATUS_SIZE,6),MPI_Comm,ireq,ierr
@@ -934,6 +944,7 @@ contains
    end subroutine CreateTag2DropTable
 
    subroutine ReleaseTag2DropTable
+      implicit none
 
       deallocate(tag_dropid   )
       deallocate(tag_rank     )
@@ -944,22 +955,30 @@ contains
 ! ==============================================
 ! output tag of droplets
 ! ==============================================
-   subroutine output_tag()
+   subroutine output_tagDrop()
+      implicit none
       integer :: i,j,k
 
       call output_VOF(0,imin,imax,jmin,jmax,kmin,kmax)
-      call tag_drop()
+      call tag_drop(0)
       if (nPdomain > 1 ) then 
          call tag_drop_all()
          call merge_drop_pieces 
       end if ! nPdomain
-      if ( DropStatisticsMethod > 0 ) call drop_statistics(0,0.d0) 
+      if ( DropStatisticsMethod > 0 ) call drop_statistics(0,0.d0)
+      call output_tag()
+   end subroutine output_tagDrop
+
+   subroutine output_tag()
+      implicit none
+      integer :: i,j,k
 
       OPEN(UNIT=90,FILE=TRIM(out_path)//'/tag-tecplot'//TRIM(int2text(rank,padding))//'.dat')
 
       write(90,*) 'title= " 3d tag "'
       write(90,*) 'variables = "x", "y", "z", "tag", "c" '
-      write(90,*) 'zone i=,',Nx/nPx+Ng*2, 'j=',Ny/nPy+Ng*2, 'k=',Nz/nPz+Ng*2,'f=point'
+      !write(90,*) 'zone i=,',Nx/nPx+Ng*2, 'j=',Ny/nPy+Ng*2, 'k=',Nz/nPz+Ng*2,'f=point'
+      write(90,*) 'zone i=',imax-imin+1, ',j=',jmax-jmin+1, ',k=',kmax-kmin+1,'f=point'
       do k = kmin,kmax
          do j=jmin,jmax
             do i=imin,imax 
@@ -974,6 +993,7 @@ contains
 ! output droplets & particles 
 ! ==============================================
    subroutine output_DP(tswap)
+      implicit none
 
       integer, intent(in) :: tswap
       integer :: i,j,k
@@ -982,7 +1002,7 @@ contains
       type(drop), dimension(NumBubble) :: drops_ex
 
       ! tag droplets and calculate drop properties
-      call tag_drop()
+      call tag_drop(0)
       if ( nPdomain > 1 ) then 
          call tag_drop_all
          call merge_drop_pieces 
@@ -1063,12 +1083,13 @@ contains
 ! Testing section
 ! ===============================================
    subroutine test_Lag_part(tswap)
+      implicit none
       include 'mpif.h'
       integer, intent(in) :: tswap
 !      integer :: ierr
                      
       if(test_tag) then
-         call output_tag()
+         call output_tagDrop()
       else if ( test_D2P ) then
          call output_DP(tswap)
       end if
@@ -1138,6 +1159,7 @@ contains
    end subroutine QSort
 
    subroutine ConvertDrop2Part(tswap)
+      implicit none
 
       include 'mpif.h'
 
@@ -1245,7 +1267,7 @@ contains
                     drops_merge_cell_list(2,ilist,idrop), &
                     drops_merge_cell_list(3,ilist,idrop)) = wf
             end do ! ilist
-      
+
             ! remove droplet vof structure
             do ilist = 1,drops_merge(idrop,rank)%num_gcell
                cvof(drops_merge_gcell_list(1,ilist,idrop), &
@@ -1298,6 +1320,7 @@ contains
    end subroutine ConvertDrop2Part
 
    subroutine CheckConvertDropCriteria(vol,xc,yc,zc,ConvertDropFlag,CriteriaConvertCase)
+      implicit none
 
       real(8), intent(in ) :: vol,xc,yc,zc
       integer, intent(in ) :: CriteriaConvertCase
@@ -1336,6 +1359,7 @@ contains
 
    subroutine ComputePartForce(tswap)
 
+      implicit none
       integer, intent(in) :: tswap
 
       integer, parameter :: drag_model_Stokes = 1
@@ -1389,9 +1413,6 @@ contains
                case default
                   call pariserror("wrong quasi-steady drag model!")
             end select ! dragmodel
-! TEMPORARY 
-!            phi = phi * (1.d0+2.d0*0.03351)/(1.d0-0.03351)**2.d0
-! END TEMPORARY 
             ! Note: set history to be zero for now
             fhx=0.d0; fhy=0.d0; fhz=0.d0
 
@@ -1421,6 +1442,8 @@ contains
       
       real(8) :: dp, dx,dy,dz,max_gridsize,min_gridsize
       real(8) :: Lx,Ly,Lz
+      real(8), parameter :: small = 1.d0-40
+      real(8), parameter :: large = 1.d0+40
 
       dp = (6.d0*volp/PI)**(1.d0/3.d0)
       dx = xh(ip)-xh(ip-1)
@@ -1434,29 +1457,49 @@ contains
          call TrilinearIntrplFluidVel(xp,yp,zp,ip,jp,kp,vf,DvfDt,2)
          call TrilinearIntrplFluidVel(xp,yp,zp,ip,jp,kp,wf,DwfDt,3)
       else if ( dp > max_gridsize ) then  ! Check flow scale scale
-         Lx = dx*(u(ip-1,jp,kp)+u(ip,jp,kp))/(u(ip,jp,kp)-u(ip-1,jp,kp))
-         Ly = dy*(v(ip,jp-1,kp)+v(ip,jp,kp))/(v(ip,jp,kp)-v(ip,jp-1,kp))
-         Lz = dz*(w(ip,jp,kp-1)+w(ip,jp,kp))/(w(ip,jp,kp)-w(ip,jp,kp-1))
+!         if ( u(ip,jp,kp)-u(ip-1,jp,kp) /= 0.d0 ) then 
+!            Lx = ABS(dx*(u(ip-1,jp,kp)+u(ip,jp,kp))/(u(ip,jp,kp)-u(ip-1,jp,kp)))
+!         else 
+!            Lx = large
+!         end if ! up(ip,jp,kp)
+!         if ( v(ip,jp,kp)-v(ip,jp-1,kp) /= 0.d0 ) then 
+!            Ly = ABS(dy*(v(ip,jp-1,kp)+v(ip,jp,kp))/(v(ip,jp,kp)-v(ip,jp-1,kp)))
+!         else 
+!            Ly = large
+!         end if ! v(ip,jp,kp)
+!         if ( w(ip,jp,kp)-w(ip,jp,kp-1) /= 0.d0 ) then 
+!            Lz = ABS(dz*(w(ip,jp,kp-1)+w(ip,jp,kp))/(w(ip,jp,kp)-w(ip,jp,kp-1)))
+!         else 
+!            Lz = large
+!         end if ! w(ip,jp,kp) 
+
+! TEMPORARY   ! NOTE: require a better estimate of the Lx,Ly,Lz later
+         Lx = large; Ly = large; Lz = large
+! END TEMPORARY 
          if ( Lx > dp ) then 
             call TrilinearIntrplFluidVel(xp,yp,zp,ip,jp,kp,uf,DufDt,1)
          else 
-            !ComputeAveFluidVel
+            call pariserror("average fluid velocity needed") !ComputeAveFluidVel
          end if ! Lx
          if ( Ly > dp ) then 
             call TrilinearIntrplFluidVel(xp,yp,zp,ip,jp,kp,vf,DvfDt,2)
          else 
-            !ComputeAveFluidVel
+            call pariserror("average fluid velocity needed") !ComputeAveFluidVel
          end if ! Lx
          if ( Lz > dp ) then 
             call TrilinearIntrplFluidVel(xp,yp,zp,ip,jp,kp,wf,DwfDt,3)
          else 
-            !ComputeAveFluidVel
+            call pariserror("average fluid velocity needed") !ComputeAveFluidVel
          end if ! Lz
+! TEMPORARY   ! NOTE: require a better estimate of DuDt after conversion 
+         DufDt = 0.d0; DvfDt = 0.d0; DwfDt = 0.d0 
+! END TEMPORARY 
       else ! interploation & averaging
       end if ! dp 
    end subroutine GetFluidProp
 
    subroutine UpdatePartSol(tswap)
+      implicit none
   
       integer, intent(in) :: tswap
 
@@ -1485,26 +1528,34 @@ contains
    end subroutine UPdatePartSol
 
    subroutine StoreOldPartSol()
+      implicit none
 
-      parts(:,rank)%xcOld = parts(:,rank)%element%xc 
-      parts(:,rank)%ycOld = parts(:,rank)%element%yc 
-      parts(:,rank)%zcOld = parts(:,rank)%element%zc 
-
-      parts(:,rank)%ucOld = parts(:,rank)%element%uc 
-      parts(:,rank)%vcOld = parts(:,rank)%element%vc 
-      parts(:,rank)%wcOld = parts(:,rank)%element%wc 
+      if ( num_part(rank) > 0 ) then 
+         parts(1:num_part(rank),rank)%xcOld = parts(1:num_part(rank),rank)%element%xc 
+         parts(1:num_part(rank),rank)%ycOld = parts(1:num_part(rank),rank)%element%yc 
+         parts(1:num_part(rank),rank)%zcOld = parts(1:num_part(rank),rank)%element%zc 
+   
+         parts(1:num_part(rank),rank)%ucOld = parts(1:num_part(rank),rank)%element%uc 
+         parts(1:num_part(rank),rank)%vcOld = parts(1:num_part(rank),rank)%element%vc 
+         parts(1:num_part(rank),rank)%wcOld = parts(1:num_part(rank),rank)%element%wc 
+      end if ! num_part(rank)
 
    end subroutine StoreOldPartSol
 
    subroutine AveragePartSol()
+      implicit none
       
-      parts(:,rank)%element%uc = 0.5d0*( parts(:,rank)%element%uc + parts(:,rank)%ucOld ) 
-      parts(:,rank)%element%vc = 0.5d0*( parts(:,rank)%element%vc + parts(:,rank)%vcOld ) 
-      parts(:,rank)%element%wc = 0.5d0*( parts(:,rank)%element%wc + parts(:,rank)%wcOld )  
+      parts(1:num_part(rank),rank)%element%uc = & 
+         0.5d0*( parts(1:num_part(rank),rank)%element%uc + parts(1:num_part(rank),rank)%ucOld ) 
+      parts(1:num_part(rank),rank)%element%vc = & 
+         0.5d0*( parts(1:num_part(rank),rank)%element%vc + parts(1:num_part(rank),rank)%vcOld ) 
+      parts(1:num_part(rank),rank)%element%wc = & 
+         0.5d0*( parts(1:num_part(rank),rank)%element%wc + parts(1:num_part(rank),rank)%wcOld )  
 
    end subroutine AveragePartSol
 
    subroutine UpdatePartLocCell   
+      implicit none
       
       integer :: i,j,k,ipart
       real(8) :: xp,yp,zp
@@ -1566,6 +1617,7 @@ contains
    end subroutine UpdatePartLocCell   
    
    subroutine CollectPartCrossBlocks
+      implicit none
        
       integer :: ipart,ipart_cross,ipart1,i,j,k
       integer :: ranknew
@@ -1629,6 +1681,7 @@ contains
    end subroutine CollectPartCrossBlocks
 
    subroutine TransferPartCrossBlocks
+      implicit none
 
       include 'mpif.h'
 
@@ -1708,6 +1761,7 @@ contains
    end subroutine TransferPartCrossBlocks
 
    subroutine SetPartBC
+      implicit none
 
       integer :: ipart
 
@@ -1730,6 +1784,7 @@ contains
    end subroutine SetPartBC
 
    subroutine ImposePartBC(ipart,rank,d)
+      implicit none
       integer, intent (in) :: ipart,rank,d
 
       if ( vofbdry_cond(d) == 'periodic' ) then
@@ -1740,6 +1795,7 @@ contains
    end subroutine ImposePartBC
 
    subroutine PartBC_periodic(ipart,rank,d)
+      implicit none
       integer, intent (in) :: ipart,rank,d
       
       if ( d == 1 ) then 
@@ -1771,6 +1827,7 @@ contains
    end subroutine PartBC_periodic
 
    subroutine LinearIntrpl(x,x0,x1,f0,f1,f)
+      implicit none
       real(8), intent (in) :: x,x0,x1,f0,f1
       real(8), intent(out) :: f      
       real(8) :: xl,xr
@@ -1781,6 +1838,7 @@ contains
    end subroutine LinearIntrpl
 
    subroutine BilinearIntrpl(x,y,x0,y0,x1,y1,f00,f01,f10,f11,f)
+      implicit none
       real(8), intent (in) :: x,y,x0,y0,x1,y1,f00,f01,f10,f11
       real(8), intent(out) :: f      
       real(8) :: f0,f1
@@ -1791,6 +1849,7 @@ contains
    end subroutine BilinearIntrpl
 
    subroutine TrilinearIntrpl(x,y,z,x0,y0,z0,x1,y1,z1,f000,f001,f010,f011,f100,f101,f110,f111,f)
+      implicit none
       real(8), intent (in) :: x,y,z,x0,y0,z0,x1,y1,z1, & 
                               f000,f001,f010,f011,f100,f101,f110,f111
       real(8), intent(out) :: f      
@@ -1806,6 +1865,7 @@ contains
    end subroutine TrilinearIntrpl
 
    subroutine TrilinearIntrplFluidVel(xp,yp,zp,ip,jp,kp,vel,sdvel,dir)
+      implicit none
       real(8), intent (in) :: xp,yp,zp
       integer, intent (in) :: ip,jp,kp,dir
       real(8), intent(out) :: vel,sdvel
@@ -1890,12 +1950,14 @@ contains
    end subroutine TrilinearIntrplFluidVel
 
    subroutine StoreDiffusionTerms()
+      implicit none
       sdu = du
       sdv = dv
       sdw = dw
    end subroutine StoreDiffusionTerms
 
    subroutine ComputeFluidAccel()
+      implicit none
 
       integer :: i,j,k
       real(8) :: dpdx,dpdy,dpdz
@@ -1934,7 +1996,7 @@ module module_output_lpp
       if(rank.ne.0) call pariserror('rank.ne.0 in append_LPP')
       if(lpp_opened==0) then
          OPEN(UNIT=88,FILE='lpp.visit')
-         write(88,10) nPdomain
+         write(88,10) NpDomain
 10       format('!NBLOCKS ',I4)
          lpp_opened=1
       else
@@ -1948,6 +2010,7 @@ module module_output_lpp
    end subroutine  append_LPP_visit_file
 
    subroutine output_LPP(nf)
+      implicit none
       integer,intent(in)  :: nf
       character(len=30) :: rootname
       integer :: ipart
