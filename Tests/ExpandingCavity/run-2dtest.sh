@@ -1,5 +1,5 @@
 #! /bin/bash
-set -x
+#set -x
 export LANG=en_EN
 
 if [ $# -lt 3 ]; then
@@ -22,7 +22,7 @@ ln -s testinput-$nx input
 	#let np=4
     #fi
     #mpirun -np $np paris > tmpout-$nx-$idt
-paris > tmpout-$nx
+paris # > tmpout-$nx
 awk ' /Step:/ { cpu = $8 } END { print "cpu = " cpu } ' < tmpout-$nx
 
 

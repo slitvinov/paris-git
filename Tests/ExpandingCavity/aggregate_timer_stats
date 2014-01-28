@@ -1,17 +1,17 @@
-Advection communications    5.4 %
+Advection communications    5.3 %
 Miscellaneous               1.5 %
-Viscous terms               3.8 %
-VOF advection              23.9 %
+Viscous terms               3.7 %
+VOF advection              23.7 %
 Heights                    19.5 %
 Heights communications      2.1 %
-Curvature                  18.5 %
+Curvature                  18.6 %
 Surface tension             0.6 %
-Advection                  15.7 %
-Poisson for pressure        6.3 %
-Output to file              1.8 %
+Advection                  15.6 %
+Poisson for pressure        6.2 %
+Output to file              2.1 %
 Lagrangian particles        0.0 %
 Front Tracking              1.0 %
     
-Overall speed Z/np          7.93535E+05
+Overall speed Z/np          7.88133E+05
     
 Allocated/proc              0.00000E+00Gbytes

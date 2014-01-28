@@ -321,6 +321,9 @@ subroutine write_vec_gnuplot(u,v,cvof,p,iout)
   integer :: i,j,k,ierr
   real(8) :: norm=0.d0, coeff, vmax
   intrinsic dsqrt
+!
+! writing u,v
+!
   OPEN(UNIT=89,FILE=TRIM(out_path)//'/UV-'//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout,padding))//'.txt')
   norm=0.d0
   k=(ks+ke)/2
@@ -331,7 +334,30 @@ subroutine write_vec_gnuplot(u,v,cvof,p,iout)
      write(89,310) x(i),y(j),coeff*dx(i)*u(i,j,k),coeff*dx(i)*v(i,j,k)
   enddo; enddo
   close(unit=89)
-310 format(e14.5,e14.5,e14.5,e14.5)
+!
+! writing cvof
+!
+  OPEN(UNIT=89,FILE=TRIM(out_path)//'/CVoF-'//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout,padding))//'.txt')
+  k=(ks+ke)/2
+  do i=is,ie
+     do j=js,je
+        write(89,310) cvof(i,j,k)
+     enddo
+     WRITE(89,*) " "
+enddo
+  close(unit=89)
+!
+! writing p
+!
+  OPEN(UNIT=89,FILE=TRIM(out_path)//'/P-'//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout,padding))//'.txt')
+  k=(ks+ke)/2
+  do i=is,ie
+     do j=js,je
+     write(89,310) x(i),y(j),p(i,j,k)
+  enddo; enddo
+  close(unit=89)
+! 310 format(e14.5,e14.5,e14.5,e14.5)
+310 format(4e14.5)
 end subroutine  write_vec_gnuplot
 !=================================================================================================
 ! append
