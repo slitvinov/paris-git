@@ -32,6 +32,6 @@ done
 renumberb.sh $START 1 9 0 bubble
 #renumberb.sh $START 1 $LIMITE 0 bubble
 
-convert -delay 5 *.png prof.mpg     
+convert -delay 15 *.gif prof.gif     
 
 exit 0

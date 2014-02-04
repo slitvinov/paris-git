@@ -11,7 +11,7 @@ fi
 basename=$5
 if [ $# -lt 5 ] 
 then
-  basename='goutte'
+  basename='bubble'
 fi
 
 echo 'basename =' $basename
@@ -19,6 +19,6 @@ echo 'basename =' $basename
 let k=$1
 while [ "$k" -le $3 ]
 do
-    mv $basename.$k.png $basename.$4$k.png
+    mv $basename.$k.gif $basename.$4$k.gif
     let k+=$2
 done

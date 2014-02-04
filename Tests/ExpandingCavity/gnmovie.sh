@@ -23,7 +23,7 @@ fi
 cp "out/CVoF-00000-$frame.txt" toplot$a.tmp
 done
 
-gnuplot <<EOF
+gnuplot << EOF
 n=0
 call "gnmovie.gp" $a
 exit
