@@ -311,7 +311,7 @@ module module_IO
   logical :: read_x, read_y, read_z, restart, ICOut, restartFront, restartAverages
   contains
 !=================================================================================================
-subroutine write_vec_gnuplot(u,v,cvof,p,iout)
+subroutine write_vec_gnuplot(u,v,cvof,p,iout,DoVOF)
   use module_grid
   use module_tmpvar
   implicit none
@@ -320,6 +320,7 @@ subroutine write_vec_gnuplot(u,v,cvof,p,iout)
   integer, intent(in) :: iout
   integer :: i,j,k,ierr
   real(8) :: norm=0.d0, coeff, vmax
+  logical :: DoVOF
   intrinsic dsqrt
 !
 ! writing u,v
@@ -335,20 +336,24 @@ subroutine write_vec_gnuplot(u,v,cvof,p,iout)
   enddo; enddo
   close(unit=89)
 !
-! writing cvof
-!
-  OPEN(UNIT=89,FILE=TRIM(out_path)//'/CVoF-'//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout,padding))//'.txt')
-  k=(ks+ke)/2
-  do i=is,ie
-     do j=js,je
-        write(89,310) cvof(i,j,k)
+  if(DoVOF) then
+     !
+     ! writing cvof
+     !
+     OPEN(UNIT=89,FILE=TRIM(out_path)//'/CVoF-'//TRIM(int2text(rank,padding))//'-'// &
+          TRIM(int2text(iout,padding))//'.txt')
+     k=(ks+ke)/2
+     do i=is,ie
+        do j=js,je
+           write(89,310) cvof(i,j,k)
+        enddo
+        WRITE(89,*) " "
      enddo
-     WRITE(89,*) " "
-enddo
-  close(unit=89)
-!
-! writing p
-!
+     close(unit=89)
+  endif
+  !
+  ! writing p
+  !
   OPEN(UNIT=89,FILE=TRIM(out_path)//'/P-'//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout,padding))//'.txt')
   k=(ks+ke)/2
   do i=is,ie
