@@ -14,13 +14,11 @@ set contour
 set cntrparam linear
 set view map
 set cntrparam levels discrete 0.5
-set title "ouptut nr  ".n
+lim=$0
+set title "ouptut from 0 to ".lim
 
-splot "toplot".n.".tmp" w l notitle lt n
-pause 1
-n=n+1
+splot for [n=1:lim] "toplot".n.".tmp" w l notitle 
 
-if (n < 20 ) reread
 exit
 
 

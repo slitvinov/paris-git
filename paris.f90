@@ -530,12 +530,13 @@ end function get_cfl
 subroutine calcStats
   use module_grid
   use module_flow
+  use module_VOF
   implicit none
   include "mpif.h"
   integer :: i,j,k,ierr
-  real(8) :: vol
+  real(8) :: vol,CC
   real(8), save :: W_int=-0.02066
-  mystats(1:9)=0d0
+  mystats(1:10)=0d0
   do k=ks,ke;  do j=js,je;  do i=is,ie
     vol = dx(i)*dy(j)*dz(k)
 ! Average u component
@@ -547,6 +548,9 @@ subroutine calcStats
     mystats(7)=mystats(7)+p(i,j,k)*vol
     mystats(8)=mystats(8)+0.5*(rho(i,j,k)+rho(i+1,j,k))*u(i,j,k)*vol
     mystats(9)=mystats(9)+0.5*(rhoo(i,j,k)+rhoo(i+1,j,k))*uold(i,j,k)*vol
+! Phase C=1 volume
+    if(DoVOF) CC=cvof(i,j,k) ;  mystats(10)=mystats(10)+CC*vol
+
   enddo;  enddo;  enddo
   if(js==Ng+1)then
     do k=ks,ke;  do i=is,ie

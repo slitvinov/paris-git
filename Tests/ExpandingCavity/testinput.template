@@ -88,7 +88,7 @@ ZLENGTH  = ZLTEMP
 !=================================================================================================
 ! Flow parameters
 
-WallVel(1,1)  = -0.001 ! can set inflow velocities here
+WallVel(1,1)  = -0.3 ! can set inflow velocities here
 
 GX      = 0.0
 GY      = 0.0
@@ -109,7 +109,7 @@ MU1      = 0.0
                     ! rho1, mu1 : density and viscosity of the matrix phase
 
 RHO2     = 1.0
-MU2      = 1.0
+MU2      = 0.0
 SIGMA    = 0.033       ! rho2, mu2, sigma : properties of the drop and surface tension
                    
 

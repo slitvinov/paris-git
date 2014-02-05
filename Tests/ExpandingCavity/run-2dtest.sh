@@ -23,7 +23,7 @@ ln -s testinput-$nx input
  #  fi
 #mpirun -np $np paris #> tmpout-$nx-$idt
 paris # > tmpout-$nx
-#awk ' /Step:/ { cpu = $8 } END { print "cpu = " cpu } ' < tmpout-$nx
+awk ' /Step:/ { cpu = $8 } END { print "cpu = " cpu } ' < tmpout-$nx
 
 
 

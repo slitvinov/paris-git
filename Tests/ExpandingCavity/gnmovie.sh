@@ -9,8 +9,7 @@ DELTA=1000
 
 for ((a=START; a <= LIMITE ; a++)) # Doubles parenthèses, et "LIMITE" sans "$".
 do
-#let "p=$p+1"
-#echo $a
+
 let frame=$DELTA*$a
 if [ $a == 0 ]; then
     frame=0000
@@ -19,13 +18,13 @@ if [ $a -lt 10 ]; then
     frame='0'$frame
 fi
 
-#echo "frame" $frame
 cp "out/CVoF-00000-$frame.txt" toplot$a.tmp
 done
 
 gnuplot << EOF
 n=0
-call "gnmovie.gp" $a
+#call "gnmovie.gp" $LIMITE
+call "merged.gp" $LIMITE
 exit
 EOF
 
