@@ -1362,14 +1362,17 @@ contains
       implicit none
       integer, intent(in) :: tswap
 
+      ! Stokes drag covers bubbles to particles limit. Finite Reynolds number
+      ! extensions SN & CG are only for particles while MKL is only for bubbles
       integer, parameter :: drag_model_Stokes = 1
       integer, parameter :: drag_model_SN = 2     ! Schiller & Nauman
       integer, parameter :: drag_model_CG = 3     ! Clift & Gauvin
+      integer, parameter :: drag_model_MKL = 4    ! Mei, Klausner,Lawrence 1994
 
       real(8), parameter :: Cm = 0.5d0
 
       real(8) :: relvel(4), partforce(3)
-      real(8) :: dp, Rep, muf, phi, rhof, rhop, taup
+      real(8) :: dp, Rep, muf, mup, phi, rhof, rhop, taup
       real(8) :: up,vp,wp, uf,vf,wf, DufDt,DvfDt,DwfDt
       real(8) :: fhx,fhy,fhz
 
@@ -1399,17 +1402,28 @@ contains
             rhof = rho1
             rhop = rho2
             muf  = mu1
+            mup  = mu2
             Rep  = rhof*relvel(4)*dp/muf
-            taup = rhop *dp*dp/18.0d0/muf
+            taup = rhop *dp*dp/18.0d0/muf & 
+                 *(3.d0 + 3.d0*muf/mup)/(3.d0 + 2.d0*muf/mup)
 
             select case ( dragmodel ) 
                case ( drag_model_Stokes ) 
                   phi = 1.d0
                case ( drag_model_SN ) 
                   phi = 1.d0+0.15d0*Rep**0.687d0
+                  if ( mu1 > mu2 ) & 
+                     call pariserror("Particle drag is used for Bubbles!")
                case ( drag_model_CG ) 
                   phi = 1.d0+0.15d0*Rep**0.687d0 & 
                       + 1.75d-2*Rep/(1.0d0 + 4.25d4/Rep**1.16d0)
+                  if ( mu1 > mu2 ) & 
+                     call pariserror("Particle drag is used for Bubbles!")
+               case ( drag_model_MKL )
+                  phi = 1.d0 + 1.0d0/(8.d0/Rep & 
+                                    + 0.5d0 *(1.d0 + 3.315d0/Rep**0.5d0))
+                  if ( mu1 < mu2 ) & 
+                     call pariserror("Bubble drag is used for particles!")
                case default
                   call pariserror("wrong quasi-steady drag model!")
             end select ! dragmodel
