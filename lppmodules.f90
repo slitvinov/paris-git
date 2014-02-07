@@ -65,7 +65,7 @@
    integer, dimension(:), allocatable :: new_drop_id
 
    type element 
-      real(8) :: xc,yc,zc,uc,vc,wc,vol
+      real(8) :: xc,yc,zc,uc,vc,wc,duc,dvc,dwc,vol
       integer :: id 
    end type element
    type (element), dimension(:,:), allocatable :: element_stat
@@ -90,7 +90,7 @@
    integer, dimension(:,:,:), allocatable :: drops_merge_gcell_list
 
    type drop_merge_comm
-      real(8) :: xc,yc,zc,uc,vc,wc,vol
+      real(8) :: xc,yc,zc,uc,vc,wc,duc,dvc,dwc,vol
       integer :: id
       integer :: num_diff_tag 
       integer :: diff_tag_list(maxnum_diff_tag)
@@ -103,7 +103,6 @@
 
    type particle
       type(element) :: element
-      real(8) :: fx,fy,fz
       real(8) :: xcOld,ycOld,zcOld,ucOld,vcOld,wcOld
       integer :: ic,jc,kc,dummyint  
       ! Note: open_mpi sometimes failed to communicate the last varialbe in 
@@ -116,8 +115,9 @@
    integer, dimension(:,:), allocatable :: parts_cross_newrank
    integer, dimension(:), allocatable :: num_part_cross
 
-   ! substantial derivative of fluid velocity, used for unsteady force calulation
-   real(8), dimension(:,:,:), allocatable :: sdu,sdv,sdw
+   ! substantial derivative of velocity
+   real(8), dimension(:,:,:), allocatable :: sdu,sdv,sdw, & 
+                                             sdu_work,sdv_work,sdw_work
 
    real(8), parameter :: PI = 3.14159265359d0
    integer, parameter :: CRAZY_INT = 3483129 
@@ -163,7 +163,10 @@ contains
       allocate( drops_merge_gcell_list(3,maxnum_cell_drop,max_num_drop) )
       allocate( sdu(imin:imax,jmin:jmax,kmin:kmax), & 
                 sdv(imin:imax,jmin:jmax,kmin:kmax), &
-                sdw(imin:imax,jmin:jmax,kmin:kmax) )
+                sdw(imin:imax,jmin:jmax,kmin:kmax), & 
+                sdu_work(imin:imax,jmin:jmax,kmin:kmax), & 
+                sdv_work(imin:imax,jmin:jmax,kmin:kmax), &
+                sdw_work(imin:imax,jmin:jmax,kmin:kmax) )
 
       ! set default values
       num_tag  = 0
@@ -175,6 +178,7 @@ contains
       LPP_initialized = .true.
 
       sdu = 0.d0; sdv = 0.d0; sdw =0.d0
+      sdu_work = 0.d0; sdv_work = 0.d0; sdw_work =0.d0
 
    end subroutine initialize_LPP
 
@@ -246,10 +250,10 @@ contains
 
          if ( DropStatisticsMethod > 0 ) call drop_statistics(tswap,time) 
 
-         if ( DoConvertVOF2LPP ) call ConvertDrop2Part(tswap)
-!         if ( DoConvertLPP2VOF ) call ConvertPart2Drop()   ! TBA
+         if ( DoConvertVOF2LPP ) call ConvertVOF2LPP(tswap)
+!         if ( DoConvertLPP2VOF ) call ConvertLPP2VOF()   ! TBA
       end if ! tswap
-      call ComputeFluidAccel()
+!      call ComputeFluidAccel()
       call ComputePartForce(tswap)
       call UpdatePartSol(tswap)
    end subroutine lppsweeps
@@ -267,7 +271,7 @@ contains
     real(8) :: volcell,cvof_scaled
 
     integer :: num_cell_drop,cell_list(3,maxnum_cell_drop)
-    real(8) :: xc,yc,zc,uc,vc,wc,vol 
+    real(8) :: xc,yc,zc,uc,vc,wc,duc,dvc,dwc,vol 
 
     logical :: merge_drop
 
@@ -307,6 +311,9 @@ contains
         uc  = 0.d0
         vc  = 0.d0
         wc  = 0.d0
+        duc  = 0.d0
+        dvc  = 0.d0
+        dwc  = 0.d0
         num_cell_drop = 0
         cell_list = 0
 
@@ -350,6 +357,9 @@ contains
                uc  = uc  + cvof_scaled*u(isq,jsq,ksq)
                vc  = vc  + cvof_scaled*v(isq,jsq,ksq)
                wc  = wc  + cvof_scaled*w(isq,jsq,ksq)
+               duc  = duc  + cvof_scaled*sdu(isq,jsq,ksq)
+               dvc  = dvc  + cvof_scaled*sdv(isq,jsq,ksq)
+               dwc  = dwc  + cvof_scaled*sdw(isq,jsq,ksq)
                if ( num_cell_drop < maxnum_cell_drop ) then
                   num_cell_drop = num_cell_drop + 1
                   cell_list(1:3,num_cell_drop) = [isq,jsq,ksq]
@@ -397,6 +407,9 @@ contains
             drops_merge(num_drop_merge(rank),rank)%element%uc  = uc/vol 
             drops_merge(num_drop_merge(rank),rank)%element%vc  = vc/vol
             drops_merge(num_drop_merge(rank),rank)%element%wc  = wc/vol
+            drops_merge(num_drop_merge(rank),rank)%element%duc  = duc/vol 
+            drops_merge(num_drop_merge(rank),rank)%element%dvc  = dvc/vol
+            drops_merge(num_drop_merge(rank),rank)%element%dwc  = dwc/vol
             drops_merge(num_drop_merge(rank),rank)%num_cell_drop = num_cell_drop
             drops_merge_cell_list(:,:,num_drop_merge(rank)) = cell_list
           else 
@@ -408,6 +421,9 @@ contains
             drops(num_drop(rank),rank)%element%uc  = uc/vol
             drops(num_drop(rank),rank)%element%vc  = vc/vol
             drops(num_drop(rank),rank)%element%wc  = wc/vol
+            drops(num_drop(rank),rank)%element%duc  = duc/vol
+            drops(num_drop(rank),rank)%element%dvc  = dvc/vol
+            drops(num_drop(rank),rank)%element%dwc  = dwc/vol
             drops(num_drop(rank),rank)%num_cell_drop = num_cell_drop
             drops_cell_list(:,:,num_drop(rank)) = cell_list
           end if ! merge_drop
@@ -470,7 +486,8 @@ contains
 
       integer :: idrop,iCell,idrop1
       integer :: idiff_tag,tag,tag1
-      real(8) :: vol_merge,xc_merge,yc_merge,zc_merge,uc_merge,vc_merge,wc_merge,vol1
+      real(8) :: vol_merge,xc_merge,yc_merge,zc_merge,uc_merge,vc_merge,wc_merge,vol1, &
+                                                      duc_merge,dvc_merge,dwc_merge
       integer :: irank, irank1
       real(8) :: max_drop_merge_vol
       integer :: tag_max_drop_merge_vol
@@ -532,6 +549,9 @@ contains
                uc_merge  = drops_merge_comm(idrop,irank)%uc*vol1
                vc_merge  = drops_merge_comm(idrop,irank)%vc*vol1
                wc_merge  = drops_merge_comm(idrop,irank)%wc*vol1
+               duc_merge  = drops_merge_comm(idrop,irank)%duc*vol1
+               dvc_merge  = drops_merge_comm(idrop,irank)%dvc*vol1
+               dwc_merge  = drops_merge_comm(idrop,irank)%dwc*vol1
 
                max_drop_merge_vol = drops_merge_comm(idrop,irank)%vol
                tag_max_drop_merge_vol = tag
@@ -548,6 +568,9 @@ contains
                   uc_merge  = uc_merge  + drops_merge_comm(idrop1,irank1)%uc*vol1
                   vc_merge  = vc_merge  + drops_merge_comm(idrop1,irank1)%vc*vol1
                   wc_merge  = wc_merge  + drops_merge_comm(idrop1,irank1)%wc*vol1
+                  duc_merge  = duc_merge  + drops_merge_comm(idrop1,irank1)%duc*vol1
+                  dvc_merge  = dvc_merge  + drops_merge_comm(idrop1,irank1)%dvc*vol1
+                  dwc_merge  = dwc_merge  + drops_merge_comm(idrop1,irank1)%dwc*vol1
                   if (drops_merge_comm(idrop1,irank1)%vol > max_drop_merge_vol) then
                      max_drop_merge_vol = drops_merge_comm(idrop1,irank1)%vol
                      tag_max_drop_merge_vol = tag1
@@ -559,6 +582,9 @@ contains
                uc_merge = uc_merge/vol_merge
                vc_merge = vc_merge/vol_merge
                wc_merge = wc_merge/vol_merge
+               duc_merge = duc_merge/vol_merge
+               dvc_merge = dvc_merge/vol_merge
+               dwc_merge = dwc_merge/vol_merge
 
                idrop1 = tag_dropid(tag_max_drop_merge_vol)
                irank1 = tag_rank  (tag_max_drop_merge_vol)
@@ -571,6 +597,9 @@ contains
                drops_merge_comm(idrop,irank)%uc  = uc_merge
                drops_merge_comm(idrop,irank)%vc  = vc_merge
                drops_merge_comm(idrop,irank)%wc  = wc_merge
+               drops_merge_comm(idrop,irank)%duc  = duc_merge
+               drops_merge_comm(idrop,irank)%dvc  = dvc_merge
+               drops_merge_comm(idrop,irank)%dwc  = dwc_merge
                do idiff_tag = 1,drops_merge_comm(idrop,irank)%num_diff_tag
                   tag1   = drops_merge_comm(idrop,irank)%diff_tag_list(idiff_tag)
                   idrop1 = tag_dropid(tag1)
@@ -582,6 +611,9 @@ contains
                   drops_merge_comm(idrop1,irank1)%uc  = uc_merge
                   drops_merge_comm(idrop1,irank1)%vc  = vc_merge
                   drops_merge_comm(idrop1,irank1)%wc  = wc_merge
+                  drops_merge_comm(idrop1,irank1)%duc  = duc_merge
+                  drops_merge_comm(idrop1,irank1)%dvc  = dvc_merge
+                  drops_merge_comm(idrop1,irank1)%dwc  = dwc_merge
                end do ! idiff_tag
             end if ! newdropid(tag)
          end do ! tag
@@ -625,12 +657,13 @@ contains
 
       element_NULL%xc = 0.d0;element_NULL%yc = 0.d0;element_NULL%zc = 0.d0
       element_NULL%uc = 0.d0;element_NULL%vc = 0.d0;element_NULL%wc = 0.d0
+      element_NULL%duc = 0.d0;element_NULL%dvc = 0.d0;element_NULL%dwc = 0.d0
       element_NULL%vol = 0.d0;element_NULL%id = CRAZY_INT
 
       !  Setup MPI derived type for element_type 
       offsets (0) = 0 
       oldtypes(0) = MPI_REAL8 
-      blockcounts(0) = 7 
+      blockcounts(0) = 10 
       call MPI_TYPE_EXTENT(MPI_REAL8, r8extent, ierr) 
       offsets    (1) = blockcounts(0)*r8extent 
       oldtypes   (1) = MPI_INTEGER  
@@ -653,6 +686,9 @@ contains
             element_stat(num_element(rank),rank)%uc  = drops(idrop,rank)%element%uc
             element_stat(num_element(rank),rank)%vc  = drops(idrop,rank)%element%vc
             element_stat(num_element(rank),rank)%wc  = drops(idrop,rank)%element%wc
+            element_stat(num_element(rank),rank)%duc  = drops(idrop,rank)%element%duc
+            element_stat(num_element(rank),rank)%dvc  = drops(idrop,rank)%element%dvc
+            element_stat(num_element(rank),rank)%dwc  = drops(idrop,rank)%element%dwc
             element_stat(num_element(rank),rank)%id  = drops(idrop,rank)%element%id
          end do ! idrop
       end if ! num_drop(rank)
@@ -668,6 +704,9 @@ contains
                element_stat(num_element(rank),rank)%uc  = drops_merge(idrop,rank)%element%uc
                element_stat(num_element(rank),rank)%vc  = drops_merge(idrop,rank)%element%vc
                element_stat(num_element(rank),rank)%wc  = drops_merge(idrop,rank)%element%wc
+               element_stat(num_element(rank),rank)%duc  = drops_merge(idrop,rank)%element%duc
+               element_stat(num_element(rank),rank)%dvc  = drops_merge(idrop,rank)%element%dvc
+               element_stat(num_element(rank),rank)%dwc  = drops_merge(idrop,rank)%element%dwc
                element_stat(num_element(rank),rank)%id  = drops_merge(idrop,rank)%element%id
             end if !drops_merge(idrop,rank)%flag_center_mass
          end do ! idrop
@@ -683,6 +722,9 @@ contains
             element_stat(num_element(rank),rank)%uc  = parts(idrop,rank)%element%uc
             element_stat(num_element(rank),rank)%vc  = parts(idrop,rank)%element%vc
             element_stat(num_element(rank),rank)%wc  = parts(idrop,rank)%element%wc
+            element_stat(num_element(rank),rank)%duc  = parts(idrop,rank)%element%duc
+            element_stat(num_element(rank),rank)%dvc  = parts(idrop,rank)%element%dvc
+            element_stat(num_element(rank),rank)%dwc  = parts(idrop,rank)%element%dwc
             element_stat(num_element(rank),rank)%id  = parts(idrop,rank)%element%id
          end do ! idrop
       end if ! num_drop(rank)
@@ -722,6 +764,9 @@ contains
                                                       element_stat(ielement,irank)%uc, &
                                                       element_stat(ielement,irank)%vc, &
                                                       element_stat(ielement,irank)%wc, &
+                                                      element_stat(ielement,irank)%duc, &
+                                                      element_stat(ielement,irank)%dvc, &
+                                                      element_stat(ielement,irank)%dwc, &
                                                       element_stat(ielement,irank)%vol
                      end do ! ielement
                   end if ! num_element_irank) 
@@ -776,7 +821,7 @@ contains
       !  Setup MPI derived type for drop_merge_comm
       offsets (0) = 0 
       oldtypes(0) = MPI_REAL8 
-      blockcounts(0) = 7 
+      blockcounts(0) = 10 
       call MPI_TYPE_EXTENT(MPI_REAL8, r8extent, ierr) 
       offsets    (1) = blockcounts(0)*r8extent 
       oldtypes   (1) = MPI_INTEGER  
@@ -799,6 +844,9 @@ contains
             drops_merge_comm(idrop,rank)%uc            = drops_merge(idrop,rank)%element%uc
             drops_merge_comm(idrop,rank)%vc            = drops_merge(idrop,rank)%element%vc
             drops_merge_comm(idrop,rank)%wc            = drops_merge(idrop,rank)%element%wc
+            drops_merge_comm(idrop,rank)%duc            = drops_merge(idrop,rank)%element%duc
+            drops_merge_comm(idrop,rank)%dvc            = drops_merge(idrop,rank)%element%dvc
+            drops_merge_comm(idrop,rank)%dwc            = drops_merge(idrop,rank)%element%dwc
          end do ! idrop
       end if ! num_drop_merge(rank)
 
@@ -836,7 +884,7 @@ contains
       !  Setup MPI derived type for drop_merge_comm
       offsets (0) = 0 
       oldtypes(0) = MPI_REAL8 
-      blockcounts(0) = 7 
+      blockcounts(0) = 10 
       call MPI_TYPE_EXTENT(MPI_REAL8, r8extent, ierr) 
       offsets    (1) = blockcounts(0)*r8extent 
       oldtypes   (1) = MPI_INTEGER  
@@ -872,6 +920,9 @@ contains
             drops_merge(idrop,rank)%element%uc  = drops_merge_comm(idrop,rank)%uc
             drops_merge(idrop,rank)%element%vc  = drops_merge_comm(idrop,rank)%vc
             drops_merge(idrop,rank)%element%wc  = drops_merge_comm(idrop,rank)%wc
+            drops_merge(idrop,rank)%element%duc  = drops_merge_comm(idrop,rank)%duc
+            drops_merge(idrop,rank)%element%dvc  = drops_merge_comm(idrop,rank)%dvc
+            drops_merge(idrop,rank)%element%dwc  = drops_merge_comm(idrop,rank)%dwc
             drops_merge(idrop,rank)%flag_center_mass  = drops_merge_comm(idrop,rank)%flag_center_mass
          end do ! idrop
       end if ! num_drop_merge(rank)
@@ -1039,7 +1090,7 @@ contains
       end if ! rank
 
       ! convert droplets to particles
-      call ConvertDrop2Part(tswap)
+      call ConvertVOF2LPP(tswap)
 
       ! output droplets & particles
       OPEN(UNIT=93,FILE=TRIM(out_path)//'/VOF_after_'//TRIM(int2text(rank,padding))//'.dat')
@@ -1158,7 +1209,7 @@ contains
     end if ! nA
    end subroutine QSort
 
-   subroutine ConvertDrop2Part(tswap)
+   subroutine ConvertVOF2LPP(tswap)
       implicit none
 
       include 'mpif.h'
@@ -1196,9 +1247,9 @@ contains
 
             ! compute average fluid quantities
             ! Note: XXX temporary, need to be improved later 
-            uf = 0.d0 !drops(idrop,rank)%element%uc
-            vf = 0.d0 !drops(idrop,rank)%element%vc
-            wf = 0.d0 !drops(idrop,rank)%element%wc
+            uf = 0.d0 
+            vf = 0.d0
+            wf = 0.d0 
 
             ! remove droplet vof structure
             MinDistPart2CellCenter = 1.0d10
@@ -1248,9 +1299,9 @@ contains
 
             ! compute average fluid quantities
             ! Note: XXX temporary, need to be improved later 
-            uf = 0.d0 !drops_merge(idrop,rank)%element%uc
-            vf = 0.d0 !drops_merge(idrop,rank)%element%vc
-            wf = 0.d0 !drops_merge(idrop,rank)%element%wc
+            uf = 0.d0 
+            vf = 0.d0 
+            wf = 0.d0 
 
             ! remove droplet vof structure
             do ilist = 1,drops_merge(idrop,rank)%num_cell_drop
@@ -1317,7 +1368,7 @@ contains
       call MPI_ALLGATHER(num_part(rank), 1, MPI_INTEGER, &
                          num_part(:)   , 1, MPI_INTEGER, MPI_Comm_World, ierr)
 
-   end subroutine ConvertDrop2Part
+   end subroutine ConvertVOF2LPP
 
    subroutine CheckConvertDropCriteria(vol,xc,yc,zc,ConvertDropFlag,CriteriaConvertCase)
       implicit none
@@ -1440,9 +1491,9 @@ contains
                          + (1.d0+Cm)*rhof/rhop*DwfDt                 &
                          + fhz )/(1.d0+Cm*rhof/rhop)
 
-            parts(ipart,rank)%fx = partforce(1)
-            parts(ipart,rank)%fy = partforce(2)
-            parts(ipart,rank)%fz = partforce(3)
+            parts(ipart,rank)%element%duc = partforce(1) 
+            parts(ipart,rank)%element%dvc = partforce(2)
+            parts(ipart,rank)%element%dwc = partforce(3)
          end do ! ipart
       end if ! num_part(rank) 
    end subroutine ComputePartForce
@@ -1505,9 +1556,6 @@ contains
          else 
             call pariserror("average fluid velocity needed") !ComputeAveFluidVel
          end if ! Lz
-! TEMPORARY   ! NOTE: require a better estimate of DuDt after conversion 
-         DufDt = 0.d0; DvfDt = 0.d0; DwfDt = 0.d0 
-! END TEMPORARY 
       else ! interploation & averaging
       end if ! dp 
    end subroutine GetFluidProp
@@ -1526,11 +1574,11 @@ contains
                                                    parts(1:num_part(rank),rank)%element%wc*dt 
 
          parts(1:num_part(rank),rank)%element%uc = parts(1:num_part(rank),rank)%element%uc +&
-                                                   parts(1:num_part(rank),rank)%fx*dt 
+                                                   parts(1:num_part(rank),rank)%element%duc*dt 
          parts(1:num_part(rank),rank)%element%vc = parts(1:num_part(rank),rank)%element%vc +&
-                                                   parts(1:num_part(rank),rank)%fy*dt 
+                                                   parts(1:num_part(rank),rank)%element%dvc*dt 
          parts(1:num_part(rank),rank)%element%wc = parts(1:num_part(rank),rank)%element%wc +&
-                                                   parts(1:num_part(rank),rank)%fz*dt
+                                                   parts(1:num_part(rank),rank)%element%dwc*dt
         
          call UpdatePartLocCell   
       end if ! num_part(rank)
@@ -1726,13 +1774,13 @@ contains
       call MPI_TYPE_EXTENT(MPI_INTEGER, intextent, ierr) 
       offsets    (0) = 0 
       oldtypes   (0) = MPI_REAL8 
-      blockcounts(0) = 7 
+      blockcounts(0) = 10 
       offsets    (1) = offsets(0) + blockcounts(0)*r8extent 
       oldtypes   (1) = MPI_INTEGER  
       blockcounts(1) = 1  
       offsets    (2) = offsets(1) + blockcounts(1)*intextent 
       oldtypes   (2) = MPI_REAL8  
-      blockcounts(2) = 9
+      blockcounts(2) = 6
       offsets    (3) = offsets(2) + blockcounts(2)*r8extent 
       oldtypes   (3) = MPI_INTEGER  
       blockcounts(3) = 4  
@@ -1963,34 +2011,51 @@ contains
       end if ! dir 
    end subroutine TrilinearIntrplFluidVel
 
-   subroutine StoreDiffusionTerms()
+   subroutine StoreBeforeConvectionTerms()
+      ! Store du, dv, dw before convection terms are computed and added
       implicit none
-      sdu = du
-      sdv = dv
-      sdw = dw
-   end subroutine StoreDiffusionTerms
+      sdu_work = du
+      sdv_work = dv
+      sdw_work = dw
+   end subroutine StoreBeforeConvectionTerms
 
-   subroutine ComputeFluidAccel()
+   subroutine StoreAfterConvectionTerms()
+      ! Store the portions of du, dv, dw due to convection terms
+      implicit none
+      sdu_work = du - sdu_work
+      sdv_work = dv - sdv_work
+      sdw_work = dw - sdw_work
+   end subroutine StoreAfterConvectionTerms
+
+   subroutine ComputeSubDerivativeVel(tswap)
       implicit none
 
-      integer :: i,j,k
-      real(8) :: dpdx,dpdy,dpdz
+      integer, intent(in) :: tswap
+      integer :: i, j, k
+     
+      ! Note: XXX The current way to compute substantial derivatives of velocity
+      ! only works when diffusion terms are solved EXPLICITLY
 
-      ! Compute substantial derivatives of fluid velocity (fluid acceleration)
-      ! Note: only needed in fluid phase
-      do i=is,ie; do j=js,je; do k=ks,ke
-         if ( cvof (i,j,k) == 0.d0 ) then 
-            dpdx = (p(i,j,k) - p(i-1,j,k))/(x(i)-x(i-1))
-            dpdy = (p(i,j,k) - p(i,j-1,k))/(y(j)-y(j-1))
-            dpdz = (p(i,j,k) - p(i,j,k-1))/(z(k)-z(k-1))
-            
-            sdu(i,j,k) = sdu(i,j,k)-dpdx/rho1
-            sdv(i,j,k) = sdv(i,j,k)-dpdy/rho1
-            sdw(i,j,k) = sdw(i,j,k)-dpdz/rho1
-         end if ! cvof 
-      end do; end do; end do ! i,j,k
+      ! Subtract the portions of du, dv, dw due to convection terms from the
+      ! overall values
+      sdu = du - sdu_work
+      sdv = dv - sdv_work
+      sdw = dw - sdw_work
 
-   end subroutine ComputeFluidAccel
+      ! Correct du, dv, dw with pressure gradients
+      do k=ks,ke;  do j=js,je; do i=is,ieu     
+         sdu(i,j,k)=sdu(i,j,k)-(2.0/dxh(i))*(p(i+1,j,k)-p(i,j,k))/(rho(i+1,j,k)+rho(i,j,k))
+      enddo; enddo; enddo
+
+      do k=ks,ke;  do j=js,jev; do i=is,ie    
+         sdv(i,j,k)=sdv(i,j,k)-(2.0/dyh(j))*(p(i,j+1,k)-p(i,j,k))/(rho(i,j+1,k)+rho(i,j,k))
+      enddo; enddo; enddo
+
+      do k=ks,kew;  do j=js,je; do i=is,ie   
+         sdw(i,j,k)=sdw(i,j,k)-(2.0/dzh(k))*(p(i,j,k+1)-p(i,j,k))/(rho(i,j,k+1)+rho(i,j,k))
+      enddo; enddo; enddo
+
+   end subroutine ComputeSubDerivativeVel
 
 
 end module module_Lag_part
@@ -1999,7 +2064,7 @@ module module_output_lpp
    use module_IO
    use module_Lag_part
    implicit none
-   integer :: lpp_opened=0;
+   integer :: lpp_opened=0
 
    contains
 

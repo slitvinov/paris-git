@@ -119,7 +119,7 @@ Program paris
   call check_stability
 
   if(DoVOF.and.rank<nPdomain) call initialize_VOF
-  if(DoVOF.and.DoLPP) call initialize_LPP
+  if(DoLPP) call initialize_LPP
 
   if(rank<nPdomain) call initialize_solids
 
@@ -143,7 +143,7 @@ Program paris
      if(ICOut .and. rank<nPdomain) then
         call output(0,is,ie+1,js,je+1,ks,ke+1)
         if(DoVOF) call output_VOF(0,imin,imax,jmin,jmax,kmin,kmax)
-        if(DoVOF .and. DoLPP) call output_LPP(0)
+        if(DoLPP) call output_LPP(0)
         call setvelocityBC(u,v,w,umask,vmask,wmask,time)
         call write_vec_gnuplot(u,v,cvof,p,itimestep,DoVOF)
         call calcstats
@@ -192,7 +192,7 @@ Program paris
            wold = w
            rhoo = rho
            muold  = mu
-           if ( DoVOF .and. DoLPP ) call StoreOldPartSol()
+           if ( DoLPP ) call StoreOldPartSol()
         endif
  !------------------------------------ADVECTION & DIFFUSION----------------------------------------
         do ii=1, itime_scheme
@@ -215,9 +215,10 @@ Program paris
               call explicitMomDiff(u,v,w,rho,mu,du,dv,dw)
            endif
            call my_timer(3,itimestep,ii)
-           if( DoLPP ) call StoreDiffusionTerms()
 
+           if( DoLPP ) call StoreBeforeConvectionTerms()
            if(.not.ZeroReynolds) call momentumConvection(u,v,w,du,dv,dw)
+           if( DoLPP ) call StoreAfterConvectionTerms()
            call my_timer(9,itimestep,ii)
 
            ! reset the surface tension force on the fixed grid (when surface tension from front)
@@ -334,6 +335,7 @@ Program paris
            do k=ks,kew;  do j=js,je; do i=is,ie;   ! CORRECT THE w-velocity
               w(i,j,k)=w(i,j,k)-dt*(2.0/dzh(k))*(p(i,j,k+1)-p(i,j,k))/(rho(i,j,k+1)+rho(i,j,k))
            enddo; enddo; enddo
+           if( DoLPP ) call ComputeSubDerivativeVel(itimestep)
            call my_timer(10,itimestep,ii)
            !--------------------------------------UPDATE COLOR---------------------------------------------
            if (DoFront) then
