@@ -1353,7 +1353,8 @@ subroutine SetupPoisson(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask,cvof)
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: utmp,vtmp,wtmp,rhot
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: umask,vmask,wmask
   real(8), dimension(is:ie,js:je,ks:ke), intent(inout) :: pmask
-  real(8), dimension(is:ie,js:je,ks:ke), intent(in) :: cvof
+!  real(8), dimension(is:ie,js:je,ks:ke), intent(in) :: cvof
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: cvof
   real(8), dimension(is:ie,js:je,ks:ke,8), intent(out) :: A
 
   real(8) :: dt
