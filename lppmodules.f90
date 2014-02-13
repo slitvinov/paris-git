@@ -126,6 +126,13 @@
    integer, parameter :: CriteriaCylinder  = 2
    integer, parameter :: CriteriaSphere    = 3
 
+   ! Stokes drag covers bubbles to particles limit. Finite Reynolds number
+   ! extensions SN & CG are only for particles while MKL is only for bubbles
+   integer, parameter :: dragmodel_Stokes = 1
+   integer, parameter :: dragmodel_SN = 2     ! Schiller & Nauman
+   integer, parameter :: dragmodel_CG = 3     ! Clift & Gauvin
+   integer, parameter :: dragmodel_MKL = 4    ! Mei, Klausner,Lawrence 1994
+
    integer :: DropStatisticsMethod 
    logical :: DoConvertVOF2LPP 
    logical :: DoConvertLPP2VOF 
@@ -240,6 +247,9 @@ contains
     
       integer, intent(in) :: tswap
       real(8), intent(in) :: time
+
+      call ComputePartForce(tswap)
+
       ! Only do tagging and conversion in specific time steps
       if ( MOD(tswap,ntimestepTag) == 0 ) then 
          call tag_drop(tswap)
@@ -253,9 +263,9 @@ contains
          if ( DoConvertVOF2LPP ) call ConvertVOF2LPP(tswap)
 !         if ( DoConvertLPP2VOF ) call ConvertLPP2VOF()   ! TBA
       end if ! tswap
-!      call ComputeFluidAccel()
-      call ComputePartForce(tswap)
+
       call UpdatePartSol(tswap)
+
    end subroutine lppsweeps
 
   subroutine tag_drop(tswap)
@@ -1220,8 +1230,10 @@ contains
       logical :: ConvertDropFlag,convertDoneFlag
       real(8) :: MinDistPart2CellCenter, DistPart2CellCenter
       integer :: ierr
-      real(8) :: uf,vf,wf
+      real(8) :: uf,vf,wf,dp,ConvertRegSize,sduf,sdvf,sdwf
       integer :: i,j,k
+      integer :: i1,ic,i2,j1,jc,j2,k1,kc,k2
+      real(8) :: x1,x2,y1,y2,z1,z2
 
       if (.not. LPP_initialized) then 
          call initialize_LPP()
@@ -1245,40 +1257,112 @@ contains
             num_part(rank) = num_part(rank) + 1
             parts(num_part(rank),rank)%element = drops(idrop,rank)%element
 
-            ! compute average fluid quantities
-            ! Note: XXX temporary, need to be improved later 
-            uf = 0.d0 
-            vf = 0.d0
-            wf = 0.d0 
+            ! Define conversion region
+            dp = (6.d0*drops(idrop,rank)%element%vol/PI)**(1.d0/3.d0)
+            ConvertRegSize = 2.0d0*dp
+            call FindCellIndexBdryConvertReg(drops(idrop,rank)%element%xc, & 
+                                             drops(idrop,rank)%element%yc, & 
+                                             drops(idrop,rank)%element%zc, & 
+                                             ConvertRegSize, & 
+                                             i1,ic,i2,j1,jc,j2,k1,kc,k2)
 
-            ! remove droplet vof structure
-            MinDistPart2CellCenter = 1.0d10
-            do ilist = 1,drops(idrop,rank)%num_cell_drop
-               cvof(drops_cell_list(1,ilist,idrop), &
-                    drops_cell_list(2,ilist,idrop), &
-                    drops_cell_list(3,ilist,idrop)) = 0.0
-                  u(drops_cell_list(1,ilist,idrop), &
-                    drops_cell_list(2,ilist,idrop), &
-                    drops_cell_list(3,ilist,idrop)) = uf 
-                  v(drops_cell_list(1,ilist,idrop), &
-                    drops_cell_list(2,ilist,idrop), &
-                    drops_cell_list(3,ilist,idrop)) = vf 
-                  w(drops_cell_list(1,ilist,idrop), &
-                    drops_cell_list(2,ilist,idrop), &
-                    drops_cell_list(3,ilist,idrop)) = wf 
-               DistPart2CellCenter = ( drops(idrop,rank)%element%xc  & 
-                           - x(drops_cell_list(1,ilist,idrop)))**2.d0 & 
-                                   + ( drops(idrop,rank)%element%yc  & 
-                           - y(drops_cell_list(2,ilist,idrop)))**2.d0 &
-                                   + ( drops(idrop,rank)%element%zc  & 
-                           - z(drops_cell_list(3,ilist,idrop)))**2.d0
-               if ( DistPart2CellCenter < MinDistPart2CellCenter ) then 
-                  MinDistPart2CellCenter = DistPart2CellCenter
-                  parts(num_part(rank),rank)%ic = drops_cell_list(1,ilist,idrop)
-                  parts(num_part(rank),rank)%jc = drops_cell_list(2,ilist,idrop)
-                  parts(num_part(rank),rank)%kc = drops_cell_list(3,ilist,idrop)
-               end if !DistPart2CellCenter
-            end do ! ilist
+            parts(num_part(rank),rank)%ic = ic 
+            parts(num_part(rank),rank)%jc = jc 
+            parts(num_part(rank),rank)%kc = kc
+
+            ! compute average fluid quantities
+!            call ComputeUndisturbedVelEE(drops(idrop,rank)%element%uc, & 
+!                                       drops(idrop,rank)%element%duc,&
+!                                       drops(idrop,rank)%element%vc, & 
+!                                       drops(idrop,rank)%element%dvc,&
+!                                       drops(idrop,rank)%element%wc, & 
+!                                       drops(idrop,rank)%element%dwc,&
+!                                       dp,rho1,rho2,mu1,mu2,Gx,Gy,Gz,& 
+!                                       uf,vf,wf)
+
+!            call ComputeUndisturbedVelAve(drops(idrop,rank)%element%xc,& 
+!                                          drops(idrop,rank)%element%yc,&
+!                                          drops(idrop,rank)%element%zc,&
+!                                          ConvertRegSize,              & 
+!                                          i1,i2,j1,j2,k1,k2,           & 
+!                                          uf,vf,wf)
+
+            ! remove droplet vof structure and reconstruct undisturbed flow field
+            do k=k1+1,k2-1; do j=j1+1,j2-1; do i=i1+1,i2-1
+               cvof(i,j,k) = 0.d0 
+               !call TrilinearIntrpl(xh(i),y(j),z(k),xh(i1),y(j1),z(k1),xh(i2),y(j2),z(k2),&
+               !                     u(i1,j1,k1),u(i1,j1,k2),u(i1,j2,k1),u(i1,j2,k2),   &
+               !                     u(i2,j1,k1),u(i2,j1,k2),u(i2,j2,k1),u(i2,j2,k2),uf)
+               !call TrilinearIntrpl(x(i),yh(j),z(k),x(i1),yh(j1),z(k1),x(i2),yh(j2),z(k2),&
+               !                     v(i1,j1,k1),v(i1,j1,k2),v(i1,j2,k1),v(i1,j2,k2),   &
+               !                     v(i2,j1,k1),v(i2,j1,k2),v(i2,j2,k1),v(i2,j2,k2),vf)
+               !call TrilinearIntrpl(x(i),y(j),zh(k),x(i1),y(j1),zh(k1),x(i2),y(j2),zh(k2),&
+               !                     w(i1,j1,k1),w(i1,j1,k2),w(i1,j2,k1),w(i1,j2,k2),   &
+               !                     w(i2,j1,k1),w(i2,j1,k2),w(i2,j2,k1),w(i2,j2,k2),wf)
+               !call TrilinearIntrpl(xh(i),y(j),z(k),xh(i1),y(j1),z(k1),xh(i2),y(j2),z(k2),&
+               !                     sdu(i1,j1,k1),sdu(i1,j1,k2),sdu(i1,j2,k1),sdu(i1,j2,k2),   &
+               !                     sdu(i2,j1,k1),sdu(i2,j1,k2),sdu(i2,j2,k1),sdu(i2,j2,k2),sduf)
+               !call TrilinearIntrpl(x(i),yh(j),z(k),x(i1),yh(j1),z(k1),x(i2),yh(j2),z(k2),&
+               !                     sdv(i1,j1,k1),sdv(i1,j1,k2),sdv(i1,j2,k1),sdv(i1,j2,k2),   &
+               !                     sdv(i2,j1,k1),sdv(i2,j1,k2),sdv(i2,j2,k1),sdv(i2,j2,k2),sdvf)
+               !call TrilinearIntrpl(x(i),y(j),zh(k),x(i1),y(j1),zh(k1),x(i2),y(j2),zh(k2),&
+               !                     sdw(i1,j1,k1),sdw(i1,j1,k2),sdw(i1,j2,k1),sdw(i1,j2,k2),   &
+               !                     sdw(i2,j1,k1),sdw(i2,j1,k2),sdw(i2,j2,k1),sdw(i2,j2,k2),sdwf)
+               x1 = xh(i)-xh(i1)
+               x2 = xh(i2)-xh(i)
+               y1 = yh(j)-yh(j1)
+               y2 = yh(j2)-yh(j)
+               z1 = zh(k)-zh(k1)
+               z2 = zh(k2)-zh(k)
+               call Surface2VolumeIntrpl(u(i1,j,k),u(i2,j,k),u(i,j1,k),u(i,j2,k),u(i,j,k1),u(i,j,k2), &
+                                         x1,x2,y1,y2,z1,z2,uf)
+               call Surface2VolumeIntrpl(v(i1,j,k),v(i2,j,k),v(i,j1,k),v(i,j2,k),v(i,j,k1),v(i,j,k2), &
+                                         x1,x2,y1,y2,z1,z2,vf)
+               call Surface2VolumeIntrpl(w(i1,j,k),w(i2,j,k),w(i,j1,k),w(i,j2,k),w(i,j,k1),w(i,j,k2), &
+                                         x1,x2,y1,y2,z1,z2,wf)
+               call Surface2VolumeIntrpl(sdu(i1,j,k),sdu(i2,j,k),sdu(i,j1,k),sdu(i,j2,k),sdu(i,j,k1),sdu(i,j,k2), &
+                                         x1,x2,y1,y2,z1,z2,sduf)
+               call Surface2VolumeIntrpl(sdv(i1,j,k),sdv(i2,j,k),sdv(i,j1,k),sdv(i,j2,k),sdv(i,j,k1),sdv(i,j,k2), &
+                                         x1,x2,y1,y2,z1,z2,sdvf)
+               call Surface2VolumeIntrpl(sdw(i1,j,k),sdw(i2,j,k),sdw(i,j1,k),sdw(i,j2,k),sdw(i,j,k1),sdw(i,j,k2), &
+                                         x1,x2,y1,y2,z1,z2,sdwf)
+                                         
+               u(i,j,k) = uf
+               v(i,j,k) = vf
+               w(i,j,k) = wf
+               sdu(i,j,k) = sduf
+               sdv(i,j,k) = sdvf
+               sdw(i,j,k) = sdwf
+            end do; end do; end do
+
+!            MinDistPart2CellCenter = 1.0d10
+!            do ilist = 1,drops(idrop,rank)%num_cell_drop
+!               cvof(drops_cell_list(1,ilist,idrop), &
+!                    drops_cell_list(2,ilist,idrop), &
+!                    drops_cell_list(3,ilist,idrop)) = 0.0
+!                  u(drops_cell_list(1,ilist,idrop), &
+!                    drops_cell_list(2,ilist,idrop), &
+!                    drops_cell_list(3,ilist,idrop)) = uf 
+!                  v(drops_cell_list(1,ilist,idrop), &
+!                    drops_cell_list(2,ilist,idrop), &
+!                    drops_cell_list(3,ilist,idrop)) = vf 
+!                  w(drops_cell_list(1,ilist,idrop), &
+!                    drops_cell_list(2,ilist,idrop), &
+!                    drops_cell_list(3,ilist,idrop)) = wf 
+!               DistPart2CellCenter = ( drops(idrop,rank)%element%xc  & 
+!                           - x(drops_cell_list(1,ilist,idrop)))**2.d0 & 
+!                                   + ( drops(idrop,rank)%element%yc  & 
+!                           - y(drops_cell_list(2,ilist,idrop)))**2.d0 &
+!                                   + ( drops(idrop,rank)%element%zc  & 
+!                           - z(drops_cell_list(3,ilist,idrop)))**2.d0
+!               if ( DistPart2CellCenter < MinDistPart2CellCenter ) then 
+!                  MinDistPart2CellCenter = DistPart2CellCenter
+!                  parts(num_part(rank),rank)%ic = drops_cell_list(1,ilist,idrop)
+!                  parts(num_part(rank),rank)%jc = drops_cell_list(2,ilist,idrop)
+!                  parts(num_part(rank),rank)%kc = drops_cell_list(3,ilist,idrop)
+!               end if !DistPart2CellCenter
+!            end do ! ilist
+
          end if !ConvertDropFlag
       end do ! idrop
       end if ! num_drop(rank) 
@@ -1408,22 +1492,222 @@ contains
       
    end subroutine CheckConvertDropCriteria
 
+   subroutine ComputeUndisturbedVelEE(uc,duc,vc,dvc,wc,dwc,dp,rhof,rhop,muf,mup,Gx,Gy,Gz,uf,vf,wf)
+
+      implicit none
+      real(8), intent (in) :: uc,duc,vc,dvc,wc,dwc,dp,rhof,rhop,muf,mup,Gx,Gy,Gz
+      real(8), intent(out) :: uf,vf,wf
+
+      real(8) :: u0,v0,w0,u1,v1,w1,Re1,u2,v2,w2,Re2,fu1,fv1,fw1,fu2,fv2,fw2
+      real(8) :: taup, a,bx,by,bz, nuf,tol,velc
+
+      integer :: iter
+      integer, parameter :: iter_max = 10
+      real(8), parameter :: toler = 1.e-9
+
+      taup = rhop*dp*dp/18.0d0/muf & 
+            *(3.d0 + 3.d0*muf/mup)/(3.d0 + 2.d0*muf/mup)
+      a  = 1.d0 - rhof/rhop
+      bx = duc - Gx
+      by = dvc - Gy
+      bz = dwc - Gz
+      nuf = muf/rhof
+
+      u2 = uc; v2 = vc; w2 = wc
+      Re2 = Rep(u2,uc,v2,vc,w2,wc,nuf,dp)
+      fu2 = fsol(u2,uc,taup,Re2,a,bx)
+      fv2 = fsol(v2,vc,taup,Re2,a,by)
+      fw2 = fsol(w2,wc,taup,Re2,a,bz)
+
+      u1 = fu2 + u2; v1 = fv2 + v2; w1 = fw2 + w2
+      Re1 = Rep(u1,uc,v1,vc,w1,wc,nuf,dp)
+      fu1 = fsol(u1,uc,taup,Re1,a,bx)
+      fv1 = fsol(v1,vc,taup,Re1,a,by)
+      fw1 = fsol(w1,wc,taup,Re1,a,bz)
+
+      do iter = 1, iter_max
+         u0 = (u2*fu1-u1*fu2)/(fu1-fu2)  
+         v0 = (v2*fv1-v1*fv2)/(fv1-fv2)  
+         w0 = (w2*fw1-w1*fw2)/(fw1-fw2)  
+         velc = sqrt(u1*u1+v1*v1+w1*w1) + 1.d-16
+         tol = sqrt( (u0-u1)**2.d0 + (v0-v1)**2.d0 + (w0-w1)**2.d0 )/velc 
+         if ( tol < toler ) then  
+            exit 
+         else
+            u2=u1; v2=v1; w2=w1
+            fu2=fu1;fv2=fv1;fw2=fw1
+            u1=u0; v1=v0; w1=w0
+            Re1 = Rep(u1,uc,v1,vc,w1,wc,nuf,dp)
+            fu1 = fsol(u1,uc,taup,Re1,a,bx)
+            fv1 = fsol(v1,vc,taup,Re1,a,by)
+            fw1 = fsol(w1,wc,taup,Re1,a,bz)
+         end if ! tol
+      end do ! iter
+      uf = u0; vf = v0; wf = w0
+
+   end subroutine ComputeUndisturbedVelEE
+
+   function fsol(uf,up,taup,Rep,a,b)
+      implicit none
+      real(8), intent(in) :: uf,up,taup,Rep,a,b
+      real(8) :: fsol
+
+      fsol = up + taup/phi(dragmodel,Rep)*a*b - uf
+   end function fsol
+
+   function Rep(uf,up,vf,vp,wf,wp,nuf,dp)
+      implicit none
+      real(8), intent(in) :: uf,up,vf,vp,wf,wp,nuf,dp 
+      real(8) :: Rep
+
+      Rep = sqrt((uf-up)**2.d0 + (vf-vp)**2.d0 + (wf-wp)**2.d0)*dp/nuf
+
+   end function Rep
+
+   subroutine ComputeUndisturbedVelAve(xc,yc,zc,l,i1,i2,j1,j2,k1,k2,uf,vf,wf)
+  
+      real(8), intent (in) :: xc,yc,zc,l
+      integer, intent (in) :: i1,i2,j1,j2,k1,k2
+      real(8), intent(out) :: uf,vf,wf
+
+      integer :: i,j,k
+      real(8) :: sumvol,sumuf,sumvf,sumwf,volcell
+
+      sumvol = 0.d0
+      sumuf  = 0.d0
+      sumvf  = 0.d0
+      sumwf  = 0.d0
+      do k=k1,k2; do j=j1,j2; do i=i1,i2
+         if ( i==i1 .or. i==i2 .or. & 
+              j==j1 .or. j==j2 .or. &
+              k==k1 .or. k==k2 ) then 
+            volcell = dx(i)*dy(j)*dz(k)
+            sumvol  = sumvol + volcell
+            sumuf   = sumuf  + volcell*u(i,j,k)
+            sumvf   = sumvf  + volcell*v(i,j,k)
+            sumwf   = sumwf  + volcell*w(i,j,k)
+         end if !
+      end do; end do; end do
+      uf = sumuf/sumvol
+      vf = sumvf/sumvol
+      wf = sumwf/sumvol
+
+   end subroutine ComputeUndisturbedVelAve
+
+   subroutine Surface2VolumeIntrpl(ux1,ux2,uy1,uy2,uz1,uz2,x1,x2,y1,y2,z1,z2,uf)
+      
+      implicit none
+      real(8), intent(in)  :: ux1,ux2,uy1,uy2,uz1,uz2,x1,x2,y1,y2,z1,z2
+      real(8), intent(out) :: uf
+   
+      real(8) :: wtsum,x1p,x2p,y1p,y2p,z1p,z2p
+
+      x1p = 1.d0/x1 
+      x2p = 1.d0/x2  
+      y1p = 1.d0/y1
+      y2p = 1.d0/y2
+      z1p = 1.d0/z1
+      z2p = 1.d0/z2
+      wtsum = x1p + x2p + y1p + y2p + z1p + z2p 
+       
+      uf =(x1p*ux1 + x2p*ux2 & 
+         + y1p*uy1 + y2p*uy2 & 
+         + z1p*uz1 + z2p*uz2)/wtsum
+
+   end subroutine Surface2VolumeIntrpl
+
+   subroutine FindCellIndexBdryConvertReg(xc,yc,zc,l,i1,ic,i2,j1,jc,j2,k1,kc,k2)
+      implicit none
+
+      real(8), intent (in) :: xc,yc,zc,l
+      integer, intent(out) :: i1,ic,i2,j1,jc,j2,k1,kc,k2
+
+      integer :: i,j,k
+      logical :: i1_notfound,j1_notfound,k1_notfound, & 
+                 ic_notfound,jc_notfound,kc_notfound, &  
+                 i2_notfound,j2_notfound,k2_notfound
+      real(8) :: l2,xl,xr,yl,yr,zl,zr
+
+      l2 = 0.5d0*l
+      xl = xc - l2
+      xr = xc + l2
+      yl = yc - l2
+      yr = yc + l2
+      zl = zc - l2
+      zr = zc + l2
+
+      i1_notfound = .true.
+      ic_notfound = .true.
+      i2_notfound = .true.
+      do i = is,ie
+         if ( x(i) > xl .and. i1_notfound ) then 
+            i1 = cellclosest(i,x(i-1),x(i),xl)
+            i1_notfound = .false.
+         else if ( x(i) > xc .and. ic_notfound ) then 
+            ic = cellclosest(i,x(i-1),x(i),xc)
+            ic_notfound = .false.
+         else if ( x(i) > xr .and. i2_notfound ) then 
+            i2 = cellclosest(i,x(i-1),x(i),xr)
+            exit 
+         end if ! x(i)
+      end do ! i
+
+      j1_notfound = .true.
+      jc_notfound = .true.
+      j2_notfound = .true.
+      do j = js,je
+         if ( y(j) > yl .and. j1_notfound ) then 
+            j1 = cellclosest(j,y(j-1),y(j),yl)
+            j1_notfound = .false.
+         else if ( y(j) > yc .and. jc_notfound ) then 
+            jc = cellclosest(j,y(j-1),y(j),yc)
+            jc_notfound = .false.
+         else if ( y(j) > yr .and. j2_notfound ) then 
+            j2 = cellclosest(j,y(j-1),y(j),yr)
+            exit 
+         end if ! y(i)
+      end do ! j
+
+      k1_notfound = .true.
+      kc_notfound = .true.
+      k2_notfound = .true.
+      do k = ks,ke
+         if ( z(k) > zl .and. k1_notfound ) then 
+            k1 = cellclosest(k,z(k-1),z(k),zl)
+            k1_notfound = .false.
+         else if ( z(k) > zc .and. kc_notfound ) then 
+            kc = cellclosest(k,z(k-1),z(k),zc)
+            kc_notfound = .false.
+         else if ( z(k) > zr .and. k2_notfound ) then 
+            k2 = cellclosest(k,z(k-1),z(k),zr)
+            exit 
+         end if ! z(i)
+      end do ! k
+
+   end subroutine FindCellIndexBdryConvertReg
+
+   function cellclosest(i,x1,x2,x)
+      integer, intent (in) :: i
+      real(8), intent (in) :: x1,x2,x
+      integer :: cellclosest
+
+      if ( x2-x < x-x1 ) then 
+         cellclosest = i
+      else 
+         cellclosest = i-1
+      end if ! x(i)
+
+   end function cellclosest
+      
    subroutine ComputePartForce(tswap)
 
       implicit none
       integer, intent(in) :: tswap
 
-      ! Stokes drag covers bubbles to particles limit. Finite Reynolds number
-      ! extensions SN & CG are only for particles while MKL is only for bubbles
-      integer, parameter :: drag_model_Stokes = 1
-      integer, parameter :: drag_model_SN = 2     ! Schiller & Nauman
-      integer, parameter :: drag_model_CG = 3     ! Clift & Gauvin
-      integer, parameter :: drag_model_MKL = 4    ! Mei, Klausner,Lawrence 1994
-
       real(8), parameter :: Cm = 0.5d0
 
       real(8) :: relvel(4), partforce(3)
-      real(8) :: dp, Rep, muf, mup, phi, rhof, rhop, taup
+      real(8) :: dp, Rep, muf, mup, rhof, rhop, taup
       real(8) :: up,vp,wp, uf,vf,wf, DufDt,DvfDt,DwfDt
       real(8) :: fhx,fhy,fhz
 
@@ -1458,45 +1742,68 @@ contains
             taup = rhop *dp*dp/18.0d0/muf & 
                  *(3.d0 + 3.d0*muf/mup)/(3.d0 + 2.d0*muf/mup)
 
-            select case ( dragmodel ) 
-               case ( drag_model_Stokes ) 
-                  phi = 1.d0
-               case ( drag_model_SN ) 
-                  phi = 1.d0+0.15d0*Rep**0.687d0
-                  if ( mu1 > mu2 ) & 
-                     call pariserror("Particle drag is used for Bubbles!")
-               case ( drag_model_CG ) 
-                  phi = 1.d0+0.15d0*Rep**0.687d0 & 
-                      + 1.75d-2*Rep/(1.0d0 + 4.25d4/Rep**1.16d0)
-                  if ( mu1 > mu2 ) & 
-                     call pariserror("Particle drag is used for Bubbles!")
-               case ( drag_model_MKL )
-                  phi = 1.d0 + 1.0d0/(8.d0/Rep & 
-                                    + 0.5d0 *(1.d0 + 3.315d0/Rep**0.5d0))
-                  if ( mu1 < mu2 ) & 
-                     call pariserror("Bubble drag is used for particles!")
-               case default
-                  call pariserror("wrong quasi-steady drag model!")
-            end select ! dragmodel
             ! Note: set history to be zero for now
             fhx=0.d0; fhy=0.d0; fhz=0.d0
 
-            partforce(1) =(relvel(1)/taup*phi + (1.d0-rhof/rhop)*Gx  &   
+            partforce(1) =(relvel(1)/taup*phi(dragmodel,Rep) + (1.d0-rhof/rhop)*Gx  &   
                          + (1.d0+Cm)*rhof/rhop*DufDt                 &  
                          + fhx )/(1.d0+Cm*rhof/rhop)
-            partforce(2) =(relvel(2)/taup*phi + (1.d0-rhof/rhop)*Gy  &
+            partforce(2) =(relvel(2)/taup*phi(dragmodel,Rep) + (1.d0-rhof/rhop)*Gy  &
                          + (1.d0+Cm)*rhof/rhop*DvfDt                 &
                          + fhy )/(1.d0+Cm*rhof/rhop)
-            partforce(3) =(relvel(3)/taup*phi + (1.d0-rhof/rhop)*Gz  &
+            partforce(3) =(relvel(3)/taup*phi(dragmodel,Rep) + (1.d0-rhof/rhop)*Gz  &
                          + (1.d0+Cm)*rhof/rhop*DwfDt                 &
                          + fhz )/(1.d0+Cm*rhof/rhop)
 
+! TEMPORARY 
+            if ( MOD(tswap,ntimestepTag) == 0 ) then
+               write(11,*) tswap*5e-8,relvel(1)/taup*phi(dragmodel,Rep), & 
+                           rhof/rhop*DufDt,Cm*rhof/rhop*(DufDt-partforce(1)),& 
+                           (1.d0+Cm)*rhof/rhop*DufDt,uf,up,DufDt
+               write(12,*) tswap*5e-8,relvel(2)/taup*phi(dragmodel,Rep), & 
+                           rhof/rhop*DvfDt,Cm*rhof/rhop*(DvfDt-partforce(2)),&
+                           (1.d0+Cm)*rhof/rhop*DvfDt,vf,vp,DvfDt
+               write(13,*) tswap*5e-8,relvel(3)/taup*phi(dragmodel,Rep), & 
+                           rhof/rhop*DwfDt,Cm*rhof/rhop*(DwfDt-partforce(3)),&
+                           (1.d0+Cm)*rhof/rhop*DwfDt,wf,wp,DwfDt
+            end if ! tswap
+! END TEMPORARY
             parts(ipart,rank)%element%duc = partforce(1) 
             parts(ipart,rank)%element%dvc = partforce(2)
             parts(ipart,rank)%element%dwc = partforce(3)
          end do ! ipart
       end if ! num_part(rank) 
    end subroutine ComputePartForce
+
+   function phi(dragmodel,Rep)
+
+      ! Note: Compute finite Reynolds number correction on quasi-steady drag
+      implicit none
+      integer, intent(in) :: dragmodel
+      real(8), intent(in) :: Rep
+      real(8) :: phi
+
+      select case ( dragmodel ) 
+         case ( dragmodel_Stokes ) 
+            phi = 1.d0
+         case ( dragmodel_SN ) 
+            phi = 1.d0+0.15d0*Rep**0.687d0
+            if ( mu1 > mu2 ) & 
+               call pariserror("Particle drag is used for Bubbles!")
+         case ( dragmodel_CG ) 
+            phi = 1.d0+0.15d0*Rep**0.687d0 & 
+                  + 1.75d-2*Rep/(1.0d0 + 4.25d4/Rep**1.16d0)
+            if ( mu1 > mu2 ) & 
+               call pariserror("Particle drag is used for Bubbles!")
+         case ( dragmodel_MKL )
+            phi = 1.d0 + 1.0d0/(8.d0/Rep & 
+                              + 0.5d0 *(1.d0 + 3.315d0/Rep**0.5d0))
+            if ( mu1 < mu2 ) & 
+               call pariserror("Bubble drag is used for particles!")
+         case default
+            call pariserror("wrong quasi-steady drag model!")
+      end select ! dragmodel
+   end function phi
 
    subroutine GetFluidProp(ip,jp,kp,xp,yp,zp,uf,vf,wf,DufDt,DvfDt,DwfDt,volp) 
 
@@ -1505,17 +1812,17 @@ contains
       real(8), intent(in)  :: volp 
       real(8), intent(out) :: uf,vf,wf,DufDt,DvfDt,DwfDt
       
-      real(8) :: dp, dx,dy,dz,max_gridsize,min_gridsize
+      real(8) :: dp, dxi,dyj,dzk,max_gridsize,min_gridsize
       real(8) :: Lx,Ly,Lz
       real(8), parameter :: small = 1.d0-40
       real(8), parameter :: large = 1.d0+40
 
       dp = (6.d0*volp/PI)**(1.d0/3.d0)
-      dx = xh(ip)-xh(ip-1)
-      dy = yh(jp)-yh(jp-1)
-      dz = zh(kp)-zh(kp-1)
-      max_gridsize = max(dx,dy,dz)
-      min_gridsize = min(dx,dy,dz)
+      dxi = xh(ip)-xh(ip-1)
+      dyj = yh(jp)-yh(jp-1)
+      dzk = zh(kp)-zh(kp-1)
+      max_gridsize = max(dxi,dyj,dzk)
+      min_gridsize = min(dxi,dyj,dzk)
 
       if ( dp < min_gridsize ) then ! Interploation
          call TrilinearIntrplFluidVel(xp,yp,zp,ip,jp,kp,uf,DufDt,1)
@@ -1523,17 +1830,17 @@ contains
          call TrilinearIntrplFluidVel(xp,yp,zp,ip,jp,kp,wf,DwfDt,3)
       else if ( dp > max_gridsize ) then  ! Check flow scale scale
 !         if ( u(ip,jp,kp)-u(ip-1,jp,kp) /= 0.d0 ) then 
-!            Lx = ABS(dx*(u(ip-1,jp,kp)+u(ip,jp,kp))/(u(ip,jp,kp)-u(ip-1,jp,kp)))
+!            Lx = ABS(dxi*(u(ip-1,jp,kp)+u(ip,jp,kp))/(u(ip,jp,kp)-u(ip-1,jp,kp)))
 !         else 
 !            Lx = large
 !         end if ! up(ip,jp,kp)
 !         if ( v(ip,jp,kp)-v(ip,jp-1,kp) /= 0.d0 ) then 
-!            Ly = ABS(dy*(v(ip,jp-1,kp)+v(ip,jp,kp))/(v(ip,jp,kp)-v(ip,jp-1,kp)))
+!            Ly = ABS(dyj*(v(ip,jp-1,kp)+v(ip,jp,kp))/(v(ip,jp,kp)-v(ip,jp-1,kp)))
 !         else 
 !            Ly = large
 !         end if ! v(ip,jp,kp)
 !         if ( w(ip,jp,kp)-w(ip,jp,kp-1) /= 0.d0 ) then 
-!            Lz = ABS(dz*(w(ip,jp,kp-1)+w(ip,jp,kp))/(w(ip,jp,kp)-w(ip,jp,kp-1)))
+!            Lz = ABS(dzk*(w(ip,jp,kp-1)+w(ip,jp,kp))/(w(ip,jp,kp)-w(ip,jp,kp-1)))
 !         else 
 !            Lz = large
 !         end if ! w(ip,jp,kp) 
@@ -1558,6 +1865,7 @@ contains
          end if ! Lz
       else ! interploation & averaging
       end if ! dp 
+
    end subroutine GetFluidProp
 
    subroutine UpdatePartSol(tswap)
@@ -2057,7 +2365,6 @@ contains
 
    end subroutine ComputeSubDerivativeVel
 
-
 end module module_Lag_part
 
 module module_output_lpp
@@ -2114,5 +2421,6 @@ module module_output_lpp
 320   format(e14.5,e14.5,e14.5,e14.5)
       close(8)
    end subroutine output_LPP
+
 end module module_output_LPP
 
