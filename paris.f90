@@ -202,6 +202,16 @@ Program paris
            endif
            call my_timer(2,itimestep,ii)
 
+!------------------------------------ LPP STUFF  -------------------------------------------------
+           ! Note: it is important to call the Lagrangian particle module before
+           ! flow calculations, since the VOF2LPP and LPP2VOF conversion will
+           ! change the VOF and flow fields 
+           if (DoLPP) then
+               call lppsweeps(itimestep,time)  
+               call my_timer(12,itimestep,ii)
+           end if ! DoLPP
+
+!------------------------------------FRONT TRACKING  ---------------------------------------------
            ! Receive front from master of front
            if(DoFront) call GetFront('recv')
            call my_timer(13,itimestep,ii)
@@ -238,10 +248,6 @@ Program paris
 
 !------------------------------------VOF STUFF ---------------------------------------------------
            if(DoVOF) then
-              if (DoLPP) then
-                 call lppsweeps(itimestep,time)   ! XXX Note: need to update particles somewhere
-                 call my_timer(12,itimestep,ii)
-              end if ! DoLPP
               call vofsweeps(itimestep)
               call my_timer(4,itimestep,ii)
               call get_all_heights()

@@ -1,4 +1,4 @@
-!=================================================================================================
+!================================================================================================
 !=================================================================================================
 ! Paris-0.1
 ! Extended from Code: FTC3D2011 (Front Tracking Code for 3D simulations)
@@ -261,7 +261,7 @@ contains
          if ( DropStatisticsMethod > 0 ) call drop_statistics(tswap,time) 
 
          if ( DoConvertVOF2LPP ) call ConvertVOF2LPP(tswap)
-!         if ( DoConvertLPP2VOF ) call ConvertLPP2VOF()   ! TBA
+         if ( DoConvertLPP2VOF ) call ConvertLPP2VOF(tswap)   
       end if ! tswap
 
       call UpdatePartSol(tswap)
@@ -1270,23 +1270,6 @@ contains
             parts(num_part(rank),rank)%jc = jc 
             parts(num_part(rank),rank)%kc = kc
 
-            ! compute average fluid quantities
-!            call ComputeUndisturbedVelEE(drops(idrop,rank)%element%uc, & 
-!                                       drops(idrop,rank)%element%duc,&
-!                                       drops(idrop,rank)%element%vc, & 
-!                                       drops(idrop,rank)%element%dvc,&
-!                                       drops(idrop,rank)%element%wc, & 
-!                                       drops(idrop,rank)%element%dwc,&
-!                                       dp,rho1,rho2,mu1,mu2,Gx,Gy,Gz,& 
-!                                       uf,vf,wf)
-
-!            call ComputeUndisturbedVelAve(drops(idrop,rank)%element%xc,& 
-!                                          drops(idrop,rank)%element%yc,&
-!                                          drops(idrop,rank)%element%zc,&
-!                                          ConvertRegSize,              & 
-!                                          i1,i2,j1,j2,k1,k2,           & 
-!                                          uf,vf,wf)
-
             ! remove droplet vof structure and reconstruct undisturbed flow field
             do k=k1+1,k2-1; do j=j1+1,j2-1; do i=i1+1,i2-1
                cvof(i,j,k) = 0.d0 
@@ -1320,48 +1303,20 @@ contains
                                          x1,x2,y1,y2,z1,z2,vf)
                call Surface2VolumeIntrpl(w(i1,j,k),w(i2,j,k),w(i,j1,k),w(i,j2,k),w(i,j,k1),w(i,j,k2), &
                                          x1,x2,y1,y2,z1,z2,wf)
-               call Surface2VolumeIntrpl(sdu(i1,j,k),sdu(i2,j,k),sdu(i,j1,k),sdu(i,j2,k),sdu(i,j,k1),sdu(i,j,k2), &
-                                         x1,x2,y1,y2,z1,z2,sduf)
-               call Surface2VolumeIntrpl(sdv(i1,j,k),sdv(i2,j,k),sdv(i,j1,k),sdv(i,j2,k),sdv(i,j,k1),sdv(i,j,k2), &
-                                         x1,x2,y1,y2,z1,z2,sdvf)
-               call Surface2VolumeIntrpl(sdw(i1,j,k),sdw(i2,j,k),sdw(i,j1,k),sdw(i,j2,k),sdw(i,j,k1),sdw(i,j,k2), &
-                                         x1,x2,y1,y2,z1,z2,sdwf)
+               !call Surface2VolumeIntrpl(sdu(i1,j,k),sdu(i2,j,k),sdu(i,j1,k),sdu(i,j2,k),sdu(i,j,k1),sdu(i,j,k2), &
+               !                          x1,x2,y1,y2,z1,z2,sduf)
+               !call Surface2VolumeIntrpl(sdv(i1,j,k),sdv(i2,j,k),sdv(i,j1,k),sdv(i,j2,k),sdv(i,j,k1),sdv(i,j,k2), &
+               !                          x1,x2,y1,y2,z1,z2,sdvf)
+               !call Surface2VolumeIntrpl(sdw(i1,j,k),sdw(i2,j,k),sdw(i,j1,k),sdw(i,j2,k),sdw(i,j,k1),sdw(i,j,k2), &
+               !                          x1,x2,y1,y2,z1,z2,sdwf)
                                          
                u(i,j,k) = uf
                v(i,j,k) = vf
                w(i,j,k) = wf
-               sdu(i,j,k) = sduf
-               sdv(i,j,k) = sdvf
-               sdw(i,j,k) = sdwf
+               !sdu(i,j,k) = sduf
+               !sdv(i,j,k) = sdvf
+               !sdw(i,j,k) = sdwf
             end do; end do; end do
-
-!            MinDistPart2CellCenter = 1.0d10
-!            do ilist = 1,drops(idrop,rank)%num_cell_drop
-!               cvof(drops_cell_list(1,ilist,idrop), &
-!                    drops_cell_list(2,ilist,idrop), &
-!                    drops_cell_list(3,ilist,idrop)) = 0.0
-!                  u(drops_cell_list(1,ilist,idrop), &
-!                    drops_cell_list(2,ilist,idrop), &
-!                    drops_cell_list(3,ilist,idrop)) = uf 
-!                  v(drops_cell_list(1,ilist,idrop), &
-!                    drops_cell_list(2,ilist,idrop), &
-!                    drops_cell_list(3,ilist,idrop)) = vf 
-!                  w(drops_cell_list(1,ilist,idrop), &
-!                    drops_cell_list(2,ilist,idrop), &
-!                    drops_cell_list(3,ilist,idrop)) = wf 
-!               DistPart2CellCenter = ( drops(idrop,rank)%element%xc  & 
-!                           - x(drops_cell_list(1,ilist,idrop)))**2.d0 & 
-!                                   + ( drops(idrop,rank)%element%yc  & 
-!                           - y(drops_cell_list(2,ilist,idrop)))**2.d0 &
-!                                   + ( drops(idrop,rank)%element%zc  & 
-!                           - z(drops_cell_list(3,ilist,idrop)))**2.d0
-!               if ( DistPart2CellCenter < MinDistPart2CellCenter ) then 
-!                  MinDistPart2CellCenter = DistPart2CellCenter
-!                  parts(num_part(rank),rank)%ic = drops_cell_list(1,ilist,idrop)
-!                  parts(num_part(rank),rank)%jc = drops_cell_list(2,ilist,idrop)
-!                  parts(num_part(rank),rank)%kc = drops_cell_list(3,ilist,idrop)
-!               end if !DistPart2CellCenter
-!            end do ! ilist
 
          end if !ConvertDropFlag
       end do ! idrop
@@ -1564,36 +1519,6 @@ contains
 
    end function Rep
 
-   subroutine ComputeUndisturbedVelAve(xc,yc,zc,l,i1,i2,j1,j2,k1,k2,uf,vf,wf)
-  
-      real(8), intent (in) :: xc,yc,zc,l
-      integer, intent (in) :: i1,i2,j1,j2,k1,k2
-      real(8), intent(out) :: uf,vf,wf
-
-      integer :: i,j,k
-      real(8) :: sumvol,sumuf,sumvf,sumwf,volcell
-
-      sumvol = 0.d0
-      sumuf  = 0.d0
-      sumvf  = 0.d0
-      sumwf  = 0.d0
-      do k=k1,k2; do j=j1,j2; do i=i1,i2
-         if ( i==i1 .or. i==i2 .or. & 
-              j==j1 .or. j==j2 .or. &
-              k==k1 .or. k==k2 ) then 
-            volcell = dx(i)*dy(j)*dz(k)
-            sumvol  = sumvol + volcell
-            sumuf   = sumuf  + volcell*u(i,j,k)
-            sumvf   = sumvf  + volcell*v(i,j,k)
-            sumwf   = sumwf  + volcell*w(i,j,k)
-         end if !
-      end do; end do; end do
-      uf = sumuf/sumvol
-      vf = sumvf/sumvol
-      wf = sumwf/sumvol
-
-   end subroutine ComputeUndisturbedVelAve
-
    subroutine Surface2VolumeIntrpl(ux1,ux2,uy1,uy2,uz1,uz2,x1,x2,y1,y2,z1,z2,uf)
       
       implicit none
@@ -1698,7 +1623,160 @@ contains
       end if ! x(i)
 
    end function cellclosest
+   
+   subroutine ConvertLPP2VOF(tswap) 
+      implicit none
+    
+      integer, intent (in) :: tswap
+
+      real(8) :: dp,uf,vf,wf,dummyreal,ConvertRegSize,mu2tomu1
+      logical :: ConvertDropFlag
+      integer :: i1,ic,i2,j1,jc,j2,k1,kc,k2
+      integer :: ipart
+      integer :: i,j,k
+
+      if ( num_part(rank) > 0 ) then 
+      do ipart = 1,num_part(rank)
+
+         call CheckConvertDropCriteria(parts(ipart,rank)%element%vol, & 
+                                       parts(ipart,rank)%element%xc,  & 
+                                       parts(ipart,rank)%element%yc,  & 
+                                       parts(ipart,rank)%element%zc,  &
+                                       ConvertDropFlag,CriteriaConvertCase)
+
+         if ( .not.ConvertDropFlag ) then
+! TEMPORARY
+            write(*,*) 'Particle is converted to drop', ipart,rank,tswap
+! END TEMPORARY
+            ! transfer droplet properties to particle
+            num_drop(rank) = num_drop(rank) + 1
+            drops(num_drop(rank),rank)%element = parts(ipart,rank)%element
+            num_part(rank) = num_part(rank) - 1
+
+            ! Define conversion region
+            dp = (6.d0*parts(ipart,rank)%element%vol/PI)**(1.d0/3.d0)
+            ConvertRegSize = 2.0d0*dp
+
+            call FindCellIndexBdryConvertReg(parts(ipart,rank)%element%xc, & 
+                                             parts(ipart,rank)%element%yc, & 
+                                             parts(ipart,rank)%element%zc, & 
+                                             ConvertRegSize, & 
+                                             i1,ic,i2,j1,jc,j2,k1,kc,k2)
+
+            call GetFluidProp(parts(ipart,rank)%ic, &
+                              parts(ipart,rank)%jc, &
+                              parts(ipart,rank)%kc, & 
+                              parts(ipart,rank)%element%xc, & 
+                              parts(ipart,rank)%element%yc, & 
+                              parts(ipart,rank)%element%zc, & 
+                              uf,vf,wf,dummyreal,dummyreal,dummyreal,& 
+                              parts(ipart,rank)%element%vol)
+
+            mu2tomu1 = mu2/mu1
+            call BuildFlowFieldVOF(i1,i2,j1,j2,k1,k2,dp,mu2tomu1, & 
+                                   parts(ipart,rank)%element%xc,& 
+                                   parts(ipart,rank)%element%yc,& 
+                                   parts(ipart,rank)%element%zc,&
+                                   parts(ipart,rank)%element%uc,& 
+                                   parts(ipart,rank)%element%vc,& 
+                                   parts(ipart,rank)%element%wc,&
+                                   uf,vf,wf)
+
+         end if ! ConvertDropFlag
+      end do ! ipart
+      end if ! num_part(rank)
+
+   end subroutine ConvertLPP2VOF
+
+   subroutine BuildFlowFieldVOF(i1,i2,j1,j2,k1,k2,dp,mu,xp,yp,zp,up,vp,wp,uf,vf,wf)
+      implicit none
+
+      integer, intent (in) :: i1,i2,j1,j2,k1,k2
+      real(8), intent (in) :: dp,mu,xp,yp,zp,up,vp,wp,uf,vf,wf
+
+      integer :: i,j,k,i0,j0,k0
+      real(8) :: radp,c,stencil3x3(-1:1,-1:1,-1:1)
+      real(8) :: rm,rm2,rm3,rx,ry,rz,rx2,ry2,rz2
+      real(8) :: um,ux,uy,uz
+      real(8) :: tm,tx,ty,tz,theta
+      real(8) :: a1,a2,a3,ur,ut,urp,utp
+      integer :: nflag
+      real(8) :: ufnew,vfnew,wfnew,wt
+      logical :: UseCreepingFlow=.false.
+
+      radp = dp/2.d0
+      a1 = radp*(2.d0+3.d0*mu)/2.d0/(1.d0+mu)
+      a2 = radp**3.d0*mu      /2.d0/(1.d0+mu)
+      a3 = 2.d0*(1.d0+mu)
+      ux=uf-up; uy=vf-vp; uz=wf-wp
+      um = sqrt(ux*ux+uy*uy+uz*uz)
+
+      do i=i1+1,i2-1; do j=j1+1,j2-1; do k=k1+1,k2-1
+         
+         ! Build VOF field of droplet
+         do i0=-1,1; do j0=-1,1; do k0=-1,1
+            stencil3x3(i0,j0,k0) = radp**2.d0 & 
+               - ((x(i+i0)-xp)**2.d0+(y(j+j0)-yp)**2.d0+(z(k+k0)-zp)**2.d0)
+         enddo; enddo; enddo
+         call ls2vof_in_cell(stencil3x3,c,nflag)
+         vof_flag(i,j,k) = nflag
+         cvof(i,j,k)     = c
+         if ( cvof(i,j,k) > 1.d0 ) cvof(i,j,k) = 1.d0
+         if ( cvof(i,j,k) < 0.d0 ) cvof(i,j,k) = 0.d0
+         
+         ! Build flow field 
+         if ( UseCreepingFlow ) then 
+            ! Use creeping flow solution for outside of droplet
+            ! transfer to spherical polar coordinate attached to droplet
+            rx=x(i)-xp; ry=y(j)-yp; rz=z(k)-zp
+            rm = sqrt(rx*rx+ry*ry+rz*rz)
+            theta = acos( (-rx*ux-ry*uy-rz*uz)/rm/um )
+            rm2 = rm*rm
+            rm3 = rm2*rm
+         
+            ! Creeping flow solution (Bubbles,Drops, & Particles, Clift et al)
+            if ( cvof(i,j,k) == 0.d0 ) then ! outside of droplet
+               ur = -um*cos(theta)*(1.d0 - a1/rm      + a2/rm3)
+               ut =  um*sin(theta)*(1.d0 - a1/rm/2.d0 + a2/rm3/2.d0)
+            !else ! inside of droplet
+            !   urp = um*cos(theta)/a3*(1.d0-     rm2/radp/radp)
+            !   utp =-um*sin(theta)/a3*(1.d0-2.d0*rm2/radp/radp)
+            !end if ! rm
+
+               ! Transfer back to cartestian coordinate
+               rx2 = rx*rx
+               ry2 = ry*ry
+               rz2 = rz*rz
+               tx  = (rz2+ry2)*ux - rx*(rz*uz+ry*uy)
+               ty  = (rx2+rz2)*uy - ry*(rx*ux+rz*uz)
+               tz  = (ry2+rx2)*uz - rz*(ry*uy+rx*ux)
+               tm  = sqrt(tx*tx + ty*ty + tz*tz)
+
+               ufnew = ur*rx/rm + ut*tx/tm + up 
+               vfnew = ur*ry/rm + ut*ty/tm + vp
+               wfnew = ur*rz/rm + ut*tz/tm + wp
+               
+               ! smoothening the transition from the original value
+               wt = exp(-(rm-radp)**2.d0/(0.5*radp)**2.d0)
+               u(i,j,k) = ufnew*wt + u(i,j,k)*(1.d0-wt)
+               v(i,j,k) = vfnew*wt + v(i,j,k)*(1.d0-wt)
+               w(i,j,k) = wfnew*wt + w(i,j,k)*(1.d0-wt)
+            else 
+               u(i,j,k) = up
+               v(i,j,k) = vp
+               w(i,j,k) = wp
+            end if ! vof_flag
+         else ! Simply replace inside of droplet with point velocity
+            if ( cvof(i,j,k) > 0.d0 ) then
+               u(i,j,k) = up
+               v(i,j,k) = vp
+               w(i,j,k) = wp
+            end if ! rm
+         end if ! UseCreepSolution
+      end do; end do; end do
       
+   end subroutine BuildFlowFieldVOF
+
    subroutine ComputePartForce(tswap)
 
       implicit none
@@ -2405,9 +2483,9 @@ module module_output_lpp
       if(rank==0) call append_LPP_visit_file(TRIM(rootname))
 
       OPEN(UNIT=8,FILE=TRIM(rootname)//TRIM(int2text(rank,padding))//'.3D')
-      write(8,10)
+!      write(8,10)
       write(8,11)
-10    format('# plot3D data file')
+!10    format('# plot3D data file')
 11    format('x y z vol')
 
       if ( num_part(rank) > 0 ) then 
