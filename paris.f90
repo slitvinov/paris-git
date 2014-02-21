@@ -312,7 +312,7 @@ Program paris
 
 !-----------------------------------------PROJECTION STEP-----------------------------------------
            call SetPressureBC(umask,vmask,wmask,tmp(is:ie,js:je,ks:ke))
-           call SetupPoisson(u,v,w,umask,vmask,wmask,rho,dt,A,tmp(is:ie,js:je,ks:ke),cvof,VolumeSource)
+           call SetupPoisson(u,v,w,umask,vmask,wmask,rho,dt,A,tmp(is:ie,js:je,ks:ke),cvof)
            ! (div u)*dt < epsilon => div u < epsilon/dt => maxresidual : maxerror/dt 
            if(HYPRE)then
               call poi_solve(A,p(is:ie,js:je,ks:ke),maxError/dt,maxit,it)

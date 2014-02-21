@@ -252,7 +252,7 @@ end module module_timer
 !=================================================================================================
 ! module_flow: Contains definition of variables for the flow solver.
 !-------------------------------------------------------------------------------------------------
-    module module_flow
+module module_flow
   implicit none
   save
   real(8), dimension(:,:,:), allocatable :: u, v, w, uold, vold, wold, fx, fy, fz, color

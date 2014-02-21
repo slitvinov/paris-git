@@ -500,16 +500,16 @@ contains
     if(d>3) call pariserror("wrong ipar")
     if(min(min(nx,ny),nz)<2) call pariserror("minimum dimension nx ny nz too small")
     max_flag=calc_imax(vof_flag)
-    if(n1>1.and.max_flag/=2.and.A_h>1d-16) then
-       if(rank==0) then
-          if(max_flag==0) then
-             write(*,*) "ls2vof_refined: error: single phase flow ? Nothing to initialize !?"
-          else
-             write(*,*) "ls2vof_refined: maximum vof_flag = ", max_flag, "but expecting maximum flag = 2"
-          endif
-       endif
-       call pariserror("bad flag")
-    endif
+    !if(n1>1.and.max_flag/=2.and.A_h>1d-16) then
+    !  if(rank==0) then
+    !      if(max_flag==0) then
+    !         write(*,*) "ls2vof_refined: error: single phase flow ? Nothing to initialize !?"
+          !else
+           !  write(*,*) "ls2vof_refined: maximum vof_flag = ", max_flag, "but expecting maximum flag = 2"
+    !      endif
+    !   endif
+    !   call pariserror("bad flag")
+    !endif
  
 ! main loop
     do k=ks,ke; do j=js,je; do i=is,ie
