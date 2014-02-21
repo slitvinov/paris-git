@@ -53,6 +53,9 @@ out_path = 'out'    ! name of the output directory
 
 nstats   = 10      ! number of time steps between flow statistics calculations
 
+!OutAxes	 = T	
+!NOutAxes = 1000
+
 !=================================================================================================
 !Grid parameters
 npx     = 1
@@ -88,7 +91,8 @@ ZLENGTH  = ZLTEMP
 !=================================================================================================
 ! Flow parameters
 
-WallVel(1,1)  = -0.3 ! can set inflow velocities here
+!WallVel(1,1)  = -0.0001 
+! can set inflow velocities here
 
 GX      = 0.0
 GY      = 0.0
@@ -100,7 +104,10 @@ dPdY      = 0.0
 dPdZ      = 0.0
                    ! Px, Py, Pz: pressure gradients in case of pressure driven channel flow
                    ! Px = (P(xLength)-P(0))/xLength
-BDRY_COND = 3  1   1   0   1   1
+
+VOLUMESOURCE = 0.2
+
+BDRY_COND = 3  3  3  3  3  3  
                    !Type of boundary condition in x,y,z direction: 0:wall  1:periodic  2:shear
                    !x- y- z- x+ y+ z+
 
@@ -110,7 +117,7 @@ MU1      = 0.0
 
 RHO2     = 1.0
 MU2      = 0.0
-SIGMA    = 0.033       ! rho2, mu2, sigma : properties of the drop and surface tension
+SIGMA    = 0.00       ! rho2, mu2, sigma : properties of the drop and surface tension
                    
 
 NumBubble = 1      !number of bubbles
@@ -127,7 +134,7 @@ amin     = 0.32
 amax     = 0.96
 aspmax   = 1.54
 
-smooth   = T        !smooth the interface
+smooth   = F        !smooth the interface
 nsmooth  = 10       !every nsmooth time steps
 nregrid  = 10       !regrid the front every nregrid time steps
 

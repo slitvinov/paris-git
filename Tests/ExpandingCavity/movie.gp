@@ -1,5 +1,5 @@
-set term png
-set output 'bubble.png'
+set term gif
+set output 'bubble.gif'
 
 set xrange [0:1]
 set yrange [0:1]

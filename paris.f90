@@ -312,7 +312,7 @@ Program paris
 
 !-----------------------------------------PROJECTION STEP-----------------------------------------
            call SetPressureBC(umask,vmask,wmask,tmp(is:ie,js:je,ks:ke))
-           call SetupPoisson(u,v,w,umask,vmask,wmask,rho,dt,A,tmp(is:ie,js:je,ks:ke),cvof)
+           call SetupPoisson(u,v,w,umask,vmask,wmask,rho,dt,A,tmp(is:ie,js:je,ks:ke),cvof,VolumeSource)
            ! (div u)*dt < epsilon => div u < epsilon/dt => maxresidual : maxerror/dt 
            if(HYPRE)then
               call poi_solve(A,p(is:ie,js:je,ks:ke),maxError/dt,maxit,it)
@@ -1289,7 +1289,7 @@ subroutine ReadParameters
                         nPy,           nPz,           amin,          amax,          aspmax,      &
                         MaxPoint,      MaxElem,       MaxFront,      xform,         yform,       &
                         zform,         dt,            nregrid,       GetPropertiesFromFront,     &
-                        DoVOF,         DoFront,       Implicit,      U_init,                     &
+                        DoVOF,         DoFront,       Implicit,      U_init,        VolumeSource,&
                         CFL,           EndTime,       MaxDt,         smooth,        nsmooth,     &
                         output_format, read_x,        read_y,        read_z,        x_file,      &
                         y_file,        z_file,        restart,       nBackup,       NumBubble,   &

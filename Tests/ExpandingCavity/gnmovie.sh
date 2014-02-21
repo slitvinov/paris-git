@@ -23,7 +23,7 @@ done
 
 gnuplot << EOF
 n=0
-#call "gnmovie.gp" $LIMITE
+call "gnmovie.gp" $LIMITE
 call "merged.gp" $LIMITE
 exit
 EOF

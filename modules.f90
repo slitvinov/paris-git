@@ -267,7 +267,7 @@ end module module_timer
   logical :: ZeroReynolds,DoVOF, DoFront, Implicit, hypre, GetPropertiesFromFront
   logical :: dosolids = .false.
   real(8) :: rho1, rho2, s
-  real(8) :: U_init
+  real(8) :: U_init, VolumeSource
   real(8) :: dpdx, dpdy, dpdz, W_ave  !pressure gradients in case of pressure driven channel flow
   real(8) :: dpdx_stat, dpdy_stat, dpdz_stat
   real(8) :: beta, MaxError
@@ -1344,7 +1344,7 @@ end subroutine SetupDensity
 ! A7*Pijk = A1*Pi-1jk + A2*Pi+1jk + A3*Pij-1k + 
 !           A4*Pij+1k + A5*Pijk-1 + A6*Pijk+1 + A8
 !-------------------------------------------------------------------------------------------------
-subroutine SetupPoisson(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask,cvof)
+subroutine SetupPoisson(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask,cvof,VolumeSource)
   use module_grid
   use module_hello
   use module_BC
@@ -1357,7 +1357,7 @@ subroutine SetupPoisson(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask,cvof)
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: cvof
   real(8), dimension(is:ie,js:je,ks:ke,8), intent(out) :: A
 
-  real(8) :: dt
+  real(8) :: dt, VolumeSource
   integer :: i,j,k
   do k=ks,ke; do j=js,je; do i=is,ie;
 !    if(mask(i,j,k))then
@@ -1368,9 +1368,9 @@ subroutine SetupPoisson(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask,cvof)
       A(i,j,k,5) = 2d0*dt*wmask(i,j,k-1)/(dz(k)*dzh(k-1)*(rhot(i,j,k-1)+rhot(i,j,k)))
       A(i,j,k,6) = 2d0*dt*wmask(i,j,k)/(dz(k)*dzh(k  )*(rhot(i,j,k+1)+rhot(i,j,k)))
       A(i,j,k,7) = sum(A(i,j,k,1:6)) + 1d-49
-      A(i,j,k,8) = -( (utmp(i,j,k)-utmp(i-1,j,k))/dx(i) &
-                     +(vtmp(i,j,k)-vtmp(i,j-1,k))/dy(j) &
-                     +(wtmp(i,j,k)-wtmp(i,j,k-1))/dz(k) )
+      A(i,j,k,8) = -( VolumeSource +(utmp(i,j,k)-utmp(i-1,j,k))/dx(i) &
+			+	(vtmp(i,j,k)-vtmp(i,j-1,k))/dy(j) &
+			+	(wtmp(i,j,k)-wtmp(i,j,k-1))/dz(k) )
 !    endif
   enddo; enddo; enddo
 
@@ -1707,7 +1707,7 @@ subroutine LinearSolver1(A,u,umask,maxError,beta,maxit,it,ierr)
     endif
     if (totalres<maxError) exit
   enddo
-  if(it==maxit+1 .and. rank==0) write(*,*) 'Warning: LinearSolver reached maxit.'
+  if(it==maxit+1 .and. rank==0) write(*,*) 'Warning: LinearSolver1 reached maxit.'
 end subroutine LinearSolver1
 !=================================================================================================
 !=================================================================================================

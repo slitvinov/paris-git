@@ -22,8 +22,8 @@ for rootsize in $* ; do
     else
 	let np=$size
     fi
-
-    mpirun -np $np paris > tmpout-$size
+    echo "number of procs, np variable " $np
+    mpirun -quiet -np $np paris > tmpout-$size
 
     let Cores=$size
     let nrofcells=$nx*$nx*$nx

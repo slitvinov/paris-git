@@ -19,18 +19,18 @@ if [ $a -lt 10 ]; then
     frame='0'$frame
 fi
 
-echo "frame" $frame
-cp "out/CVoF-00000-$frame.txt" toplot.tmp
-gnuplot <<EOF
-load "movie.gp"
-exit
+	echo "frame" $frame
+	cp "out/CVoF-00000-$frame.txt" toplot.tmp
+gnuplot << EOF
+		load "movie.gp"
+		exit
 EOF
-mv bubble.png bubble.$a.png
+	mv bubble.gif bubble.$a.gif
 done
 
-# change sat2.png into sat02.png etc...
-renumberb.sh $START 1 9 0 bubble
-#renumberb.sh $START 1 $LIMITE 0 bubble
+#change sat2.png into sat02.png etc...
+./renumberb.sh $START 1 9 0 bubble
+renumberb.sh $START 1 $LIMITE 0 bubble
 
 convert -delay 15 *.gif prof.gif     
 
