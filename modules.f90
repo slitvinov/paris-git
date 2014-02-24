@@ -1376,7 +1376,7 @@ subroutine SetupPoisson(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask,cvof,Vo
 
   if(FreeSurface) then
      do k=ks,ke; do j=js,je; do i=is,ie;
-        if(cvof(i,j,k) > 0.5d0) then ! pressure 0 in the cvof=1 phase. 
+        if(cvof(i,j,k) > 0.75d0) then ! pressure 0 in the cvof=1 phase. 
            pmask(i,j,k) = 0.d0
         endif
      enddo;enddo;enddo

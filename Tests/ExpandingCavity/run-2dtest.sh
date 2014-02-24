@@ -1,5 +1,5 @@
 #! /bin/bash
-#set -x
+set -x
 export LANG=en_EN
 
 if [ $# -lt 3 ]; then
@@ -15,11 +15,7 @@ imp=$4
 
 rm -fr input out stats
 zlength=`awk -v nx=$nx 'BEGIN { print 2./nx}'`
-let nprocs=$3*$3;
-#echo $nprocs
-let nprocsfront=$3*$3+1;
-#echo $nprocsfront
-sed s/NXTEMP/$nx/g testinput.template | sed s/DTTEMP/$dt/ | sed s/IMPTEMP/$imp/ | sed s/ZLTEMP/$zlength/ | sed s/NPXTEMP/$zlength/ > testinput-$nx
+sed s/NXTEMP/$nx/g testinput.template | sed s/DTTEMP/$dt/ | sed s/IMPTEMP/$imp/ | sed s/ZLTEMP/$zlength/  > testinput-$nx
 ln -s testinput-$nx input
  #   if [ `grep DoFront input | awk '{print $3}'` == 'T' ]; then
 #	let np=5

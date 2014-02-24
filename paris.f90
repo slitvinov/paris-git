@@ -1289,7 +1289,7 @@ subroutine ReadParameters
                         nPy,           nPz,           amin,          amax,          aspmax,      &
                         MaxPoint,      MaxElem,       MaxFront,      xform,         yform,       &
                         zform,         dt,            nregrid,       GetPropertiesFromFront,     &
-                        DoVOF,         DoFront,       Implicit,      U_init,        VolumeSource,&
+                        DoVOF,         DoFront,       Implicit,      U_init,                     &
                         CFL,           EndTime,       MaxDt,         smooth,        nsmooth,     &
                         output_format, read_x,        read_y,        read_z,        x_file,      &
                         y_file,        z_file,        restart,       nBackup,       NumBubble,   &
