@@ -198,7 +198,8 @@ Program paris
         do ii=1, itime_scheme
            if(TwoPhase.and.(.not.GetPropertiesFromFront)) then
              call linfunc(rho,rho1,rho2)
-             call linfunc(mu,mu1,mu2)
+!             call linfunc(mu,mu1,mu2)
+             call linfunc2(mu,mu1,mu2) ! Note: harmonic mean matches shear stress better
            endif
            call my_timer(2,itimestep,ii)
 
@@ -379,7 +380,8 @@ Program paris
               else
 !------------------------------------deduce rho, mu from cvof-------------------------------------
                  call linfunc(rho,rho1,rho2)
-                 call linfunc(mu,mu1,mu2)
+!                 call linfunc(mu,mu1,mu2)
+                  call linfunc2(mu,mu1,mu2)
 !------------------------------------END VOF STUFF------------------------------------------------
               endif
            endif
@@ -1161,6 +1163,16 @@ subroutine InitCondition
      else if (test_LP) then 
         call test_Lag_part(itimestep)
      endif
+
+      ! Note: give drop/bubble an initial velocity
+      if ( test_injectdrop ) then
+         do i=imin,imax-1; do j=jmin,jmax-1; do k=kmin,kmax-1
+            if((cvof(i,j,k) + cvof(i+1,j,k)) > 0.0d0) u(i,j,k) = 1.5d-1
+            if((cvof(i,j,k) + cvof(i,j+1,k)) > 0.0d0) v(i,j,k) =-1.d-1
+            if((cvof(i,j,k) + cvof(i,j,k+1)) > 0.0d0) w(i,j,k) =-5.d-1
+         enddo; enddo; enddo
+      end if ! test_bubbles
+
      if(DoFront) then
         call GetFront('recv')
         call GetFront('wait')
@@ -1188,7 +1200,8 @@ subroutine InitCondition
            mu  = mu2  + (mu1 -mu2 )*color
         else
            call linfunc(rho,rho1,rho2)
-           call linfunc(mu,mu1,mu2)
+!           call linfunc(mu,mu1,mu2)
+           call linfunc2(mu,mu1,mu2)
         endif
      else
         rho=rho1

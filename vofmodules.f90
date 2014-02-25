@@ -54,6 +54,7 @@ module module_VOF
   logical :: test_tag = .false.
   logical :: test_D2P = .false.
   logical :: test_bubbles = .false.
+  logical :: test_injectdrop = .false.
   logical :: linfunc_initialized = .false.
   real(8) :: b1,b2,b3,b4
   integer :: nfilter=0
@@ -130,6 +131,35 @@ contains
        enddo; enddo; enddo
     endif
   end subroutine linfunc
+
+  subroutine linfunc2(field,a1,a2)
+    implicit none
+    real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(out) :: field
+    real(8) :: cfiltered
+    real(8), intent(in) :: a1,a2
+    integer :: i,j,k
+    real(8) :: inva1,inva2
+
+    inva1 = 1.d0/a1
+    inva2 = 1.d0/a2
+
+    if(.not.linfunc_initialized) call initialize_linfunc
+    if(nfilter==0) then
+       field = 1.d0/(cvof*(inva2-inva1)+inva1)
+    else if (nfilter==1) then
+       do k=ks-1,ke+1; do j=js-1,je+1; do i=is-1,ie+1
+          cfiltered = b1*cvof(i,j,k) + & 
+               b2*( cvof(i-1,j,k) + cvof(i,j-1,k) + cvof(i,j,k-1) + &
+                    cvof(i+1,j,k) + cvof(i,j+1,k) + cvof(i,j,k+1) ) + &
+               b3*( cvof(i+1,j+1,k) + cvof(i+1,j-1,k) + cvof(i-1,j+1,k) + cvof(i-1,j-1,k) + &
+                    cvof(i+1,j,k+1) + cvof(i+1,j,k-1) + cvof(i-1,j,k+1) + cvof(i-1,j,k-1) + &
+                    cvof(i,j+1,k+1) + cvof(i,j+1,k-1) + cvof(i,j-1,k+1) + cvof(i,j-1,k-1) ) + &
+               b4*( cvof(i+1,j+1,k+1) + cvof(i+1,j+1,k-1) + cvof(i+1,j-1,k+1) + cvof(i+1,j-1,k-1) +  &
+                    cvof(i-1,j+1,k+1) + cvof(i-1,j+1,k-1) + cvof(i-1,j-1,k+1) + cvof(i-1,j-1,k-1) )
+          field(i,j,k) = 1.d0/(cfiltered**(inva2-inva1)+inva1)
+       enddo; enddo; enddo
+    endif
+  end subroutine linfunc2
 !=================================================================================================
 
   subroutine ReadVOFParameters
@@ -204,6 +234,8 @@ contains
        test_D2P = .true.
     else if(test_type=='bubbles_test') then
        test_bubbles = .true.
+    else if(test_type=='injectdrop_test') then
+       test_injectdrop = .true.
     else
        write(*,*) test_type, rank
        stop 'unknown initialization'

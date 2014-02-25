@@ -125,6 +125,7 @@
    integer, parameter :: CriteriaRectangle = 1
    integer, parameter :: CriteriaCylinder  = 2
    integer, parameter :: CriteriaSphere    = 3
+   integer, parameter :: CriteriaJet       = 4
 
    ! Stokes drag covers bubbles to particles limit. Finite Reynolds number
    ! extensions SN & CG are only for particles while MKL is only for bubbles
@@ -146,6 +147,8 @@
    integer :: maxnum_cell_drop
    integer :: max_num_part
    integer :: max_num_part_cross
+
+   integer :: outputlpp_format
 contains
 !=================================================================================================
    subroutine initialize_LPP()
@@ -201,7 +204,8 @@ contains
       namelist /lppparameters/ DropStatisticsMethod, dragmodel, nTimeStepTag,  &
          DoConvertVOF2LPP,DoConvertLPP2VOF,CriteriaConvertCase,            & 
          vol_cut,xlpp_min,xlpp_max,ylpp_min,ylpp_max,zlpp_min,zlpp_max,    &
-         max_num_drop, maxnum_cell_drop, max_num_part, max_num_part_cross
+         max_num_drop, maxnum_cell_drop, max_num_part, max_num_part_cross, &
+         outputlpp_format
 
       in=32
 
@@ -221,6 +225,7 @@ contains
       maxnum_cell_drop = 1000000
       max_num_part = 100
       max_num_part_cross = 10
+      outputlpp_format = 1
 
       call MPI_COMM_RANK(MPI_COMM_WORLD, rank, ierr)
       inquire(file='inputlpp',exist=file_is_there)
@@ -373,8 +378,8 @@ contains
                if ( num_cell_drop < maxnum_cell_drop ) then
                   num_cell_drop = num_cell_drop + 1
                   cell_list(1:3,num_cell_drop) = [isq,jsq,ksq]
-               else
-                  write(*,*) 'Warning: cell number of tag',current_id,'at rank',rank,'reaches max value!'
+!               else
+!                  write(*,*) 'Warning: cell number of tag',current_id,'at rank',rank,'reaches max value!'
                end if ! num_cell_drop
             else if ( isq >= Ng+1 .and. isq <= Ng+Nx .and. &     ! block ghost cells 
                       jsq >= Ng+1 .and. jsq <= Ng+Ny .and. & 
@@ -1234,6 +1239,8 @@ contains
       integer :: i,j,k
       integer :: i1,ic,i2,j1,jc,j2,k1,kc,k2
       real(8) :: x1,x2,y1,y2,z1,z2
+      real(8) :: ufp,vfp,wfp,dist2,wt
+      logical :: ConvertMergeDrop=.false.
 
       if (.not. LPP_initialized) then 
          call initialize_LPP()
@@ -1270,59 +1277,58 @@ contains
             parts(num_part(rank),rank)%jc = jc 
             parts(num_part(rank),rank)%kc = kc
 
-            ! remove droplet vof structure and reconstruct undisturbed flow field
-            do k=k1+1,k2-1; do j=j1+1,j2-1; do i=i1+1,i2-1
-               cvof(i,j,k) = 0.d0 
-               !call TrilinearIntrpl(xh(i),y(j),z(k),xh(i1),y(j1),z(k1),xh(i2),y(j2),z(k2),&
-               !                     u(i1,j1,k1),u(i1,j1,k2),u(i1,j2,k1),u(i1,j2,k2),   &
-               !                     u(i2,j1,k1),u(i2,j1,k2),u(i2,j2,k1),u(i2,j2,k2),uf)
-               !call TrilinearIntrpl(x(i),yh(j),z(k),x(i1),yh(j1),z(k1),x(i2),yh(j2),z(k2),&
-               !                     v(i1,j1,k1),v(i1,j1,k2),v(i1,j2,k1),v(i1,j2,k2),   &
-               !                     v(i2,j1,k1),v(i2,j1,k2),v(i2,j2,k1),v(i2,j2,k2),vf)
-               !call TrilinearIntrpl(x(i),y(j),zh(k),x(i1),y(j1),zh(k1),x(i2),y(j2),zh(k2),&
-               !                     w(i1,j1,k1),w(i1,j1,k2),w(i1,j2,k1),w(i1,j2,k2),   &
-               !                     w(i2,j1,k1),w(i2,j1,k2),w(i2,j2,k1),w(i2,j2,k2),wf)
-               !call TrilinearIntrpl(xh(i),y(j),z(k),xh(i1),y(j1),z(k1),xh(i2),y(j2),z(k2),&
-               !                     sdu(i1,j1,k1),sdu(i1,j1,k2),sdu(i1,j2,k1),sdu(i1,j2,k2),   &
-               !                     sdu(i2,j1,k1),sdu(i2,j1,k2),sdu(i2,j2,k1),sdu(i2,j2,k2),sduf)
-               !call TrilinearIntrpl(x(i),yh(j),z(k),x(i1),yh(j1),z(k1),x(i2),yh(j2),z(k2),&
-               !                     sdv(i1,j1,k1),sdv(i1,j1,k2),sdv(i1,j2,k1),sdv(i1,j2,k2),   &
-               !                     sdv(i2,j1,k1),sdv(i2,j1,k2),sdv(i2,j2,k1),sdv(i2,j2,k2),sdvf)
-               !call TrilinearIntrpl(x(i),y(j),zh(k),x(i1),y(j1),zh(k1),x(i2),y(j2),zh(k2),&
-               !                     sdw(i1,j1,k1),sdw(i1,j1,k2),sdw(i1,j2,k1),sdw(i1,j2,k2),   &
-               !                     sdw(i2,j1,k1),sdw(i2,j1,k2),sdw(i2,j2,k1),sdw(i2,j2,k2),sdwf)
-               x1 = xh(i)-xh(i1)
-               x2 = xh(i2)-xh(i)
-               y1 = yh(j)-yh(j1)
-               y2 = yh(j2)-yh(j)
-               z1 = zh(k)-zh(k1)
-               z2 = zh(k2)-zh(k)
-               call Surface2VolumeIntrpl(u(i1,j,k),u(i2,j,k),u(i,j1,k),u(i,j2,k),u(i,j,k1),u(i,j,k2), &
-                                         x1,x2,y1,y2,z1,z2,uf)
-               call Surface2VolumeIntrpl(v(i1,j,k),v(i2,j,k),v(i,j1,k),v(i,j2,k),v(i,j,k1),v(i,j,k2), &
-                                         x1,x2,y1,y2,z1,z2,vf)
-               call Surface2VolumeIntrpl(w(i1,j,k),w(i2,j,k),w(i,j1,k),w(i,j2,k),w(i,j,k1),w(i,j,k2), &
-                                         x1,x2,y1,y2,z1,z2,wf)
-               !call Surface2VolumeIntrpl(sdu(i1,j,k),sdu(i2,j,k),sdu(i,j1,k),sdu(i,j2,k),sdu(i,j,k1),sdu(i,j,k2), &
-               !                          x1,x2,y1,y2,z1,z2,sduf)
-               !call Surface2VolumeIntrpl(sdv(i1,j,k),sdv(i2,j,k),sdv(i,j1,k),sdv(i,j2,k),sdv(i,j,k1),sdv(i,j,k2), &
-               !                          x1,x2,y1,y2,z1,z2,sdvf)
-               !call Surface2VolumeIntrpl(sdw(i1,j,k),sdw(i2,j,k),sdw(i,j1,k),sdw(i,j2,k),sdw(i,j,k1),sdw(i,j,k2), &
-               !                          x1,x2,y1,y2,z1,z2,sdwf)
-                                         
-               u(i,j,k) = uf
-               v(i,j,k) = vf
-               w(i,j,k) = wf
-               !sdu(i,j,k) = sduf
-               !sdv(i,j,k) = sdvf
-               !sdw(i,j,k) = sdwf
-            end do; end do; end do
+            ! remove droplet vof structure
+            cvof(i1:i2,j1:j2,k1:k2) = 0.d0 
 
+            ! reconstruct undisturbed flow field within the conversion region
+            do k=k1,k2-1; do j=j1,j2-1; do i=i1,i2-1
+               ! compute undisturbed flow field from flow property outside
+               x1 = xh(i)-xh(i1-1)
+               x2 = xh(i2)-xh(i)
+               y1 = yh(j)-yh(j1-1)
+               y2 = yh(j2)-yh(j)
+               z1 = zh(k)-zh(k1-1)
+               z2 = zh(k2)-zh(k)
+               call Surface2VolumeIntrpl(u(i1-1,j,k),u(i2,j,k), &
+                                         u(i,j1-1,k),u(i,j2,k), &
+                                         u(i,j,k1-1),u(i,j,k2), &
+                                         x1,x2,y1,y2,z1,z2,uf)
+               call Surface2VolumeIntrpl(v(i1-1,j,k),v(i2,j,k), & 
+                                         v(i,j1-1,k),v(i,j2,k), & 
+                                         v(i,j,k1-1),v(i,j,k2), &
+                                         x1,x2,y1,y2,z1,z2,vf)
+               call Surface2VolumeIntrpl(w(i1-1,j,k),w(i2,j,k), & 
+                                         w(i,j1-1,k),w(i,j2,k), & 
+                                         w(i,j,k1-1),w(i,j,k2), &
+                                         x1,x2,y1,y2,z1,z2,wf)
+                                         
+               ! compute undisturbed flow field from droplet acceleration
+               !taup = rho1*dp*dp/18.0d0/mu1 & 
+               !      *(3.d0 + 3.d0*mu1/mu2)/(3.d0 + 2.d0*mu1/mu2)
+               !ufp = drops(idrop,rank)%element%duc*taup+drops(idrop,rank)%element%uc
+               !vfp = drops(idrop,rank)%element%dvc*taup+drops(idrop,rank)%element%vc
+               !wfp = drops(idrop,rank)%element%dwc*taup+drops(idrop,rank)%element%wc
+               call ComputeUndisturbedVelEE(drops(idrop,rank)%element%uc,  & 
+                                            drops(idrop,rank)%element%duc, & 
+                                            drops(idrop,rank)%element%vc,  & 
+                                            drops(idrop,rank)%element%dvc, & 
+                                            drops(idrop,rank)%element%wc,  & 
+                                            drops(idrop,rank)%element%dwc, & 
+                                            dp,rho1,rho2,mu1,mu2,Gx,Gy,Gz,ufp,vfp,wfp)
+
+               dist2 = (x(i)-drops(idrop,rank)%element%xc)**2.d0 & 
+                     + (y(j)-drops(idrop,rank)%element%yc)**2.d0 & 
+                     + (z(k)-drops(idrop,rank)%element%zc)**2.d0
+               wt = exp(-dist2*4.d0/dp/dp)
+               u(i,j,k) = uf*(1.d0-wt) + ufp*wt
+               v(i,j,k) = vf*(1.d0-wt) + vfp*wt
+               w(i,j,k) = wf*(1.d0-wt) + wfp*wt
+            end do; end do; end do
          end if !ConvertDropFlag
       end do ! idrop
       end if ! num_drop(rank) 
       
-      if ( num_drop_merge(rank) > 0 ) then
+      if ( num_drop_merge(rank) > 0 .and. ConvertMergeDrop ) then
       do idrop = 1,num_drop_merge(rank)
 
          call CheckConvertDropCriteria(drops_merge(idrop,rank)%element%vol, & 
@@ -1439,6 +1445,19 @@ contains
             if ( (  vol < vol_cut)                                      .and. &
                  ( (xc**2.d0 + yc**2.d0 + zc**2.d0) > ylpp_min**2.d0)   .and. & 
                  ( (xc**2.d0 + yc**2.d0 + zc**2.d0) < ylpp_max**2.d0) ) then 
+               ConvertDropFlag = .true.
+            else 
+               ConvertDropFlag = .false.
+            end if !vol_cut, xlpp_min... 
+         case (CriteriaJet      )   ! Note: assuming axis along x-direction
+                                    ! xlpp_max varies in time & given as 
+                                    ! xlpp_max = xlpp_min + zlpp_max*t
+                                    ! radius indicated by ylpp_min & ylpp_max
+            xlpp_max = xlpp_min + zlpp_max*time
+            if ( (  vol < vol_cut)                                        .and. &
+                 (  xc  > xlpp_min) .and. (xc  < xlpp_max)                .and. & 
+                 ( (yc-0.5d0)**2.d0 + (zc-0.5d0)**2.d0 > ylpp_min**2.d0)  .and. & 
+                 ( (yc-0.5d0)**2.d0 + (zc-0.5d0)**2.d0 < ylpp_max**2.d0) ) then 
                ConvertDropFlag = .true.
             else 
                ConvertDropFlag = .false.
@@ -1564,6 +1583,7 @@ contains
       i1_notfound = .true.
       ic_notfound = .true.
       i2_notfound = .true.
+      i2 = ie
       do i = is,ie
          if ( x(i) > xl .and. i1_notfound ) then 
             i1 = cellclosest(i,x(i-1),x(i),xl)
@@ -1580,6 +1600,7 @@ contains
       j1_notfound = .true.
       jc_notfound = .true.
       j2_notfound = .true.
+      j2 = je
       do j = js,je
          if ( y(j) > yl .and. j1_notfound ) then 
             j1 = cellclosest(j,y(j-1),y(j),yl)
@@ -1596,6 +1617,7 @@ contains
       k1_notfound = .true.
       kc_notfound = .true.
       k2_notfound = .true.
+      k2 = ke
       do k = ks,ke
          if ( z(k) > zl .and. k1_notfound ) then 
             k1 = cellclosest(k,z(k-1),z(k),zl)
@@ -1629,22 +1651,35 @@ contains
     
       integer, intent (in) :: tswap
 
-      real(8) :: dp,uf,vf,wf,dummyreal,ConvertRegSize,mu2tomu1
+      real(8) :: rp,dp,uf,vf,wf,dummyreal,ConvertRegSize,mu2tomu1
       logical :: ConvertDropFlag
       integer :: i1,ic,i2,j1,jc,j2,k1,kc,k2
       integer :: ipart
       integer :: i,j,k
+      logical :: PartAtBlockEdge = .true.
 
       if ( num_part(rank) > 0 ) then 
       do ipart = 1,num_part(rank)
 
+         ! Check if LPP locates at "LPP region"
          call CheckConvertDropCriteria(parts(ipart,rank)%element%vol, & 
                                        parts(ipart,rank)%element%xc,  & 
                                        parts(ipart,rank)%element%yc,  & 
                                        parts(ipart,rank)%element%zc,  &
                                        ConvertDropFlag,CriteriaConvertCase)
 
-         if ( .not.ConvertDropFlag ) then
+         ! Check if LPP locates at block boundary 
+         dp = (6.d0*parts(ipart,rank)%element%vol/PI)**(1.d0/3.d0)
+         rp = dp*0.5d0
+         if ( parts(ipart,rank)%element%xc - rp > x(is) .and. & 
+              parts(ipart,rank)%element%xc + rp < x(ie) .and. &
+              parts(ipart,rank)%element%yc - rp > y(js) .and. &
+              parts(ipart,rank)%element%yc + rp < y(je) .and. &
+              parts(ipart,rank)%element%zc - rp > z(ks) .and. &
+              parts(ipart,rank)%element%zc + rp < z(ke) )     & 
+              PartAtBlockEdge = .false.
+
+         if ( .not.ConvertDropFlag .and. .not.PartAtBlockEdge ) then
 ! TEMPORARY
             write(*,*) 'Particle is converted to drop', ipart,rank,tswap
 ! END TEMPORARY
@@ -1654,7 +1689,6 @@ contains
             num_part(rank) = num_part(rank) - 1
 
             ! Define conversion region
-            dp = (6.d0*parts(ipart,rank)%element%vol/PI)**(1.d0/3.d0)
             ConvertRegSize = 2.0d0*dp
 
             call FindCellIndexBdryConvertReg(parts(ipart,rank)%element%xc, & 
@@ -1834,17 +1868,17 @@ contains
                          + fhz )/(1.d0+Cm*rhof/rhop)
 
 ! TEMPORARY 
-            if ( MOD(tswap,ntimestepTag) == 0 ) then
-               write(11,*) tswap*5e-8,relvel(1)/taup*phi(dragmodel,Rep), & 
-                           rhof/rhop*DufDt,Cm*rhof/rhop*(DufDt-partforce(1)),& 
-                           (1.d0+Cm)*rhof/rhop*DufDt,uf,up,DufDt
-               write(12,*) tswap*5e-8,relvel(2)/taup*phi(dragmodel,Rep), & 
-                           rhof/rhop*DvfDt,Cm*rhof/rhop*(DvfDt-partforce(2)),&
-                           (1.d0+Cm)*rhof/rhop*DvfDt,vf,vp,DvfDt
-               write(13,*) tswap*5e-8,relvel(3)/taup*phi(dragmodel,Rep), & 
-                           rhof/rhop*DwfDt,Cm*rhof/rhop*(DwfDt-partforce(3)),&
-                           (1.d0+Cm)*rhof/rhop*DwfDt,wf,wp,DwfDt
-            end if ! tswap
+!            if ( MOD(tswap,ntimestepTag) == 0 ) then
+!               write(11,*) tswap*5e-8,relvel(1)/taup*phi(dragmodel,Rep), & 
+!                           rhof/rhop*DufDt,Cm*rhof/rhop*(DufDt-partforce(1)),& 
+!                           (1.d0+Cm)*rhof/rhop*DufDt,uf,up,DufDt
+!               write(12,*) tswap*5e-8,relvel(2)/taup*phi(dragmodel,Rep), & 
+!                           rhof/rhop*DvfDt,Cm*rhof/rhop*(DvfDt-partforce(2)),&
+!                           (1.d0+Cm)*rhof/rhop*DvfDt,vf,vp,DvfDt
+!               write(13,*) tswap*5e-8,relvel(3)/taup*phi(dragmodel,Rep), & 
+!                           rhof/rhop*DwfDt,Cm*rhof/rhop*(DwfDt-partforce(3)),&
+!                           (1.d0+Cm)*rhof/rhop*DwfDt,wf,wp,DwfDt
+!            end if ! tswap
 ! END TEMPORARY
             parts(ipart,rank)%element%duc = partforce(1) 
             parts(ipart,rank)%element%dvc = partforce(2)
@@ -2457,6 +2491,8 @@ module module_output_lpp
       implicit none
       character(*) :: rootname
       integer prank
+      integer, parameter :: LPPformatPlot3D = 1
+      integer, parameter :: LPPformatVOFVTK = 2
       if(rank.ne.0) call pariserror('rank.ne.0 in append_LPP')
       if(lpp_opened==0) then
          OPEN(UNIT=88,FILE='lpp.visit')
@@ -2467,13 +2503,36 @@ module module_output_lpp
          OPEN(UNIT=88,FILE='lpp.visit',access='append')
       endif
       do prank=0,NpDomain-1
-         write(88,11) rootname//TRIM(int2text(prank,padding))//'.3D'
+         if ( outputlpp_format == LPPformatPlot3D ) then 
+            write(88,11) rootname//TRIM(int2text(prank,padding))//'.3D'
+         else if ( outputlpp_format == LPPformatVOFVTK ) then
+            write(88,11) rootname//TRIM(int2text(prank,padding))//'.vtk'
+         else 
+            call pariserror("Unknow LPP output format!")
+         end if ! outputlpp_format
 11       format(A)
       enddo
       close(88)
    end subroutine  append_LPP_visit_file
 
    subroutine output_LPP(nf)
+
+      implicit none
+      integer,intent(in)  :: nf
+      integer, parameter :: LPPformatPlot3D = 1
+      integer, parameter :: LPPformatVOFVTK = 2
+
+      if ( outputlpp_format == LPPformatPlot3D ) then 
+         call output_LPP_Plot3D(nf)
+      else if ( outputlpp_format == LPPformatVOFVTK ) then
+         call output_LPP_VOFVTK(nf)
+      else 
+         call pariserror("Unknow LPP output format!")
+      end if ! outputlpp_format
+
+   end subroutine output_LPP
+
+   subroutine output_LPP_Plot3D(nf)
       implicit none
       integer,intent(in)  :: nf
       character(len=30) :: rootname
@@ -2498,7 +2557,81 @@ module module_output_lpp
       end if ! num_part(rank)
 320   format(e14.5,e14.5,e14.5,e14.5)
       close(8)
-   end subroutine output_LPP
+   end subroutine output_LPP_Plot3D
+
+   subroutine output_LPP_VOFVTK(nf)
+      implicit none
+      integer,intent(in)  :: nf
+      character(len=30) :: rootname
+      integer :: ipart
+      real(8) :: lppvof(imin:imax,jmin:jmax,kmin:kmax)
+      integer :: i1,ic,i2,j1,jc,j2,k1,kc,k2,i,j,k,i0,j0,k0
+      real(8) :: dp,rp,ConvertRegSize,xp,yp,zp,c,stencil3x3(-1:1,-1:1,-1:1)
+      integer :: nflag
+
+      lppvof = 0.d0
+
+      if ( num_part(rank) > 0 ) then 
+         do ipart = 1,num_part(rank)
+            dp = (6.d0*parts(ipart,rank)%element%vol/PI)**(1.d0/3.d0)
+            rp = 0.5d0*dp
+            ConvertRegSize = 2.d0*dp
+            xp = parts(ipart,rank)%element%xc
+            yp = parts(ipart,rank)%element%yc
+            zp = parts(ipart,rank)%element%zc
+            call FindCellIndexBdryConvertReg(xp,yp,zp,ConvertRegSize, & 
+                                             i1,ic,i2,j1,jc,j2,k1,kc,k2)
+         
+            do i=i1+1,i2-1; do j=j1+1,j2-1; do k=k1+1,k2-1
+               ! Build VOF field of droplet
+               do i0=-1,1; do j0=-1,1; do k0=-1,1
+                  stencil3x3(i0,j0,k0) = rp**2.d0 & 
+                     - ((x(i+i0)-xp)**2.d0+(y(j+j0)-yp)**2.d0+(z(k+k0)-zp)**2.d0)
+               enddo; enddo; enddo
+               call ls2vof_in_cell(stencil3x3,c,nflag)
+               lppvof(i,j,k) = c
+               if ( lppvof(i,j,k) > 1.d0 ) lppvof(i,j,k) = 1.d0
+               if ( lppvof(i,j,k) < 0.d0 ) lppvof(i,j,k) = 0.d0
+            end do; end do; end do
+         end do ! ipart
+      end if ! num_part(rank)
+
+      rootname=trim(out_path)//'/VTK/LPPVOF'//TRIM(int2text(nf,padding))//'-'
+      if(rank==0) call append_LPP_visit_file(TRIM(rootname))
+
+      OPEN(UNIT=8,FILE=TRIM(rootname)//TRIM(int2text(rank,padding))//'.vtk')
+      write(8,10)
+      write(8,11) time
+      write(8,12)
+      write(8,13)
+      write(8,14)imax-imin+1,jmax-jmin+1,kmax-kmin+1
+      write(8,15)(imax-imin+1)*(jmax-jmin+1)*(kmax-kmin+1)
+10    format('# vtk DataFile Version 2.0')
+11    format('grid, time ',F16.8)
+12    format('ASCII')
+13    format('DATASET STRUCTURED_GRID')
+14    format('DIMENSIONS ',I5,I5,I5)
+15    format('POINTS ',I17,' float' )
+
+      do k=kmin,kmax; do j=jmin,jmax; do i=imin,imax;
+         write(8,320) x(i),y(j),z(k)
+      enddo; enddo; enddo
+320   format(e14.5,e14.5,e14.5)
+
+      write(8,16)(imax-imin+1)*(jmax-jmin+1)*(kmax-kmin+1)
+      write(8,17)'LPPVOF'
+      write(8,18)
+16    format('POINT_DATA ',I17)
+17    format('SCALARS ',A20,' float 1')
+18    format('LOOKUP_TABLE default')
+
+      do k=kmin,kmax; do j=jmin,jmax; do i=imin,imax;
+         write(8,210) lppvof(i,j,k)
+      enddo; enddo; enddo
+210   format(e14.5)
+    close(8)
+         
+   end subroutine output_LPP_VOFVTK
 
 end module module_output_LPP
 
