@@ -197,9 +197,8 @@ Program paris
  !------------------------------------ADVECTION & DIFFUSION----------------------------------------
         do ii=1, itime_scheme
            if(TwoPhase.and.(.not.GetPropertiesFromFront)) then
-             call linfunc(rho,rho1,rho2)
-!             call linfunc(mu,mu1,mu2)
-             call linfunc2(mu,mu1,mu2) ! Note: harmonic mean matches shear stress better
+             call linfunc(rho,rho1,rho2,ArithMean)
+             call linfunc(mu,mu1,mu2,HarmMean) ! Note: harmonic mean matches shear stress better
            endif
            call my_timer(2,itimestep,ii)
 
@@ -253,7 +252,7 @@ Program paris
               call my_timer(4,itimestep,ii)
               call get_all_heights()
               call my_timer(5,itimestep,ii)
-              call linfunc(rho,rho1,rho2)
+              call linfunc(rho,rho1,rho2,ArithMean)
               call surfaceForce(du,dv,dw,rho)
               call my_timer(8,itimestep,ii)
            endif
@@ -379,9 +378,8 @@ Program paris
                  mu  = mu2  + (mu1 -mu2 )*color
               else
 !------------------------------------deduce rho, mu from cvof-------------------------------------
-                 call linfunc(rho,rho1,rho2)
-!                 call linfunc(mu,mu1,mu2)
-                  call linfunc2(mu,mu1,mu2)
+                 call linfunc(rho,rho1,rho2,ArithMean)
+                 call linfunc(mu,mu1,mu2,HarmMean)
 !------------------------------------END VOF STUFF------------------------------------------------
               endif
            endif
@@ -1199,9 +1197,8 @@ subroutine InitCondition
            rho = rho2 + (rho1-rho2)*color
            mu  = mu2  + (mu1 -mu2 )*color
         else
-           call linfunc(rho,rho1,rho2)
-!           call linfunc(mu,mu1,mu2)
-           call linfunc2(mu,mu1,mu2)
+           call linfunc(rho,rho1,rho2,ArithMean)
+           call linfunc(mu,mu1,mu2,HarmMean)
         endif
      else
         rho=rho1
