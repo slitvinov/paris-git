@@ -119,6 +119,8 @@
    real(8), dimension(:,:,:), allocatable :: sdu,sdv,sdw, & 
                                              sdu_work,sdv_work,sdw_work
 
+   logical, dimension(:,:,:), allocatable :: RegAwayInterface
+
    real(8), parameter :: PI = 3.14159265359d0
    integer, parameter :: CRAZY_INT = 3483129 
 
@@ -126,6 +128,7 @@
    integer, parameter :: CriteriaCylinder  = 2
    integer, parameter :: CriteriaSphere    = 3
    integer, parameter :: CriteriaJet       = 4
+   integer, parameter :: CriteriaInterface = 5
 
    ! Stokes drag covers bubbles to particles limit. Finite Reynolds number
    ! extensions SN & CG are only for particles while MKL is only for bubbles
@@ -177,6 +180,9 @@ contains
                 sdu_work(imin:imax,jmin:jmax,kmin:kmax), & 
                 sdv_work(imin:imax,jmin:jmax,kmin:kmax), &
                 sdw_work(imin:imax,jmin:jmax,kmin:kmax) )
+             
+      if ( CriteriaConvertCase == CriteriaInterface ) & 
+         allocate( RegAwayInterface(imin:imax,jmin:jmax,kmin:kmax) )
 
       ! set default values
       num_tag  = 0
@@ -258,15 +264,18 @@ contains
       ! Only do tagging and conversion in specific time steps
       if ( MOD(tswap,ntimestepTag) == 0 ) then 
          call tag_drop(tswap)
-         if ( nPdomain > 1 ) then 
-            call tag_drop_all
-            call merge_drop_pieces 
-         end if ! nPdomain
+         if ( nPdomain > 1 ) call tag_drop_all
+         call CreateTag2DropTable
+         if ( nPdomain > 1 ) call merge_drop_pieces 
 
          if ( DropStatisticsMethod > 0 ) call drop_statistics(tswap,time) 
 
+         if ( (DoConvertVOF2LPP .or. DoConvertLPP2VOF) .and. & 
+               CriteriaConvertCase == CriteriaInterface )  call MarkRegAwayInterface()
+
          if ( DoConvertVOF2LPP ) call ConvertVOF2LPP(tswap)
          if ( DoConvertLPP2VOF ) call ConvertLPP2VOF(tswap)   
+         call ReleaseTag2DropTable
       end if ! tswap
 
       call UpdatePartSol(tswap)
@@ -507,8 +516,6 @@ contains
       real(8) :: max_drop_merge_vol
       integer :: tag_max_drop_merge_vol
 
-      call CreateTag2DropTable
-
       ! Check ghost cells of droplet pieces
       if ( num_drop_merge(rank) > 0 ) then 
       do idrop = 1, num_drop_merge(rank) 
@@ -640,7 +647,6 @@ contains
       call distributeDropMerge
    
       ! finalize
-      call ReleaseTag2DropTable
       if ( rank == 0 ) deallocate( new_drop_id )
 
    end subroutine merge_drop_pieces
@@ -968,7 +974,7 @@ contains
          tag_rank     (drops(idrop,rank)%element%id) = rank 
          tag_mergeflag(drops(idrop,rank)%element%id) = 0 
       end do ! idrop
-   end if ! num_drop(rank)
+      end if ! num_drop(rank)
       
       if ( num_drop_merge(rank) > 0 ) then 
       do idrop = 1,num_drop_merge(rank)
@@ -979,33 +985,35 @@ contains
          tag_rank     (drops_merge(idrop,rank)%element%id) = rank 
          tag_mergeflag(drops_merge(idrop,rank)%element%id) = 1 
       end do ! idrop
-   end if ! num_drop_merge(rank) 
+      end if ! num_drop_merge(rank) 
 
-      ! MPI communication for tag tables
-      if ( rank > 0 ) then
-         if ( num_tag(rank) > 0 ) then 
-            call MPI_ISEND(tag_dropid   (tagmin(rank):tagmax(rank)),num_tag(rank), & 
-                           MPI_INTEGER, 0,    10, MPI_COMM_WORLD, req(1), ierr)
-            call MPI_ISEND(tag_rank     (tagmin(rank):tagmax(rank)),num_tag(rank), & 
-                           MPI_INTEGER, 0,    11, MPI_COMM_WORLD, req(2), ierr)
-            call MPI_ISEND(tag_mergeflag(tagmin(rank):tagmax(rank)),num_tag(rank), & 
-                           MPI_INTEGER, 0,    12, MPI_COMM_WORLD, req(3), ierr)
-            call MPI_WAITALL(3,req(1:3),sta(:,1:3),ierr)
-         end if ! num_tag(rank)
-      else
-         ireq = 0 
-         do irank = 1,nPdomain-1
-            if ( num_tag(irank) > 0 ) then
-               call MPI_IRECV(tag_dropid   (tagmin(irank):tagmax(irank)),num_tag(irank), & 
-                              MPI_INTEGER, irank, 10, MPI_COMM_WORLD, req(4), ierr)
-               call MPI_IRECV(tag_rank     (tagmin(irank):tagmax(irank)),num_tag(irank), & 
-                              MPI_INTEGER, irank, 11, MPI_COMM_WORLD, req(5), ierr)
-               call MPI_IRECV(tag_mergeflag(tagmin(irank):tagmax(irank)),num_tag(irank), & 
-                              MPI_INTEGER, irank, 12, MPI_COMM_WORLD, req(6), ierr)
-               call MPI_WAITALL(3,req(4:6),sta(:,4:6),ierr)
-            end if ! num_tag(irank)
-         end do ! irank
-      end if ! rank
+      if ( nPdomain > 1 ) then 
+         ! MPI communication for tag tables
+         if ( rank > 0 ) then
+            if ( num_tag(rank) > 0 ) then 
+               call MPI_ISEND(tag_dropid   (tagmin(rank):tagmax(rank)),num_tag(rank), & 
+                              MPI_INTEGER, 0,    10, MPI_COMM_WORLD, req(1), ierr)
+               call MPI_ISEND(tag_rank     (tagmin(rank):tagmax(rank)),num_tag(rank), & 
+                              MPI_INTEGER, 0,    11, MPI_COMM_WORLD, req(2), ierr)
+               call MPI_ISEND(tag_mergeflag(tagmin(rank):tagmax(rank)),num_tag(rank), & 
+                              MPI_INTEGER, 0,    12, MPI_COMM_WORLD, req(3), ierr)
+               call MPI_WAITALL(3,req(1:3),sta(:,1:3),ierr)
+            end if ! num_tag(rank)
+         else
+            ireq = 0 
+            do irank = 1,nPdomain-1
+               if ( num_tag(irank) > 0 ) then
+                  call MPI_IRECV(tag_dropid   (tagmin(irank):tagmax(irank)),num_tag(irank), & 
+                                 MPI_INTEGER, irank, 10, MPI_COMM_WORLD, req(4), ierr)
+                  call MPI_IRECV(tag_rank     (tagmin(irank):tagmax(irank)),num_tag(irank), & 
+                                 MPI_INTEGER, irank, 11, MPI_COMM_WORLD, req(5), ierr)
+                  call MPI_IRECV(tag_mergeflag(tagmin(irank):tagmax(irank)),num_tag(irank), & 
+                                 MPI_INTEGER, irank, 12, MPI_COMM_WORLD, req(6), ierr)
+                  call MPI_WAITALL(3,req(4:6),sta(:,4:6),ierr)
+               end if ! num_tag(irank)
+            end do ! irank
+         end if ! rank
+      end if ! nPdomain 
 
    end subroutine CreateTag2DropTable
 
@@ -1250,10 +1258,20 @@ contains
       if ( num_drop(rank) > 0 ) then 
       do idrop = 1,num_drop(rank)
 
+         ! Find cell index and define conversion region
+         dp = (6.d0*drops(idrop,rank)%element%vol/PI)**(1.d0/3.d0)
+         ConvertRegSize = 2.0d0*dp
+         call FindCellIndexBdryConvertReg(drops(idrop,rank)%element%xc, & 
+                                          drops(idrop,rank)%element%yc, & 
+                                          drops(idrop,rank)%element%zc, & 
+                                          ConvertRegSize, & 
+                                          i1,ic,i2,j1,jc,j2,k1,kc,k2)
+
          call CheckConvertDropCriteria(drops(idrop,rank)%element%vol, & 
                                        drops(idrop,rank)%element%xc,  & 
                                        drops(idrop,rank)%element%yc,  & 
                                        drops(idrop,rank)%element%zc,  &
+                                       ic,jc,kc,                      & 
                                        ConvertDropFlag,CriteriaConvertCase)
 
          if ( ConvertDropFlag ) then
@@ -1263,15 +1281,6 @@ contains
             ! transfer droplet properties to particle
             num_part(rank) = num_part(rank) + 1
             parts(num_part(rank),rank)%element = drops(idrop,rank)%element
-
-            ! Define conversion region
-            dp = (6.d0*drops(idrop,rank)%element%vol/PI)**(1.d0/3.d0)
-            ConvertRegSize = 2.0d0*dp
-            call FindCellIndexBdryConvertReg(drops(idrop,rank)%element%xc, & 
-                                             drops(idrop,rank)%element%yc, & 
-                                             drops(idrop,rank)%element%zc, & 
-                                             ConvertRegSize, & 
-                                             i1,ic,i2,j1,jc,j2,k1,kc,k2)
 
             parts(num_part(rank),rank)%ic = ic 
             parts(num_part(rank),rank)%jc = jc 
@@ -1327,7 +1336,8 @@ contains
          end if !ConvertDropFlag
       end do ! idrop
       end if ! num_drop(rank) 
-      
+     
+      ! XXX Note: drop_merge_converge is not working yet
       if ( num_drop_merge(rank) > 0 .and. ConvertMergeDrop ) then
       do idrop = 1,num_drop_merge(rank)
 
@@ -1335,6 +1345,7 @@ contains
                                        drops_merge(idrop,rank)%element%xc,  & 
                                        drops_merge(idrop,rank)%element%yc,  & 
                                        drops_merge(idrop,rank)%element%zc,  &
+                                       ic,jc,kc,                            & 
                                        ConvertDropFlag,CriteriaConvertCase)
 
          if ( ConvertDropFlag ) then
@@ -1415,10 +1426,11 @@ contains
 
    end subroutine ConvertVOF2LPP
 
-   subroutine CheckConvertDropCriteria(vol,xc,yc,zc,ConvertDropFlag,CriteriaConvertCase)
+   subroutine CheckConvertDropCriteria(vol,xc,yc,zc,ic,jc,kc,ConvertDropFlag,CriteriaConvertCase)
       implicit none
 
       real(8), intent(in ) :: vol,xc,yc,zc
+      integer, intent(in ) :: ic,jc,kc
       integer, intent(in ) :: CriteriaConvertCase
       logical, intent(out) :: ConvertDropFlag
 
@@ -1462,9 +1474,56 @@ contains
             else 
                ConvertDropFlag = .false.
             end if !vol_cut, xlpp_min... 
+         case (CriteriaInterface)
+            if ( vol < vol_cut .and. RegAwayInterface(ic,jc,kc) ) then 
+               ConvertDropFlag = .true.
+            else 
+               ConvertDropFlag = .false.
+            end if !vol_cut, RegAwayInterface... 
       end select
       
    end subroutine CheckConvertDropCriteria
+
+   subroutine MarkRegAwayInterface
+
+      implicit none
+      include 'mpif.h'
+      integer :: i,j,k
+      integer :: idrop,droptag,droprank
+      real(8) :: vol_drop,d_cut
+      integer :: shift,i1,i2,j1,j2,k1,k2   
+
+      RegAwayInterface = .true.
+      d_cut = (6.d0*vol_cut/PI)**0.333333d0
+      shift = INT(2.d0*d_cut/(xh(is+1)-xh(is)))
+
+      do k=ks,ke; do j=js,je; do i=is,ie
+         if ( cvof(i,j,k) > 0.d0 .and. cvof(i,j,k) < 1.d0 ) then 
+            ! Check volume of drop corresponding to the current cell
+            droptag  = tag_id(i,j,k) 
+            idrop    = tag_dropid   (droptag) 
+            droprank = tag_rank     (droptag)  
+            if ( tag_mergeflag(droptag) == 0 ) then 
+               vol_drop = drops(idrop,droprank)%element%vol
+            else if ( tag_mergeflag(droptag) == 1 ) then 
+               vol_drop = drops_merge(idrop,droprank)%element%vol
+            else 
+               call pariserror("Unknown tag_mergeflag!")
+            end if ! tag_mergeflag
+
+            ! if interface belongs to big liquid drop, mark the neighbor cells false
+            if ( vol_drop > vol_cut ) then
+               i1 = MAX(i-shift,imin)
+               i2 = MIN(i+shift,imax)
+               j1 = MAX(j-shift,jmin)
+               j2 = MIN(j+shift,jmax)
+               k1 = MAX(k-shift,kmin)
+               k2 = MIN(k+shift,kmax)
+               RegAwayInterface(i1:i2,j1:j2,k1:k2) = .false.
+            end if ! vol_drop
+         end if ! cvof(i,j,k)
+      end do; end do; end do
+   end subroutine MarkRegAwayInterface
 
    subroutine ComputeUndisturbedVelEE(uc,duc,vc,dvc,wc,dwc,dp,rhof,rhop,muf,mup,Gx,Gy,Gz,uf,vf,wf)
 
@@ -1654,7 +1713,7 @@ contains
       real(8) :: rp,dp,uf,vf,wf,dummyreal,ConvertRegSize,mu2tomu1
       logical :: ConvertDropFlag
       integer :: i1,ic,i2,j1,jc,j2,k1,kc,k2
-      integer :: ipart
+      integer :: ipart,ipart1
       integer :: i,j,k
       logical :: PartAtBlockEdge = .true.
 
@@ -1666,6 +1725,9 @@ contains
                                        parts(ipart,rank)%element%xc,  & 
                                        parts(ipart,rank)%element%yc,  & 
                                        parts(ipart,rank)%element%zc,  &
+                                       parts(ipart,rank)%ic,          &
+                                       parts(ipart,rank)%jc,          &
+                                       parts(ipart,rank)%kc,          &
                                        ConvertDropFlag,CriteriaConvertCase)
 
          ! Check if LPP locates at block boundary 
@@ -1686,7 +1748,6 @@ contains
             ! transfer droplet properties to particle
             num_drop(rank) = num_drop(rank) + 1
             drops(num_drop(rank),rank)%element = parts(ipart,rank)%element
-            num_part(rank) = num_part(rank) - 1
 
             ! Define conversion region
             ConvertRegSize = 2.0d0*dp
@@ -1715,8 +1776,16 @@ contains
                                    parts(ipart,rank)%element%vc,& 
                                    parts(ipart,rank)%element%wc,&
                                    uf,vf,wf)
-
+            
+            ! Remove the particle from the array  
+            do ipart1 = ipart+1,num_part(rank)
+               parts(ipart1-1,rank) = parts(ipart1,rank)
+            end do ! ipart1
+            num_part(rank) = num_part(rank) - 1
          end if ! ConvertDropFlag
+
+         ! Note: num_part(rank) has been updated
+         if ( ipart >= num_part(rank) ) exit
       end do ! ipart
       end if ! num_part(rank)
 
