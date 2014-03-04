@@ -1250,11 +1250,6 @@ contains
       real(8) :: ufp,vfp,wfp,dist2,wt
       logical :: ConvertMergeDrop=.false.
 
-      if (.not. LPP_initialized) then 
-         call initialize_LPP()
-         LPP_initialized = .true.
-      end if ! LPP_initialized
-
       if ( num_drop(rank) > 0 ) then 
       do idrop = 1,num_drop(rank)
 
@@ -2548,6 +2543,9 @@ contains
 
 end module module_Lag_part
 
+! ==================================================================================================
+! module_output_lpp: I/O module for Lagrangian particle 
+! ==================================================================================================
 module module_output_lpp
    use module_IO
    use module_Lag_part
@@ -2698,9 +2696,69 @@ module module_output_lpp
          write(8,210) lppvof(i,j,k)
       enddo; enddo; enddo
 210   format(e14.5)
-    close(8)
+      close(8)
          
    end subroutine output_LPP_VOFVTK
 
+!-------------------------------------------------------------------------------------------------
+   subroutine backup_LPP_write
+      implicit none
+      integer ::ipart
+      character(len=100) :: filename
+      filename = trim(out_path)//'/backuplpp_'//int2text(rank,3)
+      call system('mv '//trim(filename)//' '//trim(filename)//'.old')
+      OPEN(UNIT=7,FILE=trim(filename),status='unknown',action='write')
+      write(7,1100)time,itimestep,num_part(rank)
+      if ( num_part(rank) > 0 ) then 
+         do ipart=1,num_part(rank)
+            write(7,1200) parts(ipart,rank)%element%xc, & 
+                          parts(ipart,rank)%element%yc, & 
+                          parts(ipart,rank)%element%zc, & 
+                          parts(ipart,rank)%element%uc, & 
+                          parts(ipart,rank)%element%vc, & 
+                          parts(ipart,rank)%element%wc, & 
+                          parts(ipart,rank)%element%duc, & 
+                          parts(ipart,rank)%element%dvc, & 
+                          parts(ipart,rank)%element%dwc, & 
+                          parts(ipart,rank)%element%vol, &  
+                          parts(ipart,rank)%ic, & 
+                          parts(ipart,rank)%jc, & 
+                          parts(ipart,rank)%kc 
+         end do! ipart
+      end if ! num_part(rank)
+      if(rank==0)print*,'Backup LPP written at t=',time
+      1100 FORMAT(es17.8e3,2I10)
+      1200 FORMAT(10es17.8e3,3I5)
+   end subroutine backup_LPP_write
+
+!-------------------------------------------------------------------------------------------------
+   subroutine backup_LPP_read
+      implicit none
+      integer ::ipart,ierr
+      OPEN(UNIT=7,FILE=trim(out_path)//'/backuplpp_'//int2text(rank,3),status='old',action='read')
+      read(7,*)time,itimestep,num_part(rank)
+      if ( num_part(rank) < 0 ) &
+         stop 'Error: backuplpp_read'
+      if ( num_part(rank) > 0 ) then 
+         do ipart=1,num_part(rank)
+            read(7,*    ) parts(ipart,rank)%element%xc, & 
+                          parts(ipart,rank)%element%yc, & 
+                          parts(ipart,rank)%element%zc, & 
+                          parts(ipart,rank)%element%uc, & 
+                          parts(ipart,rank)%element%vc, & 
+                          parts(ipart,rank)%element%wc, & 
+                          parts(ipart,rank)%element%duc, & 
+                          parts(ipart,rank)%element%dvc, & 
+                          parts(ipart,rank)%element%dwc, & 
+                          parts(ipart,rank)%element%vol, &  
+                          parts(ipart,rank)%ic, & 
+                          parts(ipart,rank)%jc, & 
+                          parts(ipart,rank)%kc 
+         end do !ipart
+      end if ! num_part(rank)
+   end subroutine backup_LPP_read
+!-------------------------------------------------------------------------------------------------
+
 end module module_output_LPP
+!=================================================================================================
 

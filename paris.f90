@@ -155,8 +155,8 @@ Program paris
            close(121)
            write(out,'("Step:",I9," Iterations:",I9," cpu(s):",f10.2)')-1,0,end_time-start_time
            write(*,'("Step:",I6," dt=",es16.5e2," time=",es16.5e2," cpu(s):",f11.3)')   &
-                0,0.d0,0.d0,end_time-start_time
-           itimestep=0; ii=0
+                itimestep,dt,time,end_time-start_time
+!           itimestep=0; ii=0
         endif
      endif
      if(test_HF.or.test_LP) then
@@ -400,13 +400,20 @@ Program paris
 !--------------------------------------------OUTPUT-----------------------------------------------
         call calcStats
         call my_timer(2,itimestep,ii)
-        if(mod(itimestep,nbackup)==0)call backup_write
+        if(mod(itimestep,nbackup)==0) then 
+           if ( DoFront ) then 
+              call backup_write
+           else if ( DoVOF ) then 
+              call backup_VOF_write
+              if ( DoLPP ) call backup_LPP_write 
+           end if ! DoFront, DoVOF
+        end if ! itimestep
 !        if(mod(itimestep,noutuv)==0) then 
         if(mod(itimestep,nout)==0) then 
            call write_vec_gnuplot(u,v,cvof,p,itimestep,DoVOF)
            ! call output(ITIMESTEP/nout,is,ie+1,js,je+1,ks,ke+1)
            if(DoVOF) call output_VOF(ITIMESTEP/nout,imin,imax,jmin,jmax,kmin,kmax)
-           if(DoVOF .and. DoLPP) call output_LPP(ITIMESTEP/nout)
+           if(DoLPP) call output_LPP(ITIMESTEP/nout)
            if(rank==0)then
               end_time =  MPI_WTIME()
               write(out,'("Step:",I9," Iterations:",I9," cpu(s):",f10.2)')itimestep,it,end_time-start_time
@@ -1126,6 +1133,8 @@ subroutine InitCondition
   use module_surface_tension
   use module_st_testing
   use module_lag_part
+  use module_output_lpp
+  use module_output_vof
   implicit none
   include 'mpif.h'
   integer :: i,j,k, ierr, irank, req(12),sta(MPI_STATUS_SIZE,12)
@@ -1133,7 +1142,23 @@ subroutine InitCondition
   !---------------------------------------------Domain----------------------------------------------
   if(rank<nPdomain)then
      if(restart)then
-        call backup_read
+        if ( DoFront ) then 
+           call backup_read
+        else if ( DoVOF ) then 
+           call backup_VOF_read
+           call ghost_x(cvof,2,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+           call ghost_y(cvof,2,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+           call ghost_z(cvof,2,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+           call ighost_x(vof_flag,2,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+           call ighost_y(vof_flag,2,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+           call ighost_z(vof_flag,2,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+           call setVOFBC(cvof,vof_flag)
+           if ( DoLPP ) then 
+              call backup_LPP_read
+              call MPI_ALLGATHER(num_part(rank), 1, MPI_INTEGER, &
+                                 num_part(:)   , 1, MPI_INTEGER, MPI_Comm_World, ierr)
+           end if ! DoLPP
+        end if ! DoFront, DoVOF
         call SetVelocityBC(u,v,w,umask,vmask,wmask,time)
         call ghost_x(u,2,req( 1: 4)); call ghost_x(v,2,req( 5: 8)); call ghost_x(w,2,req( 9:12))
         call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
@@ -1141,19 +1166,28 @@ subroutine InitCondition
         call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
         call ghost_z(u,2,req( 1: 4)); call ghost_z(v,2,req( 5: 8)); call ghost_z(w,2,req( 9:12))
         call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
+        write(*,*) "Read backup files done!",rank,time,itimestep 
      else
         ! Set velocities and the color function. 
         ! The color function is used for density and viscosity in the domain 
         ! when set by Front-Tracking.
         color = 0.;  v = 0;  w = 0.
         u = 0.d0;
-!        if((y(j) - ylength*0.5d0)**2 + (z(k) - zlength*0.5d0)**2.lt.jetradius**2)  u = U_init
 
         if(DoVOF) then
            call initconditions_VOF()
            call get_all_heights()
         endif
         du = 0d0
+
+        ! Note: give drop/bubble an initial velocity
+        if ( test_injectdrop ) then
+           do i=imin,imax-1; do j=jmin,jmax-1; do k=kmin,kmax-1
+              if((cvof(i,j,k) + cvof(i+1,j,k)) > 0.0d0) u(i,j,k) = 1.5d-1
+              if((cvof(i,j,k) + cvof(i,j+1,k)) > 0.0d0) v(i,j,k) =-1.d-1
+              if((cvof(i,j,k) + cvof(i,j,k+1)) > 0.0d0) w(i,j,k) =-5.d-1
+           enddo; enddo; enddo
+        end if ! test_bubbles
      endif
      
      if(test_HF) then
@@ -1161,15 +1195,6 @@ subroutine InitCondition
      else if (test_LP) then 
         call test_Lag_part(itimestep)
      endif
-
-      ! Note: give drop/bubble an initial velocity
-      if ( test_injectdrop ) then
-         do i=imin,imax-1; do j=jmin,jmax-1; do k=kmin,kmax-1
-            if((cvof(i,j,k) + cvof(i+1,j,k)) > 0.0d0) u(i,j,k) = 1.5d-1
-            if((cvof(i,j,k) + cvof(i,j+1,k)) > 0.0d0) v(i,j,k) =-1.d-1
-            if((cvof(i,j,k) + cvof(i,j,k+1)) > 0.0d0) w(i,j,k) =-5.d-1
-         enddo; enddo; enddo
-      end if ! test_bubbles
 
      if(DoFront) then
         call GetFront('recv')
@@ -1230,7 +1255,8 @@ subroutine InitCondition
 
   endif
   !---------------------------------------------End Front----------------------------------------------
-  if((.not. restart).or.(.not. restartFront)) then
+!  if((.not. restart).or.(.not. restartFront)) then
+  if(.not. restart) then
      time = 0d0
      iTimeStep = 0
   endif

@@ -881,6 +881,40 @@ contains
     close(8)
 end subroutine output_VOF
 !=================================================================================================
+!=================================================================================================
+!-------------------------------------------------------------------------------------------------
+subroutine backup_VOF_write
+  implicit none
+  integer ::i,j,k
+  character(len=100) :: filename
+  filename = trim(out_path)//'/backup_'//int2text(rank,3)
+  call system('mv '//trim(filename)//' '//trim(filename)//'.old')
+  OPEN(UNIT=7,FILE=trim(filename),status='unknown',action='write')
+  !Note: p at ghost layers are needed for possion solver 
+  write(7,1100)time,itimestep,imin,imax,jmin,jmax,kmin,kmax
+  do k=kmin,kmax; do j=jmin,jmax; do i=imin,imax
+    write(7,1200) u(i,j,k), v(i,j,k), w(i,j,k), p(i,j,k), cvof(i,j,k)
+  enddo; enddo; enddo
+  if(rank==0)print*,'Backup written at t=',time
+  1100 FORMAT(es17.8e3,7I10)
+  !Note: to guarantee identical results, 16 digits are needed for real8 
+  1200 FORMAT(5es25.16e3)
+end subroutine backup_VOF_write
+!=================================================================================================
+!=================================================================================================
+!-------------------------------------------------------------------------------------------------
+subroutine backup_VOF_read
+  implicit none
+  integer ::i,j,k,i1,i2,j1,j2,k1,k2,ierr
+  OPEN(UNIT=7,FILE=trim(out_path)//'/backup_'//int2text(rank,3),status='old',action='read')
+  read(7,*)time,itimestep,i1,i2,j1,j2,k1,k2
+  if(i1/=imin .or. i2/=imax .or. j1/=jmin .or. j2/=jmax .or. k1/=kmin .or. k2/=kmax) &
+    stop 'Error: backup_read'
+  do k=kmin,kmax; do j=jmin,jmax; do i=imin,imax
+    read(7,*) u(i,j,k), v(i,j,k), w(i,j,k), p(i,j,k), cvof(i,j,k)
+  enddo; enddo; enddo
+end subroutine backup_VOF_read
+!=================================================================================================
 !-------------------------------------------------------------------------------------------------
 end module module_output_vof
 !-------------------------------------------------------------------------------------------------
