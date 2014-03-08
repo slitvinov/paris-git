@@ -29,7 +29,7 @@ restartAverages = F
 nBackup  = 200000      ! number of time steps between  backups are kept.
 
 NSTEP   = 100000       ! maximum number of time steps
-EndTime = 1d3   ! When to stop simulation
+EndTime = 380   ! When to stop simulation
 
 MaxDt   = 0.1d0    ! maximum size of time step
 dtFlag  = 1        ! 1: fixed dt;  2: fixed CFL
@@ -51,7 +51,7 @@ U_init   = 0.d0
 
 termout  = 200
 ICOut    = T        ! output initial condition
-NOUT     = 200        ! write the solution to file every nout time steps
+NOUT     = 100        ! write the solution to file every nout time steps
 output_format = 2   ! 1:tecplot 2:vtk
 out_path = 'out'    ! name of the output directory
 

@@ -46,6 +46,7 @@ module module_VOF
   integer :: parameters_read=0, refinement=-1 
   integer :: cylinder_dir = 0
   logical :: test_heights = .false.  
+  logical :: test_droplet = .false.  
   logical :: normal_up = .true.    ! used for the h
   logical :: test_curvature = .false.  
   logical :: test_curvature_2D = .false.  
@@ -63,6 +64,7 @@ module module_VOF
 
   integer, parameter :: ArithMean = 101
   integer, parameter :: HarmMean  = 102
+  integer :: ViscMean,DensMean
 
 contains
 !=================================================================================================
@@ -164,8 +166,9 @@ contains
     include 'mpif.h'
     integer ierr,in
     logical file_is_there
+    logical ViscMeanIsArith, DensMeanIsArith
     namelist /vofparameters/ vofbdry_cond,test_type,VOF_advect,refinement, &
-       cylinder_dir, normal_up, DoLPP, jetradius, FreeSurface
+       cylinder_dir, normal_up, DoLPP, jetradius, FreeSurface, ViscMeanIsArith, DensMeanIsArith
     in=31
 
     call MPI_COMM_RANK(MPI_COMM_WORLD, rank, ierr)
@@ -184,8 +187,28 @@ contains
     close(in)
     if(refinement==-1) then
        refinement=8
-       if(rank==0) write(*,*) "using default value for refinement"
+       if(rank==0) write(*,*) "Using default value for refinement"
+    else if(refinement==0) then
+       if(rank==0) write(*,*) "Warning: no refinement of VOF initial condition"
     endif
+
+    if(ViscMeanIsArith) then
+       ViscMean = ArithMean
+       if(rank==0) print *, "Using Arithmetic Mean for Viscosity"
+    else
+       ViscMean = HarmMean
+       if(rank==0) print *, "Using Harmonic Mean for Viscosity"
+    endif
+ 
+    if(DensMeanIsArith) then
+       DensMean = ArithMean
+       if(rank==0) print *, "Using Arithmetic Mean for Density"
+    else
+       DensMean = HarmMean
+       if(rank==0) print *, "Using Harmonic Mean for Density"
+    endif
+
+ 
     if (rank == 0) then 
      !open(unit=out, file=trim(out_path)//'/output', action='write', iostat=ierr)
      !if (ierr .ne. 0) stop 'ReadParameters: error opening output file'
@@ -214,7 +237,7 @@ contains
     cvof = 0.d0
     vof_flag = 3
     if(test_type=='droplet') then
-       test_heights = .false.
+       test_droplet = .true.
     else if(test_type=='height_test') then
        test_heights = .true.
     else if(test_type=='Curvature_test') then

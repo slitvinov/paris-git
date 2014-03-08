@@ -26,7 +26,7 @@ int main (int argc, char * argv[])
   if(argc >= 6)  sscanf(argv[5],"%d",&output);
 
   float errmax = 0.;
-  float error;
+  float error, error2, y2norm2;
 
   FILE * fd1;FILE * fd2;
   float * x1 = ( float *) malloc(MAXLINES*sizeof(float));
@@ -68,22 +68,36 @@ int main (int argc, char * argv[])
 	  exit(2); 
 	}
       //      printf("%g %g %g %g\n",*x1,*y1,*x2,*y2);
-      scaling = (1. - relative) + relative * *y2 * *y2;
-      error = sqrt((*y1-*y2)*(*y1-*y2)/scaling);
+      y2norm2 +=  *y2 * *y2;
+      error2 = (*y1-*y2)*(*y1-*y2);
+      error = sqrt(error2);
       if(error > errmax) errmax = error;
-      diff += (*y1-*y2)*(*y1-*y2)/scaling;
+      diff += error2;
       x1++;
       y1++;
       x2++;
       y2++;
     }
+  // compute ||y2||_2  (L2 norm of second column) 
+  y2norm2 /= nlines;
+  scaling = (1. - relative) + relative * y2norm2;
+  // rescale for relative errors
+  diff /= scaling;
+  errmax /= sqrt(scaling);
+  // get L2 of error
   diff = sqrt(diff/nlines);
   if(diff < (double) tolerance) 
     {
       if(output < 2) 
 	{
 	  printf("\033[32;1m PASS\033[0m");
-	  if(output) printf(" L2 relative error norm = %g  L_\\infty relative error norm = %g",diff,errmax);
+	  if(output)
+	    {
+	      if(relative==1) 
+		printf(" L2 relative error norm = %g  L_\\infty relative error norm = %g",diff,errmax);
+	      else
+		printf(" L2 error norm = %g  L_\\infty error norm = %g",diff,errmax);
+	    }
 	  printf("\n");
 	}
       else
@@ -93,7 +107,7 @@ int main (int argc, char * argv[])
     {
       if(output < 2) 
 	{
-	  printf("\033[31;1m FAIL\033[0m L2 error=%g Linf error = %g \n",diff,errmax);
+	  printf("\033[31;1m FAIL\033[0m L2 error norm = %g L_\\infty error norm = %g \n",diff,errmax);
 	}
       else
 	{

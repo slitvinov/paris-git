@@ -51,6 +51,19 @@ module module_grid
   integer :: imin, imax, jmin, jmax, kmin, kmax
 ! added by SZ
 contains
+!
+  function test_point_in(i,j,k)
+    integer, intent(in) :: i,j,k
+    logical :: test_point_in
+    test_point_in = (is <= i).and.(i <= ie).and.(js <= j).and.(j <= je).and.(ks <= k).and.(k <= ke)
+  end function test_point_in
+!
+  function test_point_in_wide(i,j,k)
+    integer, intent(in) :: i,j,k
+    logical :: test_point_in_wide
+    test_point_in_wide = (imin < i).and.(i < imax).and.(jmin < j).and.(j < jmax).and.(kmin < k).and.(k < kmax)
+  end function test_point_in_wide
+!
   subroutine check_sanity_in_depth()
     call check_sanity()
     if(is < 1) stop "wrong is"
@@ -309,84 +322,102 @@ module module_IO
   integer ::nout, out, output_format, nbackup, nstats, termout
   character(len=20) :: out_path, x_file, y_file, z_file
   logical :: read_x, read_y, read_z, restart, ICOut, restartFront, restartAverages
-  contains
-!=================================================================================================
-subroutine write_vec_gnuplot(u,v,cvof,p,iout,DoVOF)
-  use module_grid
-  use module_tmpvar
-  implicit none
-  include 'mpif.h'
-  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: u, v, cvof, p
-  integer, intent(in) :: iout
-  integer :: i,j,k,ierr
-  real(8) :: norm=0.d0, coeff, vmax
-  logical :: DoVOF
-  intrinsic dsqrt
-!
-! writing u,v
-!
-  OPEN(UNIT=89,FILE=TRIM(out_path)//'/UV-'//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout,padding))//'.txt')
-  norm=0.d0
-  k=(ks+ke)/2
-  vmax = maxval(sqrt(u(is:ie,js:je,ks:ke)**2 + v(is:ie,js:je,ks:ke)**2))
-  call MPI_ALLREDUCE(vmax, norm, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_Cart, ierr)  
-  coeff = 0.8/norm
-  do i=is,ie; do j=js,je
-     write(89,310) x(i),y(j),coeff*dx(i)*u(i,j,k),coeff*dx(i)*v(i,j,k)
-  enddo; enddo
-  close(unit=89)
-!
-  if(DoVOF) then
-     !
-     ! writing cvof
-     !
-     OPEN(UNIT=89,FILE=TRIM(out_path)//'/CVoF-'//TRIM(int2text(rank,padding))//'-'// &
-          TRIM(int2text(iout,padding))//'.txt')
-     k=(ks+ke)/2
-     do i=is,ie
-        do j=js,je
-           write(89,310) cvof(i,j,k)
-        enddo
-        WRITE(89,*) " "
-     enddo
-     close(unit=89)
-  endif
-  !
-  ! writing p
-  !
-  OPEN(UNIT=89,FILE=TRIM(out_path)//'/P-'//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout,padding))//'.txt')
-  k=(ks+ke)/2
-  do i=is,ie
-     do j=js,je
-     write(89,310) x(i),y(j),p(i,j,k)
-  enddo; enddo
-  close(unit=89)
-! 310 format(e14.5,e14.5,e14.5,e14.5)
+contains
+    !=================================================================================================
+  subroutine write_vec_gnuplot(u,v,cvof,p,iout,DoVOF)
+    use module_grid
+    use module_tmpvar
+    implicit none
+    include 'mpif.h'
+    real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: u, v, cvof, p
+    integer, intent(in) :: iout
+    integer :: i,j,k,ierr
+    real(8) :: norm=0.d0, coeff, vmax
+    logical :: DoVOF
+    intrinsic dsqrt
+    !
+    ! writing u,v
+    !
+    OPEN(UNIT=89,FILE=TRIM(out_path)//'/UV-'//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout,padding))//'.txt')
+    norm=0.d0
+    k=(ks+ke)/2
+    vmax = maxval(sqrt(u(is:ie,js:je,ks:ke)**2 + v(is:ie,js:je,ks:ke)**2))
+    call MPI_ALLREDUCE(vmax, norm, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_Cart, ierr)  
+    coeff = 0.8/norm
+    do i=is,ie; do j=js,je
+       write(89,310) x(i),y(j),coeff*dx(i)*u(i,j,k),coeff*dx(i)*v(i,j,k)
+    enddo; enddo
+    close(unit=89)
+    !
+    if(DoVOF) then
+       !
+       ! writing cvof
+       !
+       OPEN(UNIT=89,FILE=TRIM(out_path)//'/CVoF-'//TRIM(int2text(rank,padding))//'-'// &
+            TRIM(int2text(iout,padding))//'.txt')
+       k=(ks+ke)/2
+       do i=is,ie
+          do j=js,je
+             write(89,310) cvof(i,j,k)
+          enddo
+          WRITE(89,*) " "
+       enddo
+       close(unit=89)
+    endif
+    !
+    ! writing p
+    !
+    OPEN(UNIT=89,FILE=TRIM(out_path)//'/P-'//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout,padding))//'.txt')
+    k=(ks+ke)/2
+    do i=is,ie
+       do j=js,je
+          write(89,310) x(i),y(j),p(i,j,k)
+       enddo 
+    enddo
+    close(unit=89)
 310 format(4e14.5)
-end subroutine  write_vec_gnuplot
+  end subroutine  write_vec_gnuplot
+  !=================================================================================================
+  subroutine output_droplet(u,v,w,time)
+    use module_grid
+    implicit none
+    include 'mpif.h'
+    real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: u, v, w
+    real(8), intent(in) :: time
+    integer :: i,j,k
+    i=nx/2
+    j=ny/2
+    k=3*nz/4
+    if(test_point_in(i,j,k)) then
+       OPEN(UNIT=89,FILE=TRIM(out_path)//'/droplet-test-vel.txt',status='unknown', &
+            action='write',access='append')
+       write(89,310) time, w(i,j,k)
+       close(unit=89)
+    endif
+310 format(2e14.5)
+  end subroutine  output_droplet
 !=================================================================================================
-! append
-    SUBROUTINE append_visit_file(rootname)
-      use module_flow
-      use module_grid
+  SUBROUTINE append_visit_file(rootname)
+    use module_flow
+    use module_grid
     implicit none
     character(*) :: rootname
     integer prank
     if(rank.ne.0) stop 'rank.ne.0 in append'
-
+    
     if(opened==0) then
        OPEN(UNIT=90,FILE='parallel.visit')
        write(90,10) nPdomain
 10     format('!NBLOCKS ',I4)
        opened=1
     endif
-
+    
     do prank=0,NpDomain-1
        write(90,11) rootname//TRIM(int2text(prank,padding))//'.vtk'
- 11 format(A)
+11     format(A)
     enddo
   end subroutine  append_visit_file
-
+  
   subroutine close_visit_file()
     close(90)
   end subroutine close_visit_file

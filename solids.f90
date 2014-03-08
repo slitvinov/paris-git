@@ -321,12 +321,6 @@ contains
 !
 ! Output the velocity profile
 !
-  function test_point_in(i,j,k)
-    integer, intent(in) :: i,j,k
-    logical :: test_point_in
-    test_point_in = (imin < i).and.(i < imax).and.(jmin < j).and.(j < jmax).and.(kmin < k).and.(k < kmax)
-  end function test_point_in
-!
   subroutine output_at_location()
     integer :: j,jproc
     integer :: imidline,jmidline,kmidline
@@ -338,7 +332,7 @@ contains
     imidline = Nxt/2
     jmidline = Nyt/2   ! possible bug: why test j, Nyt need not be in processor's subdomain. 
     kmidline = Nzt/2
-    if(test_point_in(imidline,jmidline,kmidline)) then
+    if(test_point_in_wide(imidline,jmidline,kmidline)) then
        OPEN(UNIT=11,FILE=trim(out_path)//'/output_location'//TRIM(int2text(jproc,padding)),status='unknown',action='write')
        do j=jl,jh
           write(11,1100) y(j),u(imidline,j,kmidline)

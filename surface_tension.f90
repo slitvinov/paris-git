@@ -36,8 +36,6 @@ module module_surface_tension
   use module_VOF
   implicit none
   real(8), parameter :: kappamax = 2.d0
-!  integer, parameter :: nfound_min=200 ! 6 ! Bypass the mixed height step as tests show it is less accurate
-
   integer, parameter :: NDEPTH=3
   integer, parameter :: BIGINT=100
   real(8), parameter :: D_HALF_BIGINT = DBLE(BIGINT/2)
@@ -535,10 +533,11 @@ contains
         else if(.not.bulk_cell(i,j,k)) then !  non-bulk pure cell
            call get_curvature(i,j,k,kappa,nfound,nposit,afit,.true.)
         endif
-        if(kappa>kappamax) then
+        if(abs(kappa)>kappamax) then
            geom_case_count(17) = geom_case_count(17) + 1
+           kappa = sign(1d0,kappa)*kappamax
         endif
-        kapparray(i,j,k) = max(kappa,kappamax)
+        kapparray(i,j,k) = kappa
      enddo;enddo;enddo
 
      call ghost_x(kapparray(:,:,:),2,req(1:4))
@@ -648,22 +647,10 @@ contains
          origin(n) = centroid(n)
       enddo
       ! *** determine curvature from centroids
-      !      if ( (-nfound) > nfound_min )  then  ! more than 6 points to avoid special 2D degeneracy. 
-      if(1==0)  then ! Bypass the mixed height step as tests show it is less accurate
-         xfit=points(:,try(2)) - origin(try(2))
-         yfit=points(:,try(3)) - origin(try(3))
-         hfit=points(:,try(1)) - origin(try(1))
-         ! fit over all positions, not only independent ones. 
-         call parabola_fit(xfit,yfit,hfit,nposit,a,fit_success) 
-         if(.not.fit_success) call pariserror("no fit success after mixed heights")
-         kappa = 2.d0*(a(1)*(1.d0+a(5)*a(5)) + a(2)*(1.d0+a(4)*a(4)) - a(3)*a(4)*a(5)) &
-               /(1.d0+a(4)*a(4)+a(5)*a(5))**(1.5d0)
-         kappa = sign(1.d0,mxyz(try(1)))*kappa
-         return
-      endif  ! 1==0 ! ind_pos <= nfound_min
+      ! Bypass the mixed height step as tests show it is less accurate
       ! Find all centroids in 3**3
       ! use direction closest to normal
-      nfound = -100 + nfound  ! encode number of independent positions into nfound
+      nfound = -100 + nfound  ! encode number of independent positions into nfound for debugging or analysis purposes. 
       nposit=0
       do m=-1,1; do n=-1,1; do l=-1,1
          i=i0+m
@@ -743,7 +730,7 @@ contains
          endif
       else
          kappa = 2.d0*(a(1)*(1.d0+a(5)*a(5)) + a(2)*(1.d0+a(4)*a(4)) - a(3)*a(4)*a(5)) &
-              /sqrt(1.d0+a(4)*a(4)+a(5)*a(5))**3
+             /sqrt(1.d0+a(4)*a(4)+a(5)*a(5))**3
          kappa = sign(1.d0,mxyz(try(1)))*kappa
       endif
    end subroutine get_curvature

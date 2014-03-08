@@ -116,7 +116,8 @@ Program paris
 
   call initialize
   call check_sanity_in_depth()
-  call check_stability
+!  print *, "warning: no stability check"
+   call check_stability
 
   if(DoVOF.and.rank<nPdomain) call initialize_VOF
   if(DoLPP) call initialize_LPP
@@ -144,6 +145,7 @@ Program paris
         call output(0,is,ie+1,js,je+1,ks,ke+1)
         if(DoVOF) call output_VOF(0,imin,imax,jmin,jmax,kmin,kmax)
         if(DoLPP) call output_LPP(0)
+        if(test_droplet) call output_droplet(u,v,w,time)
         call setvelocityBC(u,v,w,umask,vmask,wmask,time)
         call write_vec_gnuplot(u,v,cvof,p,itimestep,DoVOF)
         call calcstats
@@ -197,8 +199,8 @@ Program paris
  !------------------------------------ADVECTION & DIFFUSION----------------------------------------
         do ii=1, itime_scheme
            if(TwoPhase.and.(.not.GetPropertiesFromFront)) then
-             call linfunc(rho,rho1,rho2,ArithMean)
-             call linfunc(mu,mu1,mu2,HarmMean) ! Note: harmonic mean matches shear stress better
+             call linfunc(rho,rho1,rho2,DensMean)
+             call linfunc(mu,mu1,mu2,ViscMean) ! Note: harmonic mean matches shear stress better
            endif
            call my_timer(2,itimestep,ii)
 
@@ -252,7 +254,7 @@ Program paris
               call my_timer(4,itimestep,ii)
               call get_all_heights()
               call my_timer(5,itimestep,ii)
-              call linfunc(rho,rho1,rho2,ArithMean)
+              call linfunc(rho,rho1,rho2,DensMean)
               call surfaceForce(du,dv,dw,rho)
               call my_timer(8,itimestep,ii)
            endif
@@ -378,8 +380,8 @@ Program paris
                  mu  = mu2  + (mu1 -mu2 )*color
               else
 !------------------------------------deduce rho, mu from cvof-------------------------------------
-                 call linfunc(rho,rho1,rho2,ArithMean)
-                 call linfunc(mu,mu1,mu2,HarmMean)
+                 call linfunc(rho,rho1,rho2,DensMean)
+                 call linfunc(mu,mu1,mu2,ViscMean)
 !------------------------------------END VOF STUFF------------------------------------------------
               endif
            endif
@@ -414,6 +416,7 @@ Program paris
            ! call output(ITIMESTEP/nout,is,ie+1,js,je+1,ks,ke+1)
            if(DoVOF) call output_VOF(ITIMESTEP/nout,imin,imax,jmin,jmax,kmin,kmax)
            if(DoLPP) call output_LPP(ITIMESTEP/nout)
+           if(test_droplet) call output_droplet(u,v,w,time)
            if(rank==0)then
               end_time =  MPI_WTIME()
               write(out,'("Step:",I9," Iterations:",I9," cpu(s):",f10.2)')itimestep,it,end_time-start_time
@@ -899,6 +902,7 @@ subroutine surfaceForce(du,dv,dw,rho)
   use module_surface_tension
   use module_tmpvar
   use module_timer
+  use module_hello
   implicit none
   real(8) :: kappa,deltax
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: du, dv, dw, rho
@@ -1222,8 +1226,8 @@ subroutine InitCondition
            rho = rho2 + (rho1-rho2)*color
            mu  = mu2  + (mu1 -mu2 )*color
         else
-           call linfunc(rho,rho1,rho2,ArithMean)
-           call linfunc(mu,mu1,mu2,HarmMean)
+           call linfunc(rho,rho1,rho2,DensMean)
+           call linfunc(mu,mu1,mu2,ViscMean)
         endif
      else
         rho=rho1
