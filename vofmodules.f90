@@ -31,6 +31,7 @@ module module_VOF
   use module_tmpvar
   implicit none
   real(8), dimension(:,:,:), allocatable, target :: cvof ! VOF tracer variable
+  real(8), dimension(:,:,:), allocatable :: cvofold 
   integer, dimension(:,:,:), allocatable :: vof_flag ! 
   !   0 empty
   !   1 full
@@ -61,6 +62,7 @@ module module_VOF
   integer :: nfilter=0
 
   logical :: DoLPP = .false.
+  logical :: output_filtered_VOF = .false.
 
   integer, parameter :: ArithMean = 101
   integer, parameter :: HarmMean  = 102
@@ -168,7 +170,8 @@ contains
     logical file_is_there
     logical ViscMeanIsArith, DensMeanIsArith
     namelist /vofparameters/ vofbdry_cond,test_type,VOF_advect,refinement, &
-       cylinder_dir, normal_up, DoLPP, jetradius, FreeSurface, ViscMeanIsArith, DensMeanIsArith
+       cylinder_dir, normal_up, DoLPP, jetradius, FreeSurface, ViscMeanIsArith, DensMeanIsArith, &
+       output_filtered_VOF
     in=31
 
     call MPI_COMM_RANK(MPI_COMM_WORLD, rank, ierr)
@@ -220,6 +223,7 @@ contains
   subroutine initialize_VOF
     use module_grid
     use module_BC
+    use module_flow
     implicit none
     include 'mpif.h'
     integer :: ierr,dir,orientation
@@ -236,6 +240,10 @@ contains
     allocate(cvof(imin:imax,jmin:jmax,kmin:kmax),vof_flag(imin:imax,jmin:jmax,kmin:kmax))
     cvof = 0.d0
     vof_flag = 3
+    if ( itime_scheme == 2 ) then  
+      allocate(cvofold(imin:imax,jmin:jmax,kmin:kmax))
+      cvofold = 0.d0
+    end if ! itime_scheme
     if(test_type=='droplet') then
        test_droplet = .true.
     else if(test_type=='height_test') then
@@ -866,6 +874,7 @@ contains
   subroutine output_VOF(nf,i1,i2,j1,j2,k1,k2)
     implicit none
     integer ::nf,i1,i2,j1,j2,k1,k2,i,j,k
+    real(8) :: cfiltered
     character(len=30) :: rootname
     rootname=trim(out_path)//'/VTK/VOF'//TRIM(int2text(nf,padding))//'-'
     if(rank==0) call append_VOF_visit_file(TRIM(rootname))
@@ -897,7 +906,19 @@ contains
 18  format('LOOKUP_TABLE default')
 
     do k=k1,k2; do j=j1,j2; do i=i1,i2;
-      write(8,210) cvof(i,j,k)
+      if ( output_filtered_VOF ) then 
+         cfiltered = b1*cvof(i,j,k) + & 
+               b2*( cvof(i-1,j,k) + cvof(i,j-1,k) + cvof(i,j,k-1) + &
+                    cvof(i+1,j,k) + cvof(i,j+1,k) + cvof(i,j,k+1) ) + &
+               b3*( cvof(i+1,j+1,k) + cvof(i+1,j-1,k) + cvof(i-1,j+1,k) + cvof(i-1,j-1,k) + &
+                    cvof(i+1,j,k+1) + cvof(i+1,j,k-1) + cvof(i-1,j,k+1) + cvof(i-1,j,k-1) + &
+                    cvof(i,j+1,k+1) + cvof(i,j+1,k-1) + cvof(i,j-1,k+1) + cvof(i,j-1,k-1) ) + &
+               b4*( cvof(i+1,j+1,k+1) + cvof(i+1,j+1,k-1) + cvof(i+1,j-1,k+1) + cvof(i+1,j-1,k-1) +  &
+                    cvof(i-1,j+1,k+1) + cvof(i-1,j+1,k-1) + cvof(i-1,j-1,k+1) + cvof(i-1,j-1,k-1) )
+         write(8,210) cfiltered
+      else 
+         write(8,210) cvof(i,j,k)
+      end if ! output_filtered_VOF
     enddo; enddo; enddo
 210 format(e14.5)
 ! 310 format(e14.5,e14.5,e14.5)

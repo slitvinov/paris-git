@@ -142,8 +142,8 @@ Program paris
      ! output initial condition
      ! if(rank==0) start_time = MPI_WTIME()
      if(ICOut .and. rank<nPdomain) then
-        call output(0,is,ie+1,js,je+1,ks,ke+1)
-        if(DoVOF) call output_VOF(0,imin,imax,jmin,jmax,kmin,kmax)
+        ! call output(0,is,ie+1,js,je+1,ks,ke+1)
+        if(DoVOF) call output_VOF(0,is,ie+1,js,je+1,ks,ke+1)
         if(DoLPP) call output_LPP(0)
         if(test_droplet) call output_droplet(u,v,w,time)
         call setvelocityBC(u,v,w,umask,vmask,wmask,time)
@@ -194,6 +194,7 @@ Program paris
            wold = w
            rhoo = rho
            muold  = mu
+           cvofold  = cvof
            if ( DoLPP ) call StoreOldPartSol()
         endif
  !------------------------------------ADVECTION & DIFFUSION----------------------------------------
@@ -397,6 +398,8 @@ Program paris
            w = 0.5*(w+wold)
            rho = 0.5*(rho+rhoo)
            mu  = 0.5*(mu +muold)
+           cvof  = 0.5*(cvof +cvofold)
+           call get_flags_and_clip()
            if ( DoVOF .and. DoLPP ) call AveragePartSol()
         endif
 !--------------------------------------------OUTPUT-----------------------------------------------
@@ -414,7 +417,7 @@ Program paris
         if(mod(itimestep,nout)==0) then 
            call write_vec_gnuplot(u,v,cvof,p,itimestep,DoVOF)
            ! call output(ITIMESTEP/nout,is,ie+1,js,je+1,ks,ke+1)
-           if(DoVOF) call output_VOF(ITIMESTEP/nout,imin,imax,jmin,jmax,kmin,kmax)
+           if(DoVOF) call output_VOF(ITIMESTEP/nout,is,ie+1,js,je+1,ks,ke+1)
            if(DoLPP) call output_LPP(ITIMESTEP/nout)
            if(test_droplet) call output_droplet(u,v,w,time)
            if(rank==0)then
