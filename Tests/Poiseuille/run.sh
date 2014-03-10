@@ -50,6 +50,8 @@ else
 fi
 
 gnuplot <<EOF &
+set term pdf
+set out "tmp.pdf"
 set size square
 set grid
 set nolabel

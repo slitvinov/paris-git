@@ -21,10 +21,10 @@ GetPropertiesFromFront = F ! T: uses Front-Tracking data to compute mu, rho and 
 		           ! F: uses VOF data to compute mu and rho. 
 
 ZeroReynolds = F
-Implicit  = F     
+Implicit  = T     
 hypre     = F      ! T: uses hyprepackage, F: uses SOR solver 
 restart   = F       ! T: start the domain from a previous simulation
-restartFront = F    ! T: start the frontfrom  a previous simulation
+restartFront = F    ! T: start the front from  a previous simulation
 restartAverages = F
 nBackup  = 200000      ! number of time steps between  backups are kept.
 
@@ -112,7 +112,7 @@ MU1     = 1.7d-5
                    ! rho1, mu1 : density and viscosity of the matrix phase
 
 RHO2    = 1000.
-MU2     = 1d-2
+MU2     = 1d-3
                    ! rho2, mu2 : properties of the drop
 SIGMA    = 0.00036
 NumBubble =  1

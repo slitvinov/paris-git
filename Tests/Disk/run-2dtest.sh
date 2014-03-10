@@ -45,6 +45,8 @@ awk '{print $1 " " $3}' < stats > deriv.tmp
 parisdeconv deriv.tmp > toplot.txt
 
 gnuplot <<EOF > tmp 2>&1  &
+set term pdf
+set out "tmp.pdf"
 f(x) = a*x + b
 FIT_LIMIT = 1e-6
 fit [2*$end/3:$end] f(x) "toplot.txt" via a, b
