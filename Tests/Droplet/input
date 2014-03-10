@@ -24,7 +24,7 @@ ZeroReynolds = F
 Implicit  = F     
 hypre     = F      ! T: uses hyprepackage, F: uses SOR solver 
 restart   = F       ! T: start the domain from a previous simulation
-restartFront = F    ! T: start the frontfrom  a previous simulation
+restartFront = F    ! T: start the front from  a previous simulation
 restartAverages = F
 nBackup  = 200000      ! number of time steps between  backups are kept.
 
