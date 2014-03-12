@@ -631,7 +631,7 @@ module module_BC
   use module_grid
   use module_hello
   implicit none
-  integer :: bdry_cond(6)
+  integer :: bdry_cond(6), inject_type=2
   logical :: bdry_read=.false.
   ! bdry_cond(i) = is the type if boundary condition in i'th direction
   ! explicits the boundary condition codes
@@ -692,7 +692,7 @@ module module_BC
     real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: u, v, w
     real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: umask,vmask,wmask
     real(8) :: t! ,uinject
-    integer :: j,k
+    integer :: i,j,k
     ! solid obstacles
     u = u*umask
     v = v*vmask
@@ -705,7 +705,7 @@ module module_BC
         v(is-1,:,:)=2*WallVel(1,2)-v(is,:,:)
         w(is-1,:,:)=2*WallVel(1,3)-w(is,:,:)
     endif
-    ! inflow boundary condition
+    ! inflow boundary condition x-
     if(bdry_cond(1)==3 .and. coords(1)==0    ) then
        do j=jmin,jmax
           do k=kmin,kmax
@@ -716,6 +716,62 @@ module module_BC
           enddo
        enddo
     endif
+    ! inflow boundary condition y-
+    if(bdry_cond(2)==3 .and. coords(2)==0    ) then
+       do i=imin,imax
+          do k=kmin,kmax
+             v(i,js-1,k)=WallVel(2,2)
+             v(i,js-2,k)=WallVel(2,2)
+             u(i,js-1,k)=0d0
+             w(i,js-1,k)=0d0
+          enddo
+       enddo
+    endif
+    ! inflow on z-
+    if(bdry_cond(3)==3 .and. coords(3)==0   ) then
+       do i=imin,imax
+          do j=jmin,jmax
+             w(i,j,ks-1)= WallVel(3,3)
+             w(i,j,ks-2)= WallVel(3,3)
+             u(i,j,ks-1)=0d0
+             v(i,j,ks-1)=0d0
+          enddo
+       enddo
+    endif
+    
+     ! inflow on x+
+    if(bdry_cond(4)==3 .and. coords(1)==nPx-1   ) then
+       do j=jmin,jmax
+          do k=kmin,kmax
+             u(ie,j,k)= WallVel(4,1)
+             u(ie+1,j,k)= WallVel(4,1)
+             v(ie,j,k)=0d0
+             w(ie,j,k)=0d0
+          enddo
+       enddo
+    endif
+     ! inflow on y+
+    if(bdry_cond(5)==3 .and. coords(2)==nPy-1   ) then
+       do i=imin,imax
+          do k=kmin,kmax
+             v(i,je,k)= WallVel(5,2)
+             v(i,je+1,k)= WallVel(5,2)
+             u(i,je,k)=0d0
+             w(i,je,k)=0d0
+          enddo
+       enddo
+    endif
+    ! inflow on z+
+    if(bdry_cond(6)==3 .and. coords(3)==nPz-1   ) then
+       do i=imin,imax
+          do j=jmin,jmax
+             w(i,j,ke)= WallVel(6,3)
+             w(i,j,ke+1)= WallVel(6,3)
+             u(i,j,ke)=0d0
+             v(i,j,ke)=0d0
+          enddo
+       enddo
+    endif    
 
     if(bdry_cond(4)==0 .and. coords(1)==nPx-1) then
         u(ie  ,:,:)=0d0
@@ -723,6 +779,7 @@ module module_BC
         v(ie+1,:,:)=2*WallVel(2,2)-v(ie,:,:)
         w(ie+1,:,:)=2*WallVel(2,3)-w(ie,:,:)
     endif
+    
     ! outflow boundary condition
     if(bdry_cond(4)==4 .and. coords(1)==nPx-1) then
         u(ie  ,:,:)=u(ie-1,:,:)
@@ -792,13 +849,15 @@ module module_BC
       real(8), parameter :: tshift = 1.d0-2 
       uinject=0d0
       !if((y(j) - 0.5d0)**2 + (z(k) - 0.5d0)**2.lt.jetradius**2) uinject=1D0
-      if((y(j) - 0.5d0)**2 + (z(k) - 0.5d0)**2.lt.jetradius**2 ) then 
+      if (Inject_type==1) then
+	    uinject = 1.d0
+      elseif((y(j) - 0.5d0)**2 + (z(k) - 0.5d0)**2.lt.jetradius**2 .and. (Inject_type==2) ) then 
          if ( t<=tshift ) then  
             uinject=1.d0
          else 
             uinject=1.d0+0.05d0*SIN(10.d0*2.d0*PI*(t-tshift))
          end if ! t
-      end if ! y(j), z(k)
+      end if ! y(j), z(k
     end function uinject
   end subroutine SetVelocityBC
 !=================================================================================================
@@ -1431,7 +1490,7 @@ subroutine SetupPoisson(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask,cvof,Vo
 
   if(FreeSurface) then
      do k=ks,ke; do j=js,je; do i=is,ie;
-        if(cvof(i,j,k) > 0.75d0) then ! pressure 0 in the cvof=1 phase. 
+        if(cvof(i,j,k) > 0.5d0) then ! pressure 0 in the cvof=1 phase. 
            pmask(i,j,k) = 0.d0
         endif
      enddo;enddo;enddo

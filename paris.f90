@@ -1345,8 +1345,8 @@ subroutine ReadParameters
                         output_format, read_x,        read_y,        read_z,        x_file,      &
                         y_file,        z_file,        restart,       nBackup,       NumBubble,   &
                         xyzrad,        hypre,         dtFlag,        ICOut,         WallVel,     &
-                        maxErrorVol,   restartFront,  nstats,        WallShear,     ZeroReynolds,&
-                        restartAverages, termout, excentricity
+                        Inject_type,   maxErrorVol,   restartFront,  nstats,        WallShear,   &
+                        ZeroReynolds,  restartAverages, termout, excentricity
   in=1
   out=2
 
