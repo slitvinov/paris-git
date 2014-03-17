@@ -180,15 +180,34 @@ module module_timer
   integer :: ierr2
   character(25) :: timer_component(components)
   logical :: timer_initialized = .false.
-
+  logical :: sizer_initialized = .false.
   real(8) :: alloc_size=0
 contains
-  subroutine add_2_my_sizer(n)
+  subroutine add_2_my_sizer_2(nvalues,nbytes)
     use module_grid
     implicit none
-    integer n
-    alloc_size=alloc_size + dble(n*(nx/npx)*(ny/npy)*(nz/npz))*8d0*1d-9
+    integer :: nvalues,nbytes
+    alloc_size=alloc_size + dble(nvalues)*dble(nbytes)*1d-9
+  end subroutine add_2_my_sizer_2
+  subroutine remove_from_my_sizer_2(nvalues,nbytes)
+    use module_grid
+    implicit none
+    integer :: nvalues,nbytes
+    alloc_size=alloc_size - dble(nvalues)*dble(nbytes)*1d-9
+  end subroutine remove_from_my_sizer_2
+
+  subroutine add_2_my_sizer(n,nbytes)
+    use module_grid
+    implicit none
+    integer n,nbytes
+!    if(.not.sizer_initialized) call initialize_sizer()
+! Alloc size in Gb
+    alloc_size=alloc_size + dble(n*(nx/npx)*(ny/npy)*(nz/npz))*nbytes*1d-9
   end subroutine add_2_my_sizer
+!  subroutine initialize_sizer
+!    implicit none
+!    alloc_size
+!  end subroutine initialize_sizer
   subroutine initialize_timer
     use module_grid
     implicit none
@@ -1193,6 +1212,7 @@ module module_poisson
 ! Solve Poisson equation. p is initial guess. 
 !=================================================================================================
   subroutine poi_solve(A,p,maxError,maxit,num_iterations)
+    use module_timer
     implicit none
     include 'mpif.h'
     integer :: ierr, nvalues, ijk, i,j,k
@@ -1207,6 +1227,8 @@ module module_poisson
     num_iterations = 0
     nvalues = mx * my * mz * nstencil
     allocate(values(nvalues), stat=ierr)
+    call add_2_my_sizer_2(nvalues,8)
+
     if(ierr/=0)stop '**** poi_solve: allocation error ****'
 
     ijk = 1
@@ -1223,6 +1245,8 @@ module module_poisson
     call HYPRE_StructMatrixSetBoxValues(Amat, ilower, iupper, nstencil, stencil_indices, &
                                         values, ierr)
     deallocate(values, stat=ierr)
+    call remove_from_my_sizer_2(nvalues,8)
+
 !------------------------------Fill in source term and initial guess------------------------------
     nvalues = mx * my * mz
     allocate(values(nvalues), stat=ierr)

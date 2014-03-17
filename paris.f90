@@ -998,11 +998,13 @@ subroutine initialize
   use module_IO
   use module_tmpvar
   use module_hello
+  use module_timer
   implicit none
   include 'mpif.h'
   integer :: ierr, i,j,k
   Nxt=Nx+2*Ng; Nyt=Ny+2*Ng; Nzt=Nz+2*Ng ! total number of cells
 
+  if(rank==0) call check_integers()
  
   if(rank<nPdomain)then
     allocate(dims(ndim),periodic(ndim),reorder(ndim),coords(ndim),STAT=ierr)
@@ -1050,13 +1052,14 @@ subroutine initialize
            color(imin:imax,jmin:jmax,kmin:kmax), dIdx(imin:imax,jmin:jmax,kmin:kmax), &
             dIdy(imin:imax,jmin:jmax,kmin:kmax), dIdz(imin:imax,jmin:jmax,kmin:kmax), &
            umask(imin:imax,jmin:jmax,kmin:kmax),vmask(imin:imax,jmin:jmax,kmin:kmax), &
-           wmask(imin:imax,jmin:jmax,kmin:kmax))
+           wmask(imin:imax,jmin:jmax,kmin:kmax))  ! 13.5*2=27
 
     allocate(tmp(imin:imax,jmin:jmax,kmin:kmax), work(imin:imax,jmin:jmax,kmin:kmax,3), &
                A(is:ie,js:je,ks:ke,1:8), averages(10,Ng:Ny+Ng+1), oldaverages(10,Ng:Ny+Ng+1), &
-               allaverages(10,Ng:Ny+Ng+1))
+               allaverages(10,Ng:Ny+Ng+1))  ! 39
 
-    allocate(mask(imin:imax,jmin:jmax,kmin:kmax)) 
+    allocate(mask(imin:imax,jmin:jmax,kmin:kmax)) ! 40
+    call add_2_my_sizer(40,8)
 
     du=0.0;dv=0.0;dw=0.0
     u=0.0;v=0.0;w=0.0;p=0.0;tmp=0.0;fx=0.0;fy=0.0;fz=0.0;drho=0.0;rho=0.0;mu=0.0;work=0.0;A=0.0
@@ -1445,3 +1448,46 @@ subroutine check_stability()
   endif
 
 end subroutine check_stability
+
+subroutine check_integers()
+  use module_grid
+  implicit none
+  integer :: n,big,nbytes,intype
+  intype = 4
+  print *, "-------------------------"
+  print *, "array index integer check"
+  print *, "-------------------------"
+  nbytes=mylog2(max(mx,my,mz))
+  print *, "log2(box size)", mylog2(max(mx,my,mz))
+  nbytes=3*mylog2(mx)+3
+  print *, "nbytes max in array index", nbytes
+  if(nbytes>=intype*8) then
+     n=0
+     big=1
+     print *, "------------"
+     print *, "integer check"
+     print *, "------------"
+     do while (n<=(64/8))
+        n=n+1
+        big = big*256
+        print *,n,big
+     end do
+     print *, "------------"
+     call pariserror("box too large for integer type")
+  endif
+  contains
+    function mylog2(n)
+      implicit none
+      integer :: mylog2
+      integer, intent(in) :: n
+      integer :: nbytes,k
+      mylog2=0
+      k=n
+      if(n<1) call pariserror("mylog2: nonpositive number")
+      do while (k>=1) 
+         mylog2=mylog2+1
+         k=k/2
+      end do
+      mylog2=mylog2-1
+    end function mylog2
+end subroutine check_integers

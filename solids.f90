@@ -98,6 +98,7 @@ contains
 !***********************************************************************
 !=================================================================================================
   SUBROUTINE initialize_solids()
+    use module_timer
     implicit none
     include 'mpif.h'
     integer :: i,j,k,index
@@ -109,6 +110,7 @@ contains
     call ReadSolidParameters
     if(dosolids) then
        allocate(solids(imin:imax,jmin:jmax,kmin:kmax))
+       call add_2_my_sizer(1,8)
        solids=0d0
        !call calcsum(solids)
        !if(rank==0) print *, "all 1 : ", s1
