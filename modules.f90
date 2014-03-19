@@ -364,7 +364,7 @@ contains
     call MPI_ALLREDUCE(vmax, norm, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_Cart, ierr)  
     coeff = 0.8/norm
     do i=is,ie; do j=js,je
-       write(89,310) x(i),y(j),coeff*dx(i)*u(i,j,k),coeff*dx(i)*v(i,j,k)
+       write(89,310) xh(i),yh(j),coeff*dx(i)*u(i,j,k),coeff*dx(i)*v(i,j,k)
     enddo; enddo
     close(unit=89)
     !
@@ -637,23 +637,23 @@ module module_BC
   ! explicits the boundary condition codes
   !                                   12345678    12345678    12345678    12345678    12345678
   character(len=8) :: expl(0:4) = (/ "wall    ", "periodic", "shear   ", "inflow  ", "outflow " /)
-  real(8) :: WallVel(6,3), WallShear(6,3)
+  real(8) :: WallVel(6,3), WallShear(6,3), WallPressure(6)
   ! Tangential velocities on the surfaces of domain. First index represent the 
   ! side on which the velocity in the direction of the second index is specified.
   ! The sides are in this order: -x,+x,-y,+y,-z,+z.
   ! Example: WallVel(4,3) represent the W velocity on +y side of the domain.
-  ! 
+  ! LM: The same convention is used for WallPressure
   ! SZ: alternately may contain the velocity of the flow for inflow boundary conditions on x+
   contains
 !=================================================================================================
 !=================================================================================================
 ! subroutine SetPressureBC: Sets the pressure boundary condition
 !-------------------------------------------------------------------------------------------------
-    subroutine SetPressureBC(umask,vmask,wmask,pmask)
+    subroutine SetPressureBC(umask,vmask,wmask,pmask,p)
     use module_grid
     implicit none
     include 'mpif.h'
-    real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: umask,vmask,wmask
+    real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: umask,vmask,wmask, p
     real(8), dimension(is:ie,js:je,ks:ke), intent(out) :: pmask
 
 
@@ -677,6 +677,23 @@ module module_BC
     if(bdry_cond(3)==0)then
       if(coords(3)==0    ) wmask(is-1:ie+1,js-1:je+1,ks-1)=0d0
       if(coords(3)==nPz-1) wmask(is-1:ie+1,js-1:je+1,ke)=0d0
+    endif
+    
+    !pressure boundary condition
+    if (bdry_cond(1)==5 .and. coords(1)==0)then
+      p(is-1,:,:) = 2*WallPressure(1) - p(is,:,:)
+    endif
+    
+    if (bdry_cond(4)==5 .and. coords(1)==nPx-1)then
+      p(ie+1,:,:) = 2*WallPressure(2) - p(ie,:,:)
+    endif
+    
+    if (bdry_cond(2)==5 .and. coords(2)==0)then
+      p(:,js-1,:) = 2*WallPressure(3) - p(:,js,:)
+    endif
+    
+    if (bdry_cond(5)==5 .and. coords(2)==nPy-1)then
+      p(:,je+1,:) = 2*WallPressure(4) - p(:,je,:)
     endif
   end subroutine SetPressureBC
 !=================================================================================================
@@ -720,8 +737,8 @@ module module_BC
     if(bdry_cond(2)==3 .and. coords(2)==0    ) then
        do i=imin,imax
           do k=kmin,kmax
-             v(i,js-1,k)=WallVel(2,2)
-             v(i,js-2,k)=WallVel(2,2)
+             v(i,js-1,k)=WallVel(3,2)
+             v(i,js-2,k)=WallVel(3,2)
              u(i,js-1,k)=0d0
              w(i,js-1,k)=0d0
           enddo
@@ -731,8 +748,8 @@ module module_BC
     if(bdry_cond(3)==3 .and. coords(3)==0   ) then
        do i=imin,imax
           do j=jmin,jmax
-             w(i,j,ks-1)= WallVel(3,3)
-             w(i,j,ks-2)= WallVel(3,3)
+             w(i,j,ks-1)= WallVel(5,3)
+             w(i,j,ks-2)= WallVel(5,3)
              u(i,j,ks-1)=0d0
              v(i,j,ks-1)=0d0
           enddo
@@ -743,8 +760,8 @@ module module_BC
     if(bdry_cond(4)==3 .and. coords(1)==nPx-1   ) then
        do j=jmin,jmax
           do k=kmin,kmax
-             u(ie,j,k)= WallVel(4,1)
-             u(ie+1,j,k)= WallVel(4,1)
+             u(ie,j,k)= WallVel(2,1)
+             u(ie+1,j,k)= WallVel(2,1)
              v(ie,j,k)=0d0
              w(ie,j,k)=0d0
           enddo
@@ -754,8 +771,8 @@ module module_BC
     if(bdry_cond(5)==3 .and. coords(2)==nPy-1   ) then
        do i=imin,imax
           do k=kmin,kmax
-             v(i,je,k)= WallVel(5,2)
-             v(i,je+1,k)= WallVel(5,2)
+             v(i,je,k)= WallVel(4,2)
+             v(i,je+1,k)= WallVel(4,2)
              u(i,je,k)=0d0
              w(i,je,k)=0d0
           enddo
@@ -837,6 +854,35 @@ module module_BC
     if(bdry_cond(6)==2 .and. coords(3)==nPz-1) then
         u(:,:,ke+1) = dzh(ke)*WallShear(6,1)+u(:,:,ke)
         v(:,:,ke+1) = dzh(ke)*WallShear(6,2)+v(:,:,ke)
+    endif
+    
+    !Set zero normal velocity gradient for pressure boundary condition
+    if (bdry_cond(1)==5 .and. coords(1)==0)then
+	u(is-1,:,:)=u(is,:,:)
+        u(is-2,:,:)=-u(is,:,:)
+        v(is-2,:,:)=v(is,:,:)
+        w(is-2,:,:)=w(is,:,:)
+    endif
+    
+    if (bdry_cond(4)==5 .and. coords(1)==nPx-1)then
+	u(ie,:,:)=u(ie-1,:,:)
+        u(ie+1,:,:)=-u(ie-1,:,:)
+        v(ie+1,:,:)=v(ie-1,:,:)
+        w(ie+1,:,:)=w(ie-1,:,:)
+    endif
+    
+    if (bdry_cond(2)==5 .and. coords(2)==0)then
+	v(:,js-1,:)=v(:,js,:)
+        v(:,js-2,:)=-v(:,js,:)
+        u(:,js-2,:)=u(:,js,:)
+        w(:,js-2,:)=w(:,js,:)
+    endif
+    
+    if (bdry_cond(5)==5 .and. coords(2)==nPy-1)then
+	v(:,je,:)=v(:,je-1,:)
+        v(:,je+1,:)=-v(:,je-1,:)
+        u(:,je+1,:)=u(:,je-1,:)
+        w(:,je+1,:)=w(:,je-1,:)
     endif
   contains
     function uinject(j,k,t)

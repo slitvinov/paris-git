@@ -314,7 +314,7 @@ Program paris
            call my_timer(1,itimestep,ii)
 
 !-----------------------------------------PROJECTION STEP-----------------------------------------
-           call SetPressureBC(umask,vmask,wmask,tmp(is:ie,js:je,ks:ke))
+           call SetPressureBC(umask,vmask,wmask,tmp(is:ie,js:je,ks:ke),p)
            call SetupPoisson(u,v,w,umask,vmask,wmask,rho,dt,A,tmp(is:ie,js:je,ks:ke),cvof,VolumeSource)
            ! (div u)*dt < epsilon => div u < epsilon/dt => maxresidual : maxerror/dt 
            if(HYPRE)then
@@ -1346,7 +1346,7 @@ subroutine ReadParameters
                         y_file,        z_file,        restart,       nBackup,       NumBubble,   &
                         xyzrad,        hypre,         dtFlag,        ICOut,         WallVel,     &
                         Inject_type,   maxErrorVol,   restartFront,  nstats,        WallShear,   &
-                        ZeroReynolds,  restartAverages, termout, excentricity
+                        WallPressure,  ZeroReynolds,  restartAverages, termout, excentricity
   in=1
   out=2
 
