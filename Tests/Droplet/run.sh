@@ -16,8 +16,8 @@ set out "tmp.png"
 replot
 EOF
 
-precision=3e-2
-compare out/droplet-test-vel.txt reference.txt $precision 1 0
+precision=3e-20
+compare out/droplet-test-vel.txt reference.txt $precision 1 1
 
 GREEN="\\033[1;32m"
 NORMAL="\\033[0m"

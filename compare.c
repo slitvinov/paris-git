@@ -15,6 +15,7 @@ int main (int argc, char * argv[])
              "The L2 AND L_\\infty norms of the difference of the second columns are computed.\n"
 	     "If RELATIVE=1 the relative error is computed.\n"
 	     "If OUTPUT=1 the relative error is printed even if the test passes.\n"
+	     "The relative error is defined as || y_1 - y_2 ||/|| y_2 ||\n"
 	     "\n");
       exit(1);
     }
@@ -107,12 +108,13 @@ int main (int argc, char * argv[])
     {
       if(output < 2) 
 	{
-	  printf("\033[31;1m FAIL\033[0m L2 error norm = %g L_\\infty error norm = %g \n",diff,errmax);
+	  if(relative==1)
+	    printf("\033[31;1m FAIL\033[0m L2 relative error norm = %g L_\\infty relative error norm = %g \n",diff,errmax);
+	  else
+	    printf("\033[31;1m FAIL\033[0m L2 error norm = %g L_\\infty error norm = %g \n",diff,errmax);
 	}
       else
-	{
 	  printf("%g %g \n",diff,errmax);
-	}
     }
   return 0;
 }

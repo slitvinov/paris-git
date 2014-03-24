@@ -651,7 +651,7 @@ contains
     integer :: ierr
 
     if (VOF_advect=='Dick_Yue') call c_mask(work(:,:,:,2))
-    if (MOD(tswap,3) .eq. 0) then
+    if (MOD(tswap,3) .eq. 0) then  ! do z then x then y 
        call swp(w,cvof,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3),vof_flag,3)
        call ghost_x(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
        call ghost_y(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
@@ -676,7 +676,7 @@ contains
        call ighost_y(vof_flag,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
        call ighost_z(vof_flag,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
 
-    elseif (MOD(tswap,2) .eq. 0) then
+    elseif (MOD(tswap,3) .eq. 1) then ! do y z x
        call swp(v,cvof,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3),vof_flag,2)
        call ghost_x(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
        call ghost_y(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
@@ -700,7 +700,7 @@ contains
        call ighost_x(vof_flag,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
        call ighost_y(vof_flag,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
        call ighost_z(vof_flag,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
-    else 
+    else ! do x y z
        call swp(u,cvof,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3),vof_flag,1)
        call ghost_x(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
        call ghost_y(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
