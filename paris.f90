@@ -205,15 +205,6 @@ Program paris
            endif
            call my_timer(2,itimestep,ii)
 
-!------------------------------------ LPP STUFF  -------------------------------------------------
-           ! Note: it is important to call the Lagrangian particle module before
-           ! flow calculations, since the VOF2LPP and LPP2VOF conversion will
-           ! change the VOF and flow fields 
-           if (DoLPP) then
-               call lppsweeps(itimestep,time)  
-               call my_timer(12,itimestep,ii)
-           end if ! DoLPP
-
 !------------------------------------FRONT TRACKING  ---------------------------------------------
            ! Receive front from master of front
            if(DoFront) call GetFront('recv')
@@ -259,6 +250,10 @@ Program paris
               call surfaceForce(du,dv,dw,rho)
               call my_timer(8,itimestep,ii)
            endif
+           if (DoLPP) then
+                call lppsweeps(itimestep,time)  
+                call my_timer(12,itimestep,ii)
+           end if ! DoLPP
 
 !------------------------------------END VOF STUFF------------------------------------------------ 
            call volumeForce(rho,rho1,rho2,dpdx,dpdy,dpdz,BuoyancyCase,fx,fy,fz,gx,gy,gz,du,dv,dw, &
@@ -402,6 +397,10 @@ Program paris
            call get_flags_and_clip()
            if ( DoVOF .and. DoLPP ) call AveragePartSol()
         endif
+        
+        if (DoLPP) then
+            call lppvofsweeps(itimestep,time)  
+        end if ! DoLPP
 !--------------------------------------------OUTPUT-----------------------------------------------
         call calcStats
         call my_timer(2,itimestep,ii)
@@ -1408,15 +1407,15 @@ subroutine pariserror(message)
   use module_grid
   implicit none
   include 'mpif.h'
-!  integer ierr
+  integer ierr
   character(*) :: message
 ! remove next line for jobs on large numbers of processors. reinstate if needed for debugging
 !  print *, "rank = ",rank
   if(rank==0) write(*,*) "ERROR *** ",message, " *** STOP "
   ! Exit MPI gracefully
   close(out)
-!   call MPI_BARRIER(MPI_COMM_WORLD, ierr)
-!   call MPI_finalize(ierr)
+   call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+   call MPI_finalize(ierr)
   if(rank==0) write(*,*) "Step: last message . . . . ParisExecutionError"
 !  if(rank==0) write(*,*) "ERROR *** ",message, " *** STOP "
   stop 

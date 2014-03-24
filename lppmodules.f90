@@ -104,7 +104,7 @@
    type particle
       type(element) :: element
       real(8) :: xcOld,ycOld,zcOld,ucOld,vcOld,wcOld
-      integer :: ic,jc,kc,dummyint  
+      integer :: ic,jc,kc,tstepConvert,dummyint  
       ! Note: open_mpi sometimes failed to communicate the last varialbe in 
       !       MPI_TYPE_STRUCt correctly, dummyint is included to go around 
       !       this bug in mpi
@@ -152,6 +152,9 @@
    integer :: max_num_part_cross
 
    integer :: outputlpp_format
+   real(8) :: ConvertRegSizeToDiam
+   
+   integer :: NumStepAfterVOFConversionForAve
 contains
 !=================================================================================================
    subroutine initialize_LPP()
@@ -207,11 +210,11 @@ contains
 
       integer ierr,in
       logical file_is_there
-      namelist /lppparameters/ DropStatisticsMethod, dragmodel, nTimeStepTag,  &
-         DoConvertVOF2LPP,DoConvertLPP2VOF,CriteriaConvertCase,            & 
+      namelist /lppparameters/ DropStatisticsMethod, dragmodel, nTimeStepTag,   &
+         DoConvertVOF2LPP,DoConvertLPP2VOF,CriteriaConvertCase, ConvertRegSizeToDiam, & 
          vol_cut,xlpp_min,xlpp_max,ylpp_min,ylpp_max,zlpp_min,zlpp_max,    &
          max_num_drop, maxnum_cell_drop, max_num_part, max_num_part_cross, &
-         outputlpp_format
+         outputlpp_format,NumStepAfterVOFConversionForAve
 
       in=32
 
@@ -232,6 +235,8 @@ contains
       max_num_part = 100
       max_num_part_cross = 10
       outputlpp_format = 1
+      ConvertRegSizeToDiam = 2.d0 
+      NumStepAfterVOFConversionForAve = 10
 
       call MPI_COMM_RANK(MPI_COMM_WORLD, rank, ierr)
       inquire(file='inputlpp',exist=file_is_there)
@@ -249,7 +254,14 @@ contains
       close(in)
       if (rank == 0) then
          write(UNIT=out,NML=lppparameters)
-      end if ! rank 
+      end if ! rank
+
+      ! Check consistence of inputs
+      if ( (dragmodel == dragmodel_CG .or. dragmodel == dragmodel_SN) .and. mu1>mu2 ) & 
+         call pariserror("Particle drag law is used for bubbles!")
+      if ( (dragmodel == dragmodel_MKL) .and. mu1<mu2 ) & 
+         call pariserror("Bubble drag law is used for particles!")
+
    end subroutine ReadLPPParameters
 
 
@@ -260,6 +272,15 @@ contains
       real(8), intent(in) :: time
 
       call ComputePartForce(tswap)
+      call UpdatePartSol(tswap)
+
+   end subroutine lppsweeps
+
+   subroutine lppvofsweeps(tswap,time)
+      implicit none
+    
+      integer, intent(in) :: tswap
+      real(8), intent(in) :: time
 
       ! Only do tagging and conversion in specific time steps
       if ( MOD(tswap,ntimestepTag) == 0 ) then 
@@ -278,9 +299,7 @@ contains
          call ReleaseTag2DropTable
       end if ! tswap
 
-      call UpdatePartSol(tswap)
-
-   end subroutine lppsweeps
+   end subroutine lppvofsweeps
 
   subroutine tag_drop(tswap)
     implicit none
@@ -1255,7 +1274,7 @@ contains
 
          ! Find cell index and define conversion region
          dp = (6.d0*drops(idrop,rank)%element%vol/PI)**(1.d0/3.d0)
-         ConvertRegSize = 2.0d0*dp
+         ConvertRegSize = ConvertRegSizeToDiam*dp
          call FindCellIndexBdryConvertReg(drops(idrop,rank)%element%xc, & 
                                           drops(idrop,rank)%element%yc, & 
                                           drops(idrop,rank)%element%zc, & 
@@ -1281,8 +1300,8 @@ contains
             parts(num_part(rank),rank)%jc = jc 
             parts(num_part(rank),rank)%kc = kc
 
-            ! remove droplet vof structure
-            cvof(i1:i2,j1:j2,k1:k2) = 0.d0 
+            ! Record the time step the drop is converted from VOF to LPP
+            parts(num_part(rank),rank)%tstepConvert = tswap
 
             ! reconstruct undisturbed flow field within the conversion region
             do k=k1,k2-1; do j=j1,j2-1; do i=i1,i2-1
@@ -1307,31 +1326,33 @@ contains
                                          x1,x2,y1,y2,z1,z2,wf)
                                          
                ! compute undisturbed flow field from droplet acceleration
-               !taup = rho1*dp*dp/18.0d0/mu1 & 
-               !      *(3.d0 + 3.d0*mu1/mu2)/(3.d0 + 2.d0*mu1/mu2)
-               !ufp = drops(idrop,rank)%element%duc*taup+drops(idrop,rank)%element%uc
-               !vfp = drops(idrop,rank)%element%dvc*taup+drops(idrop,rank)%element%vc
-               !wfp = drops(idrop,rank)%element%dwc*taup+drops(idrop,rank)%element%wc
-               call ComputeUndisturbedVelEE(drops(idrop,rank)%element%uc,  & 
-                                            drops(idrop,rank)%element%duc, & 
-                                            drops(idrop,rank)%element%vc,  & 
-                                            drops(idrop,rank)%element%dvc, & 
-                                            drops(idrop,rank)%element%wc,  & 
-                                            drops(idrop,rank)%element%dwc, & 
-                                            dp,rho1,rho2,mu1,mu2,Gx,Gy,Gz,ufp,vfp,wfp)
+!               call ComputeUndisturbedVelEE(drops(idrop,rank)%element%uc,  & 
+!                                            drops(idrop,rank)%element%duc, & 
+!                                            drops(idrop,rank)%element%vc,  & 
+!                                            drops(idrop,rank)%element%dvc, & 
+!                                            drops(idrop,rank)%element%wc,  & 
+!                                            drops(idrop,rank)%element%dwc, & 
+!                                            dp,rho1,rho2,mu1,mu2,Gx,Gy,Gz,ufp,vfp,wfp)
 
-               dist2 = (x(i)-drops(idrop,rank)%element%xc)**2.d0 & 
-                     + (y(j)-drops(idrop,rank)%element%yc)**2.d0 & 
-                     + (z(k)-drops(idrop,rank)%element%zc)**2.d0
-               wt = exp(-dist2*4.d0/dp/dp)
-               u(i,j,k) = uf*(1.d0-wt) + ufp*wt
-               v(i,j,k) = vf*(1.d0-wt) + vfp*wt
-               w(i,j,k) = wf*(1.d0-wt) + wfp*wt
+!               dist2 = (x(i)-drops(idrop,rank)%element%xc)**2.d0 & 
+!                     + (y(j)-drops(idrop,rank)%element%yc)**2.d0 & 
+!                     + (z(k)-drops(idrop,rank)%element%zc)**2.d0
+!               wt = exp(-dist2*4.d0/dp/dp)
+!               u(i,j,k) = uf*(1.d0-wt) + ufp*wt
+!               v(i,j,k) = vf*(1.d0-wt) + vfp*wt
+!               w(i,j,k) = wf*(1.d0-wt) + wfp*wt
+               u(i,j,k) = uf 
+               v(i,j,k) = vf
+               w(i,j,k) = wf
             end do; end do; end do
+
+            ! remove droplet vof structure
+            cvof(i1:i2,j1:j2,k1:k2) = 0.d0 
+
          end if !ConvertDropFlag
       end do ! idrop
       end if ! num_drop(rank) 
-     
+
       ! XXX Note: drop_merge_converge is not working yet
       if ( num_drop_merge(rank) > 0 .and. ConvertMergeDrop ) then
       do idrop = 1,num_drop_merge(rank)
@@ -1650,6 +1671,8 @@ contains
             exit 
          end if ! x(i)
       end do ! i
+      i1 = max(i1,is)
+      i2 = min(i2,ie)
 
       j1_notfound = .true.
       jc_notfound = .true.
@@ -1667,6 +1690,8 @@ contains
             exit 
          end if ! y(i)
       end do ! j
+      j1 = max(j1,js)
+      j2 = min(j2,je)
 
       k1_notfound = .true.
       kc_notfound = .true.
@@ -1684,6 +1709,8 @@ contains
             exit 
          end if ! z(i)
       end do ! k
+      k1 = max(k1,ks)
+      k2 = min(k2,ke)
 
    end subroutine FindCellIndexBdryConvertReg
 
@@ -1711,6 +1738,7 @@ contains
       integer :: ipart,ipart1
       integer :: i,j,k
       logical :: PartAtBlockEdge = .true.
+      real(8) :: Re,vmf,vmp
 
       if ( num_part(rank) > 0 ) then 
       do ipart = 1,num_part(rank)
@@ -1745,7 +1773,7 @@ contains
             drops(num_drop(rank),rank)%element = parts(ipart,rank)%element
 
             ! Define conversion region
-            ConvertRegSize = 2.0d0*dp
+            ConvertRegSize = ConvertRegSizeToDiam*dp
 
             call FindCellIndexBdryConvertReg(parts(ipart,rank)%element%xc, & 
                                              parts(ipart,rank)%element%yc, & 
@@ -1760,9 +1788,16 @@ contains
                               parts(ipart,rank)%element%yc, & 
                               parts(ipart,rank)%element%zc, & 
                               uf,vf,wf,dummyreal,dummyreal,dummyreal,& 
-                              parts(ipart,rank)%element%vol)
+                              parts(ipart,rank)%element%vol,&
+                              tswap-parts(ipart,rank)%tstepConvert)
 
             mu2tomu1 = mu2/mu1
+            vmf = sqrt(uf*uf+vf*vf+wf*wf)
+            vmp = sqrt(parts(ipart,rank)%element%uc**2.d0 & 
+                     + parts(ipart,rank)%element%vc**2.d0 & 
+                     + parts(ipart,rank)%element%wc**2.d0)
+            Re = rho1*ABS(vmf-vmp)*dp/mu1
+            
             call BuildFlowFieldVOF(i1,i2,j1,j2,k1,k2,dp,mu2tomu1, & 
                                    parts(ipart,rank)%element%xc,& 
                                    parts(ipart,rank)%element%yc,& 
@@ -1770,7 +1805,7 @@ contains
                                    parts(ipart,rank)%element%uc,& 
                                    parts(ipart,rank)%element%vc,& 
                                    parts(ipart,rank)%element%wc,&
-                                   uf,vf,wf)
+                                   uf,vf,wf,Re)
             
             ! Remove the particle from the array  
             do ipart1 = ipart+1,num_part(rank)
@@ -1786,11 +1821,11 @@ contains
 
    end subroutine ConvertLPP2VOF
 
-   subroutine BuildFlowFieldVOF(i1,i2,j1,j2,k1,k2,dp,mu,xp,yp,zp,up,vp,wp,uf,vf,wf)
+   subroutine BuildFlowFieldVOF(i1,i2,j1,j2,k1,k2,dp,mu,xp,yp,zp,up,vp,wp,uf,vf,wf,Re)
       implicit none
 
       integer, intent (in) :: i1,i2,j1,j2,k1,k2
-      real(8), intent (in) :: dp,mu,xp,yp,zp,up,vp,wp,uf,vf,wf
+      real(8), intent (in) :: dp,mu,xp,yp,zp,up,vp,wp,uf,vf,wf,Re
 
       integer :: i,j,k,i0,j0,k0
       real(8) :: radp,c,stencil3x3(-1:1,-1:1,-1:1)
@@ -1801,6 +1836,14 @@ contains
       integer :: nflag
       real(8) :: ufnew,vfnew,wfnew,wt
       logical :: UseCreepingFlow=.false.
+! TEMPORARY
+      real(8) :: expterm,term
+! END TEMPORARY 
+
+! TEMPORARY  
+         UseCreepingFlow = .true.
+         write(*,*) ' Creeping flow solution is used for LPP2VOF conversion!'
+! END TEMPORARY
 
       radp = dp/2.d0
       a1 = radp*(2.d0+3.d0*mu)/2.d0/(1.d0+mu)
@@ -1809,7 +1852,7 @@ contains
       ux=uf-up; uy=vf-vp; uz=wf-wp
       um = sqrt(ux*ux+uy*uy+uz*uz)
 
-      do i=i1+1,i2-1; do j=j1+1,j2-1; do k=k1+1,k2-1
+      do k=k1+1,k2-1; do j=j1+1,j2-1; do i=i1+1,i2-1 
          
          ! Build VOF field of droplet
          do i0=-1,1; do j0=-1,1; do k0=-1,1
@@ -1821,10 +1864,13 @@ contains
          cvof(i,j,k)     = c
          if ( cvof(i,j,k) > 1.d0 ) cvof(i,j,k) = 1.d0
          if ( cvof(i,j,k) < 0.d0 ) cvof(i,j,k) = 0.d0
-         
+        
          ! Build flow field 
          if ( UseCreepingFlow ) then 
             ! Use creeping flow solution for outside of droplet
+            ! XXX Note: the velocity is now computed at cell centers, need to be
+            ! improved later
+
             ! transfer to spherical polar coordinate attached to droplet
             rx=x(i)-xp; ry=y(j)-yp; rz=z(k)-zp
             rm = sqrt(rx*rx+ry*ry+rz*rz)
@@ -1834,8 +1880,16 @@ contains
          
             ! Creeping flow solution (Bubbles,Drops, & Particles, Clift et al)
             if ( cvof(i,j,k) == 0.d0 ) then ! outside of droplet
+               !Stokes solution 
                ur = -um*cos(theta)*(1.d0 - a1/rm      + a2/rm3)
-               ut =  um*sin(theta)*(1.d0 - a1/rm/2.d0 + a2/rm3/2.d0)
+               ut =  um*sin(theta)*(1.d0 - a1/rm/2.d0 - a2/rm3/2.d0)
+               
+               ! Oseen solution
+               !term = rm*Re/4.d0/radp
+               !expterm = exp(-term*(1.d0+cos(theta)))
+               !ur = -um*cos(theta)*(1.d0 + a2/rm3) & 
+               !    + um*a1/rm/2.d0*(term*(1.d0-expterm) - (1.d0-cos(theta))*expterm)
+               !ut =  um*sin(theta)*(1.d0 - a2/rm3/2.d0 - a1/rm/2.d0*expterm )
             !else ! inside of droplet
             !   urp = um*cos(theta)/a3*(1.d0-     rm2/radp/radp)
             !   utp =-um*sin(theta)/a3*(1.d0-2.d0*rm2/radp/radp)
@@ -1853,23 +1907,28 @@ contains
                ufnew = ur*rx/rm + ut*tx/tm + up 
                vfnew = ur*ry/rm + ut*ty/tm + vp
                wfnew = ur*rz/rm + ut*tz/tm + wp
+
+               u(i,j,k) = ufnew
+               v(i,j,k) = vfnew
+               w(i,j,k) = wfnew
                
                ! smoothening the transition from the original value
-               wt = exp(-(rm-radp)**2.d0/(0.5*radp)**2.d0)
-               u(i,j,k) = ufnew*wt + u(i,j,k)*(1.d0-wt)
-               v(i,j,k) = vfnew*wt + v(i,j,k)*(1.d0-wt)
-               w(i,j,k) = wfnew*wt + w(i,j,k)*(1.d0-wt)
+!               wt = exp(-(rm-radp)**2.d0/(0.5*radp)**2.d0)
+!               u(i,j,k) = ufnew*wt + u(i,j,k)*(1.d0-wt)
+!               v(i,j,k) = vfnew*wt + v(i,j,k)*(1.d0-wt)
+!               w(i,j,k) = wfnew*wt + w(i,j,k)*(1.d0-wt)
             else 
                u(i,j,k) = up
                v(i,j,k) = vp
                w(i,j,k) = wp
             end if ! vof_flag
          else ! Simply replace inside of droplet with point velocity
-            if ( cvof(i,j,k) > 0.d0 ) then
-               u(i,j,k) = up
-               v(i,j,k) = vp
-               w(i,j,k) = wp
-            end if ! rm
+            rx=x(i)-xp; ry=y(j)-yp; rz=z(k)-zp
+            rm = sqrt(rx*rx+ry*ry+rz*rz)
+            if((cvof(i,j,k) + cvof(i+1,j,k)) > 0.0d0) u(i,j,k) = up
+            if((cvof(i,j,k) + cvof(i,j+1,k)) > 0.0d0) v(i,j,k) = vp
+            if((cvof(i,j,k) + cvof(i,j,k+1)) > 0.0d0) w(i,j,k) = wp
+
          end if ! UseCreepSolution
       end do; end do; end do
       
@@ -1901,7 +1960,8 @@ contains
                               parts(ipart,rank)%element%yc, & 
                               parts(ipart,rank)%element%zc, & 
                               uf,vf,wf,DufDt,DvfDt,DwfDt,   & 
-                              parts(ipart,rank)%element%vol)
+                              parts(ipart,rank)%element%vol,&
+                              tswap-parts(ipart,rank)%tstepConvert)
 
             relvel(1) = uf - up
             relvel(2) = vf - vp
@@ -1932,17 +1992,17 @@ contains
                          + fhz )/(1.d0+Cm*rhof/rhop)
 
 ! TEMPORARY 
-!            if ( MOD(tswap,ntimestepTag) == 0 ) then
+            if ( MOD(tswap,ntimestepTag) == 0 ) then
 !               write(11,*) tswap*5e-8,relvel(1)/taup*phi(dragmodel,Rep), & 
 !                           rhof/rhop*DufDt,Cm*rhof/rhop*(DufDt-partforce(1)),& 
 !                           (1.d0+Cm)*rhof/rhop*DufDt,uf,up,DufDt
-!               write(12,*) tswap*5e-8,relvel(2)/taup*phi(dragmodel,Rep), & 
-!                           rhof/rhop*DvfDt,Cm*rhof/rhop*(DvfDt-partforce(2)),&
-!                           (1.d0+Cm)*rhof/rhop*DvfDt,vf,vp,DvfDt
+               write(12,*) tswap,partforce(2),relvel(2)/taup*phi(dragmodel,Rep), & 
+                           rhof/rhop*DvfDt,Cm*rhof/rhop*(DvfDt-partforce(2)),&
+                           (1.d0+Cm)*rhof/rhop*DvfDt,vf,vp,DvfDt
 !               write(13,*) tswap*5e-8,relvel(3)/taup*phi(dragmodel,Rep), & 
 !                           rhof/rhop*DwfDt,Cm*rhof/rhop*(DwfDt-partforce(3)),&
 !                           (1.d0+Cm)*rhof/rhop*DwfDt,wf,wp,DwfDt
-!            end if ! tswap
+            end if ! tswap
 ! END TEMPORARY
             parts(ipart,rank)%element%duc = partforce(1) 
             parts(ipart,rank)%element%dvc = partforce(2)
@@ -1964,26 +2024,32 @@ contains
             phi = 1.d0
          case ( dragmodel_SN ) 
             phi = 1.d0+0.15d0*Rep**0.687d0
-            if ( mu1 > mu2 ) & 
-               call pariserror("Particle drag is used for Bubbles!")
+            if ( mu1 > mu2 ) then 
+               write(*,*) "Particle drag is used for Bubbles at rank=", rank
+               stop
+            end if !mu1 
          case ( dragmodel_CG ) 
             phi = 1.d0+0.15d0*Rep**0.687d0 & 
                   + 1.75d-2*Rep/(1.0d0 + 4.25d4/Rep**1.16d0)
-            if ( mu1 > mu2 ) & 
-               call pariserror("Particle drag is used for Bubbles!")
+            if ( mu1 > mu2 ) then 
+               write(*,*) "Particle drag is used for Bubbles at rank=", rank
+               stop
+            end if !mu1 
          case ( dragmodel_MKL )
             phi = 1.d0 + 1.0d0/(8.d0/Rep & 
                               + 0.5d0 *(1.d0 + 3.315d0/Rep**0.5d0))
-            if ( mu1 < mu2 ) & 
-               call pariserror("Bubble drag is used for particles!")
+            if ( mu1 < mu2 ) then 
+               write(*,*) "Bubble drag is used for particles at rank=", rank
+               stop
+            end if !mu1 
          case default
             call pariserror("wrong quasi-steady drag model!")
       end select ! dragmodel
    end function phi
 
-   subroutine GetFluidProp(ip,jp,kp,xp,yp,zp,uf,vf,wf,DufDt,DvfDt,DwfDt,volp) 
+   subroutine GetFluidProp(ip,jp,kp,xp,yp,zp,uf,vf,wf,DufDt,DvfDt,DwfDt,volp,TimeStepAfterVOFConversion) 
 
-      integer, intent(in)  :: ip,jp,kp
+      integer, intent(in)  :: ip,jp,kp,TimeStepAfterVOFConversion
       real(8), intent(in)  :: xp,yp,zp 
       real(8), intent(in)  :: volp 
       real(8), intent(out) :: uf,vf,wf,DufDt,DvfDt,DwfDt
@@ -1992,6 +2058,8 @@ contains
       real(8) :: Lx,Ly,Lz
       real(8), parameter :: small = 1.d0-40
       real(8), parameter :: large = 1.d0+40
+
+      real(8) :: ConvertRegSize
 
       dp = (6.d0*volp/PI)**(1.d0/3.d0)
       dxi = xh(ip)-xh(ip-1)
@@ -2022,23 +2090,30 @@ contains
 !         end if ! w(ip,jp,kp) 
 
 ! TEMPORARY   ! NOTE: require a better estimate of the Lx,Ly,Lz later
-         Lx = large; Ly = large; Lz = large
-! END TEMPORARY 
-         if ( Lx > dp ) then 
-            call TrilinearIntrplFluidVel(xp,yp,zp,ip,jp,kp,uf,DufDt,1)
+         if ( NumStepAfterVOFConversionForAve > 0 .and. & 
+              TimeStepAfterVOFConversion < NumStepAfterVOFConversionForAve ) then 
+            ConvertRegSize = ConvertRegSizeToDiam*dp
+            call ComputeAveFluidVel(xp,yp,zp,ip,jp,kp,uf,vf,wf,DufDt,DvfDt,DwfDt,ConvertRegSize)
          else 
-            call pariserror("average fluid velocity needed") !ComputeAveFluidVel
-         end if ! Lx
-         if ( Ly > dp ) then 
-            call TrilinearIntrplFluidVel(xp,yp,zp,ip,jp,kp,vf,DvfDt,2)
-         else 
-            call pariserror("average fluid velocity needed") !ComputeAveFluidVel
-         end if ! Lx
-         if ( Lz > dp ) then 
-            call TrilinearIntrplFluidVel(xp,yp,zp,ip,jp,kp,wf,DwfDt,3)
-         else 
-            call pariserror("average fluid velocity needed") !ComputeAveFluidVel
-         end if ! Lz
+            Lx = large; Ly = large; Lz = large
+            if ( Lx > dp ) then 
+               call TrilinearIntrplFluidVel(xp,yp,zp,ip,jp,kp,uf,DufDt,1)
+            else 
+               call pariserror("average fluid velocity needed") !ComputeAveFluidVel
+            end if ! Lx
+            if ( Ly > dp ) then 
+               call TrilinearIntrplFluidVel(xp,yp,zp,ip,jp,kp,vf,DvfDt,2)
+            else 
+               call pariserror("average fluid velocity needed") !ComputeAveFluidVel
+            end if ! Lx
+            if ( Lz > dp ) then 
+               call TrilinearIntrplFluidVel(xp,yp,zp,ip,jp,kp,wf,DwfDt,3)
+            else 
+               call pariserror("average fluid velocity needed") !ComputeAveFluidVel
+            end if ! Lz
+         end if
+! END TEMPOARY 
+
       else ! interploation & averaging
       end if ! dp 
 
@@ -2267,7 +2342,7 @@ contains
       blockcounts(2) = 6
       offsets    (3) = offsets(2) + blockcounts(2)*r8extent 
       oldtypes   (3) = MPI_INTEGER  
-      blockcounts(3) = 4  
+      blockcounts(3) = 5  
 
       call MPI_TYPE_STRUCT(4, blockcounts, offsets, oldtypes, & 
                            MPI_particle_type, ierr) 
@@ -2495,6 +2570,43 @@ contains
       end if ! dir 
    end subroutine TrilinearIntrplFluidVel
 
+   subroutine ComputeAveFluidVel(xp,yp,zp,ip,jp,kp,um,vm,wm,sdum,sdvm,sdwm,L)
+
+      implicit none 
+      real(8), intent(in) :: xp,yp,zp,L
+      integer, intent(in) :: ip,jp,kp
+      real(8), intent(out):: um,vm,wm,sdum,sdvm,sdwm
+
+      integer :: i,j,k
+      integer :: i1,ic,i2,j1,jc,j2,k1,kc,k2
+      real(8) :: numcell
+
+      call FindCellIndexBdryConvertReg(xp,yp,zp,L, & 
+                                       i1,ic,i2,j1,jc,j2,k1,kc,k2)
+      um = 0.d0
+      vm = 0.d0 
+      wm = 0.d0 
+      sdum = 0.d0 
+      sdvm = 0.d0 
+      sdwm = 0.d0 
+      do k=k1,k2; do j=j1,j2; do i=i1,i2
+         um = um + u(i,j,k)
+         vm = vm + v(i,j,k)
+         wm = wm + w(i,j,k)
+         sdum = sdum + sdu(i,j,k)
+         sdvm = sdvm + sdv(i,j,k)
+         sdwm = sdwm + sdw(i,j,k)
+      end do; end do; end do
+      numcell = dble(i2-i1+1)*dble(j2-j1+1)*dble(k2-k1+1)
+      um = um/numcell
+      vm = vm/numcell
+      wm = wm/numcell
+      sdum = sdum/numcell
+      sdvm = sdvm/numcell
+      sdwm = sdwm/numcell
+
+   end subroutine ComputeAveFluidVel 
+
    subroutine StoreBeforeConvectionTerms()
       ! Store du, dv, dw before convection terms are computed and added
       implicit none
@@ -2642,7 +2754,7 @@ module module_output_lpp
          do ipart = 1,num_part(rank)
             dp = (6.d0*parts(ipart,rank)%element%vol/PI)**(1.d0/3.d0)
             rp = 0.5d0*dp
-            ConvertRegSize = 2.d0*dp
+            ConvertRegSize = ConvertRegSizeToDiam*dp
             xp = parts(ipart,rank)%element%xc
             yp = parts(ipart,rank)%element%yc
             zp = parts(ipart,rank)%element%zc
