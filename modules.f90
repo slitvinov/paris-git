@@ -305,7 +305,7 @@ module module_flow
   real(8) :: beta, MaxError
   integer :: maxit, it, itime_scheme, BuoyancyCase, drive
   integer :: sbx, sby, Nstep
-  integer :: maxStep, itmax, iTimeStep
+  integer :: maxStep, itmax, iTimeStep, iTimeStepRestart
 end module module_flow
 !=================================================================================================
 !=================================================================================================
@@ -338,9 +338,10 @@ module module_IO
   save
   integer :: padding=5
   integer :: opened=0;
-  integer ::nout, out, output_format, nbackup, nstats, termout
+  integer :: nout, out, output_format, nbackup, nstats, termout, nfile
   character(len=20) :: out_path, x_file, y_file, z_file
   logical :: read_x, read_y, read_z, restart, ICOut, restartFront, restartAverages
+  real(8) :: tout
 contains
     !=================================================================================================
   subroutine write_vec_gnuplot(u,v,cvof,p,iout,DoVOF)

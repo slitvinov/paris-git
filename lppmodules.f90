@@ -51,8 +51,7 @@
       ! 3 marked as C node
       ! 4 marked as reference fluid 
       ! 5 marked as ghost layer
-   !integer,parameter :: maxnum_diff_tag  = 7   ! ignore cases droplet spread over more than 1 block
-   integer,parameter :: maxnum_diff_tag  = 21   ! temporary increase max number of diff tag
+   integer,parameter :: maxnum_diff_tag  = 22   ! ignore cases droplet spread over more than 1 block
    integer :: total_num_tag,totalnum_drop,totalnum_drop_indep,num_new_drop
    integer, dimension(:), allocatable :: num_drop
    integer, dimension(:), allocatable :: num_drop_merge
@@ -425,8 +424,8 @@ contains
                   drops_merge_gcell_list(1,drops_merge(num_drop_merge(rank),rank)%num_gcell,num_drop_merge(rank)) = isq
                   drops_merge_gcell_list(2,drops_merge(num_drop_merge(rank),rank)%num_gcell,num_drop_merge(rank)) = jsq
                   drops_merge_gcell_list(3,drops_merge(num_drop_merge(rank),rank)%num_gcell,num_drop_merge(rank)) = ksq
-               else
-                  write(*,*) 'Warning: ghost cell number of tag',current_id,'at rank',rank,'reaches max value!'
+!               else
+!                  write(*,*) 'Warning: ghost cell number of tag',current_id,'at rank',rank,'reaches max value!'
                end if ! drops_merge(num_drop_merge(rank),rank)%num_gcell
             else                                                        ! domain ghost cells 
                ! Note: periodic bdry cond, to be added later
@@ -2141,11 +2140,6 @@ contains
         
          call UpdatePartLocCell   
       end if ! num_part(rank)
-      if ( nPdomain > 1 ) then  
-         call CollectPartCrossBlocks   
-         call TransferPartCrossBlocks   
-      end if ! nPdomain
-      call SetPartBC
    end subroutine UPdatePartSol
 
    subroutine StoreOldPartSol()
@@ -2165,7 +2159,8 @@ contains
 
    subroutine AveragePartSol()
       implicit none
-      
+     
+      ! Update particle solution for 2nd order time integration
       parts(1:num_part(rank),rank)%element%uc = & 
          0.5d0*( parts(1:num_part(rank),rank)%element%uc + parts(1:num_part(rank),rank)%ucOld ) 
       parts(1:num_part(rank),rank)%element%vc = & 
@@ -2173,6 +2168,14 @@ contains
       parts(1:num_part(rank),rank)%element%wc = & 
          0.5d0*( parts(1:num_part(rank),rank)%element%wc + parts(1:num_part(rank),rank)%wcOld )  
 
+      ! Transfer particles crossing blocks 
+      if ( nPdomain > 1 ) then  
+         call CollectPartCrossBlocks   
+         call TransferPartCrossBlocks   
+      end if ! nPdomain
+
+      ! Apply particle boundary condition 
+      call SetPartBC
    end subroutine AveragePartSol
 
    subroutine UpdatePartLocCell   
@@ -2410,8 +2413,8 @@ contains
 
       if ( vofbdry_cond(d) == 'periodic' ) then
          call PartBC_periodic(ipart,rank,d)
-      else 
-         call pariserror("unknown particle bondary condition!")
+!      else 
+!         call pariserror("unknown particle bondary condition!")
       end if ! vofbdry_cond
    end subroutine ImposePartBC
 
@@ -2841,6 +2844,7 @@ module module_output_lpp
       if(rank==0)print*,'Backup LPP written at t=',time
       1100 FORMAT(es17.8e3,2I10)
       1200 FORMAT(10es17.8e3,3I5)
+      CLOSE(7)
    end subroutine backup_LPP_write
 
 !-------------------------------------------------------------------------------------------------
@@ -2868,6 +2872,7 @@ module module_output_lpp
                           parts(ipart,rank)%kc 
          end do !ipart
       end if ! num_part(rank)
+      CLOSE(7)
    end subroutine backup_LPP_read
 !-------------------------------------------------------------------------------------------------
 

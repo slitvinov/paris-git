@@ -142,9 +142,9 @@ Program paris
      ! output initial condition
      ! if(rank==0) start_time = MPI_WTIME()
      if(ICOut .and. rank<nPdomain) then
-        ! call output(0,is,ie+1,js,je+1,ks,ke+1)
-        if(DoVOF) call output_VOF(0,is,ie+1,js,je+1,ks,ke+1)
-        if(DoLPP) call output_LPP(0)
+        !if (.not.restart) call output(0,is,ie+1,js,je+1,ks,ke+1)
+        if(DoVOF .and. .not.restart) call output_VOF(0,is,ie+1,js,je+1,ks,ke+1)
+        if(DoLPP .and. .not.restart) call output_LPP(0)
         if(test_droplet) call output_droplet(u,v,w,time)
         call setvelocityBC(u,v,w,umask,vmask,wmask,time)
         call write_vec_gnuplot(u,v,cvof,p,itimestep,DoVOF)
@@ -395,7 +395,7 @@ Program paris
            mu  = 0.5*(mu +muold)
            cvof  = 0.5*(cvof +cvofold)
            call get_flags_and_clip()
-           if ( DoVOF .and. DoLPP ) call AveragePartSol()
+           if ( DoLPP ) call AveragePartSol()
         endif
         
         if (DoLPP) then
@@ -413,11 +413,13 @@ Program paris
            end if ! DoFront, DoVOF
         end if ! itimestep
 !        if(mod(itimestep,noutuv)==0) then 
-        if(mod(itimestep,nout)==0) then 
+        if(mod(itimestep-itimestepRestart,nout)==0) then 
+           nfile = ITIMESTEP/nout
+           if ( tout > 0.d0 .and. dtFlag == 1 ) nfile = NINT(time/tout)
            call write_vec_gnuplot(u,v,cvof,p,itimestep,DoVOF)
-           ! call output(ITIMESTEP/nout,is,ie+1,js,je+1,ks,ke+1)
-           if(DoVOF) call output_VOF(ITIMESTEP/nout,is,ie+1,js,je+1,ks,ke+1)
-           if(DoLPP) call output_LPP(ITIMESTEP/nout)
+           ! call output(nfile,is,ie+1,js,je+1,ks,ke+1)
+           if(DoVOF) call output_VOF(nfile,is,ie+1,js,je+1,ks,ke+1)
+           if(DoLPP) call output_LPP(nfile)
            if(test_droplet) call output_droplet(u,v,w,time)
            if(rank==0)then
               end_time =  MPI_WTIME()
@@ -1274,6 +1276,7 @@ subroutine InitCondition
      time = 0d0
      iTimeStep = 0
   endif
+  iTimeStepRestart = iTimeStep
 end subroutine InitCondition
 !=================================================================================================
 ! function minabs
@@ -1345,9 +1348,11 @@ subroutine ReadParameters
                         y_file,        z_file,        restart,       nBackup,       NumBubble,   &
                         xyzrad,        hypre,         dtFlag,        ICOut,         WallVel,     &
                         Inject_type,   maxErrorVol,   restartFront,  nstats,        WallShear,   &
-                        WallPressure,  ZeroReynolds,  restartAverages, termout, excentricity
+                        WallPressure,  ZeroReynolds,  restartAverages, termout, excentricity, tout
   in=1
   out=2
+
+  tout = -1.d0
 
   open(unit=in, file='input', status='old', action='read', iostat=ierr)
   if (ierr .ne. 0) stop 'ReadParameters: error opening input file'
@@ -1392,6 +1397,9 @@ subroutine ReadParameters
   nPdomain = nPx*nPy*nPz
 
 !--- output frequency
+  if ( tout > 0.d0 .and. dtFlag == 1) then 
+     nout = NINT(tout/dt)
+  end if !tout
 
   if(termout==0) then
      termout=nout
