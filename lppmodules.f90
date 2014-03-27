@@ -72,6 +72,7 @@
    type drop
       type(element) :: element
       integer :: num_cell_drop
+      real(8) :: AspRatio
    end type drop
    type (drop), dimension(:,:), allocatable :: drops
    integer, dimension(:,:,:), allocatable :: drops_cell_list
@@ -154,6 +155,9 @@
    real(8) :: ConvertRegSizeToDiam
    
    integer :: NumStepAfterVOFConversionForAve
+
+   real(8), parameter :: AspRatioSphere = 1.d0
+   real(8) :: AspRatioTol
 contains
 !=================================================================================================
    subroutine initialize_LPP()
@@ -236,6 +240,7 @@ contains
       outputlpp_format = 1
       ConvertRegSizeToDiam = 2.d0 
       NumStepAfterVOFConversionForAve = 10
+      AspRatioTol = 1.5d0
 
       call MPI_COMM_RANK(MPI_COMM_WORLD, rank, ierr)
       inquire(file='inputlpp',exist=file_is_there)
@@ -317,6 +322,9 @@ contains
 
     logical :: merge_drop
 
+    integer :: imin_drop,imax_drop,jmin_drop,jmax_drop,kmin_drop,kmax_drop
+    integer :: idif_drop,jdif_drop,kdif_drop
+
     if (.not. LPP_initialized) then 
       call initialize_LPP()
       LPP_initialized = .true.
@@ -360,6 +368,12 @@ contains
         cell_list = 0
 
         merge_drop = .false.
+        imin_drop = imax
+        imax_drop = imin
+        jmin_drop = jmax
+        jmax_drop = jmin
+        kmin_drop = kmax
+        kmax_drop = kmin
         do while ( ns_queue > 0 )
           nc_queue = 0 
           c_queue(:,:) = 0
@@ -430,7 +444,16 @@ contains
             else                                                        ! domain ghost cells 
                ! Note: periodic bdry cond, to be added later
             end if ! isq, jsq, ksq
-            
+
+            imin_drop = MIN(isq,imin_drop)
+            imax_drop = MAX(isq,imax_drop)
+            jmin_drop = MIN(jsq,jmin_drop)
+            jmax_drop = MAX(jsq,jmax_drop)
+            kmin_drop = MIN(ksq,kmin_drop)
+            kmax_drop = MAX(ksq,kmax_drop)
+            idif_drop = imax_drop-imin_drop+1
+            jdif_drop = jmax_drop-jmin_drop+1
+            kdif_drop = kmax_drop-kmin_drop+1
           end do ! is_queue
           ! mark all C nodes as S nodes
           if ( nc_queue >= 0 ) then 
@@ -468,6 +491,9 @@ contains
             drops(num_drop(rank),rank)%element%dwc  = dwc/vol
             drops(num_drop(rank),rank)%num_cell_drop = num_cell_drop
             drops_cell_list(:,:,num_drop(rank)) = cell_list
+
+            drops(num_drop(rank),rank)%AspRatio = DBLE(MAX(idif_drop,jdif_drop,kdif_drop)) & 
+                                                 /DBLE(MIN(idif_drop,jdif_drop,kdif_drop))
           end if ! merge_drop
           current_id = current_id+1
         else ! no need to merge droplet piece only contains ghost cells  
@@ -1285,7 +1311,9 @@ contains
                                        drops(idrop,rank)%element%yc,  & 
                                        drops(idrop,rank)%element%zc,  &
                                        ic,jc,kc,                      & 
-                                       ConvertDropFlag,CriteriaConvertCase)
+                                       ConvertDropFlag,               & 
+                                       CriteriaConvertCase,           &
+                                       drops(idrop,rank)%AspRatio)
 
          if ( ConvertDropFlag ) then
 ! TEMPORARY
@@ -1361,7 +1389,8 @@ contains
                                        drops_merge(idrop,rank)%element%yc,  & 
                                        drops_merge(idrop,rank)%element%zc,  &
                                        ic,jc,kc,                            & 
-                                       ConvertDropFlag,CriteriaConvertCase)
+                                       ConvertDropFlag,CriteriaConvertCase, & 
+                                       AspRatioSphere)
 
          if ( ConvertDropFlag ) then
 ! TEMPORARY
@@ -1441,17 +1470,18 @@ contains
 
    end subroutine ConvertVOF2LPP
 
-   subroutine CheckConvertDropCriteria(vol,xc,yc,zc,ic,jc,kc,ConvertDropFlag,CriteriaConvertCase)
+   subroutine CheckConvertDropCriteria(vol,xc,yc,zc,ic,jc,kc,ConvertDropFlag,CriteriaConvertCase,AspRatio)
       implicit none
 
-      real(8), intent(in ) :: vol,xc,yc,zc
+      real(8), intent(in ) :: vol,xc,yc,zc,AspRatio
       integer, intent(in ) :: ic,jc,kc
       integer, intent(in ) :: CriteriaConvertCase
       logical, intent(out) :: ConvertDropFlag
 
       select case (CriteriaConvertCase) 
          case (CriteriaRectangle)
-            if ( (vol < vol_cut)  .and. &
+            if ( (vol < vol_cut)                         .and. &
+                 (AspRatio < AspRatioTol)                .and. &
                  (xc  > xlpp_min) .and. (xc  < xlpp_max) .and. & 
                  (yc  > ylpp_min) .and. (yc  < ylpp_max) .and. & 
                  (zc  > zlpp_min) .and. (zc  < zlpp_max) ) then 
@@ -1462,6 +1492,7 @@ contains
          case (CriteriaCylinder )   ! Note: assuming axis along x-direction
                                     ! radius indicated by ylpp_min & ylpp_max
             if ( (  vol < vol_cut)                          .and. &
+                 (  AspRatio < AspRatioTol)                 .and. &
                  ( (yc-0.5d0)**2.d0 + (zc-0.5d0)**2.d0 > ylpp_min**2.d0)  .and. & 
                  ( (yc-0.5d0)**2.d0 + (zc-0.5d0)**2.d0 < ylpp_max**2.d0) ) then 
                ConvertDropFlag = .true.
@@ -1470,6 +1501,7 @@ contains
             end if !vol_cut, xlpp_min... 
          case (CriteriaSphere   )   ! radius indicated by ylpp_min & ylpp_max 
             if ( (  vol < vol_cut)                                      .and. &
+                 (  AspRatio < AspRatioTol)                             .and. &
                  ( (xc**2.d0 + yc**2.d0 + zc**2.d0) > ylpp_min**2.d0)   .and. & 
                  ( (xc**2.d0 + yc**2.d0 + zc**2.d0) < ylpp_max**2.d0) ) then 
                ConvertDropFlag = .true.
@@ -1482,6 +1514,7 @@ contains
                                     ! radius indicated by ylpp_min & ylpp_max
             xlpp_max = xlpp_min + zlpp_max*time
             if ( (  vol < vol_cut)                                        .and. &
+                 (  AspRatio < AspRatioTol)                               .and. &
                  (  xc  > xlpp_min) .and. (xc  < xlpp_max)                .and. & 
                  ( (yc-0.5d0)**2.d0 + (zc-0.5d0)**2.d0 > ylpp_min**2.d0)  .and. & 
                  ( (yc-0.5d0)**2.d0 + (zc-0.5d0)**2.d0 < ylpp_max**2.d0) ) then 
@@ -1490,7 +1523,9 @@ contains
                ConvertDropFlag = .false.
             end if !vol_cut, xlpp_min... 
          case (CriteriaInterface)
-            if ( vol < vol_cut .and. RegAwayInterface(ic,jc,kc) ) then 
+            if ( vol < vol_cut            .and. & 
+                 AspRatio < AspRatioTol   .and. &
+                 RegAwayInterface(ic,jc,kc) ) then 
                ConvertDropFlag = .true.
             else 
                ConvertDropFlag = .false.
@@ -1750,7 +1785,8 @@ contains
                                        parts(ipart,rank)%ic,          &
                                        parts(ipart,rank)%jc,          &
                                        parts(ipart,rank)%kc,          &
-                                       ConvertDropFlag,CriteriaConvertCase)
+                                       ConvertDropFlag,               & 
+                                       CriteriaConvertCase,AspRatioSphere)
 
          ! Check if LPP locates at block boundary 
          dp = (6.d0*parts(ipart,rank)%element%vol/PI)**(1.d0/3.d0)
