@@ -9,8 +9,8 @@ awk '{ print $1,$3 } ' < stats > volume.tmp
 awk '{ print $1,$12 } ' < stats > centerofmass.tmp
 tail volume.tmp > compare.tmp
 cat centerofmass.tmp >> compare.tmp
-tail volumeref.tmp > compareref.tmp
-cat centerofmassref.tmp >> compareref.tmp
+tail volumeref.txt > compareref.tmp
+cat centerofmassref.txt >> compareref.tmp
 
 
 precision=1e-4
