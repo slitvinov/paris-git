@@ -1904,7 +1904,7 @@ subroutine calcResidual1(A,p,pmask,Residual)
   implicit none
   include 'mpif.h'
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: p
-  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: pmask
+  real(8), dimension(is:ie,js:je,ks:ke), intent(in) :: pmask
   real(8), dimension(is:ie,js:je,ks:ke,8), intent(in) :: A
   real(8) :: res, totalres, Residual
   integer :: i,j,k, ierr
