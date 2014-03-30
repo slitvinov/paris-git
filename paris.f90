@@ -1349,10 +1349,29 @@ subroutine ReadParameters
                         xyzrad,        hypre,         dtFlag,        ICOut,         WallVel,     &
                         Inject_type,   maxErrorVol,   restartFront,  nstats,        WallShear,   &
                         WallPressure,  ZeroReynolds,  restartAverages, termout, excentricity, tout
+ 
+  Nx = 0; Ny = 4; Nz = 4 ! stop absurd input files. 
+  Ng=2;xLength=1d0;yLength=1d0;zLength=1d0
+  gx = 0d0; gy=0d0; gz=0d0; bdry_cond = 0
+  dPdx = 0d0;  dPdy = 0d0; dPdz = 0d0
+  itime_scheme = 1;  nstep = 0; maxit = 50; maxError = 1d-3  
+  beta = 1.2; nout = 1; TwoPhase = .false.; rho1 = 1d0; mu1 = 0d0
+  rho2 = 1d0; mu2 = 0d0; sigma = 0d0; BuoyancyCase = 0; nPx = 1
+  nPy = 1; nPz = 1; amin = 0.32; amax = 0.96; aspmax = 1.54
+  MaxPoint = 1000000; MaxElem  = 2000000; MaxFront = 100; xform=0d0; yform=0d0; zform=0d0
+         dt=0.1d0; nregrid=10; GetPropertiesFromFront = .false.
+  DoVOF = .true.;   DoFront = .false.;   Implicit=.false.;   U_init=0d0;   VolumeSource=0d0  
+  CFL = 0.5;   EndTime = 0.;  MaxDt = 5d-2;   smooth = .true.;   nsmooth = 20
+  output_format = 2;   read_x=.false.;   read_y=.false.;   read_z=.false.
+  restart = .false.;  nBackup = 2000;  NumBubble=0
+  xyzrad = 0.d0;  hypre=.false.;  dtFlag = 2;  ICout=.false.;   WallVel = 0d0
+  Inject_type=2 ! redundant
+  maxErrorVol=1d-4;   restartfront=.false.;  nstats=10;  WallShear=0d0
+  WallPressure=0d0;   ZeroReynolds=.false.;   restartAverages=.false.;   termout=0
+  excentricity=0d0;   tout = -1.d0
+
   in=1
   out=2
-
-  tout = -1.d0
 
   open(unit=in, file='input', status='old', action='read', iostat=ierr)
   if (ierr .ne. 0) stop 'ReadParameters: error opening input file'

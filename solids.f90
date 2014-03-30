@@ -301,6 +301,13 @@ contains
       logical file_is_there
       namelist /solidparameters/ dosolids, solid_type, solid_radius,NumSpheres,sxyzrad, &
            remove_layers
+      dosolids=.false.
+      solid_type='SingleSphere'
+      solid_radius=0.1d0
+      NumSpheres=1;
+      sxyzrad=0d0
+      remove_layers=0
+
       in=1
       call MPI_COMM_RANK(MPI_COMM_WORLD, rank, ierr)
       inquire(file='inputsolids',exist=file_is_there)

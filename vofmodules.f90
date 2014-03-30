@@ -172,10 +172,19 @@ contains
     namelist /vofparameters/ vofbdry_cond,test_type,VOF_advect,refinement, &
        cylinder_dir, normal_up, DoLPP, jetradius, FreeSurface, ViscMeanIsArith, DensMeanIsArith, &
        output_filtered_VOF
+    
+     vofbdry_cond=['periodic','periodic','periodic','periodic','periodic','periodic']
+     test_type='droplet'
+     VOF_advect='CIAM'
+     refinement=-1 ! redundant
+    cylinder_dir=0 ! redundant
+    normal_up=.true. ! redundant
+    DoLPP=.false.;jetradius=01d0;FreeSurface=.false. 
+    ViscMeanIsArith=.true.; DensMeanIsArith=.true.
+    output_filtered_VOF=.false. ! redundant
+    
     in=31
 
-    DensMeanIsArith=.true.
-    ViscMeanIsArith=.true.
     call MPI_COMM_RANK(MPI_COMM_WORLD, rank, ierr)
     inquire(file='inputvof',exist=file_is_there)
     open(unit=in, file='inputvof', status='old', action='read', iostat=ierr)

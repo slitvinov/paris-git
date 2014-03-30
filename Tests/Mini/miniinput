@@ -97,7 +97,7 @@ GY      = 0.0
 GZ      = 0.0
                    ! Components of the gravity in x,y,z direction
 
-BDRY_COND = 1    0    1   1   0  1
+BDRY_COND = 1    1    1   1   1  1
                    !Type of boundary condition in x,y,z direction: 0:wall  1:periodic  2:shear
                    !x- y- z- x+ y+ z+
 
