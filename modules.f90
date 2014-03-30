@@ -65,10 +65,14 @@ contains
   end function test_point_in_wide
 !
   subroutine check_sanity_in_depth()
+    integer :: v12345678912345a=1
+    integer :: v12345678912345b=2
     call check_sanity()
-    if(is < 1) stop "wrong is"
-    if(js < 1) stop "wrong js"
-    if(ks < 1) stop "wrong ks"
+    if(is < 1) call pariserror( "wrong is")
+    if(js < 1) call pariserror( "wrong js")
+    if(ks < 1) call pariserror( "wrong ks")
+! paranoid programming
+    if(v12345678912345a.eq.v12345678912345b) call pariserror('no long variables')
   end subroutine check_sanity_in_depth
 !
   subroutine check_sanity()
@@ -78,7 +82,7 @@ contains
     if(npy < 1) stop "wrong npy"
     if(nz < 1) stop "wrong nz"
     if(npz < 1) stop "wrong npz"
-    if(nx > 32767) stop "nx too large"
+    if(nx > 32767) stop "nx too large"  ! why ?
   end subroutine check_sanity
 !
   function EndProc(d)

@@ -11,9 +11,11 @@ NORMAL="\\033[0m"
 
 if [ `grep -c Warning tmpout` -gt 0 ]; then
     tail -3 tmpout
-    echo -e "$RED" FAIL -e "$NORMAL"
+    echo -e "$RED" FAIL 
+    echo -e "$NORMAL"
 else
-    echo -e "$GREEN" PASS -e "$NORMAL"
+    echo -e "$GREEN" PASS 
+    echo -e "$NORMAL"
 fi
 
 

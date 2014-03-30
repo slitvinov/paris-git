@@ -174,6 +174,8 @@ contains
        output_filtered_VOF
     in=31
 
+    DensMeanIsArith=.true.
+    ViscMeanIsArith=.true.
     call MPI_COMM_RANK(MPI_COMM_WORLD, rank, ierr)
     inquire(file='inputvof',exist=file_is_there)
     open(unit=in, file='inputvof', status='old', action='read', iostat=ierr)
