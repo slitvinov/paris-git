@@ -641,13 +641,13 @@ module module_BC
   ! bdry_cond(i) = is the type if boundary condition in i'th direction
   ! explicits the boundary condition codes
   !                                   12345678    12345678    12345678    12345678    12345678
-  character(len=8) :: expl(0:4) = (/ "wall    ", "periodic", "shear   ", "inflow  ", "outflow " /)
-  real(8) :: WallVel(6,3), WallShear(6,3), WallPressure(6)
+  character(len=8) :: expl(0:5) = (/ "wall    ", "periodic", "shear   ", "inflow  ", "outflow ", "pressure" /)
+  real(8) :: WallVel(6,3), WallShear(6,3), BoundaryPressure(6)
   ! Tangential velocities on the surfaces of domain. First index represent the 
   ! side on which the velocity in the direction of the second index is specified.
   ! The sides are in this order: -x,+x,-y,+y,-z,+z.
   ! Example: WallVel(4,3) represent the W velocity on +y side of the domain.
-  ! LM: The same convention is used for WallPressure
+  ! LM: The same convention is used for BoundaryPressure
   ! SZ: alternately may contain the velocity of the flow for inflow boundary conditions on x+
   contains
 !=================================================================================================
@@ -686,19 +686,27 @@ module module_BC
     
     !pressure boundary condition
     if (bdry_cond(1)==5 .and. coords(1)==0)then
-      p(is-1,:,:) = 2*WallPressure(1) - p(is,:,:)
+      p(is-1,:,:) = 2*BoundaryPressure(1) - p(is,:,:)
     endif
     
     if (bdry_cond(4)==5 .and. coords(1)==nPx-1)then
-      p(ie+1,:,:) = 2*WallPressure(2) - p(ie,:,:)
+      p(ie+1,:,:) = 2*BoundaryPressure(2) - p(ie,:,:)
     endif
     
     if (bdry_cond(2)==5 .and. coords(2)==0)then
-      p(:,js-1,:) = 2*WallPressure(3) - p(:,js,:)
+      p(:,js-1,:) = 2*BoundaryPressure(3) - p(:,js,:)
     endif
     
     if (bdry_cond(5)==5 .and. coords(2)==nPy-1)then
-      p(:,je+1,:) = 2*WallPressure(4) - p(:,je,:)
+      p(:,je+1,:) = 2*BoundaryPressure(4) - p(:,je,:)
+    endif
+    
+    if (bdry_cond(3)==5 .and. coords(3)==0)then
+      p(:,:,ks-1) = 2*BoundaryPressure(5) - p(:,:,ks)
+    endif
+    
+    if (bdry_cond(6)==5 .and. coords(3)==nPz-1)then
+      p(:,:,ke+1) = 2*BoundaryPressure(6) - p(:,:,ke)
     endif
   end subroutine SetPressureBC
 !=================================================================================================
@@ -760,8 +768,7 @@ module module_BC
           enddo
        enddo
     endif
-    
-     ! inflow on x+
+    ! inflow on x+
     if(bdry_cond(4)==3 .and. coords(1)==nPx-1   ) then
        do j=jmin,jmax
           do k=kmin,kmax
@@ -889,6 +896,21 @@ module module_BC
         u(:,je+1,:)=u(:,je-1,:)
         w(:,je+1,:)=w(:,je-1,:)
     endif
+    
+    if (bdry_cond(3)==5 .and. coords(3)==0)then
+	w(:,:,ks-1)=w(:,:,ks)
+        w(:,:,ks-2)=-w(:,:,ks)
+        u(:,:,ks-2)=u(:,:,ks)
+        v(:,:,ks-2)=v(:,:,ks)
+    endif
+    
+    if (bdry_cond(6)==5 .and. coords(3)==nPz-1)then
+	w(:,:,ke)=w(:,:,ke-1)
+        w(:,:,ke+1)=-w(:,:,ke-1)
+        u(:,:,ke+1)=u(:,:,ke-1)
+        v(:,:,ke+1)=v(:,:,ke-1)    
+    endif
+    
   contains
     function uinject(j,k,t)
       use module_grid

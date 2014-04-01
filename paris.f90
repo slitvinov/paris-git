@@ -1348,7 +1348,7 @@ subroutine ReadParameters
                         y_file,        z_file,        restart,       nBackup,       NumBubble,   &
                         xyzrad,        hypre,         dtFlag,        ICOut,         WallVel,     &
                         Inject_type,   maxErrorVol,   restartFront,  nstats,        WallShear,   &
-                        WallPressure,  ZeroReynolds,  restartAverages, termout, excentricity, tout
+                        BoundaryPressure,  ZeroReynolds,  restartAverages, termout, excentricity, tout
  
   Nx = 0; Ny = 4; Nz = 4 ! stop absurd input files. 
   Ng=2;xLength=1d0;yLength=1d0;zLength=1d0
@@ -1367,7 +1367,7 @@ subroutine ReadParameters
   xyzrad = 0.d0;  hypre=.false.;  dtFlag = 2;  ICout=.false.;   WallVel = 0d0
   Inject_type=2 ! redundant
   maxErrorVol=1d-4;   restartfront=.false.;  nstats=10;  WallShear=0d0
-  WallPressure=0d0;   ZeroReynolds=.false.;   restartAverages=.false.;   termout=0
+  BoundaryPressure=0d0;   ZeroReynolds=.false.;   restartAverages=.false.;   termout=0
   excentricity=0d0;   tout = -1.d0
 
   in=1
