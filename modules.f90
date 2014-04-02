@@ -684,7 +684,7 @@ module module_BC
       if(coords(3)==nPz-1) wmask(is-1:ie+1,js-1:je+1,ke)=0d0
     endif
     
-    !pressure boundary condition
+    !pressure boundary condition ! @@@@
     if (bdry_cond(1)==5 .and. coords(1)==0)then
       p(is-1,:,:) = 2*BoundaryPressure(1) - p(is,:,:)
     endif

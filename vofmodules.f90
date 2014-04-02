@@ -283,15 +283,11 @@ contains
     ! x- y- z- x+ y+ z+
 
     if(.not.bdry_read) stop "bdry not read"
-    do orientation=1,6
-       cond = vofbdry_cond(orientation)
-       dir = orientation
-       if(orientation>3) dir = orientation-3
-       if(iachar(cond(1:1))==0) then
-          if(orientation<=3) stop "missing vof bdry condition"
-          ! mirror the color or periodicity except if outflow is set
-          vofbdry_cond(orientation) = vofbdry_cond(dir)
-          if(bdry_cond(orientation)==4) vofbdry_cond(orientation) = 'outflow'   ! outflow +
+    do orientation=3,6
+       dir = orientation-3
+       if(vofbdry_cond(orientation)=='periodic'.or.vofbdry_cond(dir)=='periodic') then
+          vofbdry_cond(orientation) = 'periodic'
+          vofbdry_cond(dir) = 'periodic'
        endif
     enddo
 
@@ -567,7 +563,7 @@ contains
     if(d>3) call pariserror("wrong ipar")
     if(min(min(nx,ny),nz)<2) call pariserror("minimum dimension nx ny nz too small")
     max_flag=calc_imax(vof_flag)
-    if(n1>1.and.max_flag/=2.and.A_h>1d-16) then
+    if(n1>1.and.max_flag/=2) then
       if(rank==0) then
           if(max_flag==0) then
              write(*,*) "ls2vof_refined: error: single phase flow ? Nothing to initialize !?"
@@ -758,9 +754,9 @@ contains
        else if(cond=='dry') then
           fb(orientation)=0
        else if(cond=='periodic') then
-          fb(orientation) = 3
+          fb(orientation) = 3  !  will do nothing
        else if(cond=='outflow') then
-          fb(orientation) = 4 
+          fb(orientation) = 4  ! will copy inflow
         else if(cond=='jet') then
            if(orientation /= 1) stop "jet only at x-"
            fb(orientation) = 2
@@ -796,29 +792,29 @@ contains
                 c(try(2)) = l; c(try(3)) = m
                 c(d)=coordlimit(d,sign) + sign
                 if(flag<2) then
-                      cv(c(1),c(2),c(3))=dble(flag)
-                      fl(c(1),c(2),c(3))=flag
-                      c(d) = c(d) + sign
-                      cv(c(1),c(2),c(3))=dble(flag)
-                      fl(c(1),c(2),c(3))=flag
-                   elseif(flag==2) then  ! jet
-                      cv(c(1),c(2),c(3))=dble(inject(c(2),c(3)))
-                      fl(c(1),c(2),c(3))=inject(c(2),c(3))
-                   elseif(flag==4) then
-                      c(d)=coordlimit(d,sign)
-                      cvhere=cv(c(1),c(2),c(3))
-                      flhere=fl(c(1),c(2),c(3))
-                      c(d) = c(d) + sign
-                      cv(c(1),c(2),c(3))=cvhere
-                      fl(c(1),c(2),c(3))=flhere
-                      c(d) = c(d) + sign
-                      cv(c(1),c(2),c(3))=cvhere
-                      fl(c(1),c(2),c(3))=flhere
-                   endif
-                enddo
+                   cv(c(1),c(2),c(3))=dble(flag)
+                   fl(c(1),c(2),c(3))=flag
+                   c(d) = c(d) + sign
+                   cv(c(1),c(2),c(3))=dble(flag)
+                   fl(c(1),c(2),c(3))=flag
+                elseif(flag==2) then  ! jet
+                   cv(c(1),c(2),c(3))=dble(inject(c(2),c(3)))
+                   fl(c(1),c(2),c(3))=inject(c(2),c(3))
+                elseif(flag==4) then
+                   c(d)=coordlimit(d,sign)
+                   cvhere=cv(c(1),c(2),c(3))
+                   flhere=fl(c(1),c(2),c(3))
+                   c(d) = c(d) + sign
+                   cv(c(1),c(2),c(3))=cvhere
+                   fl(c(1),c(2),c(3))=flhere
+                   c(d) = c(d) + sign
+                   cv(c(1),c(2),c(3))=cvhere
+                   fl(c(1),c(2),c(3))=flhere
+                endif
              enddo
-          endif
-       enddo
+          enddo
+       endif
+    enddo
   contains
   function inject(j,k)
     use module_grid

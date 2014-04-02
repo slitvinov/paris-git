@@ -107,8 +107,14 @@ dPdZ      = 0.0
 
 VOLUMESOURCE = 0.2
 
-BDRY_COND = 3  3  3  3  3  3  
+! BDRY_COND = 1 1 1 1 1 1  ! works
+! BDRY_COND = 4 4 4 4 4 4  ! fails
+! BDRY_COND = 3 1 1 4 1 1  ! fails
+! BDRY_COND = 5 5 5 5 5 5 ! fails  
+BDRY_COND = 0 0 0 0 0 0 
+
                    !Type of boundary condition in x,y,z direction: 0:wall  1:periodic  2:shear
+		   ! 3: inflow 4: outflow 5: pressure
                    !x- y- z- x+ y+ z+
 
 RHO1     = 1.0
