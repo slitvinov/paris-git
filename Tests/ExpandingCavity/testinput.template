@@ -38,7 +38,7 @@ MAXERROR= 1d-8     ! Residual for Poisson solver
 MAXERRORVOL = 1d-4
                    ! Numerical parameters
 
-ITIME_SCHEME = 2   ! time scheme: 1:first order Euler, 2: second order quasi Crank-Nicolson
+ITIME_SCHEME = 1   ! time scheme: 1:first order Euler, 2: second order quasi Crank-Nicolson
                    ! Should use first order Euler for Stokes flow ! ! ! 
 MAXIT    = 2000
 BETA     = 1.4     ! parameters for linear solver
@@ -91,9 +91,15 @@ ZLENGTH  = ZLTEMP
 !=================================================================================================
 ! Flow parameters
 
-!WallVel(1,1)  = -0.0001 
+WallVel(1,1)  = -0.05
+WallVel(2,1)  = 0.05
+WallVel(3,2)  = -0.05
+WallVel(4,2)  = 0.05
 ! can set inflow velocities here
 
+Inject_type = 1
+!Defines wall velocity implementation 	1: Constant Dirichlet velocity on specified boundary
+!					2: Implementation with uinject function for atomization
 GX      = 0.0
 GY      = 0.0
 GZ      = 0.0
@@ -105,14 +111,10 @@ dPdZ      = 0.0
                    ! Px, Py, Pz: pressure gradients in case of pressure driven channel flow
                    ! Px = (P(xLength)-P(0))/xLength
 
-VOLUMESOURCE = 0.2
+VOLUMESOURCE = 0.0
 
-
-BDRY_COND = 4 4 4 4 4 4  
-
-
+BDRY_COND = 3  3  3  3  3  3  
                    !Type of boundary condition in x,y,z direction: 0:wall  1:periodic  2:shear
-		   ! 3: inflow 4: outflow 5: pressure
                    !x- y- z- x+ y+ z+
 
 RHO1     = 1.0
@@ -121,7 +123,7 @@ MU1      = 0.0
 
 RHO2     = 1.0
 MU2      = 0.0
-SIGMA    = 0.00       ! rho2, mu2, sigma : properties of the drop and surface tension
+SIGMA    = 0.0       ! rho2, mu2, sigma : properties of the drop and surface tension
                    
 
 NumBubble = 1      !number of bubbles

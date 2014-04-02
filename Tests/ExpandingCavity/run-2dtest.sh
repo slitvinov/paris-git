@@ -13,17 +13,17 @@ nx=$2
 np_xy=$3
 imp=$4
 
-rm -fr input out stats
+rm -fr input out stats testinput-* *.tmp
 zlength=`awk -v nx=$nx 'BEGIN { print 2./nx}'`
 let nprocs=$3*$3;
 let nprocsfront=$3*$3+1;
 sed s/NXTEMP/$nx/g testinput.template | sed s/DTTEMP/$dt/ | sed s/IMPTEMP/$imp/ | sed s/ZLTEMP/$zlength/ | sed s/NPXTEMP/$np_xy/ > testinput.tmp
 ln -s testinput.tmp input
-#   if [ `grep DoFront input | awk '{print $3}'` == 'T' ]; then
+ #   if [ `grep DoFront input | awk '{print $3}'` == 'T' ]; then
 #	let np=5
-#   else
+ #   else
 let np=$nprocs
-#  fi
+ #  fi
 mpirun -np $np paris > tmpout
 
 RED="\\033[1;31m"
