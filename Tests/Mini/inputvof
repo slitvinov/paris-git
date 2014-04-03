@@ -1,6 +1,6 @@
 &VOFPARAMETERS
 
-VOFBDRY_COND = 'periodic' 'periodic'  'periodic' 'periodic'  'periodic'  'periodic' 
+VOFBDRY_COND = 'wet' 'wet' 'wet' 'wet' 'wet' 'wet' 
                    ! Type of VOF boundary condition in x,y,z direction: 'wet', '90deg','periodic'
 
 TEST_TYPE = 'droplet'

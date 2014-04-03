@@ -641,7 +641,7 @@ module module_BC
   ! bdry_cond(i) = is the type if boundary condition in i'th direction
   ! explicits the boundary condition codes
   !                                   12345678    12345678    12345678    12345678    12345678
-  character(len=8) :: expl(0:5) = (/ "wall    ", "periodic", "shear   ", "inflow  ", "outflow ", "pressure" /)
+   character(len=8) :: expl(0:5) = (/ "wall    ", "periodic", "shear   ", "inflow  ", "outflow ", "pressure" /)
   real(8) :: WallVel(6,3), WallShear(6,3), BoundaryPressure(6)
   ! Tangential velocities on the surfaces of domain. First index represent the 
   ! side on which the velocity in the direction of the second index is specified.
@@ -802,7 +802,7 @@ module module_BC
        enddo
     endif    
 
-    if(bdry_cond(4)==0 .and. coords(1)==nPx-1) then
+    if(bdry_cond(4)==0 .and. coords(1)==nPx-1) then  ! @@@ ???
         u(ie  ,:,:)=0d0
         u(ie+1,:,:)=-u(ie-1,:,:)
         v(ie+1,:,:)=2*WallVel(2,2)-v(ie,:,:)

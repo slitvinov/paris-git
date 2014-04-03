@@ -166,14 +166,15 @@ contains
     use module_IO
     implicit none
     include 'mpif.h'
-    integer ierr,in
+    integer ierr,in,i
     logical file_is_there
     logical ViscMeanIsArith, DensMeanIsArith
     namelist /vofparameters/ vofbdry_cond,test_type,VOF_advect,refinement, &
        cylinder_dir, normal_up, DoLPP, jetradius, FreeSurface, ViscMeanIsArith, DensMeanIsArith, &
        output_filtered_VOF
     
-     vofbdry_cond=['periodic','periodic','periodic','periodic','periodic','periodic']
+!     vofbdry_cond=['periodic','periodic','periodic','periodic','periodic','periodic']
+     vofbdry_cond=['undefined','undefined','undefined','undefined','undefined','undefined']
      test_type='droplet'
      VOF_advect='CIAM'
      refinement=-1 ! redundant
@@ -199,6 +200,10 @@ contains
        if (rank == 0) STOP "ReadVOFParameters: no 'inputvof' file."
     endif
     close(in)
+    do i=1,3
+       if(vofbdry_cond(i) == 'undefined') call pariserror("vofbdry_cond undefined")
+       if(vofbdry_cond(i+3) == 'undefined') vofbdry_cond(i+3) = vofbdry_cond(i) 
+    enddo
     if(refinement==-1) then
        refinement=8
        if(rank==0) write(*,*) "Using default value for refinement"
@@ -283,11 +288,16 @@ contains
     ! x- y- z- x+ y+ z+
 
     if(.not.bdry_read) stop "bdry not read"
-    do orientation=3,6
+    do orientation=4,6
        dir = orientation-3
        if(vofbdry_cond(orientation)=='periodic'.or.vofbdry_cond(dir)=='periodic') then
           vofbdry_cond(orientation) = 'periodic'
           vofbdry_cond(dir) = 'periodic'
+          if(bdry_cond(dir) /= 1) &
+               call pariserror(&
+"cannot have periodic set only in VOF &
+need to have both bdry_cond and vofbdry_cond set &
+or none at all")
        endif
     enddo
 

@@ -35,6 +35,7 @@ if [ `grep -c ERROR tmpout ` -gt 0 ]; then
 else
     awk ' /Step:/ { cpu = $8 } END { print "cpu = " cpu } ' < tmpout
     echo -e "$GREEN" PASS "$NORMAL"
+exit # exit to avoid graphic output on comput. servers
     ./gnmovie.sh
     ./volumeplot.sh
 fi

@@ -1483,10 +1483,10 @@ subroutine check_integers()
   print *, "-------------------------"
   print *, "array index integer check"
   print *, "-------------------------"
-  nbytes=mylog2(max(mx,my,mz))
+  nbytes=(mylog2(max(mx,my,mz)))/8
   print *, "log2(box size)", mylog2(max(mx,my,mz))
-  nbytes=3*mylog2(mx)+3
-  print *, "nbytes max in array index", nbytes
+  nbytes=(3*mylog2(mx)+3)/8
+  print *, "nbytes max in box array index", nbytes
   if(nbytes>=intype*8) then
      n=0
      big=1
