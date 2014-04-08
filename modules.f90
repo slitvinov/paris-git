@@ -346,7 +346,7 @@ module module_IO
   integer :: opened=0;
   integer :: nout, out, output_format, nbackup, nstats, termout, nfile
   character(len=20) :: out_path, x_file, y_file, z_file
-  logical :: read_x, read_y, read_z, restart, ICOut, restartFront, restartAverages
+  logical :: read_x, read_y, read_z, restart, ICOut, restartFront, restartAverages, zip_data
   real(8) :: tout
 contains
     !=================================================================================================
@@ -470,7 +470,7 @@ subroutine backup_write
   implicit none
   integer ::i,j,k
   character(len=100) :: filename
-  filename = trim(out_path)//'/backup_'//int2text(rank,3)
+  filename = trim(out_path)//'/backup_'//int2text(rank,padding)
   call system('mv '//trim(filename)//' '//trim(filename)//'.old')
   OPEN(UNIT=7,FILE=trim(filename),status='unknown',action='write')
   write(7,1100)time,itimestep,is,ie,js,je,ks,ke
@@ -494,7 +494,7 @@ subroutine backup_read
   use module_hello
   implicit none
   integer ::i,j,k,i1,i2,j1,j2,k1,k2,ierr
-  OPEN(UNIT=7,FILE=trim(out_path)//'/backup_'//int2text(rank,3),status='old',action='read')
+  OPEN(UNIT=7,FILE=trim(out_path)//'/backup_'//int2text(rank,padding),status='old',action='read')
   read(7,*)time,itimestep,i1,i2,j1,j2,k1,k2
   if(i1/=is .or. i2/=ie .or. j1/=js .or. j2/=je .or. k1/=ks .or. k2/=ke) &
     stop 'Error: backup_read'
@@ -582,7 +582,7 @@ subroutine output2(nf,i1,i2,j1,j2,k1,k2)
   implicit none
   integer ::nf,i1,i2,j1,j2,k1,k2,i,j,k, itype=5
 !  logical, save :: first_time=.true.
-  character(len=30) :: rootname
+  character(len=30) :: rootname,filename
   rootname=TRIM(out_path)//'/VTK/plot'//TRIM(int2text(nf,padding))//'-'
 
   if(rank==0) call append_visit_file(TRIM(rootname))
@@ -627,6 +627,13 @@ subroutine output2(nf,i1,i2,j1,j2,k1,k2)
 310 format(e14.5,e14.5,e14.5)
 
     close(8)
+
+! TEMPORARY
+    if ( zip_data ) then 
+      filename = TRIM(rootname)//TRIM(int2text(rank,padding))//'.vtk'
+      call system('gzip '//trim(filename))
+    end if ! zip_data
+! END TEMPORARY 
 end subroutine output2
 !-------------------------------------------------------------------------------------------------
 end module module_IO
@@ -638,7 +645,7 @@ module module_BC
   use module_grid
   use module_hello
   implicit none
-  integer :: bdry_cond(6), inject_type=2
+  integer :: bdry_cond(6), inject_type
   logical :: bdry_read=.false.
   ! bdry_cond(i) = is the type if boundary condition in i'th direction
   ! explicits the boundary condition codes
@@ -651,6 +658,7 @@ module module_BC
   ! Example: WallVel(4,3) represent the W velocity on +y side of the domain.
   ! LM: The same convention is used for BoundaryPressure
   ! SZ: alternately may contain the velocity of the flow for inflow boundary conditions on x+
+  real(8) :: ugas_inject,uliq_inject
   contains
 !=================================================================================================
 !=================================================================================================
@@ -916,23 +924,54 @@ module module_BC
   contains
     function uinject(j,k,t)
       use module_grid
+      use module_flow
       implicit none
       integer :: j,k
       real(8) :: t
       real(8) :: uinject
+      real(8) :: BLliq = 1.d-3 ! 0.567d-3
+      real(8) :: tshift = 1.d-5   !1.d0-2
+      real(8) :: ryz
       real(8), parameter :: PI = 3.14159265359d0
-      real(8), parameter :: tshift = 1.d0-2 
       uinject=0d0
-      !if((y(j) - 0.5d0)**2 + (z(k) - 0.5d0)**2.lt.jetradius**2) uinject=1D0
-      if (Inject_type==1) then
+      if (inject_type==1) then
 	    uinject = 1.d0
-      elseif((y(j) - 0.5d0)**2 + (z(k) - 0.5d0)**2.lt.jetradius**2 .and. (Inject_type==2) ) then 
-         if ( t<=tshift ) then  
-            uinject=1.d0
+      elseif( inject_type==2 ) then 
+         if( (y(j) - jetcenter_yc)**2.d0 + (z(k) - jetcenter_zc)**2.d0 .lt. jetradius**2.d0 ) then 
+            if ( t<=tshift ) then  
+               uinject=1.d0
+            else 
+               uinject=1.d0+0.05d0*SIN(10.d0*2.d0*PI*(t-tshift))
+            end if ! t
+         end if ! y(j)
+      else if ( inject_type == 3 ) then ! 2d coaxial jet
+         tshift = 5.d-2
+         if ( y(j) <= jetradius ) then 
+            uinject = uliq_inject & 
+                     *erf( (jetradius - y(j))/BLliq )  
+         else if ( y(j) > jetradius .and. y(j) <= 2.d0*jetradius ) then
+            uinject = ugas_inject & 
+                     *erf( (y(j) -      jetradius)/BLliq ) & 
+                     *erf( (2.d0*jetradius - y(j))/BLliq ) & 
+                     *erf(time/tshift) 
          else 
-            uinject=1.d0+0.05d0*SIN(10.d0*2.d0*PI*(t-tshift))
-         end if ! t
-      end if ! y(j), z(k
+            uinject = 0.d0 
+         end if  !
+      else if ( inject_type == 4 ) then ! 3d coaxial jet
+         tshift = 0.d-2
+         ryz = sqrt( (y(j) - jetcenter_yc)**2.d0 + (z(k) - jetcenter_zc)**2.d0 )
+         if ( ryz <= jetradius ) then 
+            uinject = 0.173d0 !& 
+                     !*erf( (jetradius - ryz)/BLliq ) & 
+         else if ( ryz > jetradius .and. ryz <= 2.d0*jetradius ) then
+            uinject = 2.0d+0 & 
+                     *erf( (ryz -      jetradius)/BLliq ) & 
+                     *erf( (2.d0*jetradius - ryz)/BLliq ) & 
+                     *erf(max(time-tshift,0.d0)/tshift) 
+         else 
+            uinject = 0.d0 
+         end if  !
+      end if ! y(j), z(k)
     end function uinject
   end subroutine SetVelocityBC
 !=================================================================================================

@@ -142,7 +142,7 @@ Program paris
      ! output initial condition
      ! if(rank==0) start_time = MPI_WTIME()
      if(ICOut .and. rank<nPdomain) then
-        !if (.not.restart) call output(0,is,ie+1,js,je+1,ks,ke+1)
+        if (.not.restart) call output(0,is,ie+1,js,je+1,ks,ke+1)
         if(DoVOF .and. .not.restart) call output_VOF(0,is,ie+1,js,je+1,ks,ke+1)
         if(DoLPP .and. .not.restart) call output_LPP(0)
         if(test_droplet) call output_droplet(u,v,w,time)
@@ -417,7 +417,7 @@ Program paris
            nfile = ITIMESTEP/nout
            if ( tout > 0.d0 .and. dtFlag == 1 ) nfile = NINT(time/tout)
            call write_vec_gnuplot(u,v,cvof,p,itimestep,DoVOF)
-           ! call output(nfile,is,ie+1,js,je+1,ks,ke+1)
+           call output(nfile,is,ie+1,js,je+1,ks,ke+1)
            if(DoVOF) call output_VOF(nfile,is,ie+1,js,je+1,ks,ke+1)
            if(DoLPP) call output_LPP(nfile)
            if(test_droplet) call output_droplet(u,v,w,time)
@@ -1347,8 +1347,9 @@ subroutine ReadParameters
                         output_format, read_x,        read_y,        read_z,        x_file,      &
                         y_file,        z_file,        restart,       nBackup,       NumBubble,   &
                         xyzrad,        hypre,         dtFlag,        ICOut,         WallVel,     &
-                        Inject_type,   maxErrorVol,   restartFront,  nstats,        WallShear,   &
-                        BoundaryPressure,  ZeroReynolds,  restartAverages, termout, excentricity, tout
+                        inject_type,   maxErrorVol,   restartFront,  nstats,        WallShear,   &
+                        BoundaryPressure,             ZeroReynolds,  restartAverages,termout,    &  
+                        excentricity,  tout,          zip_data,      ugas_inject,   uliq_inject
  
   Nx = 0; Ny = 4; Nz = 4 ! stop absurd input files. 
   Ng=2;xLength=1d0;yLength=1d0;zLength=1d0
@@ -1365,10 +1366,11 @@ subroutine ReadParameters
   output_format = 2;   read_x=.false.;   read_y=.false.;   read_z=.false.
   restart = .false.;  nBackup = 2000;  NumBubble=0
   xyzrad = 0.d0;  hypre=.false.;  dtFlag = 2;  ICout=.false.;   WallVel = 0d0
-  Inject_type=2 ! redundant
+  inject_type=2 ! redundant
   maxErrorVol=1d-4;   restartfront=.false.;  nstats=10;  WallShear=0d0
   BoundaryPressure=0d0;   ZeroReynolds=.false.;   restartAverages=.false.;   termout=0
-  excentricity=0d0;   tout = -1.d0
+  excentricity=0d0;   tout = -1.d0;          zip_data=.false.
+  ugas_inject=0.d0;   uliq_inject=1.d0
 
   in=1
   out=2

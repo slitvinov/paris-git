@@ -2848,6 +2848,12 @@ module module_output_lpp
 210   format(e14.5)
       close(8)
          
+! TEMPORARY 
+      if ( zip_data ) then 
+         filename = TRIM(rootname)//TRIM(int2text(rank,padding))//'.vtk'
+         call system('gzip '//trim(filename))
+      end if ! zip_data
+! END TEMPORARY 
    end subroutine output_LPP_VOFVTK
 
 !-------------------------------------------------------------------------------------------------
@@ -2855,7 +2861,7 @@ module module_output_lpp
       implicit none
       integer ::ipart
       character(len=100) :: filename
-      filename = trim(out_path)//'/backuplpp_'//int2text(rank,3)
+      filename = trim(out_path)//'/backuplpp_'//int2text(rank,padding)
       call system('mv '//trim(filename)//' '//trim(filename)//'.old')
       OPEN(UNIT=7,FILE=trim(filename),status='unknown',action='write')
       write(7,1100)time,itimestep,num_part(rank)
@@ -2886,7 +2892,7 @@ module module_output_lpp
    subroutine backup_LPP_read
       implicit none
       integer ::ipart,ierr
-      OPEN(UNIT=7,FILE=trim(out_path)//'/backuplpp_'//int2text(rank,3),status='old',action='read')
+      OPEN(UNIT=7,FILE=trim(out_path)//'/backuplpp_'//int2text(rank,padding),status='old',action='read')
       read(7,*)time,itimestep,num_part(rank)
       if ( num_part(rank) < 0 ) &
          stop 'Error: backuplpp_read'

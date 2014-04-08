@@ -106,6 +106,14 @@ contains
     integer :: ierr
     integer :: req(48),sta(MPI_STATUS_SIZE,48)
     real(8) :: x0,y0,z0,radius,x2,y2,z2
+    ! for 2d nozzle
+    real(8), parameter :: PI = 3.14159265359d0
+    real(8) :: hmin,lnozzle,beta,h,l1,jetradius
+    hmin = xlength/dble(nx)    
+    lnozzle = 4.d-3
+    !beta = 3.5d0/180.d0*PI 
+    ! Note: small beta is only meaningful when resolution is very high
+    jetradius = 0.01d0  ! note: need to be consistent with inputvof 
 
     call ReadSolidParameters
     if(dosolids) then
@@ -136,6 +144,17 @@ contains
              enddo
           else if (solid_type == 'BitMap') then
              s1 = read_bitmap(i,j,k)
+          else if (solid_type == '2D_nozzle') then
+             !l1 = hmin*0.5d0/tan(beta)
+             !h = tan(beta)*(lnozzle+l1-x(i))
+             h = hmin*0.5d0 
+             if ( x(i) < lnozzle .and. & 
+                  y(j) < jetradius+h .and. & 
+                  y(j) > jetradius-h ) then 
+               s1 = 1.d0 
+             else
+               s1 =-1.d0
+             end if ! x(i),y(j)
           else
              stop 'invalid type'
           endif

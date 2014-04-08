@@ -57,6 +57,7 @@ module module_VOF
   logical :: test_D2P = .false.
   logical :: test_bubbles = .false.
   logical :: test_injectdrop = .false.
+  logical :: test_jet = .false.
   logical :: linfunc_initialized = .false.
   real(8) :: b1,b2,b3,b4
   integer :: nfilter=0
@@ -67,6 +68,8 @@ module module_VOF
   integer, parameter :: ArithMean = 101
   integer, parameter :: HarmMean  = 102
   integer :: ViscMean,DensMean
+
+  real(8), parameter :: PI = 3.14159265359d0
 
 contains
 !=================================================================================================
@@ -170,7 +173,8 @@ contains
     logical file_is_there
     logical ViscMeanIsArith, DensMeanIsArith
     namelist /vofparameters/ vofbdry_cond,test_type,VOF_advect,refinement, &
-       cylinder_dir, normal_up, DoLPP, jetradius, FreeSurface, ViscMeanIsArith, DensMeanIsArith, &
+       cylinder_dir, normal_up, DoLPP, jetradius, jetcenter_yc2yLength, jetcenter_zc2zLength, & 
+       FreeSurface, ViscMeanIsArith, DensMeanIsArith, &
        output_filtered_VOF
     
 !     vofbdry_cond=['periodic','periodic','periodic','periodic','periodic','periodic']
@@ -180,7 +184,9 @@ contains
      refinement=-1 ! redundant
     cylinder_dir=0 ! redundant
     normal_up=.true. ! redundant
-    DoLPP=.false.;jetradius=01d0;FreeSurface=.false. 
+    DoLPP=.false.
+    jetradius=01d0;jetcenter_yc2yLength=0.5d0;jetcenter_zc2zLength=0.5d0
+    FreeSurface=.false. 
     ViscMeanIsArith=.true.; DensMeanIsArith=.true.
     output_filtered_VOF=.false. ! redundant
     
@@ -232,7 +238,11 @@ contains
      !open(unit=out, file=trim(out_path)//'/output', action='write', iostat=ierr)
      !if (ierr .ne. 0) stop 'ReadParameters: error opening output file'
      write(UNIT=out,NML=vofparameters)
-    end if ! rank 
+    end if ! rank
+
+    ! Set parameters depending on input parameters
+    jetcenter_yc = jetcenter_yc2yLength*yLength
+    jetcenter_zc = jetcenter_zc2zLength*zLength
 
   end subroutine ReadVOFParameters
 !
@@ -276,6 +286,8 @@ contains
        test_bubbles = .true.
     else if(test_type=='injectdrop_test') then
        test_injectdrop = .true.
+    else if(test_type=='jet') then
+       test_jet = .true.
     else
        write(*,*) test_type, rank
        stop 'unknown initialization'
@@ -335,6 +347,7 @@ or none at all")
   !  Initialize vof field and flags
   !=================================================================================================
   subroutine initconditions_VOF()
+    use module_grid
     use module_hello
     use module_flow
     use module_BC
@@ -346,6 +359,8 @@ or none at all")
     integer , parameter :: ngh=2
     integer :: ipar
     integer, parameter :: root_rank = 0
+    integer :: i,j,k
+    real(8) :: lnozzle = 4.d-3   ! need to be consistent with lnozzle in solids
     
     if( test_D2P .or. test_tag ) then 
        if ( rank == root_rank ) call random_bubbles
@@ -376,6 +391,17 @@ or none at all")
        cvof=0.d0
        vof_flag=0
     endif
+
+    ! hard code for 2d planar jet with finite length nozzle
+    if (test_jet .and. inject_type == 3 ) then
+      do i = is,ie; do j=js,je; do k = ks,ke
+         if ( x(i) < lnozzle .and. y(j) < jetradius ) then 
+            cvof(i,j,k) = 1.d0
+            vof_flag(i,j,k) = 1
+         end if ! 
+      end do; end do; end do
+    end if ! test_jet 
+
     call ghost_x(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
     call ghost_y(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
     call ghost_z(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
@@ -464,7 +490,7 @@ or none at all")
 
     wave2ls = vdir(3)*(- zz + zLength/2.d0) + vdir(2)*(-yy + yLength/2.d0) &
          + vdir(1)*(-xx + xLength/2.d0) &
-         + A_h*dx(nx/2+2)*cos(2.*3.14159*(hdir(1)*xx/xLength &
+         + A_h*dx(nx/2+2)*cos(2.*PI*(hdir(1)*xx/xLength &
          + hdir(2)*yy/yLength + hdir(3)*zz/zLength))
     wave2ls = wave2ls*dble(normalsign)
   end function wave2ls
@@ -831,8 +857,12 @@ or none at all")
     implicit none
     integer :: j,k
     integer :: inject
-    inject=0d0
-    if((y(j) - 0.5d0)**2 + (z(k) - 0.5d0)**2.lt.jetradius**2) inject=1
+    inject=0
+    if ( inject_type == 2 .or. inject_type == 4) then 
+      if ((y(j) - jetcenter_yc)**2 + (z(k) - jetcenter_zc)**2.lt.jetradius**2) inject=1
+    else if ( inject_type == 3 ) then
+      if ( y(j) <= jetradius ) inject = 1 
+    end if ! inject_type
   end function inject
 !
    function xcoord(d,i)
@@ -892,7 +922,7 @@ contains
     implicit none
     integer ::nf,i1,i2,j1,j2,k1,k2,i,j,k
     real(8) :: cfiltered
-    character(len=30) :: rootname
+    character(len=30) :: rootname,filename
     rootname=trim(out_path)//'/VTK/VOF'//TRIM(int2text(nf,padding))//'-'
     if(rank==0) call append_VOF_visit_file(TRIM(rootname))
 
@@ -940,6 +970,12 @@ contains
 210 format(e14.5)
 ! 310 format(e14.5,e14.5,e14.5)
     close(8)
+! TEMPORARY 
+    if ( zip_data ) then 
+      filename = TRIM(rootname)//TRIM(int2text(rank,padding))//'.vtk'
+      call system('gzip '//trim(filename))
+    end if ! zip_data
+! END TEMPORARY 
 end subroutine output_VOF
 !=================================================================================================
 !=================================================================================================
@@ -948,7 +984,7 @@ subroutine backup_VOF_write
   implicit none
   integer ::i,j,k
   character(len=100) :: filename
-  filename = trim(out_path)//'/backup_'//int2text(rank,3)
+  filename = trim(out_path)//'/backup_'//int2text(rank,padding)
   call system('mv '//trim(filename)//' '//trim(filename)//'.old')
   OPEN(UNIT=7,FILE=trim(filename),status='unknown',action='write')
   !Note: p at ghost layers are needed for possion solver 
@@ -967,7 +1003,7 @@ end subroutine backup_VOF_write
 subroutine backup_VOF_read
   implicit none
   integer ::i,j,k,i1,i2,j1,j2,k1,k2,ierr
-  OPEN(UNIT=7,FILE=trim(out_path)//'/backup_'//int2text(rank,3),status='old',action='read')
+  OPEN(UNIT=7,FILE=trim(out_path)//'/backup_'//int2text(rank,padding),status='old',action='read')
   read(7,*)time,itimestep,i1,i2,j1,j2,k1,k2
   if(i1/=imin .or. i2/=imax .or. j1/=jmin .or. j2/=jmax .or. k1/=kmin .or. k2/=kmax) &
     stop 'Error: backup_read'

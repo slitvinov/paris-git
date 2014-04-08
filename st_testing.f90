@@ -161,7 +161,6 @@ contains
       real(8) :: Lm_err_K
       integer :: sumCount,nfound,nindepend
       integer :: nposit
-      real(8), parameter :: PI= 3.14159265359d0
 
       OPEN(UNIT=89,FILE=TRIM(out_path)//'/curvature-'//TRIM(int2text(rank,padding))//'.txt')
       OPEN(UNIT=90,FILE=TRIM(out_path)//'/reference-'//TRIM(int2text(rank,padding))//'.txt')
