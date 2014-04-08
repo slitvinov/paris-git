@@ -121,7 +121,6 @@
 
    logical, dimension(:,:,:), allocatable :: RegAwayInterface
 
-   real(8), parameter :: PI = 3.14159265359d0
    integer, parameter :: CRAZY_INT = 3483129 
 
    integer, parameter :: CriteriaRectangle = 1
@@ -838,7 +837,7 @@ contains
                end do ! irank
             ! compute element size pdf
             case(DropStatistics_ElementSizePDF)
-               gap = 1.d-3
+               gap = yLength/dble(Ny) 
                dmax = dble(num_gaps)*gap
                count_element(:) = 0
                do irank = 0,nPdomain-1
@@ -1545,7 +1544,7 @@ contains
 
       RegAwayInterface = .true.
       d_cut = (6.d0*vol_cut/PI)**0.333333d0
-      shift = INT(2.d0*d_cut/(xh(is+1)-xh(is)))
+      shift = INT(dble(ConvertRegSizeToDiam)*0.5d0*d_cut/(xh(is+1)-xh(is)))
 
       do k=ks,ke; do j=js,je; do i=is,ie
          if ( cvof(i,j,k) > 0.d0 .and. cvof(i,j,k) < 1.d0 ) then 
@@ -2780,7 +2779,7 @@ module module_output_lpp
    subroutine output_LPP_VOFVTK(nf)
       implicit none
       integer,intent(in)  :: nf
-      character(len=30) :: rootname
+      character(len=30) :: rootname,filename
       integer :: ipart
       real(8) :: lppvof(imin:imax,jmin:jmax,kmin:kmax)
       integer :: i1,ic,i2,j1,jc,j2,k1,kc,k2,i,j,k,i0,j0,k0

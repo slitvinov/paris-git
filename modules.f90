@@ -329,6 +329,8 @@ module module_2phase
   real(8), dimension( : ), allocatable :: rad, xc, yc, zc, vol
   real(8) :: excentricity(3)
   real(8) :: jetradius = 1d100
+  real(8) :: jetcenter_yc2yLength, jetcenter_zc2zLength 
+  real(8) :: jetcenter_yc,         jetcenter_zc 
   real(8) :: sigma
   integer :: NumBubble
   logical :: FreeSurface
@@ -1554,10 +1556,10 @@ subroutine SetupPoisson(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask,cvof,Vo
       A(i,j,k,4) = 2d0*dt*vmask(i,j,k)/(dy(j)*dyh(j  )*(rhot(i,j+1,k)+rhot(i,j,k)))
       A(i,j,k,5) = 2d0*dt*wmask(i,j,k-1)/(dz(k)*dzh(k-1)*(rhot(i,j,k-1)+rhot(i,j,k)))
       A(i,j,k,6) = 2d0*dt*wmask(i,j,k)/(dz(k)*dzh(k  )*(rhot(i,j,k+1)+rhot(i,j,k)))
-      A(i,j,k,7) = sum(A(i,j,k,1:6)) + 1d-49
+      A(i,j,k,7) = sum(A(i,j,k,1:6))
       A(i,j,k,8) = -( VolumeSource +(utmp(i,j,k)-utmp(i-1,j,k))/dx(i) &
-			+	(vtmp(i,j,k)-vtmp(i,j-1,k))/dy(j) &
-			+	(wtmp(i,j,k)-wtmp(i,j,k-1))/dz(k) )
+         +  (vtmp(i,j,k)-vtmp(i,j-1,k))/dy(j) &
+         +  (wtmp(i,j,k)-wtmp(i,j,k-1))/dz(k) )
 !    endif
   enddo; enddo; enddo
 
@@ -1569,9 +1571,10 @@ subroutine SetupPoisson(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask,cvof,Vo
      enddo;enddo;enddo
   endif
 ! pressure 0 where pmask=0
-  do i=1,6; A(:,:,:,i) = pmask*A(:,:,:,i); enddo
-  A(:,:,:,7) = 1d0 - pmask + pmask*A(:,:,:,7) 
-  A(:,:,:,8) = pmask*A(:,:,:,8) 
+  do i=1,8; A(:,:,:,i) = pmask*A(:,:,:,i); enddo
+  A(:,:,:,7) = A(:,:,:,7) + 1.0d-49 
+!  A(:,:,:,7) = 1d0 - pmask + pmask*A(:,:,:,7) 
+!  A(:,:,:,8) = pmask*A(:,:,:,8) 
 end subroutine SetupPoisson
 !=================================================================================================
 !=================================================================================================
