@@ -1065,6 +1065,7 @@ subroutine initialize
     du=0.0;dv=0.0;dw=0.0
     u=0.0;v=0.0;w=0.0;p=0.0;tmp=0.0;fx=0.0;fy=0.0;fz=0.0;drho=0.0;rho=0.0;mu=0.0;work=0.0;A=0.0
     averages=0.0; oldaverages=0.0; allaverages=0d0
+    uold=0.d0;vold=0.d0;wold=0.d0
     umask = 1d0; vmask = 1d0; wmask = 1d0
 
   else  !   if(rank<nPdomain)then
