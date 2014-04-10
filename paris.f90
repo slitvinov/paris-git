@@ -570,7 +570,7 @@ subroutine calcStats
     mystats(7)=mystats(7)+p(i,j,k)*vol
 ! average momentum
     mystats(8)=mystats(8)+0.5*(rho(i,j,k)+rho(i+1,j,k))*u(i,j,k)*vol
-    mystats(9)=mystats(9)+0.5*(rhoo(i,j,k)+rhoo(i+1,j,k))*uold(i,j,k)*vol
+    mystats(9)=mystats(9)+0.5*(rho(i,j,k)+rho(i+1,j,k))*uold(i,j,k)*vol
 ! Phase C=1 volume
     if(DoVOF) CC=cvof(i,j,k) ;  mystats(10)=mystats(10)+CC*vol
 ! Phase C=1 center of mass
