@@ -59,6 +59,7 @@ if [ $d == 2 ]; then
 else
     npx=2; npy=$npx; npz=$npx
     type="Curvature_test"
+    cyldir=0
 fi
 
 if [ $setmono == mono ]; then
