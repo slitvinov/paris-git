@@ -880,45 +880,45 @@ module module_BC
     
     !Set zero normal velocity gradient for pressure boundary condition
     if (bdry_cond(1)==5 .and. coords(1)==0)then
-	u(is-1,:,:)=u(is,:,:)
-        u(is-2,:,:)=-u(is,:,:)
-        v(is-2,:,:)=v(is,:,:)
-        w(is-2,:,:)=w(is,:,:)
+       u(is-1,:,:)=u(is,:,:)
+       u(is-2,:,:)=-u(is,:,:)
+       v(is-2,:,:)=v(is,:,:)
+       w(is-2,:,:)=w(is,:,:)
     endif
     
     if (bdry_cond(4)==5 .and. coords(1)==nPx-1)then
-	u(ie,:,:)=u(ie-1,:,:)
-        u(ie+1,:,:)=-u(ie-1,:,:)
-        v(ie+1,:,:)=v(ie-1,:,:)
-        w(ie+1,:,:)=w(ie-1,:,:)
+       u(ie,:,:)=u(ie-1,:,:)
+       u(ie+1,:,:)=-u(ie-1,:,:)
+       v(ie+1,:,:)=v(ie-1,:,:)
+       w(ie+1,:,:)=w(ie-1,:,:)
     endif
     
     if (bdry_cond(2)==5 .and. coords(2)==0)then
-	v(:,js-1,:)=v(:,js,:)
-        v(:,js-2,:)=-v(:,js,:)
-        u(:,js-2,:)=u(:,js,:)
-        w(:,js-2,:)=w(:,js,:)
+       v(:,js-1,:)=v(:,js,:)
+       v(:,js-2,:)=-v(:,js,:)
+       u(:,js-2,:)=u(:,js,:)
+       w(:,js-2,:)=w(:,js,:)
     endif
     
     if (bdry_cond(5)==5 .and. coords(2)==nPy-1)then
-	v(:,je,:)=v(:,je-1,:)
-        v(:,je+1,:)=-v(:,je-1,:)
-        u(:,je+1,:)=u(:,je-1,:)
-        w(:,je+1,:)=w(:,je-1,:)
+       v(:,je,:)=v(:,je-1,:)
+       v(:,je+1,:)=-v(:,je-1,:)
+       u(:,je+1,:)=u(:,je-1,:)
+       w(:,je+1,:)=w(:,je-1,:)
     endif
     
     if (bdry_cond(3)==5 .and. coords(3)==0)then
-	w(:,:,ks-1)=w(:,:,ks)
-        w(:,:,ks-2)=-w(:,:,ks)
-        u(:,:,ks-2)=u(:,:,ks)
-        v(:,:,ks-2)=v(:,:,ks)
+       w(:,:,ks-1)=w(:,:,ks)
+       w(:,:,ks-2)=-w(:,:,ks)
+       u(:,:,ks-2)=u(:,:,ks)
+       v(:,:,ks-2)=v(:,:,ks)
     endif
     
     if (bdry_cond(6)==5 .and. coords(3)==nPz-1)then
-	w(:,:,ke)=w(:,:,ke-1)
-        w(:,:,ke+1)=-w(:,:,ke-1)
-        u(:,:,ke+1)=u(:,:,ke-1)
-        v(:,:,ke+1)=v(:,:,ke-1)    
+       w(:,:,ke)=w(:,:,ke-1)
+       w(:,:,ke+1)=-w(:,:,ke-1)
+       u(:,:,ke+1)=u(:,:,ke-1)
+       v(:,:,ke+1)=v(:,:,ke-1)    
     endif
     
   contains
@@ -935,7 +935,7 @@ module module_BC
       real(8), parameter :: PI = 3.14159265359d0
       uinject=0d0
       if (inject_type==1) then
-	    uinject = 1.d0
+         uinject = 1.d0
       elseif( inject_type==2 ) then 
          if( (y(j) - jetcenter_yc)**2.d0 + (z(k) - jetcenter_zc)**2.d0 .lt. jetradius**2.d0 ) then 
             if ( t<=tshift ) then  
