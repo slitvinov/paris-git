@@ -526,6 +526,7 @@ contains
      kapparray=2d6
 
      do k=ks,ke; do j=js,je; do i=is,ie
+       kappa=kappamax
         if (vof_flag(i,j,k) == 2 ) then  ! mixed cell
            call get_curvature(i,j,k,kappa,nfound,nposit,afit,.false.)
         else if (vof_flag(i,j,k) > 2 ) then

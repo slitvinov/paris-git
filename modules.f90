@@ -316,7 +316,7 @@ end module module_flow
 ! Temporary variables
 !-------------------------------------------------------------------------------------------------
 module module_tmpvar
-  real(8), dimension(:,:,:,:), allocatable :: work, A
+  real(8), dimension(:,:,:,:), allocatable, target :: work, A
   real(8), dimension(:,:,:), allocatable, target :: tmp
   real(8) :: tcpu(100),t0
 end module module_tmpvar

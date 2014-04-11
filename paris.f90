@@ -6,6 +6,7 @@
 ! 
 ! Authors: Sadegh Dabiri, Gretar Tryggvason.
 ! Author for VOF extensions Stephane Zaleski (zaleski@dalembert.upmc.fr).
+! Author for momentum conserving method: Daniel Fuster (fuster@dalembert.upmc.fr)
 ! Contact: sdabiri@gmail.com .
 ! A three dimensional Navier-Stokes flow solver with front tracking for modeling of multiphase 
 ! flows. Flow can be driven by wall motion, density difference or pressure gradient.
@@ -242,7 +243,11 @@ Program paris
 
 !------------------------------------VOF STUFF ---------------------------------------------------
            if(DoVOF) then
+             if (DoMOF) then
+!              call vofandmomsweeps(itimestep)
+            else
               call vofsweeps(itimestep)
+            endif
               call my_timer(4,itimestep,ii)
               call get_all_heights()
               call my_timer(5,itimestep,ii)
