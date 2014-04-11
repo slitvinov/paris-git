@@ -111,6 +111,8 @@ contains
     real(8) :: hmin,lnozzle,beta,h,l1,jetradius
     hmin = xlength/dble(nx)    
     lnozzle = 4.d-3
+    beta=1d0
+    l1=0.d0
     !beta = 3.5d0/180.d0*PI 
     ! Note: small beta is only meaningful when resolution is very high
     jetradius = 0.01d0  ! note: need to be consistent with inputvof 

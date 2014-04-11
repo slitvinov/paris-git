@@ -4,10 +4,10 @@ VOFBDRY_COND = 'periodic' 'periodic' 'periodic'
 
                    ! Type of VOF boundary condition in x,y,z direction: 'wet', '90deg','periodic'
 
-TEST_TYPE = 'Curvature_test'
+TEST_TYPE = 'Curvature2D'
 VOF_ADVECT = 'Dick_Yue'
 REFINEMENT = 8
-CYLINDER_DIR = 0
+CYLINDER_DIR = 2
 NORMAL_UP = F
 
 !=================================================================================================

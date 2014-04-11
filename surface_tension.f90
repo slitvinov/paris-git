@@ -162,7 +162,7 @@ contains
      use module_timer
      implicit none
      include 'mpif.h'
-     integer :: direction, ierr, i,itimestep,ii
+     integer :: direction, ierr, i
      integer :: req(24),sta(MPI_STATUS_SIZE,24)
      if(.not.st_initialized) call initialize_surface_tension()
 
@@ -172,7 +172,7 @@ contains
      do direction=1,3
         call get_heights_pass1(direction)
      enddo
-     call my_timer(5,itimestep,ii)
+     call my_timer(5)
 
      do i=1,6
         call ghost_x(height(:,:,:,i),2,req(4*(i-1)+1:4*i))
@@ -186,7 +186,7 @@ contains
         call ghost_z(height(:,:,:,i),2,req(4*(i-1)+1:4*i))
      enddo
      call MPI_WAITALL(24,req(1:24),sta(:,1:24),ierr)
-     call my_timer(6,itimestep,ii)
+     call my_timer(6)
      do direction=1,3
         call get_heights_pass2(direction)
         call get_heights_pass3(direction)
@@ -518,27 +518,30 @@ contains
      include 'mpif.h'
      real(8), intent(inout) :: kapparray(imin:imax,jmin:jmax,kmin:kmax)
      real(8) :: afit(6), kappa
-     integer :: ierr, i,j,k, nfound, nposit, sum_flag, n_pure_faces
+     integer :: ierr, i,j,k, nfound, nposit
      integer :: req(24),sta(MPI_STATUS_SIZE,24)
+     logical :: is_bulk_cell
      if(.not.st_initialized) call initialize_surface_tension()
 
      !*** Initialize
      kapparray=2d6
 
      do k=ks,ke; do j=js,je; do i=is,ie
-       kappa=kappamax
+        is_bulk_cell=.false. 
         if (vof_flag(i,j,k) == 2 ) then  ! mixed cell
            call get_curvature(i,j,k,kappa,nfound,nposit,afit,.false.)
         else if (vof_flag(i,j,k) > 2 ) then
            call pariserror("inconsistent vof_flag > 3")
         else if(.not.bulk_cell(i,j,k)) then !  non-bulk pure cell
            call get_curvature(i,j,k,kappa,nfound,nposit,afit,.true.)
+        else
+           is_bulk_cell=.true.
         endif
         if(abs(kappa)>kappamax) then
            geom_case_count(17) = geom_case_count(17) + 1
            kappa = sign(1d0,kappa)*kappamax
         endif
-        kapparray(i,j,k) = kappa
+        if(.not.is_bulk_cell) kapparray(i,j,k) = kappa
      enddo;enddo;enddo
 
      call ghost_x(kapparray(:,:,:),2,req(1:4))

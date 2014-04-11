@@ -146,7 +146,7 @@ Program paris
         if (.not.restart) call output(0,is,ie+1,js,je+1,ks,ke+1)
         if(DoVOF .and. .not.restart) call output_VOF(0,is,ie+1,js,je+1,ks,ke+1)
         if(DoLPP .and. .not.restart) call output_LPP(0)
-        if(test_droplet) call output_droplet(u,v,w,time)
+        if(test_droplet) call output_droplet(w,time)
         call setvelocityBC(u,v,w,umask,vmask,wmask,time)
         call write_vec_gnuplot(u,v,cvof,p,itimestep,DoVOF)
         call calcstats
@@ -204,12 +204,12 @@ Program paris
              call linfunc(rho,rho1,rho2,DensMean)
              call linfunc(mu,mu1,mu2,ViscMean) ! Note: harmonic mean matches shear stress better
            endif
-           call my_timer(2,itimestep,ii)
+           call my_timer(2)
 
 !------------------------------------FRONT TRACKING  ---------------------------------------------
            ! Receive front from master of front
            if(DoFront) call GetFront('recv')
-           call my_timer(13,itimestep,ii)
+           call my_timer(13)
            if(Implicit) then
               if(Twophase) then 
                  call momentumDiffusion(u,v,w,rho,mu,du,dv,dw)  
@@ -219,12 +219,12 @@ Program paris
            else
               call explicitMomDiff(u,v,w,rho,mu,du,dv,dw)
            endif
-           call my_timer(3,itimestep,ii)
+           call my_timer(3)
 
            if( DoLPP ) call StoreBeforeConvectionTerms()
            if(.not.ZeroReynolds) call momentumConvection(u,v,w,du,dv,dw)
            if( DoLPP ) call StoreAfterConvectionTerms()
-           call my_timer(9,itimestep,ii)
+           call my_timer(9)
 
            ! reset the surface tension force on the fixed grid (when surface tension from front)
            fx = 0d0;    dIdx=0d0
@@ -239,7 +239,7 @@ Program paris
               ! Send the updated front back
               call GetFront('send')
            endif
-           call my_timer(13,itimestep,ii)
+           call my_timer(13)
 
 !------------------------------------VOF STUFF ---------------------------------------------------
            if(DoVOF) then
@@ -248,16 +248,16 @@ Program paris
             else
               call vofsweeps(itimestep)
             endif
-              call my_timer(4,itimestep,ii)
+              call my_timer(4)
               call get_all_heights()
-              call my_timer(5,itimestep,ii)
+              call my_timer(5)
               call linfunc(rho,rho1,rho2,DensMean)
               call surfaceForce(du,dv,dw,rho)
-              call my_timer(8,itimestep,ii)
+              call my_timer(8)
            endif
            if (DoLPP) then
                 call lppsweeps(itimestep,time)  
-                call my_timer(12,itimestep,ii)
+                call my_timer(12)
            end if ! DoLPP
 
 !------------------------------------END VOF STUFF------------------------------------------------ 
@@ -266,7 +266,7 @@ Program paris
            if(dosolids) then
               du = du*umask; dv = dv*vmask; dw = dw*wmask
            endif
-           call my_timer(2,itimestep,ii)
+           call my_timer(2)
            if(Implicit) then   
               call SetupUvel(u,du,rho,mu,rho1,mu1,dt,A)
               if(hypre)then
@@ -302,7 +302,7 @@ Program paris
               v = v + dt * dv
               w = w + dt * dw
            endif
-           call my_timer(3,itimestep,ii)
+           call my_timer(3)
            call SetVelocityBC(u,v,w,umask,vmask,wmask,time)
 
            call ghost_x(u  ,2,req( 1: 4));  call ghost_x(v,2,req( 5: 8)); call ghost_x(w,2,req( 9:12)) 
@@ -311,7 +311,7 @@ Program paris
            call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
            call ghost_z(u  ,2,req( 1: 4));  call ghost_z(v,2,req( 5: 8)); call ghost_z(w,2,req( 9:12))
            call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
-           call my_timer(1,itimestep,ii)
+           call my_timer(1)
 
 !-----------------------------------------PROJECTION STEP-----------------------------------------
            call SetPressureBC(umask,vmask,wmask,tmp(is:ie,js:je,ks:ke),p)
@@ -345,7 +345,7 @@ Program paris
               w(i,j,k)=w(i,j,k)-dt*(2.0/dzh(k))*(p(i,j,k+1)-p(i,j,k))/(rho(i,j,k+1)+rho(i,j,k))
            enddo; enddo; enddo
            if( DoLPP ) call ComputeSubDerivativeVel(itimestep)
-           call my_timer(10,itimestep,ii)
+           call my_timer(10)
            !--------------------------------------UPDATE COLOR---------------------------------------------
            if (DoFront) then
                  call SetupDensity(dIdx,dIdy,dIdz,A,color)
@@ -363,7 +363,7 @@ Program paris
                     color(i,j,k)=max(color(i,j,k),0d0)
                  enddo; enddo; enddo
            endif
-           call my_timer(13,itimestep,ii)
+           call my_timer(13)
            call SetVelocityBC(u,v,w,umask,vmask,wmask,time)
            call ghost_x(u  ,2,req( 1: 4));  call ghost_x(v,2,req( 5: 8)); call ghost_x(w,2,req( 9:12)); 
            call ghost_x(color,1,req(13:16));  call MPI_WAITALL(16,req(1:16),sta(:,1:16),ierr)
@@ -371,7 +371,7 @@ Program paris
            call ghost_y(color,1,req(13:16));  call MPI_WAITALL(16,req(1:16),sta(:,1:16),ierr)
            call ghost_z(u  ,2,req( 1: 4));  call ghost_z(v,2,req( 5: 8)); call ghost_z(w,2,req( 9:12)); 
            call ghost_z(color,1,req(13:16));  call MPI_WAITALL(16,req(1:16),sta(:,1:16),ierr)
-           call my_timer(1,itimestep,ii)
+           call my_timer(1)
 
 
 !--------------------------------------UPDATE DENSITY/VISCOSITY------------------------------------
@@ -386,11 +386,11 @@ Program paris
 !------------------------------------END VOF STUFF------------------------------------------------
               endif
            endif
-           call my_timer(2,itimestep,ii)
+           call my_timer(2)
 
            ! Wait for front to be sent back
            if(DoFront)call GetFront('wait')
-           call my_timer(13,itimestep,ii)
+           call my_timer(13)
         enddo !itime_scheme
         if(itime_scheme==2) then
            u = 0.5*(u+uold)
@@ -408,7 +408,7 @@ Program paris
         end if ! DoLPP
 !--------------------------------------------OUTPUT-----------------------------------------------
         call calcStats
-        call my_timer(2,itimestep,ii)
+        call my_timer(2)
         if(mod(itimestep,nbackup)==0) then 
            if ( DoFront ) then 
               call backup_write
@@ -425,7 +425,7 @@ Program paris
            call output(nfile,is,ie+1,js,je+1,ks,ke+1)
            if(DoVOF) call output_VOF(nfile,is,ie+1,js,je+1,ks,ke+1)
            if(DoLPP) call output_LPP(nfile)
-           if(test_droplet) call output_droplet(u,v,w,time)
+           if(test_droplet) call output_droplet(w,time)
            if(rank==0)then
               end_time =  MPI_WTIME()
               write(out,'("Step:",I9," Iterations:",I9," cpu(s):",f10.2)')itimestep,it,end_time-start_time
@@ -441,7 +441,7 @@ Program paris
            write(121,'(20es14.6e2)')time,stats(1:12),dpdx,(stats(8)-stats(9))/dt,end_time-start_time
            close(121)
         endif
-        call my_timer(11,itimestep,ii)
+        call my_timer(11)
      enddo
      !-------------------------------------------------------------------------------------------------
      !--------------------------------------------End domain-------------------------------------------
@@ -920,10 +920,10 @@ subroutine surfaceForce(du,dv,dw,rho)
   implicit none
   real(8) :: kappa,deltax
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: du, dv, dw, rho
-  integer :: i,j,k,l,m,n,ii,itimestep
+  integer :: i,j,k,n
   deltax=dx(nx)
   call get_all_curvatures(tmp)
-  call my_timer(7,itimestep,ii)
+  call my_timer(7)
   do k=ks,ke;  do j=js,je; do i=is,ieu
      if(abs(cvof(i+1,j,k)-cvof(i,j,k))>EPSC/1d1) then  ! there is a non-zero grad H (H Heaviside function) 
         n=0
@@ -1514,7 +1514,7 @@ subroutine check_integers()
       implicit none
       integer :: mylog2
       integer, intent(in) :: n
-      integer :: nbytes,k
+      integer :: k
       mylog2=0
       k=n
       if(n<1) call pariserror("mylog2: nonpositive number")

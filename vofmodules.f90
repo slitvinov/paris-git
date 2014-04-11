@@ -129,7 +129,7 @@ contains
     real(8), intent(in) :: a1,a2
     integer, intent(in) :: MeanFlag
     integer :: i,j,k
-    real(8) :: inva1,inva2
+    real(8) :: inva1=0d0,inva2=0d0
 
     if(.not.linfunc_initialized) call initialize_linfunc
 
@@ -363,7 +363,7 @@ or none at all")
 
     implicit none
     include 'mpif.h'
-    integer :: ierr, req(12),sta(MPI_STATUS_SIZE,12)
+    integer :: ierr
     integer , parameter :: ngh=2
     integer :: ipar
     integer, parameter :: root_rank = 0
@@ -770,7 +770,6 @@ or none at all")
     use module_flow
     use module_tmpvar
     implicit none
-    integer i,j,k
     integer, intent(in) :: tswap
 
     if (VOF_advect=='Dick_Yue') call c_mask(work(:,:,:,2))
@@ -828,7 +827,7 @@ or none at all")
     real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: cv  ! cvof
     integer, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: fl  ! vof_flag
     integer :: fb(6),d,l,m,n,c(3),try(2:3),sign,orientation,flag,flhere
-    real(8) :: xi,eta,cvhere
+    real(8) :: cvhere
 
     do orientation=1,6
        cond = vofbdry_cond(orientation)
@@ -1049,7 +1048,7 @@ end subroutine backup_VOF_write
 !-------------------------------------------------------------------------------------------------
 subroutine backup_VOF_read
   implicit none
-  integer ::i,j,k,i1,i2,j1,j2,k1,k2,ierr
+  integer ::i,j,k,i1,i2,j1,j2,k1,k2
   OPEN(UNIT=7,FILE=trim(out_path)//'/backup_'//int2text(rank,padding),status='old',action='read')
   read(7,*)time,itimestep,i1,i2,j1,j2,k1,k2
   if(i1/=imin .or. i2/=imax .or. j1/=jmin .or. j2/=jmax .or. k1/=kmin .or. k2/=kmax) &
@@ -1084,7 +1083,6 @@ end subroutine swp
 subroutine swpmom(us,c,f,d,mom)
   use module_vof
   implicit none
-  integer i,j,k
   integer, intent(in) :: d
   real(8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: us
   real(8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: c

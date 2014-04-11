@@ -241,23 +241,19 @@ contains
 !    write(122,'("Timer initialised at time",es16.2e2)') this_time - start_time
 !    close(122)
   end subroutine initialize_timer
-  subroutine my_timer(n,itimestep,ii)
+  subroutine my_timer(n)
     use module_grid
     implicit none
     include 'mpif.h'
-    integer, intent(in) :: n,itimestep,ii
+    integer, intent(in) :: n
     real(8) :: elapsed_time
     if(rank>0) return
     if(n>components) call pariserror("n>components")
     if(.not.timer_initialized) call initialize_timer()
-!    open(unit=122,file='timer_stats',access='append')
     this_time = MPI_WTIME(ierr2)
     elapsed_time =  this_time - tmp_time
     tmp_time = this_time
     times(n) = times(n) + elapsed_time
-!    write(122,'("rank ",I2," Component: ",(A),". time ",es16.2e2," time step ",I4," subtimestep ",I1)') &
-!         rank,TRIM(timer_component(n)),times(n),itimestep,ii
-!    close(122)
   end subroutine my_timer
   subroutine wrap_up_timer(itimestep)
     use module_grid
@@ -404,11 +400,11 @@ contains
 310 format(4e14.5)
   end subroutine  write_vec_gnuplot
   !=================================================================================================
-  subroutine output_droplet(u,v,w,time)
+  subroutine output_droplet(w,time)
     use module_grid
     implicit none
     include 'mpif.h'
-    real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: u, v, w
+    real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: w
     real(8), intent(in) :: time
     integer :: i,j,k
     i=nx/2
