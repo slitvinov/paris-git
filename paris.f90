@@ -256,7 +256,7 @@ Program paris
               call my_timer(8)
            endif
            if (DoLPP) then
-                call lppsweeps(itimestep,time)  
+                call lppsweeps(itimestep)  
                 call my_timer(12)
            end if ! DoLPP
 
@@ -344,7 +344,7 @@ Program paris
            do k=ks,kew;  do j=js,je; do i=is,ie;   ! CORRECT THE w-velocity
               w(i,j,k)=w(i,j,k)-dt*(2.0/dzh(k))*(p(i,j,k+1)-p(i,j,k))/(rho(i,j,k+1)+rho(i,j,k))
            enddo; enddo; enddo
-           if( DoLPP ) call ComputeSubDerivativeVel(itimestep)
+           if( DoLPP ) call ComputeSubDerivativeVel()
            call my_timer(10)
            !--------------------------------------UPDATE COLOR---------------------------------------------
            if (DoFront) then

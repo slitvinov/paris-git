@@ -190,8 +190,8 @@ contains
     include 'mpif.h'
     real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: solids
     integer i,j,k
-    open(unit=105,file=trim(out_path)//'/bitmap-'//trim(int2text(rank,padding))//'.txt',&
-         status='new',action='write')
+    open(unit=105,file=trim(out_path)//'/bitmap-'//trim(int2text(rank,padding))//'.txt')!,&
+!         status='new',action='write')
     do i=is,ie
        do j=js,je; 
           do k=ks,ke; 

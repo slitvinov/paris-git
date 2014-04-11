@@ -940,6 +940,10 @@ module module_BC
                uinject=1.d0+0.05d0*SIN(10.d0*2.d0*PI*(t-tshift))
             end if ! t
          end if ! y(j)
+      elseif( inject_type==5 ) then 
+         if( (y(j) - jetcenter_yc)**2.d0 + (z(k) - jetcenter_zc)**2.d0 .lt. jetradius**2.d0 ) then 
+            uinject=uliq_inject
+         end if ! y(j)
       else if ( inject_type == 3 ) then ! 2d coaxial jet
          tshift = 5.d-2
          if ( y(j) <= jetradius ) then 
@@ -1448,7 +1452,7 @@ module module_poisson
     call hypre_structPFMGsetLogging(solver, 1, ierr)
     call HYPRE_StructPFMGSetup(solver, Amat, Bvec, Xvec, ierr)
     call HYPRE_StructPFMGSolve(solver, Amat, Bvec, Xvec, ierr)
-    !call hypre_structPFMGgetnumiterations(solver, num_iterations, ierr)
+    !call HYPRE_StructPFMGGetNumIterations(solver, num_iterations, ierr)
     !call hypre_structPFMGgetfinalrelative(solver, final_res_norm, ierr)
 !--------------------------------------Retrieve the solution--------------------------------------
     nvalues = mx * my * mz
@@ -1862,17 +1866,22 @@ subroutine LinearSolver(A,p,maxError,beta,maxit,it,ierr)
         A(i,j,k,3) * p(i,j-1,k) + A(i,j,k,4) * p(i,j+1,k) +            &
         A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8) )**2
     enddo; enddo; enddo
-    res = res/float(Nx*Ny*Nz)
-    call MPI_ALLREDUCE(res, totalres, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr)
-    totalres=sqrt(totalres)
-    if (.not.(totalres<1e10)) then
-      ierr=1 !stop '***** solution has diverged *****'
-      if(rank==0) print*,'Pressure solver diverged after',it,'iterations.'
+    res = res/dble(Nx*Ny*Nz)
+    if ((res*npx*npy*npz)>1.d16) then
+      print*,'Pressure solver diverged after',it,'iterations at rank ',rank
       return
-    endif
-    if (totalres<maxError) exit
+    else 
+      call MPI_ALLREDUCE(res, totalres, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr)
+      totalres=sqrt(totalres)
+!    if (.not.(totalres<1e10)) then
+!      ierr=1 !stop '***** solution has diverged *****'
+!      if(rank==0) print*,'Pressure solver diverged after',it,'iterations.'
+!      return
+!    endif
+      if (totalres<maxError) exit
+    end if !res
   enddo
-  if(it==maxit+1 .and. rank==0) write(*,*) 'Warning: LinearSolver reached maxit.'
+  if(it==maxit+1 .and. rank==0) write(*,*) 'Warning: LinearSolver reached maxit: totalres',totalres
 end subroutine LinearSolver
 !=================================================================================================
 !=================================================================================================

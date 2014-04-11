@@ -268,14 +268,13 @@ contains
    end subroutine ReadLPPParameters
 
 
-   subroutine lppsweeps(tswap,time)
+   subroutine lppsweeps(tswap)
       implicit none
     
       integer, intent(in) :: tswap
-      real(8), intent(in) :: time
 
       call ComputePartForce(tswap)
-      call UpdatePartSol(tswap)
+      call UpdatePartSol
 
    end subroutine lppsweeps
 
@@ -287,7 +286,7 @@ contains
 
       ! Only do tagging and conversion in specific time steps
       if ( MOD(tswap,ntimestepTag) == 0 ) then 
-         call tag_drop(tswap)
+         call tag_drop()
          if ( nPdomain > 1 ) call tag_drop_all
          call CreateTag2DropTable
          if ( nPdomain > 1 ) call merge_drop_pieces 
@@ -304,10 +303,9 @@ contains
 
    end subroutine lppvofsweeps
 
-  subroutine tag_drop(tswap)
+  subroutine tag_drop()
     implicit none
     include 'mpif.h'
-    integer, intent(in) :: tswap
     integer :: i,j,k, i0,j0,k0
     integer :: isq,jsq,ksq
     integer :: current_id
@@ -516,7 +514,7 @@ contains
       include 'mpif.h'
       integer :: i,j,k
       integer :: ierr,irank,num_tag_accu
-      integer :: req(4),sta(MPI_STATUS_SIZE,4),MPI_Comm,ireq
+      integer :: req(4),sta(MPI_STATUS_SIZE,4)
       integer , parameter :: ngh=2
       integer , parameter :: root=0
 
@@ -1077,7 +1075,7 @@ contains
       integer :: i,j,k
 
       call output_VOF(0,imin,imax,jmin,jmax,kmin,kmax)
-      call tag_drop(0)
+      call tag_drop()
       if (nPdomain > 1 ) then 
          call tag_drop_all()
          call merge_drop_pieces 
@@ -1119,7 +1117,7 @@ contains
       type(drop), dimension(NumBubble) :: drops_ex
 
       ! tag droplets and calculate drop properties
-      call tag_drop(0)
+      call tag_drop()
       if ( nPdomain > 1 ) then 
          call tag_drop_all
          call merge_drop_pieces 
@@ -2147,17 +2145,14 @@ contains
             end if ! Lz
          end if
 ! END TEMPOARY 
-
       else ! interploation & averaging
       end if ! dp 
 
    end subroutine GetFluidProp
 
-   subroutine UpdatePartSol(tswap)
+   subroutine UpdatePartSol()
       implicit none
   
-      integer, intent(in) :: tswap
-
       if ( num_part(rank) > 0 ) then 
          parts(1:num_part(rank),rank)%element%xc = parts(1:num_part(rank),rank)%element%xc +& 
                                                    parts(1:num_part(rank),rank)%element%uc*dt 
@@ -2278,7 +2273,7 @@ contains
    subroutine CollectPartCrossBlocks
       implicit none
        
-      integer :: ipart,ipart_cross,ipart1,i,j,k
+      integer :: ipart,i,j,k
       integer :: ranknew
       integer :: c1,c2,c3
 
@@ -2344,10 +2339,10 @@ contains
 
       include 'mpif.h'
 
-      integer :: ipart,ipart_cross,ipart1,i,j,k
+      integer :: ipart,ipart_cross,ipart1
       integer :: ierr,irank
       integer :: ranknew
-      integer :: req(4),sta(MPI_STATUS_SIZE,4),MPI_Comm,ireq
+      integer :: req(4),sta(MPI_STATUS_SIZE,4)
       integer :: MPI_particle_type, oldtypes(0:3), blockcounts(0:3), & 
                  offsets(0:3), intextent,r8extent
       integer :: maxnum_part_cross, MPI_int_row
@@ -2661,10 +2656,9 @@ contains
       sdw_work = dw - sdw_work
    end subroutine StoreAfterConvectionTerms
 
-   subroutine ComputeSubDerivativeVel(tswap)
+   subroutine ComputeSubDerivativeVel()
       implicit none
 
-      integer, intent(in) :: tswap
       integer :: i, j, k
      
       ! Note: XXX The current way to compute substantial derivatives of velocity
