@@ -1255,8 +1255,8 @@ subroutine InitCondition
      if ( test_cylinder_advection ) then
          do i=imin,imax-1; do j=jmin,jmax-1; do k=kmin,kmax-1
 !          if((cvof(i,j,k) + cvof(i+1,j,k)) > 0.0d0) then
-          u(i,j,k) = 1.d-2
-          v(i,j,k) = 1.d-2
+          u(i,j,k) = 1.d-2!*cvof(i,j,k)
+          v(i,j,k) = 1.d-2!*cvof(i,j,k)
 !          endif
         enddo; enddo; enddo
      endif
