@@ -206,6 +206,7 @@ Program paris
            endif
            call my_timer(2)
 
+           du = 0d0; dv = 0d0; dw = 0d0
 !------------------------------------FRONT TRACKING  ---------------------------------------------
            ! Receive front from master of front
            if(DoFront) call GetFront('recv')
@@ -213,13 +214,32 @@ Program paris
            if(Implicit) then
               if(Twophase) then 
                  call momentumDiffusion(u,v,w,rho,mu,du,dv,dw)  
-              else
-                 du = 0d0; dv = 0d0; dw = 0d0
               endif
            else
               call explicitMomDiff(u,v,w,rho,mu,du,dv,dw)
            endif
            call my_timer(3)
+
+
+
+           if(DoVOF) then
+             if (DoMOF) then
+              call vofandmomsweeps(itimestep)
+             else
+              call vofsweeps(itimestep)
+             endif
+              call my_timer(4)
+              call get_all_heights()
+              call my_timer(5)
+              call linfunc(rho,rho1,rho2,DensMean)
+              call surfaceForce(du,dv,dw,rho)
+              call my_timer(8)
+           endif
+
+           if (DoLPP) then
+                call lppsweeps(itimestep)  
+                call my_timer(12)
+           end if ! DoLPP
 
            if( DoLPP ) call StoreBeforeConvectionTerms()
            if(.not.ZeroReynolds) call momentumConvection(u,v,w,du,dv,dw)
@@ -240,25 +260,6 @@ Program paris
               call GetFront('send')
            endif
            call my_timer(13)
-
-!------------------------------------VOF STUFF ---------------------------------------------------
-           if(DoVOF) then
-             if (DoMOF) then
-!              call vofandmomsweeps(itimestep)
-            else
-              call vofsweeps(itimestep)
-            endif
-              call my_timer(4)
-              call get_all_heights()
-              call my_timer(5)
-              call linfunc(rho,rho1,rho2,DensMean)
-              call surfaceForce(du,dv,dw,rho)
-              call my_timer(8)
-           endif
-           if (DoLPP) then
-                call lppsweeps(itimestep)  
-                call my_timer(12)
-           end if ! DoLPP
 
 !------------------------------------END VOF STUFF------------------------------------------------ 
            call volumeForce(rho,rho1,rho2,dpdx,dpdy,dpdz,BuoyancyCase,fx,fy,fz,gx,gy,gz,du,dv,dw, &
@@ -631,6 +632,7 @@ end subroutine calcStats
 subroutine momentumConvection(u,v,w,du,dv,dw)
   use module_grid
   use module_tmpvar
+  use module_VOF
   implicit none
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: u, v, w
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: du, dv, dw
@@ -659,15 +661,29 @@ subroutine momentumConvection(u,v,w,du,dv,dw)
     else
       work(i,j,k,3) = inter(z(k+1),z(k),z(k+2),zh(k),u(i,j,k+1),u(i,j,k),u(i,j,k+2))  !
     endif
-  enddo; enddo; enddo
-  do k=ks,ke;  do j=js,je; do i=is,ieu
-    du(i,j,k)=du(i,j,k) &
-              -    ( work(i+1,j  ,k  ,1)**2 - work(i  ,j  ,k  ,1)**2 )/dxh(i) &
-              -0.5*((v(i,j  ,k  )+v(i+1,j  ,k  ))*work(i  ,j  ,k  ,2)-        &
-                    (v(i,j-1,k  )+v(i+1,j-1,k  ))*work(i  ,j-1,k  ,2))/dy(j)  &
-              -0.5*((w(i,j  ,k  )+w(i+1,j  ,k  ))*work(i  ,j  ,k  ,3)-        &
-                    (w(i,j  ,k-1)+w(i+1,j  ,k-1))*work(i  ,j  ,k-1,3))/dz(k)
-  enddo; enddo; enddo
+    enddo; enddo; enddo
+   if (DoMOF) then
+    do k=ks,ke;  do j=js,je; do i=is,ieu
+      !DF: check where to apply standard advection?
+      if ((cvof(i,j,k).eq.0.d0).or.(cvof(i,j,k).eq.1.d0)) then
+        du(i,j,k)=du(i,j,k) &
+        -    ( work(i+1,j  ,k  ,1)**2 - work(i  ,j  ,k  ,1)**2 )/dxh(i) &
+        -0.5*((v(i,j  ,k  )+v(i+1,j  ,k  ))*work(i  ,j  ,k  ,2)-        &
+        (v(i,j-1,k  )+v(i+1,j-1,k  ))*work(i  ,j-1,k  ,2))/dy(j)  &
+        -0.5*((w(i,j  ,k  )+w(i+1,j  ,k  ))*work(i  ,j  ,k  ,3)-        &
+        (w(i,j  ,k-1)+w(i+1,j  ,k-1))*work(i  ,j  ,k-1,3))/dz(k)
+      endif
+    enddo; enddo; enddo
+  else
+    do k=ks,ke;  do j=js,je; do i=is,ieu
+      du(i,j,k)=du(i,j,k) &
+      -    ( work(i+1,j  ,k  ,1)**2 - work(i  ,j  ,k  ,1)**2 )/dxh(i) &
+      -0.5*((v(i,j  ,k  )+v(i+1,j  ,k  ))*work(i  ,j  ,k  ,2)-        &
+      (v(i,j-1,k  )+v(i+1,j-1,k  ))*work(i  ,j-1,k  ,2))/dy(j)  &
+      -0.5*((w(i,j  ,k  )+w(i+1,j  ,k  ))*work(i  ,j  ,k  ,3)-        &
+      (w(i,j  ,k-1)+w(i+1,j  ,k-1))*work(i  ,j  ,k-1,3))/dz(k)
+    enddo; enddo; enddo
+  endif
 !-----------------------------------QUICK interpolation v-velocity--------------------------------
   do k=ks,ke; do j=js,jev+1; do i=is,ie
     if (v(i,j-1,k)+v(i,j,k)>0.0) then
@@ -690,14 +706,27 @@ subroutine momentumConvection(u,v,w,du,dv,dw)
       work(i,j,k,3) = inter(z(k+1),z(k),z(k+2),zh(k),v(i,j,k+1),v(i,j,k),v(i,j,k+2))  !
     endif
   enddo; enddo; enddo
-  do k=ks,ke;  do j=js,jev; do i=is,ie
-    dv(i,j,k)=dv(i,j,k) &
-              -0.5*((u(i  ,j,k  )+u(i  ,j+1,k  ))*work(i  ,j  ,k  ,1)-        &
-                    (u(i-1,j,k  )+u(i-1,j+1,k  ))*work(i-1,j  ,k  ,1))/dx(i)  &
-              -    ( work(i  ,j+1,k  ,2)**2 - work(i  ,j  ,k  ,2)**2 )/dyh(j) &
-              -0.5*((w(i  ,j,k  )+w(i  ,j+1,k  ))*work(i  ,j  ,k  ,3)-        &
-                    (w(i  ,j,k-1)+w(i  ,j+1,k-1))*work(i  ,j  ,k-1,3))/dz(k)
-  enddo; enddo; enddo
+  if (DoMOF) then
+    do k=ks,ke;  do j=js,jev; do i=is,ie
+      if ((cvof(i,j,k).eq.0.d0).or.(cvof(i,j,k).eq.1.d0)) then
+        dv(i,j,k)=dv(i,j,k) &
+        -0.5*((u(i  ,j,k  )+u(i  ,j+1,k  ))*work(i  ,j  ,k  ,1)-        &
+        (u(i-1,j,k  )+u(i-1,j+1,k  ))*work(i-1,j  ,k  ,1))/dx(i)  &
+        -    ( work(i  ,j+1,k  ,2)**2 - work(i  ,j  ,k  ,2)**2 )/dyh(j) &
+        -0.5*((w(i  ,j,k  )+w(i  ,j+1,k  ))*work(i  ,j  ,k  ,3)-        &
+        (w(i  ,j,k-1)+w(i  ,j+1,k-1))*work(i  ,j  ,k-1,3))/dz(k)
+      endif
+    enddo; enddo; enddo
+  else
+    do k=ks,ke;  do j=js,jev; do i=is,ie
+      dv(i,j,k)=dv(i,j,k) &
+      -0.5*((u(i  ,j,k  )+u(i  ,j+1,k  ))*work(i  ,j  ,k  ,1)-        &
+      (u(i-1,j,k  )+u(i-1,j+1,k  ))*work(i-1,j  ,k  ,1))/dx(i)  &
+      -    ( work(i  ,j+1,k  ,2)**2 - work(i  ,j  ,k  ,2)**2 )/dyh(j) &
+      -0.5*((w(i  ,j,k  )+w(i  ,j+1,k  ))*work(i  ,j  ,k  ,3)-        &
+      (w(i  ,j,k-1)+w(i  ,j+1,k-1))*work(i  ,j  ,k-1,3))/dz(k)
+    enddo; enddo; enddo
+  endif
 !-----------------------------------QUICK interpolation w-velocity--------------------------------
   do k=ks,kew+1; do j=js,je; do i=is,ie
     if (w(i,j,k-1)+w(i,j,k)>0.0) then
@@ -720,14 +749,25 @@ subroutine momentumConvection(u,v,w,du,dv,dw)
       work(i,j,k,2) = inter(y(j+1),y(j),y(j+2),yh(j),w(i,j+1,k),w(i,j,k),w(i,j+2,k))  !
     endif
   enddo; enddo; enddo
-  do k=ks,kew;  do j=js,je; do i=is,ie
-    dw(i,j,k)=dw(i,j,k) &
-              -0.5*((u(i  ,j  ,k)+u(i  ,j  ,k+1))*work(i  ,j  ,k  ,1)-        &
-                    (u(i-1,j  ,k)+u(i-1,j  ,k+1))*work(i-1,j  ,k  ,1))/dx(i)  &
-              -0.5*((v(i  ,j  ,k)+v(i  ,j  ,k+1))*work(i  ,j  ,k  ,2)-        &
-                    (v(i  ,j-1,k)+v(i  ,j-1,k+1))*work(i  ,j-1,k  ,2))/dy(j)  &
-              -    ( work(i  ,j  ,k+1,3)**2 - work(i  ,j  ,k  ,3)**2 )/dzh(k)
-  enddo; enddo; enddo
+  if (DoMOF) then
+    if ((cvof(i,j,k).eq.0.d0).or.(cvof(i,j,k).eq.1.d0)) then
+      dw(i,j,k)=dw(i,j,k) &
+      -0.5*((u(i  ,j  ,k)+u(i  ,j  ,k+1))*work(i  ,j  ,k  ,1)-        &
+      (u(i-1,j  ,k)+u(i-1,j  ,k+1))*work(i-1,j  ,k  ,1))/dx(i)  &
+      -0.5*((v(i  ,j  ,k)+v(i  ,j  ,k+1))*work(i  ,j  ,k  ,2)-        &
+      (v(i  ,j-1,k)+v(i  ,j-1,k+1))*work(i  ,j-1,k  ,2))/dy(j)  &
+      -    ( work(i  ,j  ,k+1,3)**2 - work(i  ,j  ,k  ,3)**2 )/dzh(k)
+    endif
+  else
+    do k=ks,kew;  do j=js,je; do i=is,ie
+      dw(i,j,k)=dw(i,j,k) &
+      -0.5*((u(i  ,j  ,k)+u(i  ,j  ,k+1))*work(i  ,j  ,k  ,1)-        &
+      (u(i-1,j  ,k)+u(i-1,j  ,k+1))*work(i-1,j  ,k  ,1))/dx(i)  &
+      -0.5*((v(i  ,j  ,k)+v(i  ,j  ,k+1))*work(i  ,j  ,k  ,2)-        &
+      (v(i  ,j-1,k)+v(i  ,j-1,k+1))*work(i  ,j-1,k  ,2))/dy(j)  &
+      -    ( work(i  ,j  ,k+1,3)**2 - work(i  ,j  ,k  ,3)**2 )/dzh(k)
+    enddo; enddo; enddo
+  endif
 contains
 !-------------------------------------------------------------------------------------------------
 real(8) function inter(x0,x1,x2,x,y0,y1,y2)
@@ -1209,7 +1249,16 @@ subroutine InitCondition
               if((cvof(i,j,k) + cvof(i,j+1,k)) > 0.0d0) v(i,j,k) =-1.d-1
               if((cvof(i,j,k) + cvof(i,j,k+1)) > 0.0d0) w(i,j,k) =-5.d-1
            enddo; enddo; enddo
-        end if ! test_bubbles
+      end if
+     endif
+
+     if ( test_cylinder_advection ) then
+         do i=imin,imax-1; do j=jmin,jmax-1; do k=kmin,kmax-1
+!          if((cvof(i,j,k) + cvof(i+1,j,k)) > 0.0d0) then
+          u(i,j,k) = 1.d-2
+          v(i,j,k) = 1.d-2
+!          endif
+        enddo; enddo; enddo
      endif
      
      if(test_HF) then
