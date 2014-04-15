@@ -192,6 +192,7 @@ contains
     FreeSurface=.false. 
     ViscMeanIsArith=.true.; DensMeanIsArith=.true.
     output_filtered_VOF=.false. ! redundant
+    DoMOF = .false.
     
     in=31
 
@@ -1054,7 +1055,7 @@ or none at all")
     integer :: j,k
     integer :: inject
     inject=0
-    if ( inject_type == 2 .or. inject_type == 4) then 
+    if ( inject_type == 2 .or. inject_type == 5 .or. inject_type == 4) then 
       if ((y(j) - jetcenter_yc)**2 + (z(k) - jetcenter_zc)**2.lt.jetradius**2) inject=1
     else if ( inject_type == 3 ) then
       if ( y(j) <= jetradius ) inject = 1 
@@ -1078,7 +1079,7 @@ or none at all")
   subroutine test_cell_size()
     implicit none
     if(dabs(dyh(js)-dxh(is))*1d14/dxh(is)>1d0.or.dabs(dzh(ks)-dxh(is))*1d14/dxh(is)>1d0) then
-       print *, "non-cubic cells"
+       print *, "non-cubic cells", dxh(is),dyh(js),dzh(ks)
        stop
     endif
   end subroutine test_cell_size

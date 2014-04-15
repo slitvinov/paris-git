@@ -1242,29 +1242,43 @@ subroutine InitCondition
         endif
         du = 0d0
 
-        ! Note: give drop/bubble an initial velocity
-        if ( test_injectdrop ) then
-           do i=imin,imax-1; do j=jmin,jmax-1; do k=kmin,kmax-1
-              if((cvof(i,j,k) + cvof(i+1,j,k)) > 0.0d0) u(i,j,k) = 1.5d-1
-              if((cvof(i,j,k) + cvof(i,j+1,k)) > 0.0d0) v(i,j,k) =-1.d-1
-              if((cvof(i,j,k) + cvof(i,j,k+1)) > 0.0d0) w(i,j,k) =-5.d-1
-           enddo; enddo; enddo
-      end if
-     endif
+        ! ====================================================================
+        ! Initial conditions for different tests
 
-     if ( test_cylinder_advection ) then
-         do i=imin,imax-1; do j=jmin,jmax-1; do k=kmin,kmax-1
-!          if((cvof(i,j,k) + cvof(i+1,j,k)) > 0.0d0) then
-          u(i,j,k) = 1.d-2!*cvof(i,j,k)
-          v(i,j,k) = 1.d-2!*cvof(i,j,k)
-!          endif
-        enddo; enddo; enddo
-     endif
+        ! -------------------------------------------------------------------
+        ! Test: inject a drop
+         if ( test_injectdrop ) then
+            do i=imin,imax-1; do j=jmin,jmax-1; do k=kmin,kmax-1
+               if((cvof(i,j,k) + cvof(i+1,j,k)) > 0.0d0) u(i,j,k) = 1.5d-1
+               if((cvof(i,j,k) + cvof(i,j+1,k)) > 0.0d0) v(i,j,k) =-1.d-1
+               if((cvof(i,j,k) + cvof(i,j,k+1)) > 0.0d0) w(i,j,k) =-5.d-1
+            enddo; enddo; enddo
+         end if
+        
+        ! -------------------------------------------------------------------
+        ! Test: advect a cylinder
+         if ( test_cylinder_advection ) then
+            do i=imin,imax-1; do j=jmin,jmax-1; do k=kmin,kmax-1
+!            if((cvof(i,j,k) + cvof(i+1,j,k)) > 0.0d0) then
+            u(i,j,k) = 1.d-2!*cvof(i,j,k)
+            v(i,j,k) = 1.d-2!*cvof(i,j,k)
+!           endif
+            enddo; enddo; enddo
+         endif
      
-     if(test_HF) then
-        call test_VOF_HF()
-     else if (test_LP) then 
-        call test_Lag_part(itimestep)
+        ! -------------------------------------------------------------------
+        ! Test: Test height function
+         if(test_HF) then
+            call test_VOF_HF()
+         end if
+
+        ! -------------------------------------------------------------------
+        ! Test: Test Lagrangian particle module
+         if (test_LP) then 
+            call test_Lag_part(itimestep)
+         endif
+        ! ====================================================================
+
      endif
 
      if(DoFront) then

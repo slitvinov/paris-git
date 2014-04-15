@@ -1217,7 +1217,8 @@ module module_BC
             uinject=uliq_inject
          end if ! y(j)
       else if ( inject_type == 3 ) then ! 2d coaxial jet
-         tshift = 5.d-2
+         !tshift = 5.d-2
+         tshift = 0.5d0*jetradius/uliq_inject
          if ( y(j) <= jetradius ) then 
             uinject = uliq_inject & 
                      *erf( (jetradius - y(j))/BLliq )  
@@ -2138,9 +2139,12 @@ subroutine LinearSolver(A,p,maxError,beta,maxit,it,ierr)
         A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8) )**2
     enddo; enddo; enddo
     res = res/dble(Nx*Ny*Nz)
-    if ((res*npx*npy*npz)>1.d16) then
+    if ((res*npx*npy*npz)>1.d16 ) then
       print*,'Pressure solver diverged after',it,'iterations at rank ',rank
-      return
+      stop  !return
+    else if (res .ne. res) then 
+       print*, 'Pressure residual value is invalid at rank', rank
+       stop !return
     else 
       call MPI_ALLREDUCE(res, totalres, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr)
       totalres=sqrt(totalres)
