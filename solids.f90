@@ -39,6 +39,7 @@ module module_solid
   integer :: NumSpheres
   logical :: bitmap_opened=.false.
   integer :: remove_layers=0
+  real(8) :: porosity 
 !***********************************************************************
 contains
 !***********************************************************************
@@ -181,7 +182,7 @@ contains
           if((solids(i,j,k) + solids(i,j,k+1)) > 0.5d0) wmask(i,j,k) = 0d0
        enddo; enddo; enddo
        call printpor(solids)
-       call calcpor(solids,0)
+       call calcpor(solids,0,porosity)
    endif
   end subroutine initialize_solids
 !============================================================================================================
@@ -469,7 +470,7 @@ subroutine final_output(flowrate)
 !=================================================================================================
 end module module_solid
 
-subroutine calcpor(smask,type)
+subroutine calcpor(smask,type,porosity)
   use module_grid
   use module_BC
   use module_IO
@@ -478,7 +479,7 @@ subroutine calcpor(smask,type)
   integer, intent(in) :: type
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: smask
   real(8) :: sum, totalsum
-  real(8) :: porosity
+  real(8), intent(out) :: porosity
   real(8) volume
   integer :: i,j,k, ierr
   sum=0.d0
