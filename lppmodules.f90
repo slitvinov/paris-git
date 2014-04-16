@@ -344,7 +344,7 @@ contains
         tag_flag(i,j,k) = 2 ! mark as S node
         num_drop(rank) = num_drop(rank) + 1
         if ( num_drop(rank) > max_num_drop ) & 
-           call pariserror("Drop number exceeds maximum number!") 
+           call lpperror("Drop number exceeds maximum number!") 
         ! put the present node into S queue
         ns_queue = ns_queue + 1 
         s_queue(ns_queue,1) = i
@@ -428,7 +428,7 @@ contains
                   num_drop      (rank) = num_drop      (rank) - 1
                   num_drop_merge(rank) = num_drop_merge(rank) + 1
                   if ( num_drop_merge(rank) > max_num_drop ) & 
-                     call pariserror("Drop merge number exceeds maximum number!") 
+                     call lpperror("Drop merge number exceeds maximum number!") 
                end if ! merge_drop
                if ( drops_merge(num_drop_merge(rank),rank)%num_gcell < maxnum_cell_drop) then 
                   drops_merge(num_drop_merge(rank),rank)%num_gcell = drops_merge(num_drop_merge(rank),rank)%num_gcell + 1
@@ -507,6 +507,7 @@ contains
     enddo; enddo; enddo
 
     num_tag(rank) = num_drop(rank) + num_drop_merge(rank)
+    if (npDomain == 1 ) total_num_tag = num_tag(rank)
    end subroutine tag_drop
 
    subroutine tag_drop_all()
@@ -578,7 +579,7 @@ contains
                   drops_merge(idrop,rank)%num_diff_tag + 1
 ! TEMPOARY 
                   if ( drops_merge(idrop,rank)%num_diff_tag > maxnum_diff_tag ) & 
-                     call pariserror("Number of different tags of a droplet pieces exceeds the max number!") 
+                     call lpperror("Number of different tags of a droplet pieces exceeds the max number!") 
 ! END TEMPORARY 
                   drops_merge(idrop,rank)%diff_tag_list(drops_merge(idrop,rank)%num_diff_tag) &
                   = tag_id(drops_merge_gcell_list(1,iCell,idrop), &
@@ -857,7 +858,7 @@ contains
                end do ! igap
                close(101)
             case default
-               call pariserror("unknown drop statistics method!")
+               call lpperror("unknown drop statistics method!")
          end select 
       end if ! rank
 
@@ -1294,14 +1295,11 @@ contains
       if ( num_drop(rank) > 0 ) then 
       do idrop = 1,num_drop(rank)
 
-         ! Find cell index and define conversion region
-         dp = (6.d0*drops(idrop,rank)%element%vol/PI)**(1.d0/3.d0)
-         ConvertRegSize = ConvertRegSizeToDiam*dp
-         call FindCellIndexBdryConvertReg(drops(idrop,rank)%element%xc, & 
-                                          drops(idrop,rank)%element%yc, & 
-                                          drops(idrop,rank)%element%zc, & 
-                                          ConvertRegSize, & 
-                                          i1,ic,i2,j1,jc,j2,k1,kc,k2)
+         ! Find cell index and check conversion criteria 
+         call FindPartLocCell(drops(idrop,rank)%element%xc,  & 
+                              drops(idrop,rank)%element%yc,  & 
+                              drops(idrop,rank)%element%zc,  &
+                              ic,jc,kc) 
 
          call CheckConvertDropCriteria(drops(idrop,rank)%element%vol, & 
                                        drops(idrop,rank)%element%xc,  & 
@@ -1313,9 +1311,8 @@ contains
                                        drops(idrop,rank)%AspRatio)
 
          if ( ConvertDropFlag ) then
-! TEMPORARY
             write(*,*) 'Drop is converted to particle', idrop,rank,tswap
-! END TEMPORARY
+            
             ! transfer droplet properties to particle
             num_part(rank) = num_part(rank) + 1
             parts(num_part(rank),rank)%element = drops(idrop,rank)%element
@@ -1327,6 +1324,11 @@ contains
             ! Record the time step the drop is converted from VOF to LPP
             parts(num_part(rank),rank)%tstepConvert = tswap
 
+            ! Define conversion region
+            dp = (6.d0*drops(idrop,rank)%element%vol/PI)**(1.d0/3.d0)
+            ConvertRegSize = ConvertRegSizeToDiam*dp
+            call FindCellIndexBdryConvertRegUnifMesh(ConvertRegSize, & 
+                                             i1,ic,i2,j1,jc,j2,k1,kc,k2)
             ! reconstruct undisturbed flow field within the conversion region
             do k=k1,k2-1; do j=j1,j2-1; do i=i1,i2-1
                ! compute undisturbed flow field from flow property outside
@@ -1555,7 +1557,7 @@ contains
             else if ( tag_mergeflag(droptag) == 1 ) then 
                vol_drop = drops_merge(idrop,droprank)%element%vol
             else 
-               call pariserror("Unknown tag_mergeflag!")
+               call lpperror("Unknown tag_mergeflag!")
             end if ! tag_mergeflag
 
             ! if interface belongs to big liquid drop, mark the neighbor cells false
@@ -1666,98 +1668,95 @@ contains
 
    end subroutine Surface2VolumeIntrpl
 
+   subroutine FindPartLocCell(xp,yp,zp,ip,jp,kp)
+      implicit none
+
+      real(8), intent (in) :: xp,yp,zp
+      integer, intent(out) :: ip,jp,kp
+
+      if ( xp < xh(is-1) .or. xp > xh(ie) .or. & 
+           yp < yh(js-1) .or. yp > yh(je) .or. & 
+           zp < zh(ks-1) .or. zp > zh(ke) )    & 
+           call lpperror("Fail to find cell index for particle outside of domain!") 
+
+      do ip = is,ie+1
+         if (xp <= xh(ip)) exit
+      end do ! ip
+
+      do jp = js,je+1
+         if (yp <= yh(jp)) exit  
+      end do ! jp
+
+      do kp = ks,ke+1
+         if (zp <= zh(kp)) exit  
+      end do ! kp
+
+   end subroutine 
+
    subroutine FindCellIndexBdryConvertReg(xc,yc,zc,l,i1,ic,i2,j1,jc,j2,k1,kc,k2)
       implicit none
 
       real(8), intent (in) :: xc,yc,zc,l
-      integer, intent(out) :: i1,ic,i2,j1,jc,j2,k1,kc,k2
+      integer, intent (in) :: ic,jc,kc
+      integer, intent(out) :: i1,i2,j1,j2,k1,k2
 
-      integer :: i,j,k
-      logical :: i1_notfound,j1_notfound,k1_notfound, & 
-                 ic_notfound,jc_notfound,kc_notfound, &  
-                 i2_notfound,j2_notfound,k2_notfound
       real(8) :: l2,xl,xr,yl,yr,zl,zr
 
       l2 = 0.5d0*l
+
       xl = xc - l2
-      xr = xc + l2
-      yl = yc - l2
-      yr = yc + l2
-      zl = zc - l2
-      zr = zc + l2
-
-      i1_notfound = .true.
-      ic_notfound = .true.
-      i2_notfound = .true.
-      i2 = ie
-      do i = is,ie
-         if ( x(i) > xl .and. i1_notfound ) then 
-            i1 = cellclosest(i,x(i-1),x(i),xl)
-            i1_notfound = .false.
-         else if ( x(i) > xc .and. ic_notfound ) then 
-            ic = cellclosest(i,x(i-1),x(i),xc)
-            ic_notfound = .false.
-         else if ( x(i) > xr .and. i2_notfound ) then 
-            i2 = cellclosest(i,x(i-1),x(i),xr)
-            exit 
-         end if ! x(i)
+      do i1 = ic,is,-1
+         if ( xl > xh(i1-1) ) exit 
       end do ! i
-      i1 = max(i1,is)
-      i2 = min(i2,ie)
+      
+      xr = xc + l2
+      do i2 = ic,ie
+         if ( xr < xh(i2  ) ) exit 
+      end do ! i
 
-      j1_notfound = .true.
-      jc_notfound = .true.
-      j2_notfound = .true.
-      j2 = je
-      do j = js,je
-         if ( y(j) > yl .and. j1_notfound ) then 
-            j1 = cellclosest(j,y(j-1),y(j),yl)
-            j1_notfound = .false.
-         else if ( y(j) > yc .and. jc_notfound ) then 
-            jc = cellclosest(j,y(j-1),y(j),yc)
-            jc_notfound = .false.
-         else if ( y(j) > yr .and. j2_notfound ) then 
-            j2 = cellclosest(j,y(j-1),y(j),yr)
-            exit 
-         end if ! y(i)
+      yl = yc - l2
+      do j1 = jc,js,-1
+         if ( yl > yh(i1-1) ) exit 
       end do ! j
-      j1 = max(j1,js)
-      j2 = min(j2,je)
 
-      k1_notfound = .true.
-      kc_notfound = .true.
-      k2_notfound = .true.
-      k2 = ke
-      do k = ks,ke
-         if ( z(k) > zl .and. k1_notfound ) then 
-            k1 = cellclosest(k,z(k-1),z(k),zl)
-            k1_notfound = .false.
-         else if ( z(k) > zc .and. kc_notfound ) then 
-            kc = cellclosest(k,z(k-1),z(k),zc)
-            kc_notfound = .false.
-         else if ( z(k) > zr .and. k2_notfound ) then 
-            k2 = cellclosest(k,z(k-1),z(k),zr)
-            exit 
-         end if ! z(i)
+      yr = yc + l2
+      do j2 = jc,je
+         if ( yr < yh(j2  ) ) exit 
+      end do ! j
+
+      zl = zc - l2
+      do k1 = kc,ks,-1
+         if ( zl > zh(k1-1) ) exit 
       end do ! k
-      k1 = max(k1,ks)
-      k2 = min(k2,ke)
+
+      zr = zc + l2
+      do k2 = kc,ke
+         if ( zr < zh(k2  ) ) exit 
+      end do ! k
 
    end subroutine FindCellIndexBdryConvertReg
 
-   function cellclosest(i,x1,x2,x)
-      integer, intent (in) :: i
-      real(8), intent (in) :: x1,x2,x
-      integer :: cellclosest
+   subroutine FindCellIndexBdryConvertRegUnifMesh(l,i1,ic,i2,j1,jc,j2,k1,kc,k2)
+      implicit none
 
-      if ( x2-x < x-x1 ) then 
-         cellclosest = i
-      else 
-         cellclosest = i-1
-      end if ! x(i)
+      real(8), intent (in) :: l
+      integer, intent (in) :: ic,jc,kc
+      integer, intent(out) :: i1,i2,j1,j2,k1,k2
 
-   end function cellclosest
-   
+      real(8) :: l2
+      integer :: ncl2
+
+      l2 = 0.5d0*l
+      ncl2 = NINT(l2/dx(is))
+      i1 = ic - ncl2
+      i2 = ic + ncl2
+      j1 = jc - ncl2
+      j2 = jc + ncl2
+      k1 = kc - ncl2
+      k2 = kc + ncl2
+
+   end subroutine FindCellIndexBdryConvertRegUnifMesh
+
    subroutine ConvertLPP2VOF(tswap) 
       implicit none
     
@@ -1807,10 +1806,10 @@ contains
             ! Define conversion region
             ConvertRegSize = ConvertRegSizeToDiam*dp
 
-            call FindCellIndexBdryConvertReg(parts(ipart,rank)%element%xc, & 
-                                             parts(ipart,rank)%element%yc, & 
-                                             parts(ipart,rank)%element%zc, & 
-                                             ConvertRegSize, & 
+            ic = parts(ipart,rank)%ic
+            jc = parts(ipart,rank)%jc
+            kc = parts(ipart,rank)%kc
+            call FindCellIndexBdryConvertRegUnifMesh(ConvertRegSize, & 
                                              i1,ic,i2,j1,jc,j2,k1,kc,k2)
 
             call GetFluidProp(parts(ipart,rank)%ic, &
@@ -2028,9 +2027,9 @@ contains
 !               write(11,*) tswap*5e-8,relvel(1)/taup*phi(dragmodel,Rep), & 
 !                           rhof/rhop*DufDt,Cm*rhof/rhop*(DufDt-partforce(1)),& 
 !                           (1.d0+Cm)*rhof/rhop*DufDt,uf,up,DufDt
-               write(12,*) tswap,partforce(2),relvel(2)/taup*phi(dragmodel,Rep), & 
-                           rhof/rhop*DvfDt,Cm*rhof/rhop*(DvfDt-partforce(2)),&
-                           (1.d0+Cm)*rhof/rhop*DvfDt,vf,vp,DvfDt
+!               write(12,*) tswap,partforce(2),relvel(2)/taup*phi(dragmodel,Rep), & 
+!                           rhof/rhop*DvfDt,Cm*rhof/rhop*(DvfDt-partforce(2)),&
+!                           (1.d0+Cm)*rhof/rhop*DvfDt,vf,vp,DvfDt
 !               write(13,*) tswap*5e-8,relvel(3)/taup*phi(dragmodel,Rep), & 
 !                           rhof/rhop*DwfDt,Cm*rhof/rhop*(DwfDt-partforce(3)),&
 !                           (1.d0+Cm)*rhof/rhop*DwfDt,wf,wp,DwfDt
@@ -2075,7 +2074,7 @@ contains
                stop
             end if !mu1 
          case default
-            call pariserror("wrong quasi-steady drag model!")
+            call lpperror("wrong quasi-steady drag model!")
       end select ! dragmodel
    end function phi
 
@@ -2131,17 +2130,17 @@ contains
             if ( Lx > dp ) then 
                call TrilinearIntrplFluidVel(xp,yp,zp,ip,jp,kp,uf,DufDt,1)
             else 
-               call pariserror("average fluid velocity needed") !ComputeAveFluidVel
+               call lpperror("average fluid velocity needed") !ComputeAveFluidVel
             end if ! Lx
             if ( Ly > dp ) then 
                call TrilinearIntrplFluidVel(xp,yp,zp,ip,jp,kp,vf,DvfDt,2)
             else 
-               call pariserror("average fluid velocity needed") !ComputeAveFluidVel
+               call lpperror("average fluid velocity needed") !ComputeAveFluidVel
             end if ! Lx
             if ( Lz > dp ) then 
                call TrilinearIntrplFluidVel(xp,yp,zp,ip,jp,kp,wf,DwfDt,3)
             else 
-               call pariserror("average fluid velocity needed") !ComputeAveFluidVel
+               call lpperror("average fluid velocity needed") !ComputeAveFluidVel
             end if ! Lz
          end if
 ! END TEMPOARY 
@@ -2211,61 +2210,67 @@ contains
    subroutine UpdatePartLocCell   
       implicit none
       
-      integer :: i,j,k,ipart
-      real(8) :: xp,yp,zp
+      integer :: i,j,k,ipart,i1,j1,k1
+      real(8) :: xp,yp,zp,up,vp,wp
 
       do ipart = 1,num_part(rank)
          ! x direction 
          i  = parts(ipart,rank)%ic
          xp = parts(ipart,rank)%element%xc 
-         if ( ( parts(ipart,rank)%element%uc > 0.d0 .and. &
-                ABS(x(i)-xp) > (0.5d0*(x(i+1)+x(i+2))-x(i)) ) .or. & 
-              ( parts(ipart,rank)%element%uc < 0.d0 .and. &
-                ABS(x(i)-xp) > (x(i)-0.5d0*(x(i-1)+x(i-2))) )) then
-            call pariserror("Particles move more than dx in dt!")
-         else if ( parts(ipart,rank)%element%uc > 0.d0 .and. &
-                    ABS(x(i)-xp) > ABS(x(i+1)-xp) ) then 
-            i = i+1
-         else if ( parts(ipart,rank)%element%uc < 0.d0 .and. &
-                    ABS(x(i)-xp) > ABS(x(i-1)-xp) ) then 
-            i = i-1
-         end if ! parts(ipart,rank)%element%uc
-         
+         up = parts(ipart,rank)%element%uc 
+         if      ( xp > xh(i-1) .and. xp <= xh(i  ) ) then
+            i1 = i
+         else if ( xp > xh(i  ) .and. xp <= xh(i+1) ) then 
+            i1 = i+1
+         else if ( xp > xh(i+1) .and. xp <= xh(i+2) ) then 
+            i1 = i+2
+         else if ( xp > xh(i-2) .and. xp <= xh(i-1) ) then 
+            i1 = i-1
+         else if ( xp > xh(i-3) .and. xp <= xh(i-2) ) then 
+            i1 = i-2
+         else 
+            call lpperror("Particle moves out of tracking range in x direction !")
+         end if !xp
+        
          ! y direction 
          j  = parts(ipart,rank)%jc
          yp = parts(ipart,rank)%element%yc 
-         if ( ( parts(ipart,rank)%element%vc > 0.d0 .and. &
-                ABS(y(j)-yp) > (0.5d0*(y(j+1)+y(j+2))-y(j)) ) .or. & 
-              ( parts(ipart,rank)%element%vc < 0.d0 .and. &
-                ABS(y(j)-yp) > (y(j)-0.5d0*(y(j-1)+y(j-2))) )) then
-            call pariserror("Particles move more than dy in dt!")
-         else if ( parts(ipart,rank)%element%vc > 0.d0 .and. &
-                    ABS(y(j)-yp) > ABS(y(j+1)-yp) ) then 
-            j = j+1
-         else if ( parts(ipart,rank)%element%vc < 0.d0 .and. &
-                    ABS(y(j)-yp) > ABS(y(j-1)-yp) ) then 
-            j = j-1
-         end if ! parts(ipart,rank)%element%vc
+         vp = parts(ipart,rank)%element%vc 
+         if      ( yp > yh(j-1) .and. yp <= yh(j  ) ) then
+            j1 = j
+         else if ( yp > yh(j  ) .and. yp <= yh(j+1) ) then 
+            j1 = j+1
+         else if ( yp > yh(j+1) .and. yp <= yh(j+2) ) then 
+            j1 = j+2
+         else if ( yp > yh(j-2) .and. yp <= yh(j-1) ) then 
+            j1 = j-1
+         else if ( yp > yh(j-3) .and. yp <= yh(j-2) ) then 
+            j1 = j-2
+         else 
+            call lpperror("Particle moves out of tracking range in y direction !")
+         end if !yp
 
          ! z direction 
          k  = parts(ipart,rank)%kc
          zp = parts(ipart,rank)%element%zc 
-         if ( ( parts(ipart,rank)%element%wc > 0.d0 .and. &
-                ABS(z(k)-zp) > (0.5d0*(z(k+1)+z(k+2))-z(k)) ) .or. & 
-              ( parts(ipart,rank)%element%wc < 0.d0 .and. &
-                ABS(z(k)-zp) > (z(k)-0.5d0*(z(k-1)+z(k-2))) )) then
-             call pariserror("Particles move more than dz in dt!")
-         else if ( parts(ipart,rank)%element%wc > 0.d0 .and. &
-                    ABS(z(k)-zp) > ABS(z(k+1)-zp) ) then 
-            k = k+1
-         else if ( parts(ipart,rank)%element%wc < 0.d0 .and. &
-                    ABS(z(k)-zp) > ABS(z(k-1)-zp) ) then 
-            k = k-1
-         end if ! parts(ipart,rank)%element%wc
+         wp = parts(ipart,rank)%element%wc 
+         if      ( zp > zh(k-1) .and. zp <= zh(k  ) ) then
+            k1 = k
+         else if ( zp > zh(k  ) .and. zp <= zh(k+1) ) then 
+            k1 = k+1
+         else if ( zp > zh(k+1) .and. zp <= zh(k+2) ) then 
+            k1 = k+2
+         else if ( zp > zh(k-2) .and. zp <= zh(k-1) ) then 
+            k1 = k-1
+         else if ( zp > zh(k-3) .and. zp <= zh(k-2) ) then 
+            k1 = k-2
+         else 
+            call lpperror("Particle moves out of tracking range in z direction !")
+         end if !zp
 
-         parts(ipart,rank)%ic = i 
-         parts(ipart,rank)%jc = j 
-         parts(ipart,rank)%kc = k 
+         parts(ipart,rank)%ic = i1 
+         parts(ipart,rank)%jc = j1
+         parts(ipart,rank)%kc = k1 
 
       end do ! ipart
    end subroutine UpdatePartLocCell   
@@ -2323,7 +2328,7 @@ contains
                c3 = (k-Ng-1)/Mz  
                ranknew = c1*npy*npz + c2*npz + c3
                if ( ranknew > nPdomain-1 .or. ranknew < 0 ) then
-                  call pariserror("new rank of particle out of range!")
+                  call lpperror("new rank of particle out of range!")
                else if ( ranknew /= rank ) then 
                   num_part_cross(rank)  = num_part_cross(rank) + 1
                   parts_cross_id     (num_part_cross(rank),rank) = ipart 
@@ -2444,7 +2449,7 @@ contains
       if ( vofbdry_cond(d) == 'periodic' ) then
          call PartBC_periodic(ipart,rank,d)
 !      else 
-!         call pariserror("unknown particle bondary condition!")
+!         call lpperror("unknown particle bondary condition!")
       end if ! vofbdry_cond
    end subroutine ImposePartBC
 
@@ -2599,7 +2604,7 @@ contains
                                        sdw(ip+1+si,jp+1+sj,kp  +sk), & 
                                        sdw(ip+1+si,jp+1+sj,kp+1+sk), sdvel)
       else 
-         call pariserror("Wrong direction in velocity interploation!")
+         call lpperror("Wrong direction in velocity interploation!")
       end if ! dir 
    end subroutine TrilinearIntrplFluidVel
 
@@ -2611,11 +2616,11 @@ contains
       real(8), intent(out):: um,vm,wm,sdum,sdvm,sdwm
 
       integer :: i,j,k
-      integer :: i1,ic,i2,j1,jc,j2,k1,kc,k2
+      integer :: i1,i2,j1,j2,k1,k2
       real(8) :: numcell
 
-      call FindCellIndexBdryConvertReg(xp,yp,zp,L, & 
-                                       i1,ic,i2,j1,jc,j2,k1,kc,k2)
+      call FindCellIndexBdryConvertRegUnifMesh(L,i1,ip,i2,j1,jp,j2,k1,kp,k2)
+
       um = 0.d0
       vm = 0.d0 
       wm = 0.d0 
@@ -2684,6 +2689,20 @@ contains
       enddo; enddo; enddo
 
    end subroutine ComputeSubDerivativeVel
+
+   subroutine lpperror(message) 
+      use module_IO
+      implicit none
+      include 'mpif.h'
+      integer ierr, MPI_errorcode
+      character(*) :: message
+      write(*,*) "LPP ERROR *** ",message, " *** STOP at rank: ", rank
+      ! Exit MPI gracefully
+      close(out)
+      call MPI_ABORT(MPI_COMM_WORLD, MPI_errorcode, ierr)
+      call MPI_finalize(ierr)
+      stop 
+   end subroutine lpperror
 
 end module module_Lag_part
 
@@ -2790,7 +2809,7 @@ module module_output_lpp
             xp = parts(ipart,rank)%element%xc
             yp = parts(ipart,rank)%element%yc
             zp = parts(ipart,rank)%element%zc
-            call FindCellIndexBdryConvertReg(xp,yp,zp,ConvertRegSize, & 
+            call FindCellIndexBdryConvertRegUnifMesh(ConvertRegSize, & 
                                              i1,ic,i2,j1,jc,j2,k1,kc,k2)
          
             do i=i1+1,i2-1; do j=j1+1,j2-1; do k=k1+1,k2-1

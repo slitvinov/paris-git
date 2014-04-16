@@ -60,6 +60,7 @@ module module_VOF
   logical :: test_injectdrop = .false.
   logical :: test_jet = .false.
   logical :: test_cylinder_advection = .false.
+  logical :: test_KHI2D = .false.
   logical :: linfunc_initialized = .false.
   logical :: DoMOF = .false.
   real(8) :: b1,b2,b3,b4
@@ -295,6 +296,8 @@ contains
        test_jet = .true.
     else if(test_type=='cylinder_advection') then
        test_cylinder_advection = .true.
+    else if(test_type=='KHI2D') then
+       test_KHI2D = .true.
     else
        write(*,*) test_type, rank
        stop 'unknown initialization'
@@ -411,7 +414,19 @@ or none at all")
             vof_flag(i,j,k) = 1
          end if ! 
       end do; end do; end do
-    end if ! test_jet 
+    end if ! test_jet
+
+    if ( test_KHI2D ) then 
+      do i = is,ie; do j=js,je; do k = ks,ke
+         !if ( y(j) > 0.5d0*yLength*(1.d0 + 0.1d0*sin(2.d0*PI*x(i)/xLength)) ) then 
+         if ( y(j) > 0.5d0*yLength ) then 
+            cvof(i,j,k) = 1.d0
+            vof_flag(i,j,k) = 1
+         end if 
+         ! Note: initial pertrubation height = 0.05*yLength 
+         ! (when boundary layer thickness delta =0.1*yLength)
+      end do; end do; end do
+    end if ! test_KHI2D
 
     call do_all_ghost(cvof)
     call do_all_ighost(vof_flag)
@@ -1078,7 +1093,7 @@ or none at all")
 !=================================================================================================
   subroutine test_cell_size()
     implicit none
-    if(dabs(dyh(js)-dxh(is))*1d14/dxh(is)>1d0.or.dabs(dzh(ks)-dxh(is))*1d14/dxh(is)>1d0) then
+    if(dabs(dyh(js)-dxh(is))*1d12/dxh(is)>1d0.or.dabs(dzh(ks)-dxh(is))*1d12/dxh(is)>1d0) then
        print *, "non-cubic cells", dxh(is),dyh(js),dzh(ks)
        stop
     endif

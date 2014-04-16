@@ -154,7 +154,7 @@ Program paris
         if(rank==0) then
            end_time =  MPI_WTIME()
            open(unit=121,file='stats',access='append')
-           write(121,'(20es14.6e2)')time,stats(1:12),dpdx,(stats(8)-stats(9))/dt,end_time-start_time
+           write(121,'(20es14.6e2)')time,stats(1:13),dpdx,(stats(8)-stats(9))/dt,end_time-start_time
            close(121)
            write(out,'("Step:",I9," Iterations:",I9," cpu(s):",f10.2)')-1,0,end_time-start_time
            write(*,'("Step:",I6," dt=",es16.5e2," time=",es16.5e2," cpu(s):",f11.3)')   &
@@ -221,7 +221,6 @@ Program paris
            call my_timer(3)
 
 
-
            if(DoVOF) then
              if (DoMOF) then
               call vofandmomsweeps(itimestep)
@@ -268,6 +267,7 @@ Program paris
               du = du*umask; dv = dv*vmask; dw = dw*wmask
            endif
            call my_timer(2)
+  
            if(Implicit) then   
               call SetupUvel(u,du,rho,mu,rho1,mu1,dt,A)
               if(hypre)then
@@ -333,7 +333,7 @@ Program paris
                    &" maxerror: ",e7.1)') residual*dt,maxerror
               if(rank==0.and..not.hypre) write(*,'("              pressure iterations :",I9)')it
            endif
-           
+      
            do k=ks,ke;  do j=js,je; do i=is,ieu;    ! CORRECT THE u-velocity 
               u(i,j,k)=u(i,j,k)-dt*(2.0/dxh(i))*(p(i+1,j,k)-p(i,j,k))/(rho(i+1,j,k)+rho(i,j,k))
            enddo; enddo; enddo
@@ -406,6 +406,7 @@ Program paris
         
         if (DoLPP) then
             call lppvofsweeps(itimestep,time)  
+            call my_timer(14)
         end if ! DoLPP
 !--------------------------------------------OUTPUT-----------------------------------------------
         call calcStats
@@ -439,7 +440,7 @@ Program paris
               !        write(121,'("            Iterations:",I7," cpu(s):",f10.2)')it,end_time-start_time
               !        close(121)
            open(unit=121,file='stats',access='append')
-           write(121,'(20es14.6e2)')time,stats(1:12),dpdx,(stats(8)-stats(9))/dt,end_time-start_time
+           write(121,'(20es14.6e2)')time,stats(1:13),dpdx,(stats(8)-stats(9))/dt,end_time-start_time
            close(121)
         endif
         call my_timer(11)
@@ -581,6 +582,9 @@ subroutine calcStats
     if(DoVOF) CC=cvof(i,j,k) ;  mystats(10)=mystats(10)+CC*vol
 ! Phase C=1 center of mass
     if(DoVOF) CC=cvof(i,j,k) ;  mystats(11)=mystats(11)+CC*vol*x(i)
+! kinetic energy
+    mystats(12)=mystats(12)+0.5*(rho(i,j,k)+rho(i+1,j,k))*u(i,j,k)*u(i,j,k)*vol
+    mystats(13)=mystats(13)+0.5*(rho(i,j,k)+rho(i+1,j,k))*v(i,j,k)*v(i,j,k)*vol
   enddo;  enddo;  enddo
 
 ! Shear stress on y=0,Ly
@@ -1276,9 +1280,21 @@ subroutine InitCondition
         ! Test: Test Lagrangian particle module
          if (test_LP) then 
             call test_Lag_part(itimestep)
-         endif
-        ! ====================================================================
+         end if ! test_LP
 
+        ! -------------------------------------------------------------------
+        ! Test: Test 2d (Quasi-2d) Kelvin-Helmoltz Instability
+        ! ====================================================================
+         if ( test_KHI2D ) then 
+            do i=imin,imax-1; do j=jmin,jmax-1; do k=kmin,kmax-1
+               if( y(j) > yLength*0.5d0 ) & 
+                  u(i,j,k) = 1.d1*erf( (y(j)-0.5d0*yLength)/(0.1d0*yLength) )
+               ! ugas = 10 & delta = 0.1*yLength
+               v(i,j,k) = 5.d-1*sin(4.d0*PI*x(i)/xLength) & 
+                        *exp(-((y(j)-0.5d0*yLength)/(0.05d0*yLength))**2.d0)
+               ! perturbation thickness = 0.05*yLength, wavenum = 2
+            enddo; enddo; enddo
+         end if ! test_KHI_2D 
      endif
 
      if(DoFront) then

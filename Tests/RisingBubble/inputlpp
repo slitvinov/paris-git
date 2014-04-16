@@ -1,0 +1,20 @@
+&LPPPARAMETERS
+
+DropStatisticsMethod = 1
+DRAGMODEL = 4
+nTimeStepTag = 1
+DoConvertVOF2LPP = T 
+DoConvertLPP2VOF = F
+ConvertRegSizeToDiam = 4.0
+CriteriaConvertCase = 1
+VOL_CUT = 7e-6
+XLPP_MIN = 0.d0
+XLPP_MAX = 1.d0
+YLPP_MIN = 0.00113 
+YLPP_MAX = 0.0035
+ZLPP_MIN = 0.d0
+ZLPP_MAX = 1.d0
+NumStepAfterVOFConversionForAve = 10 
+!=================================================================================================
+/
+! end of the namelist

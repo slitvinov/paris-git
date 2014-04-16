@@ -177,7 +177,7 @@ end module module_hello
 module module_timer
   implicit none
   save
-  integer, parameter :: components=13, steps=1000
+  integer, parameter :: components=14, steps=1000
   real(8) :: times(components), percentage(components), tmp_time, this_time
   real(8) :: start_time, end_time=0.d0
   real(8) :: start_loop, end_loop
@@ -229,8 +229,9 @@ contains
     timer_component(9) = 'Advection'
     timer_component(10) = 'Poisson for pressure'
     timer_component(11) = 'Output to file'
-    timer_component(12) = 'Lagrangian particles'
+    timer_component(12) = 'Lag particles advection'
     timer_component(13) = 'Front Tracking'
+    timer_component(14) = 'Tag, convert, drop stats'
     times=0d0
     this_time =  MPI_WTIME(ierr2)
     tmp_time = this_time
