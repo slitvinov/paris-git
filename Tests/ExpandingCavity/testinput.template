@@ -27,7 +27,7 @@ restartFront = F   ! T: start the frontfrom  a previous simulation
 restartAverages = F
 nBackup = 90000   ! number of time steps between  backups are kept.
 
-NSTEP   = 80000       ! maximum number of time steps
+NSTEP   = 50000       ! maximum number of time steps
 EndTime = 1.0       ! When to stop simulation
 
 MaxDt   = 0.1  ! maximum size of time step
@@ -47,7 +47,7 @@ BETA     = 1.4     ! parameters for linear solver
 ! Output parameters
 
 ICOut    = T        ! output initial condition
-NOUT     = 1000      ! write the solution to file every nout time steps
+NOUT     = 100      ! write the solution to file every nout time steps
 output_format = 2   ! 1:tecplot 2:vtk
 out_path = 'out'    ! name of the output directory
 
@@ -91,11 +91,11 @@ ZLENGTH  = ZLTEMP
 !=================================================================================================
 ! Flow parameters
 
-WallVel(1,1)  = -0.05
-WallVel(2,1)  = 0.05
-WallVel(3,2)  = -0.05
-WallVel(4,2)  = 0.05
-! can set inflow velocities here
+BoundaryPressure(1) = -0.03
+BoundaryPressure(2) = -0.03
+BoundaryPressure(3) = -0.03
+BoundaryPressure(4) = -0.03
+! Sets pressure BC x- x+ y- y+ z- z+
 
 Inject_type = 1
 !Defines wall velocity implementation 	1: Constant Dirichlet velocity on specified boundary
@@ -113,8 +113,9 @@ dPdZ      = 0.0
 
 VOLUMESOURCE = 0.0
 
-BDRY_COND = 3  3  3  3  3  3  
-                   !Type of boundary condition in x,y,z direction: 0:wall  1:periodic  2:shear
+BDRY_COND = 5  5  1  5  5  1	 
+                   !Type of boundary condition in x,y,z direction: 0:wall  1:periodic  2:shear  3:inflow
+		   !                                               4:outflow  5:pressure 
                    !x- y- z- x+ y+ z+
 
 RHO1     = 1.0
@@ -123,7 +124,7 @@ MU1      = 0.0
 
 RHO2     = 1.0
 MU2      = 0.0
-SIGMA    = 0.0       ! rho2, mu2, sigma : properties of the drop and surface tension
+SIGMA    = 0.00       ! rho2, mu2, sigma : properties of the drop and surface tension
                    
 
 NumBubble = 1      !number of bubbles

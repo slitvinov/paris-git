@@ -647,7 +647,7 @@ module module_BC
   ! bdry_cond(i) = is the type if boundary condition in i'th direction
   ! explicits the boundary condition codes
   !                                   12345678    12345678    12345678    12345678    12345678
-   character(len=8) :: expl(0:5) = (/ "wall    ", "periodic", "shear   ", "inflow  ", "outflow ", "pressure" /)
+   character(len=8) :: expl(0:5) = (/ "wall    ", "periodic", "shear   ", "velocity", "outflow ", "pressure" /)
   real(8) :: WallVel(6,3), WallShear(6,3), BoundaryPressure(6)
   ! Tangential velocities on the surfaces of domain. First index represent the 
   ! side on which the velocity in the direction of the second index is specified.
@@ -818,7 +818,6 @@ module module_BC
     ! outflow boundary condition
     if(bdry_cond(4)==4 .and. coords(1)==nPx-1) then
         u(ie  ,:,:)=u(ie-1,:,:)
-        u(ie+1,:,:)=-u(ie-1,:,:)
         v(ie+1,:,:)=v(ie-1,:,:)
         w(ie+1,:,:)=w(ie-1,:,:)
     endif
@@ -877,42 +876,36 @@ module module_BC
     !Set zero normal velocity gradient for pressure boundary condition
     if (bdry_cond(1)==5 .and. coords(1)==0)then
        u(is-1,:,:)=u(is,:,:)
-       u(is-2,:,:)=-u(is,:,:)
        v(is-2,:,:)=v(is,:,:)
        w(is-2,:,:)=w(is,:,:)
     endif
     
     if (bdry_cond(4)==5 .and. coords(1)==nPx-1)then
        u(ie,:,:)=u(ie-1,:,:)
-       u(ie+1,:,:)=-u(ie-1,:,:)
        v(ie+1,:,:)=v(ie-1,:,:)
        w(ie+1,:,:)=w(ie-1,:,:)
     endif
     
     if (bdry_cond(2)==5 .and. coords(2)==0)then
        v(:,js-1,:)=v(:,js,:)
-       v(:,js-2,:)=-v(:,js,:)
        u(:,js-2,:)=u(:,js,:)
        w(:,js-2,:)=w(:,js,:)
     endif
     
     if (bdry_cond(5)==5 .and. coords(2)==nPy-1)then
        v(:,je,:)=v(:,je-1,:)
-       v(:,je+1,:)=-v(:,je-1,:)
        u(:,je+1,:)=u(:,je-1,:)
        w(:,je+1,:)=w(:,je-1,:)
     endif
     
     if (bdry_cond(3)==5 .and. coords(3)==0)then
        w(:,:,ks-1)=w(:,:,ks)
-       w(:,:,ks-2)=-w(:,:,ks)
        u(:,:,ks-2)=u(:,:,ks)
        v(:,:,ks-2)=v(:,:,ks)
     endif
     
     if (bdry_cond(6)==5 .and. coords(3)==nPz-1)then
        w(:,:,ke)=w(:,:,ke-1)
-       w(:,:,ke+1)=-w(:,:,ke-1)
        u(:,:,ke+1)=u(:,:,ke-1)
        v(:,:,ke+1)=v(:,:,ke-1)    
     endif
