@@ -1145,23 +1145,20 @@ contains
     write(8,12)
     write(8,13)
     write(8,14)i2-i1+1,j2-j1+1,k2-k1+1
-    write(8,15)(i2-i1+1)*(j2-j1+1)*(k2-k1+1)
+    write(8,15) x(i1),y(j1),z(k1)
+    write(8,16) x(i1+1)-x(i1),y(j1+1)-y(j1),z(k1+1)-z(k1)
 10  format('# vtk DataFile Version 2.0')
 11  format('grid, time ',F16.8)
 12  format('ASCII')
-13  format('DATASET STRUCTURED_GRID')
+13  format('DATASET STRUCTURED_POINTS')
 14  format('DIMENSIONS ',I5,I5,I5)
-15  format('POINTS ',I17,' float' )
+15  format('ORIGIN ',F16.8,F16.8,F16.8)
+16  format('SPACING ',F16.8,F16.8,F16.8)
 
-    do k=k1,k2; do j=j1,j2; do i=i1,i2;
-      write(8,320) x(i),y(j),z(k)
-    enddo; enddo; enddo
-320 format(e14.5,e14.5,e14.5)
-
-    write(8,16)(i2-i1+1)*(j2-j1+1)*(k2-k1+1)
+    write(8,19)(i2-i1+1)*(j2-j1+1)*(k2-k1+1)
     write(8,17)'VOF'
     write(8,18)
-16  format('POINT_DATA ',I17)
+19  format('POINT_DATA ',I17)
 17  format('SCALARS ',A20,' float 1')
 18  format('LOOKUP_TABLE default')
 
