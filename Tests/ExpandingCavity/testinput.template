@@ -97,7 +97,7 @@ BoundaryPressure(3) = -0.03
 BoundaryPressure(4) = -0.03
 ! Sets pressure BC x- x+ y- y+ z- z+
 
-Inject_type = 1
+!Inject_type = 1
 !Defines wall velocity implementation 	1: Constant Dirichlet velocity on specified boundary
 !					2: Implementation with uinject function for atomization
 GX      = 0.0
