@@ -643,6 +643,7 @@ or none at all")
     if(d>3) call pariserror("wrong ipar")
     if(min(min(nx,ny),nz)<2) call pariserror("minimum dimension nx ny nz too small")
     max_flag=calc_imax(vof_flag)
+
     if(n1>1.and.max_flag/=2) then
       if(rank==0) then
           if(max_flag==0) then

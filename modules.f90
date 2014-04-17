@@ -655,6 +655,7 @@ module module_BC
   ! Example: WallVel(4,3) represent the W velocity on +y side of the domain.
   ! LM: The same convention is used for BoundaryPressure
   ! SZ: alternately may contain the velocity of the flow for inflow boundary conditions on x+
+  real(8) :: ugas_inject,uliq_inject
   contains
 !=================================================================================================
 !=================================================================================================
