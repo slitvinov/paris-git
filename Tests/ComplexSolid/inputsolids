@@ -3,7 +3,7 @@
 dosolids = T
 solid_type ='BitMap'
 solid_radius=0.3
-remove_layers=10
+remove_layers=5
 !=================================================================================================
 
 &end

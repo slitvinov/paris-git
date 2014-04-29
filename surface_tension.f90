@@ -138,7 +138,7 @@ contains
      if(recomputenormals) call pariserror("recomputenormals is true, normals not allocated")
      if(.not.st_initialized) call initialize_surface_tension()
 
-     if(ng.lt.2) stop "wrong ng"
+     if(ng.lt.2) call pariserror("wrong ng")
       do k=ks-1,ke+1
          do j=js-1,je+1
             do i=is-1,ie+1
@@ -423,7 +423,7 @@ contains
          else if (d.eq.3) then
             si=0; sj=0; sk=1
          else
-            stop "bad direction"
+            call pariserror("bad direction")
          endif
          index =  2*(d-1)+2
          if(mxyz(d).gt.0) index = 2*(d-1)+1

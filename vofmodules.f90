@@ -208,7 +208,7 @@ contains
           print *, 'rank=',rank,' has error ',ierr,' opening file inputsolids'
        endif
     else
-       if (rank == 0) STOP "ReadVOFParameters: no 'inputvof' file."
+       if (rank == 0) call pariserror("ReadVOFParameters: no 'inputvof' file.")
     endif
     close(in)
     do i=1,3
@@ -309,7 +309,7 @@ contains
     ! orientation order:    
     ! x- y- z- x+ y+ z+
 
-    if(.not.bdry_read) stop "bdry not read"
+    if(.not.bdry_read) call pariserror("bdry not read")
     do orientation=4,6
        dir = orientation-3
        if(vofbdry_cond(orientation)=='periodic'.or.vofbdry_cond(dir)=='periodic') then
@@ -336,7 +336,7 @@ or none at all")
 !=================================================================================================
   subroutine get_flags_and_clip()
     integer :: i,j,k
-    if(ng.lt.2) stop "wrong ng"
+    if(ng.lt.2) call pariserror("wrong ng")
     do k=kmin,kmax
        do j=jmin,jmax
           do i=imin,imax
@@ -1007,7 +1007,7 @@ or none at all")
        else if(cond=='outflow') then
           fb(orientation) = 4  ! will copy inflow
         else if(cond=='jet') then
-           if(orientation /= 1) stop "jet only at x-"
+           if(orientation /= 1) call pariserror("jet only at x-")
            fb(orientation) = 2
        else
           call pariserror("this vofbc not implemented")

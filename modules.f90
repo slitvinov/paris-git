@@ -76,13 +76,13 @@ contains
   end subroutine check_sanity_in_depth
 !
   subroutine check_sanity()
-    if(nx < 1) stop "wrong nx"
-    if(npx < 1) stop "wrong npx"
-    if(ny < 1) stop "wrong ny"
-    if(npy < 1) stop "wrong npy"
-    if(nz < 1) stop "wrong nz"
-    if(npz < 1) stop "wrong npz"
-    if(nx > 32767) stop "nx too large"  ! why ?
+    if(nx < 1) call pariserror("wrong nx")
+    if(npx < 1) call pariserror("wrong npx")
+    if(ny < 1) call pariserror("wrong ny")
+    if(npy < 1) call pariserror("wrong npy")
+    if(nz < 1) call pariserror("wrong nz")
+    if(npz < 1) call pariserror("wrong npz")
+    if(nx > 32767) call pariserror("nx too large")  ! why ? INTEGER*4 goes to 2**32-1 but NX*NY*NZ then too large ? 
   end subroutine check_sanity
 !
   function EndProc(d)
@@ -426,7 +426,7 @@ contains
     implicit none
     character(*) :: rootname
     integer prank
-    if(rank.ne.0) stop 'rank.ne.0 in append'
+    if(rank.ne.0) call pariserror("rank.ne.0 in append")
     
     if(opened==0) then
        OPEN(UNIT=90,FILE='parallel.visit')
@@ -494,7 +494,7 @@ subroutine backup_read
   OPEN(UNIT=7,FILE=trim(out_path)//'/backup_'//int2text(rank,padding),status='old',action='read')
   read(7,*)time,itimestep,i1,i2,j1,j2,k1,k2
   if(i1/=is .or. i2/=ie .or. j1/=js .or. j2/=je .or. k1/=ks .or. k2/=ke) &
-    stop 'Error: backup_read'
+    call pariserror("Error: backup_read")
   do k=ks,ke; do j=js,je; do i=is,ie
     read(7,*) u(i,j,k), v(i,j,k), w(i,j,k), p(i,j,k), color(i,j,k)
   enddo; enddo; enddo
@@ -653,6 +653,7 @@ module module_BC
   ! LM: The same convention is used for BoundaryPressure
   ! SZ: alternately may contain the velocity of the flow for inflow boundary conditions on x+
   real(8) :: ugas_inject,uliq_inject
+  logical :: check_setup=.true.
   contains
 !=================================================================================================
 !=================================================================================================
@@ -663,7 +664,7 @@ module module_BC
     implicit none
     include 'mpif.h'
     real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: umask,vmask,wmask, p
-    real(8), dimension(is:ie,js:je,ks:ke), intent(out) :: pmask
+    real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: pmask
 
 
   ! for walls set the mask to zero
@@ -671,11 +672,10 @@ module module_BC
       if(coords(1)==0    ) umask(is-1,js-1:je+1,ks-1:ke+1)=0d0
       if(coords(1)==nPx-1) umask(ie,js-1:je+1,ks-1:ke+1)=0d0
     endif
-    ! outflow boundary condition
+
+    ! initialization of pmask
+    ! pmask not needed anymore for outflow/velocity boundary condition
     pmask=1d0
-    if(bdry_cond(4)==4 .and. coords(1)==nPx-1) then
-      pmask(ie,:,:)=0d0
-    endif
 
 
     if(bdry_cond(2)==0)then
@@ -813,9 +813,12 @@ module module_BC
         w(ie+1,:,:)=2*WallVel(2,3)-w(ie,:,:)
     endif
     
-    ! outflow boundary condition
+    ! outflow/velocity boundary condition
+    ! same velocity as opposing inflow. 
     if(bdry_cond(4)==4 .and. coords(1)==nPx-1) then
-        u(ie  ,:,:)=u(ie-1,:,:)
+       if(inject_type/=1) call pariserror("wrong injectype") ! not yet implmented for outflow/velocity,
+        u(ie  ,:,:)=WallVel(1,1)
+        u(ie+1,:,:)=WallVel(1,1)
         v(ie+1,:,:)=v(ie-1,:,:)
         w(ie+1,:,:)=w(ie-1,:,:)
     endif
@@ -1295,7 +1298,7 @@ module module_BC
     integer, save :: srcL, srcR, destL, destR, face(2)
     logical, save :: first_time=.true.
 
-    if(ngh>Ng) stop 'ghost error: not enough ghost layers to fill'
+    if(ngh>Ng) call pariserror("ghost error: not enough ghost layers to fill")
     if(first_time) then
       first_time=.false.
       jlen=jmax-jmin+1; klen=kmax-kmin+1; !ilen=ngh
@@ -1324,7 +1327,7 @@ module module_BC
     integer, save :: srcL, srcR, destL, destR, face(2)
     logical, save :: first_time=.true.
 
-    if(ngh>Ng) stop 'ghost error: not enough ghost layers to fill'
+    if(ngh>Ng) call pariserror("ghost error: not enough ghost layers to fill")
     if(first_time)then
       first_time=.false.
       klen=kmax-kmin+1; ilen=imax-imin+1; !jlen=ngh
@@ -1353,7 +1356,7 @@ module module_BC
     integer, save :: srcL, srcR, destL, destR, face(2)
     logical, save :: first_time=.true.
 
-    if(ngh>Ng) stop 'ghost error: not enough ghost layers to fill'
+    if(ngh>Ng) call pariserror("ghost error: not enough ghost layers to fill")
     if(first_time)then
       first_time=.false.
       ilen=imax-imin+1; jlen=jmax-jmin+1; !klen=ngh
@@ -1383,7 +1386,7 @@ module module_BC
     integer, save :: srcL, srcR, destL, destR, face(2)
     logical, save :: first_time=.true.
 
-    if(ngh>Ng) stop 'ghost error: not enough ghost layers to fill'
+    if(ngh>Ng) call pariserror("ghost error: not enough ghost layers to fill")
     if(first_time) then
       first_time=.false.
       jlen=jmax-jmin+1; klen=kmax-kmin+1; !ilen=ngh
@@ -1412,7 +1415,7 @@ module module_BC
     integer, save :: srcL, srcR, destL, destR, face(2)
     logical, save :: first_time=.true.
 
-    if(ngh>Ng) stop 'ghost error: not enough ghost layers to fill'
+    if(ngh>Ng) call pariserror("ghost error: not enough ghost layers to fill")
     if(first_time)then
       first_time=.false.
       klen=kmax-kmin+1; ilen=imax-imin+1; !jlen=ngh
@@ -1441,7 +1444,7 @@ module module_BC
     integer, save :: srcL, srcR, destL, destR, face(2)
     logical, save :: first_time=.true.
 
-    if(ngh>Ng) stop 'ghost error: not enough ghost layers to fill'
+    if(ngh>Ng) call pariserror("ghost error: not enough ghost layers to fill")
     if(first_time)then
       first_time=.false.
       ilen=imax-imin+1; jlen=jmax-jmin+1; !klen=ngh
@@ -1665,7 +1668,7 @@ module module_poisson
     allocate(values(nvalues), stat=ierr)
     call add_2_my_sizer_2(nvalues,8)
 
-    if(ierr/=0)stop '**** poi_solve: allocation error ****'
+    if(ierr/=0)call pariserror("**** poi_solve: allocation error ****")
 
     ijk = 1
     do k=ks,ke;  do j=js,je;  do i=is,ie
@@ -1843,8 +1846,7 @@ subroutine SetupPoisson(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask,cvof,Vo
   implicit none
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: utmp,vtmp,wtmp,rhot
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: umask,vmask,wmask
-  real(8), dimension(is:ie,js:je,ks:ke), intent(inout) :: pmask
-!  real(8), dimension(is:ie,js:je,ks:ke), intent(in) :: cvof
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: pmask
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: cvof
   real(8), dimension(is:ie,js:je,ks:ke,8), intent(out) :: A
 
@@ -1859,11 +1861,25 @@ subroutine SetupPoisson(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask,cvof,Vo
       A(i,j,k,5) = 2d0*dt*wmask(i,j,k-1)/(dz(k)*dzh(k-1)*(rhot(i,j,k-1)+rhot(i,j,k)))
       A(i,j,k,6) = 2d0*dt*wmask(i,j,k)/(dz(k)*dzh(k  )*(rhot(i,j,k+1)+rhot(i,j,k)))
       A(i,j,k,7) = sum(A(i,j,k,1:6))
-      A(i,j,k,8) = -( VolumeSource +(utmp(i,j,k)-utmp(i-1,j,k))/dx(i) &
+      A(i,j,k,8) =  -(  VolumeSource +(utmp(i,j,k)-utmp(i-1,j,k))/dx(i) &
          +  (vtmp(i,j,k)-vtmp(i,j-1,k))/dy(j) &
          +  (wtmp(i,j,k)-wtmp(i,j,k-1))/dz(k) )
 !    endif
   enddo; enddo; enddo
+
+! dp/dn = 0 for inflow bc on face 1 == x- : do not correct u(is-1)
+! inflow bc on other faces not implemented yet.  
+  if(bdry_cond(1)==3 .and. coords(1)==0) then
+     A(is,:,:,7) = A(is,:,:,7) - A(is,:,:,1)
+     A(is,:,:,1) = 0d0
+  endif
+
+! dp/dn = 0 for outflow/fixed velocity bc on face 4 == x+
+! outflow/fixed velocity bc on other faces not implemented yet.  
+  if(bdry_cond(4)==4 .and. coords(4)==Npx - 1) then
+     A(ie,:,:,7) = A(ie,:,:,7) - A(ie,:,:,2)
+     A(ie,:,:,2) = 0d0
+  endif
 
   if(FreeSurface) then
      do k=ks,ke; do j=js,je; do i=is,ie;
@@ -1871,12 +1887,14 @@ subroutine SetupPoisson(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask,cvof,Vo
            pmask(i,j,k) = 0.d0
         endif
      enddo;enddo;enddo
-  endif
-! pressure 0 where pmask=0
-  do i=1,8; A(:,:,:,i) = pmask*A(:,:,:,i); enddo
-  A(:,:,:,7) = A(:,:,:,7) + 1.0d-49 
-!  A(:,:,:,7) = 1d0 - pmask + pmask*A(:,:,:,7) 
-!  A(:,:,:,8) = pmask*A(:,:,:,8) 
+     ! pressure 0 where pmask=0
+     do i=1,8
+        A(:,:,:,i) = pmask*A(:,:,:,i)
+     enddo
+  else
+     A(:,:,:,7) = A(:,:,:,7) + 1.0d-49 
+     if(check_setup) call check_poisson_setup(A,pmask)
+     endif
 end subroutine SetupPoisson
 !=================================================================================================
 !=================================================================================================
@@ -2105,47 +2123,47 @@ subroutine LinearSolver(A,p,maxError,beta,maxit,it,ierr)
   logical :: mask(imin:imax,jmin:jmax,kmin:kmax)
 !--------------------------------------ITERATION LOOP--------------------------------------------  
   do it=1,maxit
-    do k=ks,ke; do j=js,je; do i=is,ie
-      p(i,j,k)=(1d0-beta)*p(i,j,k)+beta* 1d0/A(i,j,k,7)*(              &
-        A(i,j,k,1) * p(i-1,j,k) + A(i,j,k,2) * p(i+1,j,k) +            &
-        A(i,j,k,3) * p(i,j-1,k) + A(i,j,k,4) * p(i,j+1,k) +            &
-        A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8))
-    enddo; enddo; enddo
-!---------------------------------CHECK FOR CONVERGENCE-------------------------------------------
-    res = 0d0
-    call ghost_x(p,1,req( 1: 4)); call ghost_y(p,1,req( 5: 8)); call ghost_z(p,1,req( 9:12))
-    do k=ks+1,ke-1; do j=js+1,je-1; do i=is+1,ie-1
-      res=res+abs(-p(i,j,k) * A(i,j,k,7) +                             &
-        A(i,j,k,1) * p(i-1,j,k) + A(i,j,k,2) * p(i+1,j,k) +            &
-        A(i,j,k,3) * p(i,j-1,k) + A(i,j,k,4) * p(i,j+1,k) +            &
-        A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8) )**2
-    enddo; enddo; enddo
-    call MPI_WAITALL(12,req,sta,ierr)
-    mask=.true.
-    mask(is+1:ie-1,js+1:je-1,ks+1:ke-1)=.false.
-    do k=ks,ke; do j=js,je; do i=is,ie
-      if(mask(i,j,k))res=res+abs(-p(i,j,k) * A(i,j,k,7) +              &
-        A(i,j,k,1) * p(i-1,j,k) + A(i,j,k,2) * p(i+1,j,k) +            &
-        A(i,j,k,3) * p(i,j-1,k) + A(i,j,k,4) * p(i,j+1,k) +            &
-        A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8) )**2
-    enddo; enddo; enddo
-    res = res/dble(Nx*Ny*Nz)
-    if ((res*npx*npy*npz)>1.d16 ) then
-      print*,'Pressure solver diverged after',it,'iterations at rank ',rank
-      stop  !return
-    else if (res .ne. res) then 
-       print*, 'Pressure residual value is invalid at rank', rank
-       stop !return
-    else 
-      call MPI_ALLREDUCE(res, totalres, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr)
-      totalres=sqrt(totalres)
-!    if (.not.(totalres<1e10)) then
-!      ierr=1 !stop '***** solution has diverged *****'
-!      if(rank==0) print*,'Pressure solver diverged after',it,'iterations.'
-!      return
-!    endif
-      if (totalres<maxError) exit
-    end if !res
+     do k=ks,ke; do j=js,je; do i=is,ie
+        p(i,j,k)=(1d0-beta)*p(i,j,k)+beta* 1d0/A(i,j,k,7)*(              &
+             A(i,j,k,1) * p(i-1,j,k) + A(i,j,k,2) * p(i+1,j,k) +            &
+             A(i,j,k,3) * p(i,j-1,k) + A(i,j,k,4) * p(i,j+1,k) +            &
+             A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8))
+     enddo; enddo; enddo
+     !---------------------------------CHECK FOR CONVERGENCE-------------------------------------------
+     res = 0d0
+     call ghost_x(p,1,req( 1: 4)); call ghost_y(p,1,req( 5: 8)); call ghost_z(p,1,req( 9:12))
+     do k=ks+1,ke-1; do j=js+1,je-1; do i=is+1,ie-1
+        res=res+abs(-p(i,j,k) * A(i,j,k,7) +                             &
+             A(i,j,k,1) * p(i-1,j,k) + A(i,j,k,2) * p(i+1,j,k) +            &
+             A(i,j,k,3) * p(i,j-1,k) + A(i,j,k,4) * p(i,j+1,k) +            &
+             A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8) )**2
+     enddo; enddo; enddo
+     call MPI_WAITALL(12,req,sta,ierr)
+     mask=.true.
+     mask(is+1:ie-1,js+1:je-1,ks+1:ke-1)=.false.
+     do k=ks,ke; do j=js,je; do i=is,ie
+        if(mask(i,j,k))res=res+abs(-p(i,j,k) * A(i,j,k,7) +              &
+             A(i,j,k,1) * p(i-1,j,k) + A(i,j,k,2) * p(i+1,j,k) +            &
+             A(i,j,k,3) * p(i,j-1,k) + A(i,j,k,4) * p(i,j+1,k) +            &
+             A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8) )**2
+     enddo; enddo; enddo
+     res = res/dble(Nx*Ny*Nz)
+     if ((res*npx*npy*npz)>1.d16 ) then
+        print*,'Pressure solver diverged after',it,'iterations at rank ',rank
+        stop  !return
+     else if (res .ne. res) then 
+        print*, 'Pressure residual value is invalid at rank', rank
+        stop !return
+     else 
+        call MPI_ALLREDUCE(res, totalres, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr)
+        totalres=sqrt(totalres)
+        !    if (.not.(totalres<1e10)) then
+        !      ierr=1 !call pariserror("***** solution has diverged *****")
+        !      if(rank==0) print*,'Pressure solver diverged after',it,'iterations.'
+        !      return
+        !    endif
+        if (totalres<maxError) exit
+     end if !res
   enddo
   if(it==maxit+1 .and. rank==0) write(*,*) 'Warning: LinearSolver reached maxit: totalres',totalres
 end subroutine LinearSolver
@@ -2201,8 +2219,8 @@ subroutine LinearSolver1(A,u,umask,maxError,beta,maxit,it,ierr)
     call MPI_ALLREDUCE(res, totalres, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr)
     totalres=sqrt(totalres)
     if (.not.(totalres<1e10)) then
-      ierr=1 !stop '***** solution has diverged *****'
-      if(rank==0) print*,'Viscous solver diverged after',it,'iterations.'
+      ierr=1 
+      call pariserror("***** solution has diverged *****")
       return
     endif
     if (totalres<maxError) exit
@@ -2235,7 +2253,7 @@ subroutine calcResidual(A,p, Residual)
 end subroutine calcResidual
 !=================================================================================================
 !=================================================================================================
-! Returns the residual
+! Returns the residual including pmask
 !-------------------------------------------------------------------------------------------------
 subroutine calcResidual1(A,p,pmask,Residual)
   use module_grid
@@ -2243,7 +2261,7 @@ subroutine calcResidual1(A,p,pmask,Residual)
   implicit none
   include 'mpif.h'
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: p
-  real(8), dimension(is:ie,js:je,ks:ke), intent(in) :: pmask
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: pmask
   real(8), dimension(is:ie,js:je,ks:ke,8), intent(in) :: A
   real(8) :: res, totalres, Residual
   integer :: i,j,k, ierr

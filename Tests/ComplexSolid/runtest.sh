@@ -13,7 +13,7 @@ let nx=$3
 let idt=0
 imp=$4
 precision=$5
-maxerr=`awk -v dt0=$dt0 'BEGIN {print 0.01*dt0}'`
+maxerr=`awk -v dt0=$dt0 'BEGIN {print 0.001*dt0}'`
 
 dt=$dt0
 
@@ -21,17 +21,18 @@ npx=2; npy=$npx; npz=$npx
 
 # /bin/rm -f flowrates-IMP-$imp*
 
-# prepare rock
+# #prepare rock
 
-#if [ -s bitmap-0000.txt ]; then
-#rm bitmap*.txt
-#fi
+if [ -s bitmap-0000.txt ]; then
+    rm bitmap*.txt
+fi
 
-#here=`pwd`
-#cd Rock100/
-#rockread $nx $npx < segmented2048W_SS_SWM_CAC_IC_SS_400CUBE_SS_EXP.ai > rockread_out.tmp
-#mv bitmap*.txt $here
-#cd $here
+echo "preparing Rock$nx"
+here=`pwd`
+cd Rock$nx/
+rockread $nx $npx < rock_$nx.txt > rockread_out.tmp
+mv bitmap*.txt $here
+cd $here
 
 
 while [ $idt -lt $ndt ] ; do

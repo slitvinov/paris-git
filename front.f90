@@ -269,7 +269,7 @@ module module_front
     ne=4*2*nps*nps
 
     if(PointLength(front)/=0 .or. ElemLength(front)/=0) &
-      stop 'Error: Only one sphere per front is allowed.'
+      call pariserror("Error: Only one sphere per front is allowed.")
 
     do i = 1,np
       call add_obj(point, PointConnect, PointLength(front), PointFirst(front), &
@@ -762,13 +762,13 @@ end subroutine write_integer
     real(8) :: xp(3)
     integer :: point,i,i1
     i = floor(PointCoords(point,1)-0.5);   i1 = Ng+modulo(i-Ng,Nx)
-    !if(i>Nx .or. i<1)stop 'Error: GetCoords'; 
+    !if(i>Nx .or. i<1)call pariserror("Error: GetCoords"); 
     xp(1)=xh(i1)+dx(i1+1)*(PointCoords(point,1)-dfloat(i)-0.5)+xLength*floor(dfloat(i-Ng)/dfloat(Nx))
     i = floor(PointCoords(point,2)-0.5);   i1 = Ng+modulo(i-Ng,Ny)
-    !if(i>Ny .or. i<1)stop 'Error: GetCoords'; 
+    !if(i>Ny .or. i<1)call pariserror("Error: GetCoords"); 
     xp(2)=yh(i1)+dy(i1+1)*(PointCoords(point,2)-dfloat(i)-0.5)+yLength*floor(dfloat(i-Ng)/dfloat(Ny))
     i = floor(PointCoords(point,3)-0.5);   i1 = Ng+modulo(i-Ng,Nz)
-    !if(i>Nz .or. i<1)stop 'Error: GetCoords'; 
+    !if(i>Nz .or. i<1)call pariserror("Error: GetCoords"); 
     xp(3)=zh(i1)+dz(i1+1)*(PointCoords(point,3)-dfloat(i)-0.5)+zLength*floor(dfloat(i-Ng)/dfloat(Nz))
   end subroutine GetCoords
 !=================================================================================================
@@ -1183,7 +1183,7 @@ end subroutine write_integer
       enddo
 
     else
-      stop 'Error: Incorrect input for DistributeFront'
+      call pariserror("Error: Incorrect input for DistributeFront")
     endif
    end subroutine DistributeFront
 !=================================================================================================
@@ -1216,7 +1216,7 @@ end subroutine write_integer
       call MPI_WAITALL(2,req,sta,ierr)
       call MPI_GET_COUNT(sta(:,2), MPI_INTEGER, NumLocPoint, ierr)
     else
-      stop 'Error: Incorrect input for DistributeFront'
+      call pariserror("Error: Incorrect input for DistributeFront")
     endif
   end subroutine GetFront
 !=================================================================================================

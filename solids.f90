@@ -71,7 +71,7 @@ contains
        bitmap_opened=.true.
     endif
     read_bitmap=tmp(i,j,k)
-    if(i<remove_layers+Ng) read_bitmap=0d0
+    if(i<remove_layers+Ng.or.i>Nx+Ng-remove_layers) read_bitmap=0d0
   end function read_bitmap
 !=================================================================================================
   SUBROUTINE append_solid_visit_file(rootname)
@@ -175,7 +175,7 @@ contains
        call ghost_z(solids,2,req(1:4));  call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
 
        ! For solid objects set mask according to placement of solids
-
+       umask=1d0; vmask=1d0; wmask=1d0
        do i=imin,imax-1; do j=jmin,jmax-1; do k=kmin,kmax-1
           if((solids(i,j,k) + solids(i+1,j,k)) > 0.5d0) umask(i,j,k) = 0d0
           if((solids(i,j,k) + solids(i,j+1,k)) > 0.5d0) vmask(i,j,k) = 0d0

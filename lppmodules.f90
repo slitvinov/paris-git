@@ -252,7 +252,7 @@ contains
             print *, 'rank=',rank,' has error ',ierr,' opening file inputlpp'
          endif
       else
-         if (rank == 0) STOP "ReadLPPParameters: no 'inputlpp' file."
+         if (rank == 0) call pariserror("ReadLPPParameters: no 'inputlpp' file.")
       endif
       close(in)
       if (rank == 0) then
@@ -2908,7 +2908,7 @@ module module_output_lpp
       OPEN(UNIT=7,FILE=trim(out_path)//'/backuplpp_'//int2text(rank,padding),status='old',action='read')
       read(7,*)time,itimestep,num_part(rank)
       if ( num_part(rank) < 0 ) &
-         stop 'Error: backuplpp_read'
+         call pariserror("Error: backuplpp_read")
       if ( num_part(rank) > 0 ) then 
          do ipart=1,num_part(rank)
             read(7,*    ) parts(ipart,rank)%element%xc, & 

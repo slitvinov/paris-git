@@ -76,7 +76,7 @@ Program paris
 !---------------------------------------INITIALIZATION--------------------------------------------
   ! Initialize MPI
   call MPI_INIT(ierr)
-  if (ierr /= 0) STOP '*** Main: unsuccessful MPI-initialization'
+  if (ierr /= 0) call pariserror("*** Main: unsuccessful MPI-initialization")
   call MPI_COMM_RANK(MPI_COMM_WORLD, rank, ierr)
   call MPI_COMM_SIZE(MPI_COMM_WORLD, numProcess, ierr)
   start_time = MPI_Wtime(ierr)
@@ -87,27 +87,27 @@ Program paris
   !Check consistency of options
   if(rank==0) then
      if(TwoPhase.or.FreeSurface) then
-        if((.not.DoFront).and.(.not.DoVOF)) stop 'need a phase tracking for two-phase'
-        if(GetPropertiesFromFront.and.(.not.DoFront)) stop 'need Front to get properties from'
-        if((.not.GetPropertiesFromFront).and.(.not.DoVOF)) stop 'need VOF to get properties from'
+        if((.not.DoFront).and.(.not.DoVOF)) call pariserror("need a phase tracking for two-phase")
+        if(GetPropertiesFromFront.and.(.not.DoFront)) call pariserror("need Front to get properties from")
+        if((.not.GetPropertiesFromFront).and.(.not.DoVOF)) call pariserror("need VOF to get properties from")
      endif
-     if(TwoPhase.and.FreeSurface) stop 'cannnot be both TwoPhase and FreeSurface'
+     if(TwoPhase.and.FreeSurface) call pariserror("cannnot be both TwoPhase and FreeSurface")
   endif
 
   ! check number of processors
-  if ((NumProcess < nPdomain+1).and.DoFront) STOP '*** Main: Error with number of processes - Front!'
-  if (NumProcess < nPdomain) STOP '*** Main: Error with number of processes!'
+  if ((NumProcess < nPdomain+1).and.DoFront) call pariserror("*** Main: Error with number of processes - Front!")
+  if (NumProcess < nPdomain) call pariserror("*** Main: Error with number of processes!")
 
   icolor = 0                                  ! Processes 0 to nPdomain-1 are used to solve domain
   if(rank>=nPdomain) icolor = MPI_UNDEFINED
   call MPI_COMM_SPLIT(MPI_COMM_WORLD, icolor, 0, MPI_Comm_Domain, ierr)
-  If (ierr /= 0) STOP '*** Main: unsuccessful MPI split'
+  If (ierr /= 0) call pariserror("*** Main: unsuccessful MPI split")
 
   icolor = 0                                  ! Process nPdomain is used to solve front
   if(rank>nPdomain) icolor = MPI_UNDEFINED
   if((rank==nPdomain).and.(.not.DoFront)) icolor = MPI_UNDEFINED
   call MPI_COMM_SPLIT(MPI_COMM_WORLD, icolor, 0, MPI_Comm_Active, ierr)
-  If (ierr /= 0) STOP '*** Main: unsuccessful MPI split'
+  If (ierr /= 0) call pariserror("*** Main: unsuccessful MPI split")
 
   if((rank>nPdomain).or.((rank==nPdomain).and.(.not.DoFront)))then
     call MPI_BARRIER(MPI_COMM_WORLD, ierr)
@@ -315,8 +315,8 @@ Program paris
            call my_timer(1)
 
 !-----------------------------------------PROJECTION STEP-----------------------------------------
-           call SetPressureBC(umask,vmask,wmask,tmp(is:ie,js:je,ks:ke),p)
-           call SetupPoisson(u,v,w,umask,vmask,wmask,rho,dt,A,tmp(is:ie,js:je,ks:ke),cvof,VolumeSource)
+           call SetPressureBC(umask,vmask,wmask,tmp,p)
+           call SetupPoisson(u,v,w,umask,vmask,wmask,rho,dt,A,tmp,cvof,VolumeSource)
            ! (div u)*dt < epsilon => div u < epsilon/dt => maxresidual : maxerror/dt 
            if(HYPRE)then
               call poi_solve(A,p(is:ie,js:je,ks:ke),maxError/dt,maxit,it)
@@ -325,7 +325,7 @@ Program paris
               call ghost_z(p,1,req(9:12)) 
               call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
            else
-              call LinearSolver(A,p,maxError/dt,beta,maxit,it,ierr)
+              call NewSolver(A,p,maxError/dt,beta,maxit,it,ierr)
            endif
            if(mod(itimestep,termout)==0) then
               call calcresidual(A,p,residual)
@@ -334,17 +334,18 @@ Program paris
               if(rank==0.and..not.hypre) write(*,'("              pressure iterations :",I9)')it
            endif
       
-           do k=ks,ke;  do j=js,je; do i=is,ieu;    ! CORRECT THE u-velocity 
-              u(i,j,k)=u(i,j,k)-dt*(2.0/dxh(i))*(p(i+1,j,k)-p(i,j,k))/(rho(i+1,j,k)+rho(i,j,k))
+           do k=ks,ke;  do j=js,je; do i=is,ieu    ! CORRECT THE u-velocity 
+              u(i,j,k)=u(i,j,k)-dt*(2.0*umask(i,j,k)/dxh(i))*(p(i+1,j,k)-p(i,j,k))/(rho(i+1,j,k)+rho(i,j,k))
            enddo; enddo; enddo
            
-           do k=ks,ke;  do j=js,jev; do i=is,ie;    ! CORRECT THE v-velocity
-              v(i,j,k)=v(i,j,k)-dt*(2.0/dyh(j))*(p(i,j+1,k)-p(i,j,k))/(rho(i,j+1,k)+rho(i,j,k))
+           do k=ks,ke;  do j=js,jev; do i=is,ie    ! CORRECT THE v-velocity
+              v(i,j,k)=v(i,j,k)-dt*(2.0*vmask(i,j,k)/dyh(j))*(p(i,j+1,k)-p(i,j,k))/(rho(i,j+1,k)+rho(i,j,k))
            enddo; enddo; enddo
       
-           do k=ks,kew;  do j=js,je; do i=is,ie;   ! CORRECT THE w-velocity
-              w(i,j,k)=w(i,j,k)-dt*(2.0/dzh(k))*(p(i,j,k+1)-p(i,j,k))/(rho(i,j,k+1)+rho(i,j,k))
+           do k=ks,kew;  do j=js,je; do i=is,ie   ! CORRECT THE w-velocity
+              w(i,j,k)=w(i,j,k)-dt*(2.0*wmask(i,j,k)/dzh(k))*(p(i,j,k+1)-p(i,j,k))/(rho(i,j,k+1)+rho(i,j,k))
            enddo; enddo; enddo
+           if(mod(itimestep,nout)==0) call check_corrected_vel(u,v,w,umask,vmask,wmask,itimestep)
            if( DoLPP ) call ComputeSubDerivativeVel()
            call my_timer(10)
            !--------------------------------------UPDATE COLOR---------------------------------------------
@@ -353,7 +354,7 @@ Program paris
                  if(hypre)then
                     call poi_solve(A,color(is:ie,js:je,ks:ke),maxError,maxit,it)
                  else
-                    call LinearSolver(A,color,maxError,beta,maxit,it,ierr)
+                    call NewSolver(A,color,maxError,beta,maxit,it,ierr)
                     if(mod(itimestep,termout)==0) then
                        if(rank==0.and..not.hypre)write(*  ,'("              density  iterations:",I9)')it
                     endif
@@ -433,7 +434,7 @@ Program paris
               write(out,'("Step:",I9," Iterations:",I9," cpu(s):",f10.2)')itimestep,it,end_time-start_time
            endif
         endif
-        if(nstats==0) STOP " *** Main: nstats = 0"
+        if(nstats==0) call pariserror(" *** Main: nstats = 0")
         if(mod(itimestep,nstats)==0.and.rank==0)then
               !        open(unit=121,file='track')
               !        write(121,'("Step:",I10," dt=",es16.5e2," time=",es16.5e2)')itimestep,dt,time
@@ -499,6 +500,7 @@ Program paris
 !--------------------------------------------End front--------------------------------------------
   endif
 !-------------------------------------------------------------------------------------------------
+  if(rank==0) print*,"paris: end of main time loop"
 !--------------- END OF MAIN TIME LOOP ----------------------------------------------------------
   call wrap_up_timer(itimestep)
   if(rank==0) then 
@@ -606,7 +608,7 @@ subroutine calcStats
   rho_ave = stats(6)
   p_ave = stats(7)
 ! This stops the code in case the average velocity (stats(2)) becomes NaN.
-  if(stats(2).ne.stats(2)) stop "********** Invalid flow rate **********"
+  if(stats(2).ne.stats(2)) call pariserror("********** Invalid flow rate **********")
   W_int = W_int + dt*(stats(2)-1d0)
   dpdx_stat = 1.0d0*(stats(2)-1d0) + 0.2d0*W_int
   !dpdz_stat = min(max(dpdz_stat,-2),2)
@@ -928,7 +930,7 @@ subroutine volumeForce(rho,rho1,rho2,dpdx,dpdy,dpdz,BuoyancyCase,fx,fy,fz,gx,gy,
   elseif(BuoyancyCase==3) then
     rro=rho_ave
   else
-    stop 'volumeForce: invalid buoyancy option'
+    call pariserror("volumeForce: invalid buoyancy option")
   endif
 
   do k=ks,ke;  do j=js,je; do i=is,ieu
@@ -1061,7 +1063,9 @@ subroutine initialize
     dims(1) = nPx; dims(2) = nPy; dims(3) = nPz
     
     reorder = 1
-    periodic = 0; 
+
+! Initialise boundary condition and MPI_Comm_cart periodicity
+    periodic = 0 
     do i=1,ndim 
        if (bdry_cond(i) == 1) then
           periodic(i) = 1
@@ -1074,11 +1078,16 @@ subroutine initialize
        endif
     enddo
 
+! determine if check of bc setup is possible
+    do i=1,2*ndim
+       if (bdry_cond(i) >= 5) check_setup=.false.
+    enddo
+
     call MPI_Cart_Create(MPI_Comm_Domain,ndim,dims,periodic,reorder,MPI_Comm_Cart,ierr)
-    if (ierr /= 0) STOP '*** Grid: unsuccessful Cartesian MPI-initialization'
+    if (ierr /= 0) call pariserror("*** Grid: unsuccessful Cartesian MPI-initialization")
 
     call MPI_Cart_Coords(MPI_Comm_Cart,rank,ndim,coords,ierr)
-    if (ierr /= 0) STOP '*** Grid: unsuccessful in getting topology coordinates'
+    if (ierr /= 0) call pariserror("*** Grid: unsuccessful in getting topology coordinates")
 
 !     print *, "rank",rank,"coords",coords
 !     stop
@@ -1089,6 +1098,15 @@ subroutine initialize
     ieu=ie; if(bdry_cond(1)/=1 .and. coords(1)==nPx-1) ieu=ie-1
     jev=je; if(bdry_cond(2)/=1 .and. coords(2)==nPy-1) jev=je-1
     kew=ke; if(bdry_cond(3)/=1 .and. coords(3)==nPz-1) kew=ke-1
+
+!     ! For pressure correction with inflow
+!     ! dp/dn = 0 for inflow bc on face 1 == x- 
+!     ! inflow bc on other faces not implemented yet.  
+!     if(bdry_cond(1)==3 .and. coords(1)==0) then
+!        istpc=is+1
+!     else
+!        istpc=is
+!     endif
 
     allocate(  u(imin:imax,jmin:jmax,kmin:kmax), uold(imin:imax,jmin:jmax,kmin:kmax), &
               du(imin:imax,jmin:jmax,kmin:kmax),   fx(imin:imax,jmin:jmax,kmin:kmax), &
@@ -1309,7 +1327,7 @@ subroutine InitCondition
            call ghost_z(color,1,req( 9:12))
            call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
         else
-           call LinearSolver(A,color,maxError,beta,maxit,it,ierr)
+           call NewSolver(A,color,maxError,beta,maxit,it,ierr)
            if(rank==0)print*,it,'iterations for initial density.'
         endif
         do k=ks,ke;  do j=js,je; do i=is,ie
@@ -1389,7 +1407,7 @@ function int2text(number,length)
   integer :: number, length, i
   character(len=length) :: int2text
   character, dimension(0:9) :: num = (/'0', '1', '2', '3', '4', '5', '6', '7', '8', '9'/)
-  if(number>=10**length)stop 'int2text error: string is not large enough'
+  if(number>=10**length)call pariserror("int2text error: string is not large enough")
   do i=1,length
     int2text(length+1-i:length+1-i) = num(mod(number/(10**(i-1)),10))
   enddo
@@ -1436,7 +1454,7 @@ subroutine ReadParameters
                         BoundaryPressure,             ZeroReynolds,  restartAverages,termout,    &  
                         excentricity,  tout,          zip_data,      ugas_inject,   uliq_inject
  
-  Nx = 0; Ny = 4; Nz = 4 ! stop absurd input files. 
+  Nx = 0; Ny = 4; Nz = 4 ! cause absurd input file that lack nx value to fail. 
   Ng=2;xLength=1d0;yLength=1d0;zLength=1d0
   gx = 0d0; gy=0d0; gz=0d0; bdry_cond = 0
   dPdx = 0d0;  dPdy = 0d0; dPdz = 0d0
@@ -1461,14 +1479,14 @@ subroutine ReadParameters
   out=2
 
   open(unit=in, file='input', status='old', action='read', iostat=ierr)
-  if (ierr .ne. 0) stop 'ReadParameters: error opening input file'
+  if (ierr .ne. 0) call pariserror("ReadParameters: error opening input file")
   read(UNIT=in,NML=parameters)
   close(in)
   call check_sanity()
   bdry_read=.true.
-  if(MaxFront>10000) stop 'Error: ReadParameters: increase size of xyzrad array'
+  if(MaxFront>10000) call pariserror("Error: ReadParameters: increase size of xyzrad array")
 
-  if(numBubble>MaxFront) stop 'Error: ReadParameters: increase size of xyzrad array (MaxFront)'
+  if(numBubble>MaxFront) call pariserror("Error: ReadParameters: increase size of xyzrad array (MaxFront)")
 
   allocate(xc(MaxFront), yc(MaxFront), zc(MaxFront))
   allocate(FrontProps(1:14,MaxFront),rad(MaxFront))
@@ -1490,15 +1508,15 @@ subroutine ReadParameters
      call system('cp input         '//trim(out_path))
      !call system('cp paris.f90 '//trim(out_path))
      open(unit=out, file=trim(out_path)//'/output', action='write', iostat=ierr)
-     if (ierr .ne. 0) stop 'ReadParameters: error opening output file'
+     if (ierr .ne. 0) call pariserror("ReadParameters: error opening output file")
      write(UNIT=out,NML=parameters)
   endif
 
   ! Number of grid points in streamwise and transverse directions must
   ! be integral multiples of total number of processors
-  if(mod(Nx,nPx) /= 0) Stop 'ReadParameters: Nx not divisible by nPx!'
-  if(mod(Ny,nPy) /= 0) Stop 'ReadParameters: Ny not divisible by nPy!'
-  if(mod(Nz,nPz) /= 0) Stop 'ReadParameters: Nz not divisible by nPz!'
+  if(mod(Nx,nPx) /= 0) call pariserror("ReadParameters: Nx not divisible by nPx!")
+  if(mod(Ny,nPy) /= 0) call pariserror("ReadParameters: Ny not divisible by nPy!")
+  if(mod(Nz,nPz) /= 0) call pariserror("ReadParameters: Nz not divisible by nPz!")
   Mx = Nx/nPx; My = Ny/nPy; Mz = Nz/nPz
   nPdomain = nPx*nPy*nPz
 
@@ -1523,15 +1541,12 @@ subroutine pariserror(message)
   include 'mpif.h'
   integer ierr
   character(*) :: message
-! remove next line for jobs on large numbers of processors. reinstate if needed for debugging
-!  print *, "rank = ",rank
-  if(rank==0) write(*,*) "ERROR *** ",message, " *** STOP "
+  OPEN(UNIT=89,FILE=TRIM(out_path)//'/error-rank-'//TRIM(int2text(rank,padding))//'.txt')
+  write(89,*) message
   ! Exit MPI gracefully
   close(out)
-   call MPI_BARRIER(MPI_COMM_WORLD, ierr)
-   call MPI_finalize(ierr)
-  if(rank==0) write(*,*) "Step: last message . . . . ParisExecutionError"
-!  if(rank==0) write(*,*) "ERROR *** ",message, " *** STOP "
+  call MPI_abort(MPI_COMM_WORLD, ierr)
+  call MPI_finalize(ierr)
   stop 
 end subroutine pariserror
 

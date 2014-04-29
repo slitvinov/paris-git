@@ -41,7 +41,7 @@ while [ $idt -lt $ndt ] ; do
     else
 	let np=4
     fi
-    mpirun -np $np paris > tmpout-$nx-$idt
+    mpirun -quiet -np $np paris > tmpout-$nx-$idt
     awk ' /Step:/ { cpu = $8 } END { print "cpu = " cpu } ' < tmpout-$nx-$idt
     awk -v dt=$dt '{ print dt " " $1 " " $2}' < out/flowrate.txt >> flowrates-IMP-$imp.txt
     dt=`awk -v dt=$dt 'BEGIN {print dt/2}'`
