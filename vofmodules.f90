@@ -241,7 +241,7 @@ contains
  
     if (rank == 0) then 
      !open(unit=out, file=trim(out_path)//'/output', action='write', iostat=ierr)
-     !if (ierr .ne. 0) stop 'ReadParameters: error opening output file'
+     !if (ierr .ne. 0) call pariserror("ReadParameters: error opening output file")
      write(UNIT=out,NML=vofparameters)
     end if ! rank
 
@@ -300,7 +300,7 @@ contains
        test_KHI2D = .true.
     else
        write(*,*) test_type, rank
-       stop 'unknown initialization'
+       call pariserror("unknown initialization")
     endif
     test_HF = test_heights .or. test_curvature .or. test_curvature_2D
     test_LP = test_tag .or. test_D2P 
@@ -1216,7 +1216,7 @@ subroutine backup_VOF_read
   OPEN(UNIT=7,FILE=trim(out_path)//'/backup_'//int2text(rank,padding),status='old',action='read')
   read(7,*)time,itimestep,i1,i2,j1,j2,k1,k2
   if(i1/=imin .or. i2/=imax .or. j1/=jmin .or. j2/=jmax .or. k1/=kmin .or. k2/=kmax) &
-    stop 'Error: backup_read'
+    call pariserror("Error: backup_read")
   do k=kmin,kmax; do j=jmin,jmax; do i=imin,imax
     read(7,*) u(i,j,k), v(i,j,k), w(i,j,k), p(i,j,k), cvof(i,j,k)
   enddo; enddo; enddo

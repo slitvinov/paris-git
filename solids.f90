@@ -78,7 +78,7 @@ contains
     implicit none
     character(*) :: rootname
     integer prank
-    if(rank.ne.0) stop 'rank.ne.0 in append_solid'
+    if(rank.ne.0) call pariserror("rank.ne.0 in append_solid")
 
     if(solid_opened==0) then
        OPEN(UNIT=89,FILE='solid.visit')
@@ -159,7 +159,7 @@ contains
                s1 =-1.d0
              end if ! x(i),y(j)
           else
-             stop 'invalid type'
+             call pariserror("invalid type")
           endif
           if(s1 > 0.) then
              solids(i,j,k) = 1d0
@@ -310,7 +310,7 @@ contains
       WRITE(6,*) '1: ', CARRAY(1,1),' , ' , CARRAY(1,2) 
       WRITE(6,*) '2: ', CARRAY(2,1),' , ' , CARRAY(2,2) 
       WRITE(6,*) ' '
-      STOP 'OUTFARRAY'
+      CALL PARISERROR("OUTFARRAY")
     END SUBROUTINE OUTFARRAY
 !***********************************************************************
     subroutine ReadSolidParameters
