@@ -291,7 +291,7 @@ module module_flow
   real(8), dimension(:,:,:), allocatable :: u, v, w, uold, vold, wold, fx, fy, fz, color
   real(8), dimension(:,:,:), allocatable :: p, rho, rhoo, muold, mu, dIdx, dIdy, dIdz
   real(8), dimension(:,:,:), allocatable :: umask,vmask,wmask
-  real(8), dimension(:,:,:), allocatable :: du,dv,dw,drho
+  real(8), dimension(:,:,:), allocatable :: du,dv,dw,drho,du_c,dv_c,dw_c
   real(8), dimension(:,:), allocatable :: averages,oldaverages, allaverages
   logical, allocatable, dimension(:,:,:) :: mask
 
@@ -324,12 +324,13 @@ end module module_tmpvar
 !-------------------------------------------------------------------------------------------------
 module module_2phase
   real(8), dimension( : ), allocatable :: rad, xc, yc, zc, vol
+  real(8), dimension(:,:,:), allocatable :: u_c, v_c, w_c, u_cold, v_cold, w_cold
   real(8) :: excentricity(3)
   real(8) :: jetradius = 1d100
   real(8) :: jetcenter_yc2yLength, jetcenter_zc2zLength 
   real(8) :: jetcenter_yc,         jetcenter_zc 
-  real(8) :: sigma
-  integer :: NumBubble
+  real(8) :: sigma, MAXERROR_FS
+  integer :: NumBubble, MAXIT_FS
   logical :: FreeSurface
 end module module_2phase
 !=================================================================================================
@@ -1840,7 +1841,7 @@ end subroutine SetupDensity
 ! A7*Pijk = A1*Pi-1jk + A2*Pi+1jk + A3*Pij-1k + 
 !           A4*Pij+1k + A5*Pijk-1 + A6*Pijk+1 + A8
 !-------------------------------------------------------------------------------------------------
-subroutine SetupPoisson(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask,cvof,VolumeSource)
+subroutine SetupPoisson(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask,cvof,n1,n2,n3,VolumeSource)
   use module_grid
   use module_hello
   use module_BC
@@ -1849,10 +1850,13 @@ subroutine SetupPoisson(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask,cvof,Vo
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: utmp,vtmp,wtmp,rhot
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: umask,vmask,wmask
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: pmask
-  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: cvof
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: cvof,n1,n2,n3
   real(8), dimension(is:ie,js:je,ks:ke,8), intent(out) :: A
+  real(8), dimension(is:ie,js:je,ks:ke) :: x_int, y_int, z_int
+  real(8) :: alpha, x_test, y_test, z_test, n_x, n_y, n_z
+  real(8) :: x_l, x_r, y_b, y_t, z_r, z_f
 
-  real(8) :: dt, VolumeSource
+  real(8) :: dt, VolumeSource, limit
   integer :: i,j,k
   do k=ks,ke; do j=js,je; do i=is,ie;
 !    if(mask(i,j,k))then
@@ -1868,6 +1872,143 @@ subroutine SetupPoisson(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask,cvof,Vo
          +  (wtmp(i,j,k)-wtmp(i,j,k-1))/dz(k) )
 !    endif
   enddo; enddo; enddo
+  
+  if(FreeSurface) then
+     x_int = 0d0; y_int = 0d0; z_int = 0d0
+     
+     do k=ks,ke; do j=js,je; do i=is,ie
+        limit = 0.10*min(dx(i),dy(j),dz(k))
+        if(cvof(i,j,k) >= 0.5d0) then ! pressure 0 in the cvof=1 phase. 
+           pmask(i,j,k) = 0.d0
+           
+           n_x = ABS(n1(i,j,k)); n_y = ABS(n2(i,j,k)); n_z = ABS(n3(i,j,k))
+           alpha = local_al3d(n_x,n_y,n_z,cvof(i,j,k))
+          
+           if (n_x .ne. 0.d0) then
+              x_test = (alpha - (n_y+n_z)/2d0)/n_x
+              if (x_test<1.d0 .and. x_test>0d0) then
+                 if (n1(i,j,k) > 0d0) then 
+                    x_int(i,j,k) = xh(i-1) + x_test*dx(i)
+                    x_l = x(i+1) - x_int(i,j,k)
+                    A(i+1,j,k,1) = 2d0*dt*umask(i,j,k)/((dx(i+1)+x_l)/2d0*x_l*(rhot(i,j,k)+rhot(i+1,j,k)))
+                    A(i+1,j,k,2) = 2d0*dt*umask(i+1,j,k)/((dx(i+1)+x_l)/2d0*dxh(i+2)*(rhot(i+1,j,k)+rhot(i+2,j,k)))
+                 else 
+                    x_int(i,j,k) = xh(i) - x_test*dx(i)
+                    x_r = x_int(i,j,k) - x(i-1) 
+                    A(i-1,j,k,1) = 2d0*dt*umask(i-2,j,k)/((dx(i-1)+x_r)/2d0*dxh(i-2)*(rhot(i-1,j,k)+rhot(i-2,j,k)))
+                    A(i-1,j,k,2) = 2d0*dt*umask(i-1,j,k)/((dx(i-1)+x_r)/2d0*x_r*(rhot(i,j,k)+rhot(i-1,j,k)))
+                 endif
+              endif
+           endif
+
+           if (n_y .ne. 0.d0) then
+              !write(*,*)'non-zero n2 normal'
+              y_test = (alpha - (n_x+n_z)/2d0)/n_y
+              if (y_test<1.d0 .and. y_test>0d0) then
+                 if (n2(i,j,k) > 0d0) then 
+                    y_int(i,j,k) = yh(j-1) + y_test*dy(j)
+                    y_b = y(j+1) - y_int(i,j,k)
+                    A(i,j+1,k,3) = 2d0*dt*vmask(i,j,k)/((dy(j+1)+y_b)/2d0*y_b*(rhot(i,j,k)+rhot(i,j+1,k)))
+                    A(i,j+1,k,4) = 2d0*dt*vmask(i,j+1,k)/((dy(j+1)+y_b)/2d0*dyh(j+2)*(rhot(i,j+1,k)+rhot(i,j+2,k)))
+                 else 
+                    y_int(i,j,k) = yh(j) - y_test*dy(j)
+                    y_t = y_int(i,j,k) - y(j-1) 
+                    A(i,j-1,k,3) = 2d0*dt*vmask(i,j-2,k)/((dy(j-1)+y_t)/2d0*dyh(j-2)*(rhot(i,j-1,k)+rhot(i,j-2,k)))
+                    A(i,j-1,k,4) = 2d0*dt*vmask(i,j-1,k)/((dy(j-1)+y_t)/2d0*y_t*(rhot(i,j,k)+rhot(i,j-1,k)))
+                 endif
+              endif
+           endif
+           
+           if (n_z .ne. 0.d0) then
+              !write(*,*)'non-zero n3 normal'
+              z_test = (alpha - (n_x+n_y)/2d0)/n_z
+              if (z_test<1.d0 .and. z_test>0d0) then
+                 if (n3(i,j,k) > 0d0) then 
+                    z_int(i,j,k) = zh(k-1) + z_test*dz(k)
+                    z_r = z(k+1) - z_int(i,j,k)
+                    A(i,j,k+1,5) = 2d0*dt*wmask(i,j,k)/((dz(k+1)+z_r)/2d0*z_r*(rhot(i,j,k)+rhot(i,j,k+1)))
+                    A(i,j,k+1,6) = 2d0*dt*wmask(i,j,k+1)/((dz(k+1)+z_r)/2d0*dzh(k+2)*(rhot(i,j,k+1)+rhot(i,j,k+2)))
+                 else 
+                    z_int(i,j,k) = zh(k) - z_test*dz(k)
+                    z_f = z_int(i,j,k) - z(k-1)
+                    A(i,j,k-1,5) = 2d0*dt*wmask(i,j,k-2)/((dz(k-1)+z_f)/2d0*dzh(k-2)*(rhot(i,j,k-1)+rhot(i,j,k-2)))
+                    A(i,j,k-1,6) = 2d0*dt*wmask(i,j,k-1)/((dz(k-1)+z_f)/2d0*z_f*(rhot(i,j,k)+rhot(i,j,k-1)))
+                 endif
+              endif
+           endif
+        endif
+        
+        if (cvof(i,j,k)>0d0 .and. cvof(i,j,k)<0.5d0) then
+           n_x = ABS(n1(i,j,k)); n_y = ABS(n2(i,j,k)); n_z = ABS(n3(i,j,k));
+           alpha = local_al3d(n_x,n_y,n_z,cvof(i,j,k))
+          
+           if (n_x .ne. 0.d0) then
+              x_test = (alpha - (n_y+n_z)/2d0)/n_x
+              if (x_test<1.d0 .and. x_test>0d0) then
+                 if (n1(i,j,k) > 0d0) then 
+                    x_int(i,j,k) = xh(i-1) + x_test*dx(i)
+                    x_l = x(i) - x_int(i,j,k)
+                    
+                    if (x_l < limit) x_l = limit !arbitrary small limit, to be evaluated
+                    A(i,j,k,1) = 2d0*dt*umask(i-1,j,k)/((dx(i)+x_l)/2d0*x_l*(rhot(i-1,j,k)+rhot(i,j,k)))
+                    A(i,j,k,2) = 2d0*dt*umask(i,j,k)/((dx(i)+x_l)/2d0*dxh(i+1)*(rhot(i,j,k)+rhot(i+1,j,k)))
+                 else 
+                    x_int(i,j,k) = xh(i) - x_test*dx(i)
+                    x_r = x_int(i,j,k) - x(i)
+                    
+                    if (x_r < limit) x_r = limit !arbitrary small limit, to be evaluated
+                    A(i,j,k,1) = 2d0*dt*umask(i-1,j,k)/((dx(i)+x_r)/2d0*dxh(i-1)*(rhot(i,j,k)+rhot(i-1,j,k)))
+                    A(i,j,k,2) = 2d0*dt*umask(i,j,k)/((dx(i)+x_r)/2d0*x_r*(rhot(i+1,j,k)+rhot(i,j,k)))
+                 endif
+              endif
+           endif
+
+           if (n_y .ne. 0.d0) then
+              y_test = (alpha - (n_x+n_z)/2d0)/n_y
+              if (y_test<1.d0 .and. y_test>0d0) then
+                 if (n2(i,j,k) > 0d0) then 
+                    y_int(i,j,k) = yh(j-1) + y_test*dy(j)
+                    y_b = y(j) - y_int(i,j,k)
+                    
+                    if (y_b < limit) y_b = limit !arbitrary small limit, to be evaluated
+                    A(i,j,k,3) = 2d0*dt*vmask(i,j-1,k)/((dy(j)+y_b)/2d0*y_b*(rhot(i,j-1,k)+rhot(i,j,k)))
+                    A(i,j,k,4) = 2d0*dt*vmask(i,j,k)/((dy(j)+y_b)/2d0*dyh(j+1)*(rhot(i,j,k)+rhot(i,j+1,k)))
+                 else 
+                    y_int(i,j,k) = yh(j) - y_test*dy(j)
+                    y_t = y_int(i,j,k) - y(j) 
+                    
+                    if (y_t < limit) y_t = limit !arbitrary small limit, to be evaluated
+                    A(i,j,k,3) = 2d0*dt*vmask(i,j-1,k)/((dy(j)+y_t)/2d0*dyh(j-1)*(rhot(i,j,k)+rhot(i,j-1,k)))
+                    A(i,j,k,4) = 2d0*dt*vmask(i,j,k)/((dy(j)+y_t)/2d0*y_t*(rhot(i,j+1,k)+rhot(i,j,k)))
+                 endif
+              endif
+           endif
+           
+           if (n_z .ne. 0.d0) then
+              z_test = (alpha - (n_x+n_y)/2d0)/n_z
+              if (z_test<1.d0 .and. y_test>0d0) then
+                 if (n3(i,j,k) > 0d0) then 
+                    z_int(i,j,k) = zh(k-1) + z_test*dz(k)
+                    z_r = z(k) - z_int(i,j,k)
+                    if (z_r < limit) z_r = limit !arbitrary small limit, to be evaluated
+                    A(i,j,k,5) = 2d0*dt*wmask(i,j,k-1)/((dz(k)+z_r)/2d0*z_r*(rhot(i,j,k-1)+rhot(i,j,k)))
+                    A(i,j,k,6) = 2d0*dt*wmask(i,j,k)/((dz(k)+z_r)/2d0*dzh(k+1)*(rhot(i,j,k)+rhot(i,j,k+1)))
+                 else 
+                    z_int(i,j,k) = zh(k) - z_test*dz(k)
+                    z_f = z_int(i,j,k) - z(k-1)
+                    if (z_f < limit) z_f = limit !arbitrary small limit, to be evaluated
+                    A(i,j,k,5) = 2d0*dt*wmask(i,j,k-1)/((dz(k)+z_f)/2d0*dzh(k-1)*(rhot(i,j,k)+rhot(i,j,k-1)))
+                    A(i,j,k,6) = 2d0*dt*wmask(i,j,k)/((dz(k)+z_f)/2d0*z_f*(rhot(i,j,k+1)+rhot(i,j,k)))
+                 endif
+              endif
+           endif
+         endif
+     enddo;enddo;enddo
+     
+     do k=ks,ke; do j=js,je; do i=is,ie;
+        A(i,j,k,7) = sum(A(i,j,k,1:6)) + 1d-49
+     enddo;enddo;enddo
+  endif
 
 ! dp/dn = 0 for inflow bc on face 1 == x- : do not correct u(is-1)
 ! inflow bc on other faces not implemented yet.  
@@ -1883,20 +2024,87 @@ subroutine SetupPoisson(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask,cvof,Vo
      A(ie,:,:,2) = 0d0
   endif
 
-  if(FreeSurface) then
-     do k=ks,ke; do j=js,je; do i=is,ie;
-        if(cvof(i,j,k) > 0.5d0) then ! pressure 0 in the cvof=1 phase. 
-           pmask(i,j,k) = 0.d0
-        endif
-     enddo;enddo;enddo
-     ! pressure 0 where pmask=0
      do i=1,8
         A(:,:,:,i) = pmask*A(:,:,:,i)
      enddo
-  else
+  !else
      A(:,:,:,7) = A(:,:,:,7) + 1.0d-49 
      if(check_setup) call check_poisson_setup(A,pmask)
-     endif
+     !endif
+     
+!routine is basically copied here.     
+contains
+  ! ****** 1 ******* 2 ******* 3 ******* 4 ******* 5 ******* 6 ******* 7 *
+  ! PROGRAM TO FIND alpha IN: m1 x1 + m2 x2 + m3 x3 = alpha,
+  ! GIVEN m1+m2+m3=1 (all > 0) AND THE VOLUMETRIC FRACTION cc
+  ! ****** 1 ******* 2 ******* 3 ******* 4 ******* 5 ******* 6 ******* 7 *
+  function local_al3d(b1,b2,b3,cc)
+    !***
+    implicit none
+    real(8) m1,m2,m3,cc,b1,b2,b3,tmp,pr,ch,mm,m12
+    real(8) p,p12,q,teta,cs,local_al3d
+    real(8) untier,v1,v2,v3
+    parameter (untier=1.d0/3.d0)
+    intrinsic dmax1,dmin1,dsqrt,dacos,dcos
+    !***  
+    !     (1) order coefficients: m1<m2<m3; (2) get ranges: v1<v2<v3;
+    !     (3) limit ch (0.d0 < ch < 0.5d0); (4) calculate alpha
+    !*(1)* 
+    m1 = dmin1(b1,b2)
+    m3 = dmax1(b1,b2)
+    m2 = b3
+    if (m2 .lt. m1) then
+       tmp = m1
+       m1 = m2
+       m2 = tmp
+    else if (m2 .gt. m3) then
+       tmp = m3
+       m3 = m2
+       m2 = tmp
+    endif
+    !*(2)*
+    m12 = m1 + m2 
+    pr  = DMAX1(6.d0*m1*m2*m3,1.d-50)
+    V1  = m1*m1*m1/pr
+    V2  = V1 + 0.5d0*(m2-m1)/m3
+    if (m3 .LT. m12) then
+       mm = m3
+       V3 = (m3*m3*(3.d0*m12-m3) + m1*m1*(m1-3.d0*m3) +&
+            m2*m2*(m2-3.d0*m3))/pr
+    else
+       mm = m12
+       V3 = 0.5d0*mm/m3
+    endif
+    !*(3)*
+    ch = DMIN1(cc,1.d0-cc)
+    !*(4)*      
+    if (ch .LT. V1) then
+       !***         AL3D = cbrt(pr*ch)
+       local_AL3D = (pr*ch)**UNTIER
+    else if (ch .LT. V2) then
+       local_AL3D = 0.5d0*(m1 + DSQRT(m1*m1 + 8.d0*m2*m3*(ch-V1)))
+    else if (ch .LT. V3) then
+       p = 2.d0*m1*m2
+       q = 1.5d0*m1*m2*(m12 - 2.d0*m3*ch)
+       p12 = DSQRT(p)
+       teta = DACOS(q/(p*p12))/3.d0
+       cs = DCOS(teta)
+       local_AL3D = p12*(DSQRT(3.d0*(1.d0-cs*cs)) - cs) + m12
+    else if (m12 .LT. m3) then
+       local_AL3D = m3*ch + 0.5d0*mm
+    else 
+       p = m1*(m2+m3) + m2*m3 - 0.25d0
+       q = 1.5d0*m1*m2*m3*(0.5d0-ch)
+       p12 = DSQRT(p)
+       teta = DACOS(q/(p*p12))/3.0
+       cs = DCOS(teta)
+       local_AL3D = p12*(DSQRT(3.d0*(1.d0-cs*cs)) - cs) + 0.5d0
+    endif
+
+    if (cc .GT. 0.5d0)  local_AL3D = 1.d0 - local_AL3D
+    !***
+    return
+  end function local_al3d
 end subroutine SetupPoisson
 !=================================================================================================
 !=================================================================================================

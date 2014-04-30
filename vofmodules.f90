@@ -255,6 +255,7 @@ contains
     use module_grid
     use module_BC
     use module_flow
+    use module_2phase
     implicit none
     include 'mpif.h'
     integer :: ierr,dir,orientation
@@ -272,6 +273,15 @@ contains
     if (DoMOF) allocate(workmom(imin:imax,jmin:jmax,kmin:kmax,4))
     cvof = 0.d0
     vof_flag = 3
+    !allocate matrices for Free Surface
+    if(FreeSurface) then
+       allocate(u_c(imin:imax,jmin:jmax,kmin:kmax), du_c(imin:imax,jmin:jmax,kmin:kmax), &
+            v_c(imin:imax,jmin:jmax,kmin:kmax), dv_c(imin:imax,jmin:jmax,kmin:kmax), &
+            w_c(imin:imax,jmin:jmax,kmin:kmax), dw_c(imin:imax,jmin:jmax,kmin:kmax), &
+            u_cold(imin:imax,jmin:jmax,kmin:kmax), v_cold(imin:imax,jmin:jmax,kmin:kmax), &
+            w_cold(imin:imax,jmin:jmax,kmin:kmax))
+       u_cold = 0d0; v_cold = 0d0; w_cold = 0d0
+    endif
     if ( itime_scheme == 2 ) then  
       allocate(cvofold(imin:imax,jmin:jmax,kmin:kmax))
       cvofold = 0.d0
@@ -1091,6 +1101,138 @@ or none at all")
       endif
     end function xcoord
   end subroutine SetVOFBC
+!=================================================================================================
+subroutine extrapolate_velocities(n1,n2,n3)
+    use module_grid
+    use module_flow
+    use module_2phase
+    implicit none
+    include 'mpif.h'
+    integer :: i,j,k, iter_FS
+    real(8) :: n_x, n_y, n_z
+    real(8) :: dtau, SS_error
+    real(8) :: du_x, du_y, du_z, dv_x, dv_y, dv_z, dw_x, dw_y, dw_z
+    real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: n1,n2,n3 
+    real(8), dimension(imin:imax,jmin:jmax,kmin:kmax) :: u_cmask,v_cmask,w_cmask
+    
+    u_cmask = 0d0; v_cmask = 0d0; w_cmask =0d0
+    
+    !this loop sets all cavity cells neighbouring a cut cell
+    do k=ks,ke; do j=js,je; do i=is,ie
+      if ((vof_flag(i,j,k) == 1) .and. ((vof_flag(i-1,j,k) == 2) .or. (vof_flag(i+1,j,k) == 2) .or. &
+	(vof_flag(i,j-1,k) == 2) .or. (vof_flag(i,j+1,k) == 2) .or. &
+	(vof_flag(i,j,k-1) == 2) .or. (vof_flag(i,j,k+1) == 2))) then
+	u_cmask(i,j,k) = 1d0; u_cmask(i-1,j,k) = 1d0
+	v_cmask(i,j,k) = 1d0; v_cmask(i,j-1,k) = 1d0
+	w_cmask(i,j,k) = 1d0; w_cmask(i,j,k-1) = 1d0
+      endif
+    enddo; enddo; enddo
+    
+    do iter_FS = 1, MAXIT_FS
+        
+    SS_error = 0d0
+    do k=ks,ke; do j=js,je; do i=is,ie
+      dtau = 0.3*min(dx(i),dy(j),dz(k))
+      
+!-----Calc extrapolated u-velocity
+      n_x = (n1(i+1,j,k) + n1(i,j,k))/2d0
+      n_y = (n2(i,j+1,k) + n2(i,j,k))/2d0 !need to improve this
+      n_z = (n3(i,j,k+1) + n3(i,j,k))/2d0 !need to improve this
+      
+      if (n_x .gt. 0d0) then 
+	du_x = n1(i+1,j,k)*(u_cold(i+1,j,k)-u_cold(i,j,k))/dx(i+1)
+      else
+	du_x = n1(i,j,k)*(u_cold(i,j,k)-u_cold(i-1,j,k))/dx(i)
+      endif
+      
+      if (n_y .gt. 0d0) then 
+	du_y = n2(i,j+1,k)*(u_cold(i,j+1,k)-u_cold(i,j,k))/dyh(j+1)
+      else
+	du_y = n2(i,j,k)*(u_cold(i,j,k)-u_cold(i,j-1,k))/dyh(j)
+      endif
+      
+       if (n_z .gt. 0d0) then 
+	du_z = n3(i,j,k+1)*(u_cold(i,j,k+1)-u_cold(i,j,k))/dzh(k+1)
+      else
+	du_z = n3(i,j,k)*(u_cold(i,j,k)-u_cold(i,j,k-1))/dzh(k)
+      endif
+      
+      du_c(i,j,k) = u_cmask(i,j,k)*dtau*(du_x + du_y + du_z)
+      
+!-----Calc extrapolated v-velocity
+      if (n_x .gt. 0d0) then 
+	dv_x = n1(i+1,j,k)*(v_cold(i+1,j,k)-v_cold(i,j,k))/dxh(i+1)
+      else
+	dv_x = n1(i,j,k)*(v_cold(i,j,k)-v_cold(i-1,j,k))/dxh(i)
+      endif
+      
+      if (n_y .gt. 0d0) then 
+	dv_y = n2(i,j+1,k)*(v_cold(i,j+1,k)-v_cold(i,j,k))/dy(j+1)
+      else
+	dv_y = n2(i,j,k)*(v_cold(i,j,k)-v_cold(i,j-1,k))/dy(j)
+      endif
+      
+       if (n_z .gt. 0d0) then 
+	dv_z = n3(i,j,k+1)*(v_cold(i,j,k+1)-v_cold(i,j,k))/dzh(k+1)
+      else
+	dv_z = n3(i,j,k)*(v_cold(i,j,k)-v_cold(i,j,k-1))/dzh(k)
+      endif
+      
+      dv_c(i,j,k) = v_cmask(i,j,k)*dtau*(dv_x + dv_y + dv_z) 
+        
+!-----Calc extrapolated w-velocity
+      if (n_x .gt. 0d0) then 
+	dw_x = n1(i+1,j,k)*(w_cold(i+1,j,k)-w_cold(i,j,k))/dxh(i+1)
+      else
+	dw_x = n1(i,j,k)*(w_cold(i,j,k)-w_cold(i-1,j,k))/dxh(i)
+      endif
+      
+      if (n_y .gt. 0d0) then 
+	dw_y = n2(i,j+1,k)*(w_cold(i,j+1,k)-w_cold(i,j,k))/dyh(j+1)
+      else
+	dw_y = n2(i,j,k)*(w_cold(i,j,k)-w_cold(i,j-1,k))/dyh(j)
+      endif
+      
+       if (n_z .gt. 0d0) then 
+	dw_z = n3(i,j,k+1)*(w_cold(i,j,k+1)-w_cold(i,j,k))/dz(k+1)
+      else
+	dw_z = n3(i,j,k)*(w_cold(i,j,k)-w_cold(i,j,k-1))/dz(k)
+      endif
+      
+      dw_c(i,j,k) = w_cmask(i,j,k)*dtau*(dw_x + dw_y + dw_z)  
+      
+      SS_error = SS_error + (du_c(i,j,k)**2d0) + (dv_c(i,j,k)**2d0) + (dw_c(i,j,k)**2d0)
+    enddo; enddo; enddo
+    
+    !write(*,'(I8,e14.5)')iter_FS,SS_error    
+    u_c = u_cold + du_c
+    v_c = v_cold + dv_c
+    w_c = w_cold + dw_c
+    
+    if (SS_error < MAXERROR_FS) exit
+    
+    u_cold = u_c
+    v_cold = v_c
+    w_cold = w_c
+    
+    if(iter_FS==MAXIT_FS .and. rank==0) write(*,*) 'Warning: FS extrapolation reached maxit_FS.'
+           
+  enddo
+  
+  do k=ks,ke; do j=js,je; do i=is,ie
+!     if ((vof_flag(i,j,k) == 1) .and. ((vof_flag(i-1,j,k) == 2) .or. (vof_flag(i+1,j,k) == 2) .or. &
+! 	(vof_flag(i,j-1,k) == 2) .or. (vof_flag(i,j+1,k) == 2) .or. &
+! 	(vof_flag(i,j,k-1) == 2) .or. (vof_flag(i,j,k+1) == 2))) then
+! 	u(i,j,k) = u_c(i,j,k); u(i-1,j,k) = u_c(i-1,j,k)
+! 	v(i,j,k) = v_c(i,j,k); v(i,j-1,k) = v_c(i,j-1,k)
+! 	w(i,j,k) = w_c(i,j,k); w(i,j,k-1) = w_c(i,j,k-1)
+!       endif
+     if (u_cmask(i,j,k) == 1d0) u(i,j,k) = u_c(i,j,k)
+     if (v_cmask(i,j,k) == 1d0) v(i,j,k) = v_c(i,j,k)
+     if (w_cmask(i,j,k) == 1d0) w(i,j,k) = w_c(i,j,k)    
+  enddo; enddo; enddo
+  
+  end subroutine extrapolate_velocities
 !=================================================================================================
   subroutine test_cell_size()
     implicit none

@@ -219,6 +219,14 @@ Program paris
               call explicitMomDiff(u,v,w,rho,mu,du,dv,dw)
            endif
            call my_timer(3)
+!----------------------------------EXTRAPOLATION FOR FREE SURFACE---------------------------------
+           if (DoVOF .and. FreeSurface) then
+             u_cold = u !initialize cavity velocities to that of calculated field
+             v_cold = v
+             w_cold = w
+             call get_normals(n1,n2,n3)
+             call extrapolate_velocities(n1,n2,n3)
+           endif !Extrapolation
 
            if(DoVOF) then
              if (DoMOF) then
@@ -315,7 +323,7 @@ Program paris
 
 !-----------------------------------------PROJECTION STEP-----------------------------------------
            call SetPressureBC(umask,vmask,wmask,tmp,p)
-           call SetupPoisson(u,v,w,umask,vmask,wmask,rho,dt,A,tmp,cvof,VolumeSource)
+           call SetupPoisson(u,v,w,umask,vmask,wmask,rho,dt,A,tmp,cvof,n1,n2,n3,VolumeSource)
            ! (div u)*dt < epsilon => div u < epsilon/dt => maxresidual : maxerror/dt 
            if(HYPRE)then
               call poi_solve(A,p(is:ie,js:je,ks:ke),maxError/dt,maxit,it)

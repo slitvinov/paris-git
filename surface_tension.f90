@@ -69,7 +69,7 @@ contains
 !=================================================================================================
   subroutine initialize_surface_tension()
     implicit none
-    if(.not.recomputenormals) then
+    if(.not.recomputenormals .or. FreeSurface) then
        allocate(n1(imin:imax,jmin:jmax,kmin:kmax), n2(imin:imax,jmin:jmax,kmin:kmax),  &
                n3(imin:imax,jmin:jmax,kmin:kmax))
     endif
@@ -129,12 +129,13 @@ contains
 !  Put normals in a common array. Absolutely not sure this is efficient
 !
 !=================================================================================================
-   subroutine get_normals()
+   subroutine get_normals(n1,n2,n3)
      implicit none
      real(8) :: stencil3x3(-1:1,-1:1,-1:1)
      integer :: i,j,k
      integer :: i0,j0,k0
      real(8) :: mxyz(3)
+     real(8), dimension(:,:,:), allocatable :: n1,n2,n3 
      if(recomputenormals) call pariserror("recomputenormals is true, normals not allocated")
      if(.not.st_initialized) call initialize_surface_tension()
 
