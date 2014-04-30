@@ -1191,7 +1191,7 @@ module module_BC
       integer :: j,k
       real(8) :: t
       real(8) :: uinject
-      real(8) :: BLliq = 1.d-3 ! 0.567d-3
+      real(8) :: BLliq = 2.d-3 !1.d-3 ! 0.567d-3
       real(8) :: tshift = 1.d-5   !1.d0-2
       real(8) :: ryz
       real(8), parameter :: PI = 3.14159265359d0
@@ -1212,14 +1212,16 @@ module module_BC
          end if ! y(j)
       else if ( inject_type == 3 ) then ! 2d coaxial jet
          !tshift = 5.d-2
-         tshift = 0.5d0*jetradius/uliq_inject
+         !tshift = 0.5d0*jetradius/uliq_inject
+         tshift = jetradius/uliq_inject
          if ( y(j) <= jetradius ) then 
             uinject = uliq_inject & 
                      *erf( (jetradius - y(j))/BLliq )  
          else if ( y(j) > jetradius .and. y(j) <= 2.d0*jetradius ) then
             uinject = ugas_inject & 
                      *erf( (y(j) -      jetradius)/BLliq ) & 
-                     *erf( (2.d0*jetradius - y(j))/BLliq ) & 
+                     !*erf( (2.d0*jetradius - y(j))/BLliq ) & 
+                     !*erf(max(time-tshift,0.d0)/tshift) 
                      *erf(time/tshift) 
          else 
             uinject = 0.d0 
@@ -2123,49 +2125,42 @@ subroutine LinearSolver(A,p,maxError,beta,maxit,it,ierr)
   logical :: mask(imin:imax,jmin:jmax,kmin:kmax)
 !--------------------------------------ITERATION LOOP--------------------------------------------  
   do it=1,maxit
-     do k=ks,ke; do j=js,je; do i=is,ie
-        p(i,j,k)=(1d0-beta)*p(i,j,k)+beta* 1d0/A(i,j,k,7)*(              &
-             A(i,j,k,1) * p(i-1,j,k) + A(i,j,k,2) * p(i+1,j,k) +            &
-             A(i,j,k,3) * p(i,j-1,k) + A(i,j,k,4) * p(i,j+1,k) +            &
-             A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8))
-     enddo; enddo; enddo
-     !---------------------------------CHECK FOR CONVERGENCE-------------------------------------------
-     res = 0d0
-     call ghost_x(p,1,req( 1: 4)); call ghost_y(p,1,req( 5: 8)); call ghost_z(p,1,req( 9:12))
-     do k=ks+1,ke-1; do j=js+1,je-1; do i=is+1,ie-1
-        res=res+abs(-p(i,j,k) * A(i,j,k,7) +                             &
-             A(i,j,k,1) * p(i-1,j,k) + A(i,j,k,2) * p(i+1,j,k) +            &
-             A(i,j,k,3) * p(i,j-1,k) + A(i,j,k,4) * p(i,j+1,k) +            &
-             A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8) )**2
-     enddo; enddo; enddo
-     call MPI_WAITALL(12,req,sta,ierr)
-     mask=.true.
-     mask(is+1:ie-1,js+1:je-1,ks+1:ke-1)=.false.
-     do k=ks,ke; do j=js,je; do i=is,ie
-        if(mask(i,j,k))res=res+abs(-p(i,j,k) * A(i,j,k,7) +              &
-             A(i,j,k,1) * p(i-1,j,k) + A(i,j,k,2) * p(i+1,j,k) +            &
-             A(i,j,k,3) * p(i,j-1,k) + A(i,j,k,4) * p(i,j+1,k) +            &
-             A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8) )**2
-     enddo; enddo; enddo
-     res = res/dble(Nx*Ny*Nz)
-     if ((res*npx*npy*npz)>1.d16 ) then
-        print*,'Pressure solver diverged after',it,'iterations at rank ',rank
-        stop  !return
-     else if (res .ne. res) then 
-        print*, 'Pressure residual value is invalid at rank', rank
-        stop !return
-     else 
-        call MPI_ALLREDUCE(res, totalres, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr)
-        totalres=sqrt(totalres)
-        !    if (.not.(totalres<1e10)) then
-        !      ierr=1 !call pariserror("***** solution has diverged *****")
-        !      if(rank==0) print*,'Pressure solver diverged after',it,'iterations.'
-        !      return
-        !    endif
-        if (totalres<maxError) exit
-     end if !res
+    do k=ks,ke; do j=js,je; do i=is,ie
+      p(i,j,k)=(1d0-beta)*p(i,j,k)+beta* 1d0/A(i,j,k,7)*(              &
+        A(i,j,k,1) * p(i-1,j,k) + A(i,j,k,2) * p(i+1,j,k) +            &
+        A(i,j,k,3) * p(i,j-1,k) + A(i,j,k,4) * p(i,j+1,k) +            &
+        A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8))
+    enddo; enddo; enddo
+!---------------------------------CHECK FOR CONVERGENCE-------------------------------------------
+    res = 0d0
+    call ghost_x(p,1,req( 1: 4)); call ghost_y(p,1,req( 5: 8)); call ghost_z(p,1,req( 9:12))
+    do k=ks+1,ke-1; do j=js+1,je-1; do i=is+1,ie-1
+      res=res+abs(-p(i,j,k) * A(i,j,k,7) +                             &
+        A(i,j,k,1) * p(i-1,j,k) + A(i,j,k,2) * p(i+1,j,k) +            &
+        A(i,j,k,3) * p(i,j-1,k) + A(i,j,k,4) * p(i,j+1,k) +            &
+        A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8) )**2
+    enddo; enddo; enddo
+    call MPI_WAITALL(12,req,sta,ierr)
+    mask=.true.
+    mask(is+1:ie-1,js+1:je-1,ks+1:ke-1)=.false.
+    do k=ks,ke; do j=js,je; do i=is,ie
+      if(mask(i,j,k))res=res+abs(-p(i,j,k) * A(i,j,k,7) +              &
+        A(i,j,k,1) * p(i-1,j,k) + A(i,j,k,2) * p(i+1,j,k) +            &
+        A(i,j,k,3) * p(i,j-1,k) + A(i,j,k,4) * p(i,j+1,k) +            &
+        A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8) )**2
+    enddo; enddo; enddo
+    res = res/dble(Nx*Ny*Nz)
+    if ( (res*npx*npy*npz>1.d16) .or. (res.ne.res) ) then
+      print*,'Pressure residule is too large or NaN, res= ',res 
+      print*,'Pressure solver diverged after',it,'iterations at rank ',rank
+      stop  !return
+    else 
+      call MPI_ALLREDUCE(res, totalres, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr)
+      totalres=sqrt(totalres)
+      if (totalres<maxError) exit
+    end if !res
   enddo
-  if(it==maxit+1 .and. rank==0) write(*,*) 'Warning: LinearSolver reached maxit: totalres',totalres
+  if(it==maxit+1 .and. rank==0) write(*,*) 'Warning: Pressure Solver reached maxit: totalres',totalres,maxError
 end subroutine LinearSolver
 !=================================================================================================
 !=================================================================================================
@@ -2216,16 +2211,17 @@ subroutine LinearSolver1(A,u,umask,maxError,beta,maxit,it,ierr)
         A(i,j,k,5) * u(i,j,k-1) + A(i,j,k,6) * u(i,j,k+1) + A(i,j,k,8) )**2
     enddo; enddo; enddo
     res = res/float(Nx*Ny*Nz)
-    call MPI_ALLREDUCE(res, totalres, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr)
-    totalres=sqrt(totalres)
-    if (.not.(totalres<1e10)) then
-      ierr=1 
-      call pariserror("***** solution has diverged *****")
-      return
-    endif
-    if (totalres<maxError) exit
+    if ( (res*npx*npy*npz>1.d16) .or. (res.ne.res) ) then
+      print*,'Viscous term residule is too large or NaN, res= ',res 
+      print*,'Viscous term solver diverged after',it,'iterations at rank ',rank
+      stop  !return
+    else 
+      call MPI_ALLREDUCE(res, totalres, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr)
+      totalres=sqrt(totalres)
+      if (totalres<maxError) exit
+    end if !res
   enddo
-  if(it==maxit+1 .and. rank==0) write(*,*) 'Warning: LinearSolver1 reached maxit.'
+  if(it==maxit+1 .and. rank==0) write(*,*) 'Warning: Viscous Solver reached maxit: totalres',totalres,maxError
 end subroutine LinearSolver1
 !=================================================================================================
 !=================================================================================================

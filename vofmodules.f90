@@ -438,7 +438,7 @@ or none at all")
   !=================================================================================================
   subroutine random_bubbles()
     use module_2phase
-!    use IFPORT
+    !use IFPORT
     implicit none
     integer ib
 
@@ -1131,7 +1131,14 @@ contains
     close(88)
   end subroutine  append_VOF_visit_file
 !=================================================================================================
-  subroutine output_VOF(nf,i1,i2,j1,j2,k1,k2)
+subroutine output_VOF(nf,i1,i2,j1,j2,k1,k2)
+  implicit none
+  integer :: nf,i1,i2,j1,j2,k1,k2
+  if(output_format==2) call output_VOF_VTKSG(nf,i1,i2,j1,j2,k1,k2)
+  if(output_format==3) call output_VOF_VTKSP(nf,i1,i2,j1,j2,k1,k2)
+end subroutine output_VOF
+!=================================================================================================
+  subroutine output_VOF_VTKSP(nf,i1,i2,j1,j2,k1,k2)
     implicit none
     integer ::nf,i1,i2,j1,j2,k1,k2,i,j,k
     real(8) :: cfiltered
@@ -1186,7 +1193,67 @@ contains
       call system('gzip '//trim(filename))
     end if ! zip_data
 ! END TEMPORARY 
-end subroutine output_VOF
+end subroutine output_VOF_VTKSP
+!=================================================================================================
+  subroutine output_VOF_VTKSG(nf,i1,i2,j1,j2,k1,k2)
+    implicit none
+    integer ::nf,i1,i2,j1,j2,k1,k2,i,j,k
+    real(8) :: cfiltered
+    character(len=30) :: rootname,filename
+    rootname=trim(out_path)//'/VTK/VOF'//TRIM(int2text(nf,padding))//'-'
+    if(rank==0) call append_VOF_visit_file(TRIM(rootname))
+
+    OPEN(UNIT=8,FILE=TRIM(rootname)//TRIM(int2text(rank,padding))//'.vtk')
+    write(8,10)
+    write(8,11) time
+    write(8,12)
+    write(8,13)
+    write(8,14)i2-i1+1,j2-j1+1,k2-k1+1
+    write(8,15)(i2-i1+1)*(j2-j1+1)*(k2-k1+1)
+10  format('# vtk DataFile Version 2.0')
+11  format('grid, time ',F16.8)
+12  format('ASCII')
+13  format('DATASET STRUCTURED_GRID')
+14  format('DIMENSIONS ',I5,I5,I5)
+15  format('POINTS ',I17,' float' )
+
+    do k=k1,k2; do j=j1,j2; do i=i1,i2;
+      write(8,320) x(i),y(j),z(k)
+    enddo; enddo; enddo
+320 format(e14.5,e14.5,e14.5)
+
+    write(8,19)(i2-i1+1)*(j2-j1+1)*(k2-k1+1)
+    write(8,17)'VOF'
+    write(8,18)
+19  format('POINT_DATA ',I17)
+17  format('SCALARS ',A20,' float 1')
+18  format('LOOKUP_TABLE default')
+
+    do k=k1,k2; do j=j1,j2; do i=i1,i2;
+      if ( output_filtered_VOF ) then 
+         cfiltered = b1*cvof(i,j,k) + & 
+               b2*( cvof(i-1,j,k) + cvof(i,j-1,k) + cvof(i,j,k-1) + &
+                    cvof(i+1,j,k) + cvof(i,j+1,k) + cvof(i,j,k+1) ) + &
+               b3*( cvof(i+1,j+1,k) + cvof(i+1,j-1,k) + cvof(i-1,j+1,k) + cvof(i-1,j-1,k) + &
+                    cvof(i+1,j,k+1) + cvof(i+1,j,k-1) + cvof(i-1,j,k+1) + cvof(i-1,j,k-1) + &
+                    cvof(i,j+1,k+1) + cvof(i,j+1,k-1) + cvof(i,j-1,k+1) + cvof(i,j-1,k-1) ) + &
+               b4*( cvof(i+1,j+1,k+1) + cvof(i+1,j+1,k-1) + cvof(i+1,j-1,k+1) + cvof(i+1,j-1,k-1) +  &
+                    cvof(i-1,j+1,k+1) + cvof(i-1,j+1,k-1) + cvof(i-1,j-1,k+1) + cvof(i-1,j-1,k-1) )
+         write(8,210) cfiltered
+      else 
+         write(8,210) cvof(i,j,k)
+      end if ! output_filtered_VOF
+    enddo; enddo; enddo
+210 format(e14.5)
+! 310 format(e14.5,e14.5,e14.5)
+    close(8)
+! TEMPORARY 
+    if ( zip_data ) then 
+      filename = TRIM(rootname)//TRIM(int2text(rank,padding))//'.vtk'
+      call system('gzip '//trim(filename))
+    end if ! zip_data
+! END TEMPORARY 
+end subroutine output_VOF_VTKSG
 !=================================================================================================
 !=================================================================================================
 !-------------------------------------------------------------------------------------------------
@@ -1336,7 +1403,11 @@ subroutine swpz(us,c,f,d,vof1,vof2,vof3)
                    inv(i0) = -1
                 endif
               enddo
-              !*(3)*  
+              !*(3)*
+! TEMPORARY - Note: avoid calculating alpha when mxyz is zero, which occurs when cvof is 
+!                   a very small non-zero number in an isolated cell  
+              if ( mxyz(1) == 0.d0 .and. mxyz(2) == 0.d0 .and. mxyz(3) == 0.d0 ) cycle
+! END TEMPORARY  
               alpha = al3d(mxyz(1),mxyz(2),mxyz(3),c(i,j,k))
               !*(4)*  
               mxyz(:) = inv*mxyz

@@ -150,7 +150,7 @@ contains
           else if (solid_type == '2D_nozzle') then
              !l1 = hmin*0.5d0/tan(beta)
              !h = tan(beta)*(lnozzle+l1-x(i))
-             h = hmin*0.5d0 
+             h = hmin*1.d0 
              if ( x(i) < lnozzle .and. & 
                   y(j) < jetradius+h .and. & 
                   y(j) > jetradius-h ) then 

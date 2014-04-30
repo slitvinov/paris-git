@@ -220,7 +220,6 @@ Program paris
            endif
            call my_timer(3)
 
-
            if(DoVOF) then
              if (DoMOF) then
               call vofandmomsweeps(itimestep)
@@ -1306,11 +1305,17 @@ subroutine InitCondition
          if ( test_KHI2D ) then 
             do i=imin,imax-1; do j=jmin,jmax-1; do k=kmin,kmax-1
                if( y(j) > yLength*0.5d0 ) & 
-                  u(i,j,k) = 1.d1*erf( (y(j)-0.5d0*yLength)/(0.1d0*yLength) )
+                  u(i,j,k) = 1.d1*erf( (y(j)-0.5d0*yLength)/(0.1d0*yLength*2.d0) )
                ! ugas = 10 & delta = 0.1*yLength
-               v(i,j,k) = 5.d-1*sin(4.d0*PI*x(i)/xLength) & 
-                        *exp(-((y(j)-0.5d0*yLength)/(0.05d0*yLength))**2.d0)
-               ! perturbation thickness = 0.05*yLength, wavenum = 2
+               if ( Nz > 2 ) then   ! quasi-2D, perturb both x & z directions 
+                  v(i,j,k) = 5.d-1*sin(2.d0*PI*x(i)/xLength) &
+                                  !*sin(2.d0*PI*z(k)/zLength) & 
+                                  *exp(-((y(j)-0.5d0*yLength)/(0.05d0*yLength*2.d0))**2.d0)
+               else  ! 2D, only perturb x direction 
+                  v(i,j,k) = 5.d-1*sin(4.d0*PI*x(i)/xLength) & 
+                                  *exp(-((y(j)-0.5d0*yLength)/(0.05d0*yLength))**2.d0)
+               end if ! Nz
+               ! perturbation thickness = 0.05*yLength, wavenum(x) = 1
             enddo; enddo; enddo
          end if ! test_KHI_2D 
      endif

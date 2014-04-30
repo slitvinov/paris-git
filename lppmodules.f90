@@ -821,7 +821,7 @@ contains
                      do ielement = 1, num_element(irank) 
                         ielem_plot = ielem_plot + 1 
                         OPEN(UNIT=200+ielem_plot,FILE=TRIM(out_path)//'/element-'//TRIM(int2text(ielem_plot,padding))//'.dat')
-                        write(200+ielem_plot,*) time,element_stat(ielement,irank)%xc, & 
+                        write(200+ielem_plot,'(11(E15.6,1X))') time,element_stat(ielement,irank)%xc, & 
                                                       element_stat(ielement,irank)%yc, &
                                                       element_stat(ielement,irank)%zc, &
                                                       element_stat(ielement,irank)%uc, &
@@ -2298,7 +2298,7 @@ contains
                if ( i < Ng ) then 
                   i = i + Nx
                else if ( i > Ng+Nx ) then
-                  i = i + Nx
+                  i = i - Nx
                end if !i
             end if ! vofbrdy_cond(1)
 
@@ -2306,7 +2306,7 @@ contains
                if ( j < Ng ) then 
                   j = j + Ny
                else if ( j > Ng+Ny ) then
-                  j = j + Ny
+                  j = j - Ny
                end if !i
             end if ! vofbrdy_cond(2)
             
@@ -2314,12 +2314,12 @@ contains
                if ( k < Ng ) then 
                   k = k + Nz
                else if ( k > Ng+Nz ) then
-                  k = k + Nz
+                  k = k - Nz
                end if !i
             end if ! vofbrdy_cond(3)
             ! Note: here only collect and transfer particles which cross blocks 
-            !        due to periodic BC, the location and cell information will 
-            !        not be changed until SetPartBC is called
+            !       due to periodic BC, the location and cell index stored in 
+            !       parts(ipart,rank) will not be changed until SetPartBC is called
 
             if ( i > ie .or. j > je .or. k > ke .or. &
                  i < is .or. j < js .or. k < ks ) then
