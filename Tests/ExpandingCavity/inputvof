@@ -5,7 +5,11 @@ VOFBDRY_COND = 'dry' 'dry' 'periodic'
 
 TEST_TYPE = 'droplet'
 VOF_ADVECT = 'CIAM'
+
 FreeSurface = T
+MAXERROR_FS = 1d-8
+MAXIT_FS = 40
+
 DoLPP = F
 CYLINDER_DIR = 3
 

@@ -1879,7 +1879,7 @@ subroutine SetupPoisson(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask,cvof,n1
      do k=ks,ke; do j=js,je; do i=is,ie
         limit = 0.10*min(dx(i),dy(j),dz(k))
         if(cvof(i,j,k) >= 0.5d0) then ! pressure 0 in the cvof=1 phase. 
-           pmask(i,j,k) = 0.d0
+           pmask(i,j,k) = 0d0
            
            n_x = ABS(n1(i,j,k)); n_y = ABS(n2(i,j,k)); n_z = ABS(n3(i,j,k))
            alpha = local_al3d(n_x,n_y,n_z,cvof(i,j,k))
@@ -1939,7 +1939,7 @@ subroutine SetupPoisson(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask,cvof,n1
         endif
         
         if (cvof(i,j,k)>0d0 .and. cvof(i,j,k)<0.5d0) then
-           n_x = ABS(n1(i,j,k)); n_y = ABS(n2(i,j,k)); n_z = ABS(n3(i,j,k));
+           n_x = ABS(n1(i,j,k)); n_y = ABS(n2(i,j,k)); n_z = ABS(n3(i,j,k))
            alpha = local_al3d(n_x,n_y,n_z,cvof(i,j,k))
           
            if (n_x .ne. 0.d0) then
@@ -1948,14 +1948,12 @@ subroutine SetupPoisson(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask,cvof,n1
                  if (n1(i,j,k) > 0d0) then 
                     x_int(i,j,k) = xh(i-1) + x_test*dx(i)
                     x_l = x(i) - x_int(i,j,k)
-                    
                     if (x_l < limit) x_l = limit !arbitrary small limit, to be evaluated
                     A(i,j,k,1) = 2d0*dt*umask(i-1,j,k)/((dx(i)+x_l)/2d0*x_l*(rhot(i-1,j,k)+rhot(i,j,k)))
                     A(i,j,k,2) = 2d0*dt*umask(i,j,k)/((dx(i)+x_l)/2d0*dxh(i+1)*(rhot(i,j,k)+rhot(i+1,j,k)))
                  else 
                     x_int(i,j,k) = xh(i) - x_test*dx(i)
                     x_r = x_int(i,j,k) - x(i)
-                    
                     if (x_r < limit) x_r = limit !arbitrary small limit, to be evaluated
                     A(i,j,k,1) = 2d0*dt*umask(i-1,j,k)/((dx(i)+x_r)/2d0*dxh(i-1)*(rhot(i,j,k)+rhot(i-1,j,k)))
                     A(i,j,k,2) = 2d0*dt*umask(i,j,k)/((dx(i)+x_r)/2d0*x_r*(rhot(i+1,j,k)+rhot(i,j,k)))
@@ -1969,14 +1967,12 @@ subroutine SetupPoisson(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask,cvof,n1
                  if (n2(i,j,k) > 0d0) then 
                     y_int(i,j,k) = yh(j-1) + y_test*dy(j)
                     y_b = y(j) - y_int(i,j,k)
-                    
                     if (y_b < limit) y_b = limit !arbitrary small limit, to be evaluated
                     A(i,j,k,3) = 2d0*dt*vmask(i,j-1,k)/((dy(j)+y_b)/2d0*y_b*(rhot(i,j-1,k)+rhot(i,j,k)))
                     A(i,j,k,4) = 2d0*dt*vmask(i,j,k)/((dy(j)+y_b)/2d0*dyh(j+1)*(rhot(i,j,k)+rhot(i,j+1,k)))
                  else 
                     y_int(i,j,k) = yh(j) - y_test*dy(j)
                     y_t = y_int(i,j,k) - y(j) 
-                    
                     if (y_t < limit) y_t = limit !arbitrary small limit, to be evaluated
                     A(i,j,k,3) = 2d0*dt*vmask(i,j-1,k)/((dy(j)+y_t)/2d0*dyh(j-1)*(rhot(i,j,k)+rhot(i,j-1,k)))
                     A(i,j,k,4) = 2d0*dt*vmask(i,j,k)/((dy(j)+y_t)/2d0*y_t*(rhot(i,j+1,k)+rhot(i,j,k)))
@@ -2002,13 +1998,24 @@ subroutine SetupPoisson(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask,cvof,n1
                  endif
               endif
            endif
-         endif
+        endif
      enddo;enddo;enddo
      
-     do k=ks,ke; do j=js,je; do i=is,ie;
+     do k=ks,ke; do j=js,je; do i=is,ie
+        A(i,j,k,1) = pmask(i,j,k)*A(i,j,k,1)
+        A(i,j,k,2) = pmask(i,j,k)*A(i,j,k,2)
+        A(i,j,k,3) = pmask(i,j,k)*A(i,j,k,3)
+        A(i,j,k,4) = pmask(i,j,k)*A(i,j,k,4)
+        A(i,j,k,5) = pmask(i,j,k)*A(i,j,k,5)
+        A(i,j,k,6) = pmask(i,j,k)*A(i,j,k,6)
         A(i,j,k,7) = sum(A(i,j,k,1:6)) + 1d-49
+        A(i,j,k,8) = pmask(i,j,k)*A(i,j,k,8)
      enddo;enddo;enddo
-  endif
+     
+  else
+     A(:,:,:,7) = A(:,:,:,7) + 1.0d-49 
+     if(check_setup) call check_poisson_setup(A,pmask)
+  endif !FreeSurface
 
 ! dp/dn = 0 for inflow bc on face 1 == x- : do not correct u(is-1)
 ! inflow bc on other faces not implemented yet.  
@@ -2016,22 +2023,12 @@ subroutine SetupPoisson(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask,cvof,n1
      A(is,:,:,7) = A(is,:,:,7) - A(is,:,:,1)
      A(is,:,:,1) = 0d0
   endif
-
 ! dp/dn = 0 for outflow/fixed velocity bc on face 4 == x+
 ! outflow/fixed velocity bc on other faces not implemented yet.  
   if(bdry_cond(4)==4 .and. coords(4)==Npx - 1) then
      A(ie,:,:,7) = A(ie,:,:,7) - A(ie,:,:,2)
      A(ie,:,:,2) = 0d0
   endif
-
-     do i=1,8
-        A(:,:,:,i) = pmask*A(:,:,:,i)
-     enddo
-  !else
-     A(:,:,:,7) = A(:,:,:,7) + 1.0d-49 
-     if(check_setup) call check_poisson_setup(A,pmask)
-     !endif
-     
 !routine is basically copied here.     
 contains
   ! ****** 1 ******* 2 ******* 3 ******* 4 ******* 5 ******* 6 ******* 7 *

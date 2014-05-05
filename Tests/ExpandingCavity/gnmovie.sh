@@ -3,7 +3,7 @@
 
 LIMITE=20
 START=0
-DELTA=1000
+DELTA=100
 
 /bin/rm -f *.png
 
@@ -12,9 +12,11 @@ do
 
 let frame=$DELTA*$a
 if [ $a == 0 ]; then
-    frame=0000
+    frame=000
 fi
 if [ $a -lt 10 ]; then
+    frame='00'$frame
+else
     frame='0'$frame
 fi
 

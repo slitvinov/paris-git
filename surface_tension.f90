@@ -72,6 +72,7 @@ contains
     if(.not.recomputenormals .or. FreeSurface) then
        allocate(n1(imin:imax,jmin:jmax,kmin:kmax), n2(imin:imax,jmin:jmax,kmin:kmax),  &
                n3(imin:imax,jmin:jmax,kmin:kmax))
+       recomputenormals = .false.
     endif
     allocate(height(imin:imax,jmin:jmax,kmin:kmax,6))
     if(nx.ge.500000.or.ny.gt.500000.or.nz.gt.500000) call pariserror("nx too large")

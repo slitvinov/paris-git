@@ -177,7 +177,6 @@ Program paris
         if(dtFlag==2)call TimeStepSize(dt)
         time=time+dt
         itimestep=itimestep+1
-
         if(mod(itimestep,termout)==0) then
            end_time =  MPI_WTIME()
            cflmax = get_cfl(dt)
@@ -221,13 +220,12 @@ Program paris
            call my_timer(3)
 !----------------------------------EXTRAPOLATION FOR FREE SURFACE---------------------------------
            if (DoVOF .and. FreeSurface) then
-             u_cold = u !initialize cavity velocities to that of calculated field
-             v_cold = v
-             w_cold = w
-             call get_normals(n1,n2,n3)
-             call extrapolate_velocities(n1,n2,n3)
+              u_cold = u !initialize cavity velocities to that of calculated field
+              v_cold = v
+              w_cold = w
+              call get_normals(n1,n2,n3)
+              call extrapolate_velocities(n1,n2,n3)
            endif !Extrapolation
-
            if(DoVOF) then
              if (DoMOF) then
               call vofandmomsweeps(itimestep)
@@ -241,7 +239,6 @@ Program paris
               call surfaceForce(du,dv,dw,rho)
               call my_timer(8)
            endif
-
            if (DoLPP) then
                 call lppsweeps(itimestep)  
                 call my_timer(12)
@@ -266,7 +263,7 @@ Program paris
               call GetFront('send')
            endif
            call my_timer(13)
-
+           
 !------------------------------------END VOF STUFF------------------------------------------------ 
            call volumeForce(rho,rho1,rho2,dpdx,dpdy,dpdz,BuoyancyCase,fx,fy,fz,gx,gy,gz,du,dv,dw, &
                 rho_ave)
@@ -320,7 +317,6 @@ Program paris
            call ghost_z(u  ,2,req( 1: 4));  call ghost_z(v,2,req( 5: 8)); call ghost_z(w,2,req( 9:12))
            call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
            call my_timer(1)
-
 !-----------------------------------------PROJECTION STEP-----------------------------------------
            call SetPressureBC(umask,vmask,wmask,tmp,p)
            call SetupPoisson(u,v,w,umask,vmask,wmask,rho,dt,A,tmp,cvof,n1,n2,n3,VolumeSource)
@@ -340,7 +336,6 @@ Program paris
                    &" maxerror: ",e7.1)') residual*dt,maxerror
               if(rank==0.and..not.hypre) write(*,'("              pressure iterations :",I9)')it
            endif
-      
            do k=ks,ke;  do j=js,je; do i=is,ieu    ! CORRECT THE u-velocity 
               u(i,j,k)=u(i,j,k)-dt*(2.0*umask(i,j,k)/dxh(i))*(p(i+1,j,k)-p(i,j,k))/(rho(i+1,j,k)+rho(i,j,k))
            enddo; enddo; enddo
@@ -411,7 +406,6 @@ Program paris
            call get_flags_and_clip()
            if ( DoLPP ) call AveragePartSol()
         endif
-        
         if (DoLPP) then
             call lppvofsweeps(itimestep,time)  
             call my_timer(14)

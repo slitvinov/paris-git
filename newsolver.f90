@@ -64,6 +64,8 @@ subroutine NewSolver(A,p,maxError,beta,maxit,it,ierr)
         A(i,j,k,3) * p(i,j-1,k) + A(i,j,k,4) * p(i,j+1,k) +            &
         A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8) )**2
     enddo; enddo; enddo
+    !write(*,'(e14.5)')res2
+    !write(*,'(2i4)')ks,ke
     call MPI_WAITALL(12,req,sta,ierr)
     mask=.true.
     mask(is+1:ie-1,js+1:je-1,ks+1:ke-1)=.false.

@@ -178,7 +178,7 @@ contains
     logical ViscMeanIsArith, DensMeanIsArith
     namelist /vofparameters/ vofbdry_cond,test_type,VOF_advect,refinement, &
        cylinder_dir, normal_up, DoLPP, jetradius, jetcenter_yc2yLength, jetcenter_zc2zLength, & 
-       FreeSurface, ViscMeanIsArith, DensMeanIsArith, &
+       FreeSurface, ViscMeanIsArith, DensMeanIsArith, MAXERROR_FS, MAXIT_FS, &
        output_filtered_VOF, DoMOF
     
 !     vofbdry_cond=['periodic','periodic','periodic','periodic','periodic','periodic']
