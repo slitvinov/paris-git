@@ -958,7 +958,7 @@ or none at all")
                   ccell   = 0.5d0*(cvofh1(i,j,k)+cvofh2(i,j,k))
                   if (((tmpreal.gt.0.d0).and.(tmpreal.lt.1.d0)) &
                   .or.((ccell.gt.0.d0).and.ccell.lt.1.d0)) then
-                    rhoavg    = cvofh1(i,j,k)*dxh(i) + cvofh2(i,j-1,k)*dyh(j-1) 
+                    rhoavg    = cvofh1(i,j,k)*dyh(j) + cvofh2(i,j-1,k)*dyh(j-1) 
                     rhoavg    = rhoavg/(dyh(j) + dyh(j-1))
                     rhoavg    = rho1*rhoavg + rho2*(1.d0 - rhoavg)
                     us(i,j,k) = mom/rhoavg
@@ -978,7 +978,7 @@ or none at all")
                   ccell   = 0.5d0*(cvofh1(i,j,k)+cvofh2(i,j,k))
                   if (((tmpreal.gt.0.d0).and.(tmpreal.lt.1.d0)) &
                   .or.((ccell.gt.0.d0).and.ccell.lt.1.d0)) then
-                    rhoavg    = cvofh1(i,j,k)*dzh(i) + cvofh2(i,j,k-1)*dzh(k-1) 
+                    rhoavg    = cvofh1(i,j,k)*dzh(k) + cvofh2(i,j,k-1)*dzh(k-1) 
                     rhoavg    = rhoavg/(dzh(k) + dzh(k-1))
                     rhoavg    = rho1*rhoavg + rho2*(1.d0 - rhoavg)
                     us(i,j,k) = mom/rhoavg
