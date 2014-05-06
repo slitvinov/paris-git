@@ -1113,7 +1113,6 @@ subroutine extrapolate_velocities()
     real(8) :: n_x, n_y, n_z
     real(8) :: dtau, SS_error
     real(8) :: du_x, du_y, du_z, dv_x, dv_y, dv_z, dw_x, dw_y, dw_z
-    !real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: n1,n2,n3 
     real(8), dimension(imin:imax,jmin:jmax,kmin:kmax) :: u_cmask,v_cmask,w_cmask
     
     u_cmask = 0d0; v_cmask = 0d0; w_cmask =0d0
