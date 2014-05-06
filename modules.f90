@@ -2026,7 +2026,7 @@ subroutine SetupPoisson(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask,cvof,n1
   endif
 ! dp/dn = 0 for outflow/fixed velocity bc on face 4 == x+
 ! outflow/fixed velocity bc on other faces not implemented yet.  
-  if(bdry_cond(4)==4 .and. coords(4)==Npx - 1) then
+  if(bdry_cond(4)==4 .and. coords(1)==Npx - 1) then
      A(ie,:,:,7) = A(ie,:,:,7) - A(ie,:,:,2)
      A(ie,:,:,2) = 0d0
   endif
