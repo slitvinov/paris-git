@@ -351,6 +351,7 @@ contains
   subroutine write_vec_gnuplot(u,v,cvof,p,iout,DoVOF)
     use module_grid
     use module_tmpvar
+    use module_hello
     implicit none
     include 'mpif.h'
     real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: u, v, cvof, p

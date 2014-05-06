@@ -71,6 +71,7 @@ Program paris
   integer :: req(48),sta(MPI_STATUS_SIZE,48)
   INTEGER :: irank, ii, i, j, k
   real(8) :: residual,cflmax,get_cfl
+  real(8), parameter :: cflmax_allowed=0.5d0
 
 
 !---------------------------------------INITIALIZATION--------------------------------------------
@@ -184,6 +185,7 @@ Program paris
            if(rank==0) &
                 write(*,  '("Step: ", I6," dt=",es16.5e2," time=",es16.5e2," cpu(s):",f11.3   ," cfl=",es16.5e2)') &
                 itimestep,dt,time,end_time-start_time,cflmax
+           if(cflmax.gt.cflmax_allowed) call pariserror("CFL too large")
         endif
 
         if(itime_scheme==2) then
