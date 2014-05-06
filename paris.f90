@@ -133,9 +133,9 @@ Program paris
                                                     is,ie,js,je,ks,ke,Nx,Ny,Nz,bdry_cond)
   if(HYPRE .and. rank==0) write(out,*)'hypre initialized'
   if(HYPRE .and. rank==0) write(*  ,*)'hypre initialized'
-  
-  call InitCondition
-  if(rank<nPdomain) then
+
+    call InitCondition
+    if(rank<nPdomain) then
 !-------------------------------------------------------------------------------------------------
 !------------------------------------------Begin domain-------------------------------------------
 !-------------------------------------------------------------------------------------------------
@@ -167,6 +167,7 @@ Program paris
         close(out)
         call MPI_BARRIER(MPI_COMM_WORLD, ierr)
         call MPI_finalize(ierr)
+        write(*,'("Paris exits succesfully")')
         stop
      endif
  
@@ -501,7 +502,6 @@ Program paris
 !--------------------------------------------End front--------------------------------------------
   endif
 !-------------------------------------------------------------------------------------------------
-  if(rank==0) print*,"paris: end of main time loop"
 !--------------- END OF MAIN TIME LOOP ----------------------------------------------------------
   call wrap_up_timer(itimestep)
   if(rank==0) then 
@@ -511,6 +511,7 @@ Program paris
   if(rank<nPdomain)  call output_at_location()
   if(rank==0)  call final_output(stats(2))
   if(HYPRE) call poi_finalize
+  write(*,'("Paris exits succesfully")')
   call print_st_stats()
   call MPI_BARRIER(MPI_COMM_WORLD, ierr)
   call MPI_FINALIZE(ierr)
@@ -1070,12 +1071,7 @@ subroutine initialize
     do i=1,ndim 
        if (bdry_cond(i) == 1) then
           periodic(i) = 1
-          if (bdry_cond(i+3) /= 1) then
-             if(rank==0) print*,  "inconsistent boundary conditions"
-             call MPI_BARRIER(MPI_COMM_WORLD, ierr)
-             call MPI_finalize(ierr)
-             stop
-          endif
+          if (bdry_cond(i+3) /= 1) call pariserror("inconsistent boundary conditions")
        endif
     enddo
 

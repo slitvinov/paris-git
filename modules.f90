@@ -726,8 +726,8 @@ module module_BC
     include 'mpif.h'
     real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: u, v, w
     real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: umask,vmask,wmask
-    real(8) :: t! ,uinject
-    integer :: i,j,k
+    real(8) :: t,flux,tflux,uaverage
+    integer :: i,j,k,ierr
     ! solid obstacles
     u = u*umask
     v = v*vmask
@@ -740,16 +740,20 @@ module module_BC
         v(is-1,:,:)=2*WallVel(1,2)-v(is,:,:)
         w(is-1,:,:)=2*WallVel(1,3)-w(is,:,:)
     endif
-    ! inflow boundary condition x-
+    ! inflow boundary condition x- with injection
     if(bdry_cond(1)==3 .and. coords(1)==0    ) then
+       flux=0
        do j=jmin,jmax
           do k=kmin,kmax
              u(is-1,j,k)=WallVel(1,1)*uinject(j,k,t)
              u(is-2,j,k)=WallVel(1,1)*uinject(j,k,t)
              v(is-1,j,k)=0d0
              w(is-1,j,k)=0d0
+             flux=flux+u(is-1,j,k)*dx(j)*dz(k)
           enddo
        enddo
+       call MPI_ALLREDUCE(flux, tflux, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr)
+       uaverage=tflux/(Ylength*Zlength)
     endif
     ! inflow boundary condition y-
     if(bdry_cond(2)==3 .and. coords(2)==0    ) then
@@ -817,9 +821,7 @@ module module_BC
     ! outflow/velocity boundary condition
     ! same velocity as opposing inflow. 
     if(bdry_cond(4)==4 .and. coords(1)==nPx-1) then
-       if(inject_type/=1) call pariserror("wrong injectype") ! not yet implmented for outflow/velocity,
-        u(ie  ,:,:)=WallVel(1,1)
-        u(ie+1,:,:)=WallVel(1,1)
+        u(ie  ,:,:)=uaverage
         v(ie+1,:,:)=v(ie-1,:,:)
         w(ie+1,:,:)=w(ie-1,:,:)
     endif
