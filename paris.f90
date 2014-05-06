@@ -221,8 +221,8 @@ Program paris
               u_cold = u !initialize cavity velocities to that of calculated field
               v_cold = v
               w_cold = w
-              call get_normals(n1,n2,n3)
-              call extrapolate_velocities(n1,n2,n3)
+              call get_normals()
+              call extrapolate_velocities()
            endif !Extrapolation
            if(DoVOF) then
              if (DoMOF) then
