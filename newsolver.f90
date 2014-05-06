@@ -87,13 +87,11 @@ contains
     real(8), intent(in) :: res2
     integer, intent(out) :: ierr
     if ((res2*npx*npy*npz)>1.d16 ) then
-       print*,'Pressure solver diverged after',it,'iterations at rank ',rank
-       ierr=1
-       stop  !return
+       if(rank==0) print*,'Pressure solver diverged after',it,'iterations at rank ',rank
+       call pariserror("newsolver error")
     else if (res2 .ne. res2) then 
-       print*, 'it:',it,'Pressure residual value is invalid at rank', rank
-       ierr=1
-       stop !return
+       if(rank==0) print*, 'it:',it,'Pressure residual value is invalid at rank', rank
+       call pariserror("newsolver error")
     else
        ierr=0
     endif

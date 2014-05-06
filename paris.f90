@@ -110,9 +110,7 @@ Program paris
   If (ierr /= 0) call pariserror("*** Main: unsuccessful MPI split")
 
   if((rank>nPdomain).or.((rank==nPdomain).and.(.not.DoFront)))then
-    call MPI_BARRIER(MPI_COMM_WORLD, ierr)
-    call MPI_finalize(ierr)
-    stop
+     call pariserror("rank>nPdomain).or.((rank==nPdomain).and.(.not.DoFront))")
   endif
 
   call initialize
@@ -167,13 +165,12 @@ Program paris
         close(out)
         call MPI_BARRIER(MPI_COMM_WORLD, ierr)
         call MPI_finalize(ierr)
-        write(*,'("Paris exits succesfully")')
+        if(rank==0) write(*,'("Paris exits succesfully")')
         stop
      endif
- 
-
-!-----------------------------------------MAIN TIME LOOP------------------------------------------
+ !-----------------------------------------MAIN TIME LOOP------------------------------------------
      call initialize_timer()
+
      do while(time<EndTime .and. itimestep<nstep)
         if(dtFlag==2)call TimeStepSize(dt)
         time=time+dt
@@ -319,7 +316,7 @@ Program paris
            call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
            call my_timer(1)
 !-----------------------------------------PROJECTION STEP-----------------------------------------
-           call SetPressureBC(umask,vmask,wmask,tmp,p)
+           call SetPressureBC(umask,vmask,wmask,p)
            call SetupPoisson(u,v,w,umask,vmask,wmask,rho,dt,A,tmp,cvof,n1,n2,n3,VolumeSource)
            ! (div u)*dt < epsilon => div u < epsilon/dt => maxresidual : maxerror/dt 
            if(HYPRE)then
@@ -511,7 +508,7 @@ Program paris
   if(rank<nPdomain)  call output_at_location()
   if(rank==0)  call final_output(stats(2))
   if(HYPRE) call poi_finalize
-  write(*,'("Paris exits succesfully")')
+  if(rank==0) write(*,'("Paris exits succesfully")')
   call print_st_stats()
   call MPI_BARRIER(MPI_COMM_WORLD, ierr)
   call MPI_FINALIZE(ierr)
@@ -1546,7 +1543,9 @@ subroutine pariserror(message)
   character(*) :: message
   OPEN(UNIT=89,FILE=TRIM(out_path)//'/error-rank-'//TRIM(int2text(rank,padding))//'.txt')
   write(89,*) message
+  if(rank==0) print*,message
   ! Exit MPI gracefully
+  close(89)
   close(out)
   call MPI_abort(MPI_COMM_WORLD, ierr)
   call MPI_finalize(ierr)

@@ -96,7 +96,7 @@ GX      = 0.0
 GY      = 0.0
 GZ      = 0.0
                    ! Components of the gravity in x,y,z direction
-inject_type = 1 
+inject_type = 1
 
 dPdX      = 0.0
 dPdY      = 0.0

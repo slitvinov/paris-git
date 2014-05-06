@@ -355,7 +355,7 @@ contains
     include 'mpif.h'
     real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: u, v, cvof, p
     integer, intent(in) :: iout
-    integer :: i,j,k,ierr
+    integer :: i,j,k,ierr,indices(3)
     real(8) :: norm=0.d0, coeff, vmax
     logical :: DoVOF
     intrinsic dsqrt
@@ -366,6 +366,12 @@ contains
     norm=0.d0
     k=(ks+ke)/2
     vmax = maxval(sqrt(u(is:ie,js:je,ks:ke)**2 + v(is:ie,js:je,ks:ke)**2))
+    if(vmax.gt.1D50) then 
+       indices = maxloc(sqrt(u(is:ie,js:je,ks:ke)**2 + v(is:ie,js:je,ks:ke)**2))
+       if(rank==0) print*,"velocity diverged at",indices
+       call pariserror("vmax diverged")
+    endif
+    if(vmax.ne.vmax) call pariserror("invalid vmax")
     call MPI_ALLREDUCE(vmax, norm, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_Cart, ierr)  
     coeff = 0.8/norm
     do i=is,ie; do j=js,je
@@ -660,12 +666,11 @@ module module_BC
 !=================================================================================================
 ! subroutine SetPressureBC: Sets the pressure boundary condition
 !-------------------------------------------------------------------------------------------------
-    subroutine SetPressureBC(umask,vmask,wmask,pmask,p)
+    subroutine SetPressureBC(umask,vmask,wmask,p)
     use module_grid
     implicit none
     include 'mpif.h'
     real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: umask,vmask,wmask, p
-    real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: pmask
 
 
   ! for walls set the mask to zero
@@ -673,11 +678,6 @@ module module_BC
       if(coords(1)==0    ) umask(is-1,js-1:je+1,ks-1:ke+1)=0d0
       if(coords(1)==nPx-1) umask(ie,js-1:je+1,ks-1:ke+1)=0d0
     endif
-
-    ! initialization of pmask
-    ! pmask not needed anymore for outflow/velocity boundary condition
-    pmask=1d0
-
 
     if(bdry_cond(2)==0)then
       if(coords(2)==0    ) vmask(is-1:ie+1,js-1,ks-1:ke+1)=0d0
@@ -741,20 +741,20 @@ module module_BC
         w(is-1,:,:)=2*WallVel(1,3)-w(is,:,:)
     endif
     ! inflow boundary condition x- with injection
+    flux=0
     if(bdry_cond(1)==3 .and. coords(1)==0    ) then
-       flux=0
        do j=jmin,jmax
           do k=kmin,kmax
              u(is-1,j,k)=WallVel(1,1)*uinject(j,k,t)
              u(is-2,j,k)=WallVel(1,1)*uinject(j,k,t)
              v(is-1,j,k)=0d0
              w(is-1,j,k)=0d0
-             flux=flux+u(is-1,j,k)*dx(j)*dz(k)
           enddo
        enddo
-       call MPI_ALLREDUCE(flux, tflux, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr)
-       uaverage=tflux/(Ylength*Zlength)
+       flux=sum(u(is-1,js:je,ks:ke))
     endif
+    call MPI_ALLREDUCE(flux, tflux, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr)
+    uaverage=tflux/(ny*nz)
     ! inflow boundary condition y-
     if(bdry_cond(2)==3 .and. coords(2)==0    ) then
        do i=imin,imax
@@ -1851,7 +1851,7 @@ subroutine SetupPoisson(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask,cvof,n1
   implicit none
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: utmp,vtmp,wtmp,rhot
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: umask,vmask,wmask
-  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: pmask
+  real(8), dimension(is:ie,js:je,ks:ke), intent(inout) :: pmask
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: cvof,n1,n2,n3
   real(8), dimension(is:ie,js:je,ks:ke,8), intent(out) :: A
   real(8), dimension(is:ie,js:je,ks:ke) :: x_int, y_int, z_int
@@ -1859,7 +1859,7 @@ subroutine SetupPoisson(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask,cvof,n1
   real(8) :: x_l, x_r, y_b, y_t, z_r, z_f
 
   real(8) :: dt, VolumeSource, limit
-  integer :: i,j,k
+  integer :: i,j,k,l
   do k=ks,ke; do j=js,je; do i=is,ie;
 !    if(mask(i,j,k))then
       A(i,j,k,1) = 2d0*dt*umask(i-1,j,k)/(dx(i)*dxh(i-1)*(rhot(i-1,j,k)+rhot(i,j,k)))
@@ -1877,6 +1877,7 @@ subroutine SetupPoisson(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask,cvof,n1
   
   if(FreeSurface) then
      x_int = 0d0; y_int = 0d0; z_int = 0d0
+     pmask = 1d0
      
      do k=ks,ke; do j=js,je; do i=is,ie
         limit = 0.10*min(dx(i),dy(j),dz(k))
@@ -2004,12 +2005,9 @@ subroutine SetupPoisson(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask,cvof,n1
      enddo;enddo;enddo
      
      do k=ks,ke; do j=js,je; do i=is,ie
-        A(i,j,k,1) = pmask(i,j,k)*A(i,j,k,1)
-        A(i,j,k,2) = pmask(i,j,k)*A(i,j,k,2)
-        A(i,j,k,3) = pmask(i,j,k)*A(i,j,k,3)
-        A(i,j,k,4) = pmask(i,j,k)*A(i,j,k,4)
-        A(i,j,k,5) = pmask(i,j,k)*A(i,j,k,5)
-        A(i,j,k,6) = pmask(i,j,k)*A(i,j,k,6)
+        do l=1,6
+           A(i,j,k,l) = pmask(i,j,k)*A(i,j,k,l)
+        enddo
         A(i,j,k,7) = sum(A(i,j,k,1:6)) + 1d-49
         A(i,j,k,8) = pmask(i,j,k)*A(i,j,k,8)
      enddo;enddo;enddo
