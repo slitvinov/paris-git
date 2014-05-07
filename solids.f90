@@ -133,6 +133,8 @@ contains
              s1 = solid_func_one_sphere(x(i),y(j),z(k),xlength) 
           else if (solid_type == 'SingleDisk') then
              s1 = solid_func_one_disk(x(i),y(j),xlength) 
+          else if (solid_type == 'SingleSquare') then
+             s1 = solid_func_one_square(x(i),y(j),xlength) 
           else if (solid_type == 'List_of_Spheres') then
              s1=-1d0
              do index=1,NumSpheres
@@ -229,6 +231,16 @@ contains
     return
   end function disk_func
 
+  FUNCTION square_func(x1,y1,x0,y0,radius)
+    !***
+    implicit none
+    real(8) :: square_func
+    real(8) , intent(in) :: x1,y1,x0,y0,radius
+    square_func = - max(abs(x1-x0),abs(y1-y0)) + radius
+    return
+  end function square_func
+
+
   ! example implicit solid definition function 
   FUNCTION solid_func_one_sphere(x1, y1, z1,boxL)
     implicit none
@@ -258,6 +270,20 @@ contains
     solid_func_one_disk = disk_func(x2,y2,x0,y0,radius)
     return 
   end function  solid_func_one_disk
+
+ FUNCTION solid_func_one_square(x1, y1, boxL)
+    implicit none
+    real(8) :: solid_func_one_square
+    real(8) , intent(in) :: x1,y1,boxL
+    real(8) :: x0,y0,x2,y2
+    real(8) :: radius
+    x2 = x1/boxL
+    y2 = y1/boxL
+    x0=0.5;y0=0.5
+    radius = solid_radius
+    solid_func_one_square = square_func(x2,y2,x0,y0,radius)
+    return 
+  end function  solid_func_one_square
 
   ! One basic CFC cell: one vertex + three faces
   FUNCTION solid_func_CFC_scaled( x1,  y1,  z1)
