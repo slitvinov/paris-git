@@ -167,12 +167,12 @@ contains
 !          solids(i,j,k) = s1
        enddo; enddo; enddo
 
-       call output_solids(0,is,ie,js,je,ks,ke)
        if(rank==0) write(out,*)'solids type ', solid_type, ' initialized'
        if(rank==0) write(6,*)  'solids type ', solid_type, ' initialized'
        call ghost_x(solids,2,req(1:4));  call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
        call ghost_y(solids,2,req(1:4));  call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
        call ghost_z(solids,2,req(1:4));  call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+       call output_solids(0,is-1,ie,js-1,je,ks-1,ke)
 
        ! For solid objects set mask according to placement of solids
        umask=1d0; vmask=1d0; wmask=1d0
