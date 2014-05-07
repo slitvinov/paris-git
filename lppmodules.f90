@@ -136,6 +136,10 @@
    integer, parameter :: dragmodel_CG = 3     ! Clift & Gauvin
    integer, parameter :: dragmodel_MKL = 4    ! Mei, Klausner,Lawrence 1994
 
+   integer, parameter :: DropStatistics_PlotElement      = 1
+   integer, parameter :: DropStatistics_ElementSizePDF   = 2
+   integer, parameter :: DropStatistics_PlotParticle     = 3
+
    integer :: DropStatisticsMethod 
    logical :: DoConvertVOF2LPP 
    logical :: DoConvertLPP2VOF 
@@ -143,7 +147,9 @@
    integer :: ntimesteptag
    integer :: CriteriaConvertCase
    real(8) :: vol_cut, xlpp_min,ylpp_min,zlpp_min, & 
-                       xlpp_max,ylpp_max,zlpp_max  
+                       xlpp_max,ylpp_max,zlpp_max
+   real(8) :: volcell 
+   character(20) :: lppbdry_cond(6)
 
    integer :: max_num_drop 
    integer :: maxnum_cell_drop
@@ -157,6 +163,9 @@
 
    real(8), parameter :: AspRatioSphere = 1.d0
    real(8) :: AspRatioTol
+
+   logical :: WallEffectSettling
+   logical :: output_lpp_evolution 
 contains
 !=================================================================================================
    subroutine initialize_LPP()
@@ -201,6 +210,8 @@ contains
       sdu = 0.d0; sdv = 0.d0; sdw =0.d0
       sdu_work = 0.d0; sdv_work = 0.d0; sdw_work =0.d0
 
+      volcell = (yLength/dble(Ny))**3.d0
+
    end subroutine initialize_LPP
 
    subroutine ReadLPPParameters
@@ -211,12 +222,14 @@ contains
       include 'mpif.h'
 
       integer ierr,in
+      integer :: i
       logical file_is_there
       namelist /lppparameters/ DropStatisticsMethod, dragmodel, nTimeStepTag,   &
          DoConvertVOF2LPP,DoConvertLPP2VOF,CriteriaConvertCase, ConvertRegSizeToDiam, & 
          vol_cut,xlpp_min,xlpp_max,ylpp_min,ylpp_max,zlpp_min,zlpp_max,    &
          max_num_drop, maxnum_cell_drop, max_num_part, max_num_part_cross, &
-         outputlpp_format,NumStepAfterVOFConversionForAve
+         outputlpp_format,NumStepAfterVOFConversionForAve, &
+         WallEffectSettling,output_lpp_evolution,lppbdry_cond 
 
       in=32
 
@@ -240,6 +253,9 @@ contains
       ConvertRegSizeToDiam = 2.d0 
       NumStepAfterVOFConversionForAve = 10
       AspRatioTol = 1.5d0
+      WallEffectSettling = .false.
+      output_lpp_evolution = .false.
+      lppbdry_cond=['undefined','undefined','undefined','undefined','undefined','undefined']
 
       call MPI_COMM_RANK(MPI_COMM_WORLD, rank, ierr)
       inquire(file='inputlpp',exist=file_is_there)
@@ -265,16 +281,23 @@ contains
       if ( (dragmodel == dragmodel_MKL) .and. mu1<mu2 ) & 
          call pariserror("Bubble drag law is used for particles!")
 
+      do i=1,6
+         if(lppbdry_cond(i) == 'undefined') then 
+            lppbdry_cond(i) = 'periodic'
+            if ( rank == 0 ) write(*,*) 'undefined lpp condition in direction', i,' now is set to periodic by default!' 
+         end if ! lppbdry_cond 
+      end do !i
    end subroutine ReadLPPParameters
 
 
-   subroutine lppsweeps(tswap)
+   subroutine lppsweeps(tswap,time,iStage)
       implicit none
     
-      integer, intent(in) :: tswap
+      integer, intent(in) :: tswap,iStage
+      real(8), intent(in) :: time
 
-      call ComputePartForce(tswap)
-      call UpdatePartSol
+      call ComputePartForce(tswap,time)
+      call UpdatePartSol(iStage)
 
    end subroutine lppsweeps
 
@@ -312,7 +335,7 @@ contains
     integer :: s_queue(Nx*Ny,3),c_queue(Nx*Ny,3) ! record i,j,k
     integer :: ns_queue,is_queue,nc_queue
     
-    real(8) :: volcell,cvof_scaled
+    real(8) :: cvof_scaled
 
     integer :: num_cell_drop,cell_list(3,maxnum_cell_drop)
     real(8) :: xc,yc,zc,uc,vc,wc,duc,dvc,dwc,vol 
@@ -401,7 +424,6 @@ contains
                   ksq >= ks .and. ksq <= ke ) then
                tag_flag(isq,jsq,ksq) = 1 ! mark S node as tagged
                ! perform droplet calculation
-               volcell = dx(isq)*dy(jsq)*dz(ksq) 
                cvof_scaled = cvof(isq,jsq,ksq)*volcell
                vol = vol + cvof_scaled
                xc  = xc  + cvof_scaled*x(isq)
@@ -707,9 +729,6 @@ contains
       integer :: num_element_estimate(0:nPdomain-1)
       type(element) :: element_NULL
 
-      integer, parameter :: DropStatistics_PlotElement = 1
-      integer, parameter :: DropStatistics_ElementSizePDF = 2
-      
       integer, parameter :: num_gaps = 1000
       real(8) :: gap,dmax,d
       integer :: igap,count_element(num_gaps)
@@ -1367,9 +1386,9 @@ contains
 !               u(i,j,k) = uf*(1.d0-wt) + ufp*wt
 !               v(i,j,k) = vf*(1.d0-wt) + vfp*wt
 !               w(i,j,k) = wf*(1.d0-wt) + wfp*wt
-               u(i,j,k) = uf 
-               v(i,j,k) = vf
-               w(i,j,k) = wf
+!               u(i,j,k) = uf 
+!               v(i,j,k) = vf
+!               w(i,j,k) = wf
             end do; end do; end do
 
             ! remove droplet vof structure
@@ -1477,59 +1496,55 @@ contains
       integer, intent(in ) :: CriteriaConvertCase
       logical, intent(out) :: ConvertDropFlag
 
+      logical :: ConvertDropRegion = .false.
+      logical :: ConvertDropShape  = .false.
+
       select case (CriteriaConvertCase) 
          case (CriteriaRectangle)
-            if ( (vol < vol_cut)                         .and. &
-                 (AspRatio < AspRatioTol)                .and. &
-                 (xc  > xlpp_min) .and. (xc  < xlpp_max) .and. & 
+            if ( (xc  > xlpp_min) .and. (xc  < xlpp_max) .and. & 
                  (yc  > ylpp_min) .and. (yc  < ylpp_max) .and. & 
                  (zc  > zlpp_min) .and. (zc  < zlpp_max) ) then 
-               ConvertDropFlag = .true.
-            else 
-               ConvertDropFlag = .false.
-            end if !vol_cut, xlpp_min...
+               ConvertDropRegion = .true.
+            end if !xlpp_min...
          case (CriteriaCylinder )   ! Note: assuming axis along x-direction
                                     ! radius indicated by ylpp_min & ylpp_max
-            if ( (  vol < vol_cut)                          .and. &
-                 (  AspRatio < AspRatioTol)                 .and. &
-                 ( (yc-0.5d0)**2.d0 + (zc-0.5d0)**2.d0 > ylpp_min**2.d0)  .and. & 
+            if ( ( (yc-0.5d0)**2.d0 + (zc-0.5d0)**2.d0 > ylpp_min**2.d0)  .and. & 
                  ( (yc-0.5d0)**2.d0 + (zc-0.5d0)**2.d0 < ylpp_max**2.d0) ) then 
-               ConvertDropFlag = .true.
-            else 
-               ConvertDropFlag = .false.
-            end if !vol_cut, xlpp_min... 
+               ConvertDropRegion = .true.
+            end if !xlpp_min... 
          case (CriteriaSphere   )   ! radius indicated by ylpp_min & ylpp_max 
-            if ( (  vol < vol_cut)                                      .and. &
-                 (  AspRatio < AspRatioTol)                             .and. &
-                 ( (xc**2.d0 + yc**2.d0 + zc**2.d0) > ylpp_min**2.d0)   .and. & 
+            if ( ( (xc**2.d0 + yc**2.d0 + zc**2.d0) > ylpp_min**2.d0)   .and. & 
                  ( (xc**2.d0 + yc**2.d0 + zc**2.d0) < ylpp_max**2.d0) ) then 
-               ConvertDropFlag = .true.
-            else 
-               ConvertDropFlag = .false.
-            end if !vol_cut, xlpp_min... 
+               ConvertDropRegion = .true.
+            end if !xlpp_min... 
          case (CriteriaJet      )   ! Note: assuming axis along x-direction
                                     ! xlpp_max varies in time & given as 
                                     ! xlpp_max = xlpp_min + zlpp_max*t
                                     ! radius indicated by ylpp_min & ylpp_max
             xlpp_max = xlpp_min + zlpp_max*time
-            if ( (  vol < vol_cut)                                        .and. &
-                 (  AspRatio < AspRatioTol)                               .and. &
-                 (  xc  > xlpp_min) .and. (xc  < xlpp_max)                .and. & 
+            if ( (  xc  > xlpp_min) .and. (xc  < xlpp_max)                .and. & 
                  ( (yc-0.5d0)**2.d0 + (zc-0.5d0)**2.d0 > ylpp_min**2.d0)  .and. & 
                  ( (yc-0.5d0)**2.d0 + (zc-0.5d0)**2.d0 < ylpp_max**2.d0) ) then 
-               ConvertDropFlag = .true.
-            else 
-               ConvertDropFlag = .false.
-            end if !vol_cut, xlpp_min... 
+               ConvertDropRegion = .true.
+            end if !xlpp_min... 
          case (CriteriaInterface)
-            if ( vol < vol_cut            .and. & 
-                 AspRatio < AspRatioTol   .and. &
-                 RegAwayInterface(ic,jc,kc) ) then 
-               ConvertDropFlag = .true.
-            else 
-               ConvertDropFlag = .false.
-            end if !vol_cut, RegAwayInterface... 
+            if ( RegAwayInterface(ic,jc,kc) ) then 
+               ConvertDropRegion = .true.
+            end if !RegAwayInterface... 
       end select
+
+      if ( vol < volcell*3.375d0 ) then   
+         ConvertDropShape = .true. 
+      ! Check aspect ratio for drop diameter larger 1.5dx
+      else if ( (vol < vol_cut) .and. (AspRatio < AspRatioTol) ) then 
+         ConvertDropShape = .true. 
+      end if ! vol, AspRatio
+
+      ConvertDropFlag = ConvertDropRegion .and. ConvertDropShape
+
+      ! Always keep drop smaller than a cell as LPP (mostly generated by VOF
+      ! error)
+      if ( vol < volcell ) ConvertDropFlag = .true. 
       
    end subroutine CheckConvertDropCriteria
 
@@ -1965,31 +1980,35 @@ contains
       
    end subroutine BuildFlowFieldVOF
 
-   subroutine ComputePartForce(tswap)
+   subroutine ComputePartForce(tswap,time)
 
       implicit none
       integer, intent(in) :: tswap
+      real(8), intent(in) :: time
 
       real(8), parameter :: Cm = 0.5d0
 
       real(8) :: relvel(4), partforce(3)
       real(8) :: dp, Rep, muf, mup, rhof, rhop, taup
-      real(8) :: up,vp,wp, uf,vf,wf, DufDt,DvfDt,DwfDt
+      real(8) :: xp,yp,zp, up,vp,wp, uf,vf,wf, DufDt,DvfDt,DwfDt
       real(8) :: fhx,fhy,fhz
+      
+      real(8) :: dp2Lx
 
       integer :: ipart
       if ( num_part(rank) > 0 ) then
          do ipart = 1,num_part(rank)
+            xp = parts(ipart,rank)%element%xc
+            yp = parts(ipart,rank)%element%yc 
+            zp = parts(ipart,rank)%element%zc 
             up = parts(ipart,rank)%element%uc
             vp = parts(ipart,rank)%element%vc
             wp = parts(ipart,rank)%element%wc
 
             call GetFluidProp(parts(ipart,rank)%ic, &
                               parts(ipart,rank)%jc, &
-                              parts(ipart,rank)%kc, & 
-                              parts(ipart,rank)%element%xc, & 
-                              parts(ipart,rank)%element%yc, & 
-                              parts(ipart,rank)%element%zc, & 
+                              parts(ipart,rank)%kc, &
+                              xp,yp,zp, & 
                               uf,vf,wf,DufDt,DvfDt,DwfDt,   & 
                               parts(ipart,rank)%element%vol,&
                               tswap-parts(ipart,rank)%tstepConvert)
@@ -2009,6 +2028,12 @@ contains
             taup = rhop *dp*dp/18.0d0/muf & 
                  *(3.d0 + 3.d0*muf/mup)/(3.d0 + 2.d0*muf/mup)
 
+            if ( WallEffectSettling ) then 
+               dp2Lx = dp/xLength   ! assuming Lx=Lz, y is settling direction
+               taup  = taup*((1.d0-dp2Lx)/(1.d0-0.33d0*dp2Lx))**2.7d0
+               ! correction correlation by De Felice 1996
+            end if ! WallEffectSettling
+
             ! Note: set history to be zero for now
             fhx=0.d0; fhy=0.d0; fhz=0.d0
 
@@ -2021,26 +2046,36 @@ contains
             partforce(3) =(relvel(3)/taup*phi(dragmodel,Rep) + (1.d0-rhof/rhop)*Gz  &
                          + (1.d0+Cm)*rhof/rhop*DwfDt                 &
                          + fhz )/(1.d0+Cm*rhof/rhop)
+            
+            if ( output_lpp_evolution .and. mod(tswap,nstats)==0 ) then
+               call output_LPP_parameter(rank,ipart,xp,yp,zp,up,vp,wp,uf,vf,wf,dp,time)
+            end if ! 
 
-! TEMPORARY 
-            if ( MOD(tswap,ntimestepTag) == 0 ) then
-!               write(11,*) tswap*5e-8,relvel(1)/taup*phi(dragmodel,Rep), & 
-!                           rhof/rhop*DufDt,Cm*rhof/rhop*(DufDt-partforce(1)),& 
-!                           (1.d0+Cm)*rhof/rhop*DufDt,uf,up,DufDt
-!               write(12,*) tswap,partforce(2),relvel(2)/taup*phi(dragmodel,Rep), & 
-!                           rhof/rhop*DvfDt,Cm*rhof/rhop*(DvfDt-partforce(2)),&
-!                           (1.d0+Cm)*rhof/rhop*DvfDt,vf,vp,DvfDt
-!               write(13,*) tswap*5e-8,relvel(3)/taup*phi(dragmodel,Rep), & 
-!                           rhof/rhop*DwfDt,Cm*rhof/rhop*(DwfDt-partforce(3)),&
-!                           (1.d0+Cm)*rhof/rhop*DwfDt,wf,wp,DwfDt
-            end if ! tswap
-! END TEMPORARY
             parts(ipart,rank)%element%duc = partforce(1) 
             parts(ipart,rank)%element%dvc = partforce(2)
             parts(ipart,rank)%element%dwc = partforce(3)
          end do ! ipart
       end if ! num_part(rank) 
    end subroutine ComputePartForce
+
+   subroutine output_LPP_parameter(rank,ipart,xp,yp,zp,up,vp,wp,uf,vf,wf,dp,time)
+
+      integer, intent(in) :: rank, ipart
+      real(8), intent(in) :: xp,yp,zp,up,vp,wp,uf,vf,wf,dp,time
+
+      character(len=30) :: rootname
+      real(8) :: urel2, Re,We
+
+      urel2 = (up-uf)*(up-uf) + (vp-vf)*(vp-vf) + (wp-wf)*(wp-wf)
+      Re = sqrt(urel2)*rho1*dp/(mu1+1.d-16)
+      We = urel2*rho1*dp/(sigma+1.d-16)
+
+      rootname=trim(out_path)//'/LPP-PARA'//TRIM(int2text(rank,padding))//'-'
+      OPEN(UNIT=11,FILE=TRIM(rootname)//TRIM(int2text(ipart,padding))//'.dat',access='append')
+      write(11,'(13(E15.8,1X))') time,xp,yp,zp,up,vp,wp,uf,vf,wf,Re,We
+      CLOSE(11)
+   
+   end subroutine output_LPP_parameter
 
    function phi(dragmodel,Rep)
 
@@ -2149,8 +2184,9 @@ contains
 
    end subroutine GetFluidProp
 
-   subroutine UpdatePartSol()
+   subroutine UpdatePartSol(iStage)
       implicit none
+      integer, intent (in) :: iStage
   
       if ( num_part(rank) > 0 ) then 
          parts(1:num_part(rank),rank)%element%xc = parts(1:num_part(rank),rank)%element%xc +& 
@@ -2167,7 +2203,7 @@ contains
          parts(1:num_part(rank),rank)%element%wc = parts(1:num_part(rank),rank)%element%wc +&
                                                    parts(1:num_part(rank),rank)%element%dwc*dt
         
-         call UpdatePartLocCell   
+         if ( iStage == 1 ) call UpdatePartLocCell   
       end if ! num_part(rank)
    end subroutine UPdatePartSol
 
@@ -2190,6 +2226,13 @@ contains
       implicit none
      
       ! Update particle solution for 2nd order time integration
+      parts(1:num_part(rank),rank)%element%xc = & 
+         0.5d0*( parts(1:num_part(rank),rank)%element%xc + parts(1:num_part(rank),rank)%xcOld ) 
+      parts(1:num_part(rank),rank)%element%yc = & 
+         0.5d0*( parts(1:num_part(rank),rank)%element%yc + parts(1:num_part(rank),rank)%ycOld ) 
+      parts(1:num_part(rank),rank)%element%zc = & 
+         0.5d0*( parts(1:num_part(rank),rank)%element%zc + parts(1:num_part(rank),rank)%zcOld )  
+      
       parts(1:num_part(rank),rank)%element%uc = & 
          0.5d0*( parts(1:num_part(rank),rank)%element%uc + parts(1:num_part(rank),rank)%ucOld ) 
       parts(1:num_part(rank),rank)%element%vc = & 
@@ -2197,13 +2240,14 @@ contains
       parts(1:num_part(rank),rank)%element%wc = & 
          0.5d0*( parts(1:num_part(rank),rank)%element%wc + parts(1:num_part(rank),rank)%wcOld )  
 
+      call UpdatePartLocCell   
+      
       ! Transfer particles crossing blocks 
       if ( nPdomain > 1 ) then  
          call CollectPartCrossBlocks   
          call TransferPartCrossBlocks   
       end if ! nPdomain
 
-      ! Apply particle boundary condition 
       call SetPartBC
    end subroutine AveragePartSol
 
@@ -2211,14 +2255,17 @@ contains
       implicit none
       
       integer :: i,j,k,ipart,i1,j1,k1
-      real(8) :: xp,yp,zp,up,vp,wp
+      real(8) :: xp,yp,zp
 
       do ipart = 1,num_part(rank)
          ! x direction 
          i  = parts(ipart,rank)%ic
-         xp = parts(ipart,rank)%element%xc 
-         up = parts(ipart,rank)%element%uc 
-         if      ( xp > xh(i-1) .and. xp <= xh(i  ) ) then
+         xp = parts(ipart,rank)%element%xc
+         if      ( i <= Ng+1 ) then
+            i1 = INT((xp + dble(Ng)*dx(2))/dx(2)) + 1
+         else if ( i > Nx+Ng ) then 
+            i1 = Nx+2*Ng - INT((xh(Nx+2*Ng)-xp)/dx(Nx+Ng+1)) 
+         else if ( xp > xh(i-1) .and. xp <= xh(i  ) ) then
             i1 = i
          else if ( xp > xh(i  ) .and. xp <= xh(i+1) ) then 
             i1 = i+1
@@ -2235,8 +2282,11 @@ contains
          ! y direction 
          j  = parts(ipart,rank)%jc
          yp = parts(ipart,rank)%element%yc 
-         vp = parts(ipart,rank)%element%vc 
-         if      ( yp > yh(j-1) .and. yp <= yh(j  ) ) then
+         if      ( j <= Ng+1 ) then
+            j1 = INT((yp + dble(Ng)*dy(2))/dy(2)) + 1
+         else if ( j > Ny+Ng ) then 
+            j1 = Ny+2*Ng - INT((yh(Ny+2*Ng)-yp)/dy(Ny+Ng+1)) 
+         else if ( yp > yh(j-1) .and. yp <= yh(j  ) ) then
             j1 = j
          else if ( yp > yh(j  ) .and. yp <= yh(j+1) ) then 
             j1 = j+1
@@ -2246,15 +2296,18 @@ contains
             j1 = j-1
          else if ( yp > yh(j-3) .and. yp <= yh(j-2) ) then 
             j1 = j-2
-         else 
+         else
             call lpperror("Particle moves out of tracking range in y direction !")
          end if !yp
 
          ! z direction 
          k  = parts(ipart,rank)%kc
          zp = parts(ipart,rank)%element%zc 
-         wp = parts(ipart,rank)%element%wc 
-         if      ( zp > zh(k-1) .and. zp <= zh(k  ) ) then
+         if      ( k <= Ng+1 ) then
+            k1 = INT((zp + dble(Ng)*dz(2))/dz(2)) + 1
+         else if ( k > Nz+Ng ) then 
+            k1 = Nz+2*Ng - INT((zh(Nz+2*Ng)-zp)/dz(Nz+Ng+1)) 
+         else if ( zp > zh(k-1) .and. zp <= zh(k  ) ) then
             k1 = k
          else if ( zp > zh(k  ) .and. zp <= zh(k+1) ) then 
             k1 = k+1
@@ -2294,29 +2347,12 @@ contains
             j = parts(ipart,rank)%jc
             k = parts(ipart,rank)%kc
 
-            if ( vofbdry_cond(1) == 'periodic' ) then
-               if ( i < Ng ) then 
-                  i = i + Nx
-               else if ( i > Ng+Nx ) then
-                  i = i - Nx
-               end if !i
-            end if ! vofbrdy_cond(1)
-
-            if ( vofbdry_cond(2) == 'periodic' ) then
-               if ( j < Ng ) then 
-                  j = j + Ny
-               else if ( j > Ng+Ny ) then
-                  j = j - Ny
-               end if !i
-            end if ! vofbrdy_cond(2)
-            
-            if ( vofbdry_cond(3) == 'periodic' ) then
-               if ( k < Ng ) then 
-                  k = k + Nz
-               else if ( k > Ng+Nz ) then
-                  k = k - Nz
-               end if !i
-            end if ! vofbrdy_cond(3)
+            if ( lppbdry_cond(1) == 'periodic' .and. i <= Ng )   i = i + Nx
+            if ( lppbdry_cond(4) == 'periodic' .and. i > Ng+Nx ) i = i - Nx
+            if ( lppbdry_cond(2) == 'periodic' .and. j <= Ng )   j = j + Ny
+            if ( lppbdry_cond(5) == 'periodic' .and. j > Ng+Ny ) j = j - Ny
+            if ( lppbdry_cond(3) == 'periodic' .and. k <= Ng )   k = k + Nz
+            if ( lppbdry_cond(6) == 'periodic' .and. k > Ng+Nz ) k = k - Nz
             ! Note: here only collect and transfer particles which cross blocks 
             !       due to periodic BC, the location and cell index stored in 
             !       parts(ipart,rank) will not be changed until SetPartBC is called
@@ -2421,22 +2457,60 @@ contains
 
    subroutine SetPartBC
       implicit none
-
       integer :: ipart
 
       if ( num_part(rank) > 0 ) then 
          do ipart = 1,num_part(rank)
-            if ( parts(ipart,rank)%ic < Ng .or. parts(ipart,rank)%ic > Ng+Nx ) then 
-               call ImposePartBC(ipart,rank,1)
-            end if ! parts(ipart,rank)%ic
+            if ( parts(ipart,rank)%ic <= Ng ) then
+               if ( lppbdry_cond(1) == 'exit') then 
+                  call PartBC_exit(ipart,rank)
+                  cycle 
+               else 
+                  call ImposePartBC(ipart,rank,1)
+               end if ! lppbdry_cond
+            else if ( parts(ipart,rank)%ic > Ng+Nx ) then 
+               if ( lppbdry_cond(4) == 'exit') then 
+                  call PartBC_exit(ipart,rank)
+                  cycle 
+               else 
+                  call ImposePartBC(ipart,rank,4)
+               end if ! lppbdry_cond
+            end if ! ic 
 
-            if ( parts(ipart,rank)%jc < Ng .or. parts(ipart,rank)%jc > Ng+Ny ) then 
-               call ImposePartBC(ipart,rank,2)
-            end if ! parts(ipart,rank)%jc
+            if ( parts(ipart,rank)%jc <= Ng ) then 
+               if ( lppbdry_cond(2) == 'exit') then 
+                  call PartBC_exit(ipart,rank)
+                  cycle 
+               else 
+                  call ImposePartBC(ipart,rank,2)
+               end if ! lppbdry_cond
+            else if ( parts(ipart,rank)%jc > Ng+Ny ) then 
+               if ( lppbdry_cond(5) == 'exit') then 
+                  call PartBC_exit(ipart,rank)
+                  cycle 
+               else 
+                  call ImposePartBC(ipart,rank,5)
+               end if ! lppbdry_cond
+            end if ! jc 
 
-            if ( parts(ipart,rank)%kc < Ng .or. parts(ipart,rank)%kc > Ng+Nz ) then 
-               call ImposePartBC(ipart,rank,3)
-            end if ! parts(ipart,rank)%kc
+            if ( parts(ipart,rank)%kc <= Ng ) then  
+               if ( lppbdry_cond(3) == 'exit') then 
+                  call PartBC_exit(ipart,rank)
+                  cycle 
+               else 
+                  call ImposePartBC(ipart,rank,3)
+               end if ! lppbdry_cond
+            else if ( parts(ipart,rank)%kc > Ng+Nz ) then 
+               if ( lppbdry_cond(6) == 'exit') then 
+                  call PartBC_exit(ipart,rank)
+                  cycle 
+               else 
+                  call ImposePartBC(ipart,rank,6)
+               end if ! lppbdry_cond
+            end if ! kc
+         
+            ! Note: num_part(rank) has been updated in PartBC_exit
+            if ( ipart >= num_part(rank) ) exit
          end do ! ipart
       end if ! num_part(rank)
 
@@ -2446,11 +2520,13 @@ contains
       implicit none
       integer, intent (in) :: ipart,rank,d
 
-      if ( vofbdry_cond(d) == 'periodic' ) then
+      if ( lppbdry_cond(d) == 'periodic' ) then
          call PartBC_periodic(ipart,rank,d)
-!      else 
-!         call lpperror("unknown particle bondary condition!")
-      end if ! vofbdry_cond
+      else if ( lppbdry_cond(d) == 'reflect' ) then 
+         call PartBC_reflect(ipart,rank,d)
+      else 
+         call lpperror("Unknown particle bondary condition!")
+      end if ! lppbdry_cond
    end subroutine ImposePartBC
 
    subroutine PartBC_periodic(ipart,rank,d)
@@ -2458,33 +2534,70 @@ contains
       integer, intent (in) :: ipart,rank,d
       
       if ( d == 1 ) then 
-         if ( parts(ipart,rank)%ic < Ng ) then 
-            parts(ipart,rank)%ic = parts(ipart,rank)%ic + Nx
-            parts(ipart,rank)%element%xc = parts(ipart,rank)%element%xc + xLength
-         else if ( parts(ipart,rank)%ic > Ng+Nx ) then 
-            parts(ipart,rank)%ic = parts(ipart,rank)%ic - Nx
-            parts(ipart,rank)%element%xc = parts(ipart,rank)%element%xc - xLength
-         end if ! parts(ipart,rank)%ic
+         parts(ipart,rank)%ic = parts(ipart,rank)%ic + Nx
+         parts(ipart,rank)%element%xc = parts(ipart,rank)%element%xc + xLength
+      else if ( d == 4 ) then 
+         parts(ipart,rank)%ic = parts(ipart,rank)%ic - Nx
+         parts(ipart,rank)%element%xc = parts(ipart,rank)%element%xc - xLength
       else if ( d == 2 ) then 
-         if ( parts(ipart,rank)%jc < Ng ) then 
-            parts(ipart,rank)%jc = parts(ipart,rank)%jc + Ny
-            parts(ipart,rank)%element%yc = parts(ipart,rank)%element%yc + yLength
-         else if ( parts(ipart,rank)%jc > Ng+Ny ) then 
-            parts(ipart,rank)%jc = parts(ipart,rank)%jc - Ny
-            parts(ipart,rank)%element%yc = parts(ipart,rank)%element%yc - yLength
-         end if ! parts(ipart,rank)%jc
+         parts(ipart,rank)%jc = parts(ipart,rank)%jc + Ny
+         parts(ipart,rank)%element%yc = parts(ipart,rank)%element%yc + yLength
+      else if ( d == 5 ) then 
+         parts(ipart,rank)%jc = parts(ipart,rank)%jc - Ny
+         parts(ipart,rank)%element%yc = parts(ipart,rank)%element%yc - yLength
       else if ( d == 3 ) then 
-         if ( parts(ipart,rank)%kc < Ng ) then 
-            parts(ipart,rank)%kc = parts(ipart,rank)%kc + Nz
-            parts(ipart,rank)%element%zc = parts(ipart,rank)%element%zc + zLength
-         else if ( parts(ipart,rank)%kc > Ng+Nz ) then 
-            parts(ipart,rank)%kc = parts(ipart,rank)%kc - Nz
-            parts(ipart,rank)%element%zc = parts(ipart,rank)%element%zc - zLength
-         end if ! parts(ipart,rank)%kc
+         parts(ipart,rank)%kc = parts(ipart,rank)%kc + Nz
+         parts(ipart,rank)%element%zc = parts(ipart,rank)%element%zc + zLength
+      else if ( d == 6 ) then 
+         parts(ipart,rank)%kc = parts(ipart,rank)%kc - Nz
+         parts(ipart,rank)%element%zc = parts(ipart,rank)%element%zc - zLength
       end if ! d
-
    end subroutine PartBC_periodic
 
+   subroutine PartBC_exit(ipart,rank)
+      implicit none
+      integer, intent (in) :: ipart,rank
+      
+      integer :: ipart1
+
+      ! Remove the particle from the array  
+      do ipart1 = ipart+1,num_part(rank)
+         parts(ipart1-1,rank) = parts(ipart1,rank)
+      end do ! ipart1
+      num_part(rank) = num_part(rank) - 1
+   end subroutine PartBC_exit
+
+   subroutine PartBC_reflect(ipart,rank,d)
+      implicit none
+      integer, intent (in) :: ipart,rank,d
+      
+      if ( d == 1 ) then 
+         parts(ipart,rank)%ic = 2* Ng    +1-parts(ipart,rank)%ic 
+         parts(ipart,rank)%element%xc = -parts(ipart,rank)%element%xc 
+         parts(ipart,rank)%element%uc = -parts(ipart,rank)%element%uc 
+      else if ( d == 4 ) then 
+         parts(ipart,rank)%ic = 2*(Nx+Ng)+1-parts(ipart,rank)%ic 
+         parts(ipart,rank)%element%xc = 2.d0*xLength - parts(ipart,rank)%element%xc 
+         parts(ipart,rank)%element%uc = -parts(ipart,rank)%element%uc 
+      else if ( d == 2 ) then 
+         parts(ipart,rank)%jc = 2* Ng    +1-parts(ipart,rank)%jc 
+         parts(ipart,rank)%element%yc = -parts(ipart,rank)%element%yc 
+         parts(ipart,rank)%element%vc = -parts(ipart,rank)%element%vc 
+      else if ( d == 5 ) then 
+         parts(ipart,rank)%jc = 2*(Ny+Ng)+1-parts(ipart,rank)%ic 
+         parts(ipart,rank)%element%yc = 2.d0*yLength - parts(ipart,rank)%element%yc 
+         parts(ipart,rank)%element%vc = -parts(ipart,rank)%element%vc 
+      else if ( d == 3 ) then 
+         parts(ipart,rank)%kc = 2* Ng    +1-parts(ipart,rank)%kc 
+         parts(ipart,rank)%element%zc = -parts(ipart,rank)%element%zc 
+         parts(ipart,rank)%element%wc = -parts(ipart,rank)%element%wc 
+      else if ( d == 6 ) then 
+         parts(ipart,rank)%kc = 2*(Nz+Ng)+1-parts(ipart,rank)%kc 
+         parts(ipart,rank)%element%zc = 2.d0*zLength - parts(ipart,rank)%element%zc 
+         parts(ipart,rank)%element%wc = -parts(ipart,rank)%element%wc 
+      end if ! d
+   end subroutine PartBC_reflect
+   
    subroutine LinearIntrpl(x,x0,x1,f0,f1,f)
       implicit none
       real(8), intent (in) :: x,x0,x1,f0,f1

@@ -240,7 +240,7 @@ Program paris
               call my_timer(8)
            endif
            if (DoLPP) then
-                call lppsweeps(itimestep)  
+                call lppsweeps(itimestep,time,ii)  
                 call my_timer(12)
            end if ! DoLPP
 
@@ -411,7 +411,7 @@ Program paris
             call my_timer(14)
         end if ! DoLPP
 !--------------------------------------------OUTPUT-----------------------------------------------
-        call calcStats
+        if(mod(itimestep,nstats)==0) call calcStats
         call my_timer(2)
         if(mod(itimestep,nbackup)==0) then 
            if ( DoFront ) then 
@@ -567,6 +567,7 @@ subroutine calcStats
   include "mpif.h"
   integer :: i,j,k,ierr
   real(8) :: vol,CC=0d0
+  real(8) :: kenergy
   real(8), save :: W_int=-0.02066
   mystats(1:16)=0d0
   do k=ks,ke;  do j=js,je;  do i=is,ie
@@ -586,8 +587,9 @@ subroutine calcStats
 ! Phase C=1 center of mass
     if(DoVOF) CC=cvof(i,j,k) ;  mystats(11)=mystats(11)+CC*vol*x(i)
 ! kinetic energy
-    mystats(12)=mystats(12)+0.5*(rho(i,j,k)+rho(i+1,j,k))*u(i,j,k)*u(i,j,k)*vol
-    mystats(13)=mystats(13)+0.5*(rho(i,j,k)+rho(i+1,j,k))*v(i,j,k)*v(i,j,k)*vol
+    kenergy = 0.5d0*(u(i,j,k)*u(i,j,k) + v(i,j,k)*v(i,j,k) + w(i,j,k)*w(i,j,k))
+    mystats(12)=mystats(12)+0.5*(rho(i,j,k)+rho(i+1,j,k))*kenergy*vol*cvof(i,j,k)
+    mystats(13)=mystats(13)+0.5*(rho(i,j,k)+rho(i+1,j,k))*kenergy*vol*(1.d0-cvof(i,j,k))
   enddo;  enddo;  enddo
 
 ! Shear stress on y=0,Ly

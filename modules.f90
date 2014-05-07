@@ -518,6 +518,7 @@ subroutine output(nf,i1,i2,j1,j2,k1,k2)
   integer :: nf,i1,i2,j1,j2,k1,k2
   if(output_format==1) call output1(nf,i1,i2,j1,j2,k1,k2)
   if(output_format==2) call output2(nf,i1,i2,j1,j2,k1,k2)
+  if(output_format==3) call output3(nf,i1,i2,j1,j2,k1,k2)
 end subroutine output
 !-------------------------------------------------------------------------------------------------
 subroutine output1(nf,i1,i2,j1,j2,k1,k2)
@@ -582,6 +583,68 @@ subroutine output2(nf,i1,i2,j1,j2,k1,k2)
 
   if(rank==0) call append_visit_file(TRIM(rootname))
 
+    OPEN(UNIT=8,FILE=TRIM(rootname)//TRIM(int2text(rank,padding))//'.vtk')
+    write(8,10)
+    write(8,11) time
+    write(8,12)
+    write(8,13)
+    write(8,14)i2-i1+1,j2-j1+1,k2-k1+1
+    write(8,15)(i2-i1+1)*(j2-j1+1)*(k2-k1+1)
+10  format('# vtk DataFile Version 2.0')
+11  format('grid, time ',F16.8)
+12  format('ASCII')
+13  format('DATASET STRUCTURED_GRID')
+14  format('DIMENSIONS ',I5,I5,I5)
+15  format('POINTS ',I17,' float' )
+
+    do k=k1,k2; do j=j1,j2; do i=i1,i2;
+      write(8,320) x(i),y(j),z(k)
+    enddo; enddo; enddo
+320 format(e14.5,e14.5,e14.5)
+
+    write(8,19)(i2-i1+1)*(j2-j1+1)*(k2-k1+1)
+    if (itype .le. 4)then
+      write(8,17)'density'
+      write(8,18)
+    else
+      write(8,20)
+    endif
+19  format('POINT_DATA ',I17)
+17  format('SCALARS ',A20,' float 1')
+20  format('VECTORS uv float')
+18  format('LOOKUP_TABLE default')
+
+    do k=k1,k2; do j=j1,j2; do i=i1,i2;
+      if (itype .eq. 1)write(8,210)rho(i,j,k)
+      if (itype .eq. 5)write(8,310)0.5*(u(i,j,k)+u(i-1,j,k)), &
+         0.5*(v(i,j,k)+v(i,j-1,k)),0.5*(w(i,j,k)+w(i,j,k-1))
+    enddo; enddo; enddo
+210 format(e14.5)
+310 format(e14.5,e14.5,e14.5)
+
+    close(8)
+
+! TEMPORARY
+    if ( zip_data ) then 
+      filename = TRIM(rootname)//TRIM(int2text(rank,padding))//'.vtk'
+      call system('gzip '//trim(filename))
+    end if ! zip_data
+! END TEMPORARY 
+end subroutine output2
+!-------------------------------------------------------------------------------------------------
+subroutine output3(nf,i1,i2,j1,j2,k1,k2)
+  use module_flow
+  use module_grid
+  use module_hello
+  !use IO_mod
+  implicit none
+  integer ::nf,i1,i2,j1,j2,k1,k2,i,j,k, itype=5
+!  logical, save :: first_time=.true.
+  character(len=30) :: rootname,filename
+  rootname=TRIM(out_path)//'/VTK/plot'//TRIM(int2text(nf,padding))//'-'
+
+  if(rank==0) call append_visit_file(TRIM(rootname))
+
   OPEN(UNIT=8,FILE=TRIM(rootname)//TRIM(int2text(rank,padding))//'.vtk')
     write(8,10)
     write(8,11)time
@@ -626,7 +689,7 @@ subroutine output2(nf,i1,i2,j1,j2,k1,k2)
       call system('gzip '//trim(filename))
     end if ! zip_data
 ! END TEMPORARY 
-end subroutine output2
+end subroutine output3
 !-------------------------------------------------------------------------------------------------
 end module module_IO
 !=================================================================================================
@@ -1192,12 +1255,13 @@ module module_BC
       uinject=0d0
       if (inject_type==1) then
          uinject = 1.d0
-      elseif( inject_type==2 ) then 
+      elseif( inject_type==2 ) then
+         tshift = 0.01d0
          if( (y(j) - jetcenter_yc)**2.d0 + (z(k) - jetcenter_zc)**2.d0 .lt. jetradius**2.d0 ) then 
             if ( t<=tshift ) then  
-               uinject=1.d0
+               uinject=uliq_inject
             else 
-               uinject=1.d0+0.05d0*SIN(10.d0*2.d0*PI*(t-tshift))
+               uinject=uliq_inject*(1.d0+0.05d0*SIN(10.d0*2.d0*PI*(t-tshift)))
             end if ! t
          end if ! y(j)
       elseif( inject_type==5 ) then 
@@ -1205,9 +1269,9 @@ module module_BC
             uinject=uliq_inject
          end if ! y(j)
       else if ( inject_type == 3 ) then ! 2d coaxial jet
-         !tshift = 5.d-2
+         tshift = 1.d-1
          !tshift = 0.5d0*jetradius/uliq_inject
-         tshift = jetradius/uliq_inject
+         !tshift = jetradius/uliq_inject
          if ( y(j) <= jetradius ) then 
             uinject = uliq_inject & 
                      *erf( (jetradius - y(j))/BLliq )  
