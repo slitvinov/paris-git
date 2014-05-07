@@ -376,7 +376,8 @@ contains
     call MPI_ALLREDUCE(vmax, norm, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_Cart, ierr)  
     coeff = 0.8/norm
     do i=is,ie; do j=js,je
-       write(89,310) xh(i),yh(j),coeff*dx(i)*u(i,j,k),coeff*dx(i)*v(i,j,k)
+       write(89,310) x(i),y(j),coeff*dx(i)*0.5d0*(u(i,j,k)+u(i-1,j,k)), &
+                  coeff*dy(j)*0.5d0*(v(i,j,k)+v(i,j-1,k))
     enddo; enddo
     close(unit=89)
     !
