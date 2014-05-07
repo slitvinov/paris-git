@@ -1,0 +1,33 @@
+<?xml version="1.0"?>
+<Object name="ContourAttributes">
+    <Object name="defaultPalette">
+        <Object name="ColorControlPointList">
+            <Field name="compactColors" type="unsignedCharVector">255 0 0 255 0 255 0 255 0 0 255 255 0 255 255 255 255 0 255 255 255 255 0 255 255 135 0 255 255 0 135 255 168 168 168 255 255 68 68 255 99 255 99 255 99 99 255 255 40 165 165 255 255 99 255 255 255 255 99 255 255 170 99 255 170 79 255 255 150 0 0 255 0 150 0 255 0 0 150 255 0 109 109 255 150 0 150 255 150 150 0 255 150 84 0 255 160 0 79 255 255 104 28 255 0 170 81 255 68 255 124 255 0 130 255 255 130 0 255 255 </Field>
+            <Field name="compactPositions" type="floatVector">0 0.034 0.069 0.103 0.138 0.172 0.207 0.241 0.276 0.31 0.345 0.379 0.414 0.448 0.483 0.517 0.552 0.586 0.621 0.655 0.69 0.724 0.759 0.793 0.828 0.862 0.897 0.931 0.966 1 </Field>
+            <Field name="smoothing" type="string">None</Field>
+            <Field name="equalSpacingFlag" type="bool">true</Field>
+            <Field name="discreteFlag" type="bool">true</Field>
+            <Field name="externalFlag" type="bool">false</Field>
+        </Object>
+    </Object>
+    <Field name="colorType" type="string">ColorByMultipleColors</Field>
+    <Field name="colorTableName" type="string">Default</Field>
+    <Field name="legendFlag" type="bool">true</Field>
+    <Field name="lineStyle" type="int">0</Field>
+    <Field name="lineWidth" type="int">0</Field>
+    <Object name="singleColor">
+        <Object name="ColorAttribute">
+            <Field name="color" type="unsignedCharArray" length="4">255 0 0 255 </Field>
+        </Object>
+    </Object>
+    <Field name="contourNLevels" type="int">1</Field>
+    <Field name="contourValue" type="doubleVector"></Field>
+    <Field name="contourPercent" type="doubleVector"></Field>
+    <Field name="contourMethod" type="string">Level</Field>
+    <Field name="minFlag" type="bool">false</Field>
+    <Field name="maxFlag" type="bool">false</Field>
+    <Field name="min" type="double">0</Field>
+    <Field name="max" type="double">1</Field>
+    <Field name="scaling" type="string">Linear</Field>
+    <Field name="wireframe" type="bool">false</Field>
+</Object>
