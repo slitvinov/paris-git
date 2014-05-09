@@ -1871,7 +1871,7 @@ subroutine SetupPoisson(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask,cvof,n1
   real(8), dimension(is:ie,js:je,ks:ke) :: x_int, y_int, z_int
   real(8) :: alpha, x_test, y_test, z_test, n_x, n_y, n_z
   real(8) :: x_l, x_r, y_b, y_t, z_r, z_f
-
+  real(8) :: al3d
   real(8) :: dt, VolumeSource, limit
   integer :: i,j,k,l
   do k=ks,ke; do j=js,je; do i=is,ie;
@@ -1899,7 +1899,7 @@ subroutine SetupPoisson(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask,cvof,n1
            pmask(i,j,k) = 0d0
            
            n_x = ABS(n1(i,j,k)); n_y = ABS(n2(i,j,k)); n_z = ABS(n3(i,j,k))
-           alpha = local_al3d(n_x,n_y,n_z,cvof(i,j,k))
+           alpha = al3d(n_x,n_y,n_z,cvof(i,j,k))
           
            if (n_x .ne. 0.d0) then
               x_test = (alpha - (n_y+n_z)/2d0)/n_x
@@ -1957,7 +1957,7 @@ subroutine SetupPoisson(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask,cvof,n1
         
         if (cvof(i,j,k)>0d0 .and. cvof(i,j,k)<0.5d0) then
            n_x = ABS(n1(i,j,k)); n_y = ABS(n2(i,j,k)); n_z = ABS(n3(i,j,k))
-           alpha = local_al3d(n_x,n_y,n_z,cvof(i,j,k))
+           alpha = al3d(n_x,n_y,n_z,cvof(i,j,k))
           
            if (n_x .ne. 0.d0) then
               x_test = (alpha - (n_y+n_z)/2d0)/n_x
@@ -2027,6 +2027,9 @@ subroutine SetupPoisson(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask,cvof,n1
      enddo;enddo;enddo
      
   else
+!      do k=ks,ke; do j=js,je; do i=is,ie
+!         if( A(i,j,k,7) .lt. 1d-49)   A(i,j,k,7) = 1d0
+!      enddo;enddo;enddo        
      A(:,:,:,7) = A(:,:,:,7) + 1.0d-49 
      if(check_setup) call check_poisson_setup(A,pmask)
   endif !FreeSurface
@@ -2044,78 +2047,6 @@ subroutine SetupPoisson(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask,cvof,n1
      A(ie,:,:,2) = 0d0
   endif
 !routine is basically copied here.     
-contains
-  ! ****** 1 ******* 2 ******* 3 ******* 4 ******* 5 ******* 6 ******* 7 *
-  ! PROGRAM TO FIND alpha IN: m1 x1 + m2 x2 + m3 x3 = alpha,
-  ! GIVEN m1+m2+m3=1 (all > 0) AND THE VOLUMETRIC FRACTION cc
-  ! ****** 1 ******* 2 ******* 3 ******* 4 ******* 5 ******* 6 ******* 7 *
-  function local_al3d(b1,b2,b3,cc)
-    !***
-    implicit none
-    real(8) m1,m2,m3,cc,b1,b2,b3,tmp,pr,ch,mm,m12
-    real(8) p,p12,q,teta,cs,local_al3d
-    real(8) untier,v1,v2,v3
-    parameter (untier=1.d0/3.d0)
-    intrinsic dmax1,dmin1,dsqrt,dacos,dcos
-    !***  
-    !     (1) order coefficients: m1<m2<m3; (2) get ranges: v1<v2<v3;
-    !     (3) limit ch (0.d0 < ch < 0.5d0); (4) calculate alpha
-    !*(1)* 
-    m1 = dmin1(b1,b2)
-    m3 = dmax1(b1,b2)
-    m2 = b3
-    if (m2 .lt. m1) then
-       tmp = m1
-       m1 = m2
-       m2 = tmp
-    else if (m2 .gt. m3) then
-       tmp = m3
-       m3 = m2
-       m2 = tmp
-    endif
-    !*(2)*
-    m12 = m1 + m2 
-    pr  = DMAX1(6.d0*m1*m2*m3,1.d-50)
-    V1  = m1*m1*m1/pr
-    V2  = V1 + 0.5d0*(m2-m1)/m3
-    if (m3 .LT. m12) then
-       mm = m3
-       V3 = (m3*m3*(3.d0*m12-m3) + m1*m1*(m1-3.d0*m3) +&
-            m2*m2*(m2-3.d0*m3))/pr
-    else
-       mm = m12
-       V3 = 0.5d0*mm/m3
-    endif
-    !*(3)*
-    ch = DMIN1(cc,1.d0-cc)
-    !*(4)*      
-    if (ch .LT. V1) then
-       !***         AL3D = cbrt(pr*ch)
-       local_AL3D = (pr*ch)**UNTIER
-    else if (ch .LT. V2) then
-       local_AL3D = 0.5d0*(m1 + DSQRT(m1*m1 + 8.d0*m2*m3*(ch-V1)))
-    else if (ch .LT. V3) then
-       p = 2.d0*m1*m2
-       q = 1.5d0*m1*m2*(m12 - 2.d0*m3*ch)
-       p12 = DSQRT(p)
-       teta = DACOS(q/(p*p12))/3.d0
-       cs = DCOS(teta)
-       local_AL3D = p12*(DSQRT(3.d0*(1.d0-cs*cs)) - cs) + m12
-    else if (m12 .LT. m3) then
-       local_AL3D = m3*ch + 0.5d0*mm
-    else 
-       p = m1*(m2+m3) + m2*m3 - 0.25d0
-       q = 1.5d0*m1*m2*m3*(0.5d0-ch)
-       p12 = DSQRT(p)
-       teta = DACOS(q/(p*p12))/3.0
-       cs = DCOS(teta)
-       local_AL3D = p12*(DSQRT(3.d0*(1.d0-cs*cs)) - cs) + 0.5d0
-    endif
-
-    if (cc .GT. 0.5d0)  local_AL3D = 1.d0 - local_AL3D
-    !***
-    return
-  end function local_al3d
 end subroutine SetupPoisson
 !=================================================================================================
 !=================================================================================================
