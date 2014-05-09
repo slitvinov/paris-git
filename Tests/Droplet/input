@@ -29,17 +29,17 @@ restartAverages = F
 nBackup  = 200000      ! number of time steps between  backups are kept.
 
 NSTEP   = 100000       ! maximum number of time steps
-EndTime = 380   ! When to stop simulation
+EndTime = 1d3   ! When to stop simulation
 
 MaxDt   = 0.1d0    ! maximum size of time step
 dtFlag  = 1        ! 1: fixed dt;  2: fixed CFL
 dt      = 0.1d0    ! dt in case of dtFlag=1
 CFL     = 0.25
-MAXERROR= 1d-7     ! Residual for Poisson solver
+MAXERROR= 1d-5     ! Residual for Poisson solver
 MAXERRORVOL = 1d-6 ! Tolerance for Front Tracking
                    ! Numerical parameters
 
-ITIME_SCHEME = 1
+ITIME_SCHEME = 2
                    ! time scheme: 1:first order Euler, 2: second order quasi Crank-Nicolson
 
 MAXIT    = 2000
@@ -60,9 +60,9 @@ nstats   = 200      ! number of time steps between flow statistics output
 !=================================================================================================
 ! Grid parameters
 
-npx      = 2
-npy      = 2
-npz      = 2
+npx      = 1
+npy      = 1
+npz      = 1
                    ! number of processors in x,y,z direction
 
 Nx      = 32
@@ -112,7 +112,7 @@ MU1     = 1.7d-5
                    ! rho1, mu1 : density and viscosity of the matrix phase
 
 RHO2    = 1000.
-MU2     = 1d-2
+MU2     = 1d-3
                    ! rho2, mu2 : properties of the drop
 SIGMA    = 0.00036
 NumBubble =  1

@@ -66,7 +66,7 @@ module module_VOF
   logical :: use_Vofi
 
   real(8) :: b1,b2,b3,b4
-  integer :: nfilter=0
+  integer :: nfilter=1
 
   logical :: DoLPP = .false.
   logical :: output_filtered_VOF = .false.

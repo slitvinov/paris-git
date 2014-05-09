@@ -1598,10 +1598,17 @@ module module_poisson
   public :: poi_initialize, poi_solve, poi_finalize
   interface
      integer FUNCTION GetNumIterations (isolver,inum) &
-          bind(C, name="HYPRE_StructPFMGGetNumIterations")
+          bind(C, name="HYPRE_StructSMGGetNumIterations")
        integer :: inum
        integer*8 , VALUE :: isolver
      END FUNCTION GetNumIterations
+  end interface
+  interface
+     integer FUNCTION GetFinalRelative (isolver,rnum) &
+          bind(C, name="HYPRE_StructSMGGetFinalRelativeResidualNorm")
+       real(8) :: rnum
+       integer*8 , VALUE :: isolver
+     END FUNCTION GetFinalRelative
   end interface
 
   integer :: nstencil
@@ -1726,24 +1733,25 @@ module module_poisson
     call HYPRE_StructVectorAssemble(Bvec, ierr)
     call HYPRE_StructVectorAssemble(Xvec, ierr)
 !---------------------------------------Solve the equations---------------------------------------
-    call HYPRE_StructPFMGCreate(mpi_comm_poi, solver, ierr)
-    call HYPRE_StructPFMGSetMaxIter(solver, maxit, ierr)
-    call HYPRE_StructPFMGSetTol(solver, MaxError, ierr)
-
-    call HYPRE_StructPFMGSetRelaxType(solver, 3, ierr)
-
-    call hypre_structPFMGsetLogging(solver, 1, ierr)
-    call HYPRE_StructPFMGSetup(solver, Amat, Bvec, Xvec, ierr)
+    call HYPRE_StructSMGCreate(mpi_comm_poi, solver, ierr)
+    call HYPRE_StructSMGSetMaxIter(solver, maxit, ierr)
+    call HYPRE_StructSMGSetTol(solver, MaxError, ierr)
+#ifdef PFMG
+    call HYPRE_StructSMGSetRelaxType(solver, 3, ierr)
+#endif
+    call hypre_structSMGsetLogging(solver, 1, ierr)
+    call HYPRE_StructSMGSetup(solver, Amat, Bvec, Xvec, ierr)
     one = 1
-    call HYPRE_StructPFMGSetPrintLevel(solver,one,ierr) 
-    call HYPRE_StructPFMGSolve(solver, Amat, Bvec, Xvec, ierr)
+    call HYPRE_StructSMGSetPrintLevel(solver,one,ierr) 
+    call HYPRE_StructSMGSolve(solver, Amat, Bvec, Xvec, ierr)
     ierr = GetNumIterations(solver, num_iterations)
-!    call hypre_structPFMGgetfinalrelative(solver, final_res_norm, ierr)
+!    ierr = Getfinalrelative(solver, final_res_norm)
+!    print *, "relative error",final_res_norm
 !--------------------------------------Retrieve the solution--------------------------------------
     nvalues = mx * my * mz
     allocate(values(nvalues), stat=ierr)
     call HYPRE_StructVectorGetBoxValues(Xvec, ilower, iupper, values, ierr)
-    call HYPRE_StructPFMGDestroy(solver, ierr)
+    call HYPRE_StructSMGDestroy(solver, ierr)
 
     ijk = 1
     do k=ks,ke;  do j=js,je;  do i=is,ie
@@ -2238,29 +2246,32 @@ end subroutine LinearSolver1
 !=================================================================================================
 ! Returns the residual. L2 norm of the new divergence. 
 !-------------------------------------------------------------------------------------------------
-subroutine calcResidual(A,p, Residual)
+subroutine calcResidual(A,p, residual)
   use module_grid
   use module_BC
   implicit none
   include 'mpif.h'
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: p
   real(8), dimension(is:ie,js:je,ks:ke,8), intent(in) :: A
-  real(8) :: res, totalres, Residual
+  real(8) :: res, totalres, Residual,locres ! ,globmax,maxnorm
   integer :: i,j,k, ierr
   res = 0d0
+!  maxnorm = 0d0
   do k=ks,ke; do j=js,je; do i=is,ie
-    res=res+abs(-p(i,j,k) * A(i,j,k,7) +                             &
+      locres = abs(-p(i,j,k) * A(i,j,k,7) +                             &
       A(i,j,k,1) * p(i-1,j,k) + A(i,j,k,2) * p(i+1,j,k) +            &
       A(i,j,k,3) * p(i,j-1,k) + A(i,j,k,4) * p(i,j+1,k) +            &
-      A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8) )**2
+      A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8) )
+      res = res + locres
+!      maxnorm = max(maxnorm,locres)
   enddo; enddo; enddo
   res = res/float(Nx*Ny*Nz)
-  call MPI_ALLREDUCE(res, totalres, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr)
-  Residual = sqrt(totalres)
+  call MPI_ALLREDUCE(res, residual, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr)
+!  call MPI_ALLREDUCE(maxnorm, globmax, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_Comm_Cart, ierr)
 end subroutine calcResidual
 !=================================================================================================
 !=================================================================================================
-! Returns the residual including pmask
+! Returns the residual including pmask  ! @@fixme: dangerous pmask not used that way 
 !-------------------------------------------------------------------------------------------------
 subroutine calcResidual1(A,p,pmask,Residual)
   use module_grid

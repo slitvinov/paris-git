@@ -13,7 +13,7 @@ let nx=$3
 let idt=0
 imp=$4
 precision=$5
-maxerr=`awk -v dt0=$dt0 'BEGIN {print 0.001*dt0}'`
+maxerr=`awk -v dt0=$dt0 'BEGIN {print 0.01*dt0}'`
 
 dt=$dt0
 
