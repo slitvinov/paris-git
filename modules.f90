@@ -1769,131 +1769,35 @@ module module_poisson
 end module module_poisson
 !=================================================================================================
 !=================================================================================================
-! creates new data type for passing non-contiguous 
+! module module_free_surface
+! written by Leon Malan and Stephane Zaleski
 !-------------------------------------------------------------------------------------------------
-SUBROUTINE para_type_block3a(imin, imax, jmin, jmax, ilen, jlen, klen, ioldtype,inewtype)
+module module_free_surface
   implicit none
-  INCLUDE 'mpif.h'
-  integer :: imin, imax, jmin, jmax, ilen, jlen, klen, ioldtype,inewtype,isize, ierr, itemp, idist
-  CALL MPI_TYPE_EXTENT(ioldtype, isize, ierr)
-  CALL MPI_TYPE_VECTOR(jlen, ilen, imax - imin + 1, ioldtype, itemp, ierr)
-  idist = (imax - imin + 1) * (jmax - jmin + 1) * isize
-  CALL MPI_TYPE_HVECTOR(klen, 1, idist, itemp, inewtype, ierr)
-  CALL MPI_TYPE_COMMIT(inewtype, ierr)
-END
-!=================================================================================================
-!=================================================================================================
-! The Poisson equation for the density is setup with matrix A as
-! A7*Pijk = A1*Pi-1jk + A2*Pi+1jk + A3*Pij-1k + 
-!           A4*Pij+1k + A5*Pijk-1 + A6*Pijk+1 + A8
-!-------------------------------------------------------------------------------------------------
-subroutine SetupDensity(dIdx,dIdy,dIdz,A,color) !,mask)
-  use module_grid
-  use module_BC
-  implicit none
-  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: dIdx,dIdy,dIdz, color
-  real(8), dimension(is:ie,js:je,ks:ke,8), intent(out) :: A
-  integer :: i,j,k
-  logical, save :: first=.true.
-  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax) :: dI
-  do k=ks,ke; do j=js,je; do i=is,ie
-      A(i,j,k,1) = 1d0/dx(i)/dxh(i-1)
-      A(i,j,k,2) = 1d0/dx(i)/dxh(i  )
-      A(i,j,k,3) = 1d0/dy(j)/dyh(j-1)
-      A(i,j,k,4) = 1d0/dy(j)/dyh(j  )
-      A(i,j,k,5) = 1d0/dz(k)/dzh(k-1)
-      A(i,j,k,6) = 1d0/dz(k)/dzh(k  )
-      A(i,j,k,7) = sum(A(i,j,k,1:6))
-      A(i,j,k,8) = -(dIdx(i,j,k)-dIdx(i-1,j,k))/dx(i) &
-                   -(dIdy(i,j,k)-dIdy(i,j-1,k))/dy(j) &
-                   -(dIdz(i,j,k)-dIdz(i,j,k-1))/dz(k)
-  enddo; enddo; enddo
+  save
+  contains
+    subroutine setuppoisson_fs(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask,cvof,n1,n2,n3,VolumeSource)
+        use module_grid
+        use module_hello
+        use module_BC
+        use module_2phase
+        implicit none
+        real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: utmp,vtmp,wtmp,rhot
+        real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: umask,vmask,wmask
+        real(8), dimension(is:ie,js:je,ks:ke), intent(inout) :: pmask
+        real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: cvof,n1,n2,n3
+        real(8), dimension(is:ie,js:je,ks:ke,8), intent(out) :: A
+        real(8), dimension(is:ie,js:je,ks:ke) :: x_int, y_int, z_int
+        real(8) :: alpha, x_test, y_test, z_test, n_x, n_y, n_z
+        real(8) :: x_l, x_r, y_b, y_t, z_r, z_f
+        real(8) :: al3d
+        real(8) :: dt, limit
+        integer :: i,j,k,l
 
-  if(bdry_cond(1)==0)then
-    if(coords(1)==0    ) A(is,:,:,8)=A(is,:,:,8)+A(is,:,:,1)
-    if(coords(1)==nPx-1) A(ie,:,:,8)=A(ie,:,:,8)+A(ie,:,:,2)
-    if(coords(1)==0    ) A(is,:,:,1) = 0d0
-    if(coords(1)==nPx-1) A(ie,:,:,2) = 0d0
-  endif
-  if(bdry_cond(2)==0)then
-    if(coords(2)==0    ) A(:,js,:,8)=A(:,js,:,8)+A(:,js,:,3)
-    if(coords(2)==nPy-1) A(:,je,:,8)=A(:,je,:,8)+A(:,je,:,4)
-    if(coords(2)==0    ) A(:,js,:,3) = 0d0
-    if(coords(2)==nPy-1) A(:,je,:,4) = 0d0
-  endif
-  if(bdry_cond(3)==0)then
-    if(coords(3)==0    ) A(:,:,ks,8)=A(:,:,ks,8)+A(:,:,ks,5)
-    if(coords(3)==nPz-1) A(:,:,ke,8)=A(:,:,ke,8)+A(:,:,ke,6)
-    if(coords(3)==0    ) A(:,:,ks,5) = 0d0
-    if(coords(3)==nPz-1) A(:,:,ke,6) = 0d0
-  endif
-
-  if(.not. first)then
-     first=.false.
-     do k=ks,ke; do j=js,je; do i=is,ie
-        dI(i,j,k) = ( (dIdx(i,j,k)+dIdx(i-1,j,k))**2 + &
-             (dIdx(i,j,k)+dIdx(i-1,j,k))**2 + &
-             (dIdx(i,j,k)+dIdx(i-1,j,k))**2 )
-        if( dI(i,j,k)<1e-6 )then
-           A(i,j,k,1:6) = 0d0
-           A(i,j,k,7) = 1d0
-           A(i,j,k,8) = float(floor(color(i,j,k)+0.5))
-        endif
-     enddo; enddo; enddo
-  endif
-
-!  do k=ks,ke; do j=js,je; do i=is,ie
-!      A(i,j,k,7) = sum(A(i,j,k,1:6))
-!  enddo; enddo; enddo
-  ! Anchor a point to 1
-!  if(coords(1)==0 .and. coords(2)==0 .and. coords(3)==0) then
-!    A(is,js,ks,:)=0d0
-!    A(is,js,ks,7:8)=1d0
-!  endif
-end subroutine SetupDensity
-!=================================================================================================
-!=================================================================================================
-! The Poisson equation for the pressure is setup with matrix A as
-! A7*Pijk = A1*Pi-1jk + A2*Pi+1jk + A3*Pij-1k + 
-!           A4*Pij+1k + A5*Pijk-1 + A6*Pijk+1 + A8
-!-------------------------------------------------------------------------------------------------
-subroutine SetupPoisson(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask,cvof,n1,n2,n3,VolumeSource)
-  use module_grid
-  use module_hello
-  use module_BC
-  use module_2phase
-  implicit none
-  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: utmp,vtmp,wtmp,rhot
-  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: umask,vmask,wmask
-  real(8), dimension(is:ie,js:je,ks:ke), intent(inout) :: pmask
-  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: cvof,n1,n2,n3
-  real(8), dimension(is:ie,js:je,ks:ke,8), intent(out) :: A
-  real(8), dimension(is:ie,js:je,ks:ke) :: x_int, y_int, z_int
-  real(8) :: alpha, x_test, y_test, z_test, n_x, n_y, n_z
-  real(8) :: x_l, x_r, y_b, y_t, z_r, z_f
-  real(8) :: al3d
-  real(8) :: dt, VolumeSource, limit
-  integer :: i,j,k,l
-  do k=ks,ke; do j=js,je; do i=is,ie;
-!    if(mask(i,j,k))then
-      A(i,j,k,1) = 2d0*dt*umask(i-1,j,k)/(dx(i)*dxh(i-1)*(rhot(i-1,j,k)+rhot(i,j,k)))
-      A(i,j,k,2) = 2d0*dt*umask(i,j,k)/(dx(i)*dxh(i  )*(rhot(i+1,j,k)+rhot(i,j,k)))
-      A(i,j,k,3) = 2d0*dt*vmask(i,j-1,k)/(dy(j)*dyh(j-1)*(rhot(i,j-1,k)+rhot(i,j,k)))
-      A(i,j,k,4) = 2d0*dt*vmask(i,j,k)/(dy(j)*dyh(j  )*(rhot(i,j+1,k)+rhot(i,j,k)))
-      A(i,j,k,5) = 2d0*dt*wmask(i,j,k-1)/(dz(k)*dzh(k-1)*(rhot(i,j,k-1)+rhot(i,j,k)))
-      A(i,j,k,6) = 2d0*dt*wmask(i,j,k)/(dz(k)*dzh(k  )*(rhot(i,j,k+1)+rhot(i,j,k)))
-      A(i,j,k,7) = sum(A(i,j,k,1:6))
-      A(i,j,k,8) =  -(  VolumeSource +(utmp(i,j,k)-utmp(i-1,j,k))/dx(i) &
-         +  (vtmp(i,j,k)-vtmp(i,j-1,k))/dy(j) &
-         +  (wtmp(i,j,k)-wtmp(i,j,k-1))/dz(k) )
-!    endif
-  enddo; enddo; enddo
-  
-  if(FreeSurface) then
-     x_int = 0d0; y_int = 0d0; z_int = 0d0
-     pmask = 1d0
-     
-     do k=ks,ke; do j=js,je; do i=is,ie
+         x_int = 0d0; y_int = 0d0; z_int = 0d0
+         pmask = 1d0
+         
+         do k=ks,ke; do j=js,je; do i=is,ie
         limit = 0.10*min(dx(i),dy(j),dz(k))
         if(cvof(i,j,k) >= 0.5d0) then ! pressure 0 in the cvof=1 phase. 
            pmask(i,j,k) = 0d0
@@ -2025,7 +1929,128 @@ subroutine SetupPoisson(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask,cvof,n1
         A(i,j,k,7) = sum(A(i,j,k,1:6)) + 1d-49
         A(i,j,k,8) = pmask(i,j,k)*A(i,j,k,8)
      enddo;enddo;enddo
-     
+   end subroutine setuppoisson_fs
+ end module module_free_surface
+!=================================================================================================
+!=================================================================================================
+! creates new data type for passing non-contiguous 
+!-------------------------------------------------------------------------------------------------
+SUBROUTINE para_type_block3a(imin, imax, jmin, jmax, ilen, jlen, klen, ioldtype,inewtype)
+  implicit none
+  INCLUDE 'mpif.h'
+  integer :: imin, imax, jmin, jmax, ilen, jlen, klen, ioldtype,inewtype,isize, ierr, itemp, idist
+  CALL MPI_TYPE_EXTENT(ioldtype, isize, ierr)
+  CALL MPI_TYPE_VECTOR(jlen, ilen, imax - imin + 1, ioldtype, itemp, ierr)
+  idist = (imax - imin + 1) * (jmax - jmin + 1) * isize
+  CALL MPI_TYPE_HVECTOR(klen, 1, idist, itemp, inewtype, ierr)
+  CALL MPI_TYPE_COMMIT(inewtype, ierr)
+END
+!=================================================================================================
+!=================================================================================================
+! The Poisson equation for the density is setup with matrix A as
+! A7*Pijk = A1*Pi-1jk + A2*Pi+1jk + A3*Pij-1k + 
+!           A4*Pij+1k + A5*Pijk-1 + A6*Pijk+1 + A8
+!-------------------------------------------------------------------------------------------------
+subroutine SetupDensity(dIdx,dIdy,dIdz,A,color) !,mask)
+  use module_grid
+  use module_BC
+  implicit none
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: dIdx,dIdy,dIdz, color
+  real(8), dimension(is:ie,js:je,ks:ke,8), intent(out) :: A
+  integer :: i,j,k
+  logical, save :: first=.true.
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax) :: dI
+  do k=ks,ke; do j=js,je; do i=is,ie
+      A(i,j,k,1) = 1d0/dx(i)/dxh(i-1)
+      A(i,j,k,2) = 1d0/dx(i)/dxh(i  )
+      A(i,j,k,3) = 1d0/dy(j)/dyh(j-1)
+      A(i,j,k,4) = 1d0/dy(j)/dyh(j  )
+      A(i,j,k,5) = 1d0/dz(k)/dzh(k-1)
+      A(i,j,k,6) = 1d0/dz(k)/dzh(k  )
+      A(i,j,k,7) = sum(A(i,j,k,1:6))
+      A(i,j,k,8) = -(dIdx(i,j,k)-dIdx(i-1,j,k))/dx(i) &
+                   -(dIdy(i,j,k)-dIdy(i,j-1,k))/dy(j) &
+                   -(dIdz(i,j,k)-dIdz(i,j,k-1))/dz(k)
+  enddo; enddo; enddo
+
+  if(bdry_cond(1)==0)then
+    if(coords(1)==0    ) A(is,:,:,8)=A(is,:,:,8)+A(is,:,:,1)
+    if(coords(1)==nPx-1) A(ie,:,:,8)=A(ie,:,:,8)+A(ie,:,:,2)
+    if(coords(1)==0    ) A(is,:,:,1) = 0d0
+    if(coords(1)==nPx-1) A(ie,:,:,2) = 0d0
+  endif
+  if(bdry_cond(2)==0)then
+    if(coords(2)==0    ) A(:,js,:,8)=A(:,js,:,8)+A(:,js,:,3)
+    if(coords(2)==nPy-1) A(:,je,:,8)=A(:,je,:,8)+A(:,je,:,4)
+    if(coords(2)==0    ) A(:,js,:,3) = 0d0
+    if(coords(2)==nPy-1) A(:,je,:,4) = 0d0
+  endif
+  if(bdry_cond(3)==0)then
+    if(coords(3)==0    ) A(:,:,ks,8)=A(:,:,ks,8)+A(:,:,ks,5)
+    if(coords(3)==nPz-1) A(:,:,ke,8)=A(:,:,ke,8)+A(:,:,ke,6)
+    if(coords(3)==0    ) A(:,:,ks,5) = 0d0
+    if(coords(3)==nPz-1) A(:,:,ke,6) = 0d0
+  endif
+
+  if(.not. first)then
+     first=.false.
+     do k=ks,ke; do j=js,je; do i=is,ie
+        dI(i,j,k) = ( (dIdx(i,j,k)+dIdx(i-1,j,k))**2 + &
+             (dIdx(i,j,k)+dIdx(i-1,j,k))**2 + &
+             (dIdx(i,j,k)+dIdx(i-1,j,k))**2 )
+        if( dI(i,j,k)<1e-6 )then
+           A(i,j,k,1:6) = 0d0
+           A(i,j,k,7) = 1d0
+           A(i,j,k,8) = float(floor(color(i,j,k)+0.5))
+        endif
+     enddo; enddo; enddo
+  endif
+
+!  do k=ks,ke; do j=js,je; do i=is,ie
+!      A(i,j,k,7) = sum(A(i,j,k,1:6))
+!  enddo; enddo; enddo
+  ! Anchor a point to 1
+!  if(coords(1)==0 .and. coords(2)==0 .and. coords(3)==0) then
+!    A(is,js,ks,:)=0d0
+!    A(is,js,ks,7:8)=1d0
+!  endif
+end subroutine SetupDensity
+!=================================================================================================
+!=================================================================================================
+! The Poisson equation for the pressure is setup with matrix A as
+! A7*Pijk = A1*Pi-1jk + A2*Pi+1jk + A3*Pij-1k + 
+!           A4*Pij+1k + A5*Pijk-1 + A6*Pijk+1 + A8
+!-------------------------------------------------------------------------------------------------
+subroutine SetupPoisson(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask,cvof,n1,n2,n3,VolumeSource)
+  use module_grid
+  use module_hello
+  use module_BC
+  use module_2phase
+  use module_free_surface
+  implicit none
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: utmp,vtmp,wtmp,rhot
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: umask,vmask,wmask
+  real(8), dimension(is:ie,js:je,ks:ke), intent(inout) :: pmask
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: cvof,n1,n2,n3
+  real(8), dimension(is:ie,js:je,ks:ke,8), intent(out) :: A
+  real(8), intent(in) :: dt, VolumeSource
+  integer :: i,j,k,l
+  do k=ks,ke; do j=js,je; do i=is,ie;
+!    if(mask(i,j,k))then
+      A(i,j,k,1) = 2d0*dt*umask(i-1,j,k)/(dx(i)*dxh(i-1)*(rhot(i-1,j,k)+rhot(i,j,k)))
+      A(i,j,k,2) = 2d0*dt*umask(i,j,k)/(dx(i)*dxh(i  )*(rhot(i+1,j,k)+rhot(i,j,k)))
+      A(i,j,k,3) = 2d0*dt*vmask(i,j-1,k)/(dy(j)*dyh(j-1)*(rhot(i,j-1,k)+rhot(i,j,k)))
+      A(i,j,k,4) = 2d0*dt*vmask(i,j,k)/(dy(j)*dyh(j  )*(rhot(i,j+1,k)+rhot(i,j,k)))
+      A(i,j,k,5) = 2d0*dt*wmask(i,j,k-1)/(dz(k)*dzh(k-1)*(rhot(i,j,k-1)+rhot(i,j,k)))
+      A(i,j,k,6) = 2d0*dt*wmask(i,j,k)/(dz(k)*dzh(k  )*(rhot(i,j,k+1)+rhot(i,j,k)))
+      A(i,j,k,7) = sum(A(i,j,k,1:6))
+      A(i,j,k,8) =  -(  VolumeSource +(utmp(i,j,k)-utmp(i-1,j,k))/dx(i) &
+         +  (vtmp(i,j,k)-vtmp(i,j-1,k))/dy(j) &
+         +  (wtmp(i,j,k)-wtmp(i,j,k-1))/dz(k) )
+!    endif
+  enddo; enddo; enddo
+  if(FreeSurface) then
+   call setuppoisson_fs(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask,cvof,n1,n2,n3,VolumeSource)
   else
 !      do k=ks,ke; do j=js,je; do i=is,ie
 !         if( A(i,j,k,7) .lt. 1d-49)   A(i,j,k,7) = 1d0
