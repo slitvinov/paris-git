@@ -8,14 +8,23 @@ FC = mpif90
 
 # remove funny cflags from my environment
 
-#FFLAGS =  -O3 -Wall -ffpe-trap=invalid,zero,overflow,underflow,precision,denormal # -g -gstabs # -O3 #
+#FLAGS =  -O3 -cpp -Wall -ffpe-trap=invalid,zero,overflow,underflow,precision,denormal # -g -gstabs # -O3 #
 
 # trap invalid to catch signaling NaN s ? 
 
-#FFLAGS = -g -Wall -ffpe-trap=invalid,zero,overflow # -g -gstabs # -O3 #
-#FOPTS =  -g -Wall -ffpe-trap=invalid,zero,overflow # -g -gstabs # -O3 #
+#FLAGS = -g -cpp -Wall -ffpe-trap=invalid,zero,overflow # -g -gstabs # -O3 #
+#FOPTS =  -g -cpp -Wall -ffpe-trap=invalid,zero,overflow # -g -gstabs # -O3 #
 
-FFLAGS = -O2 # -g -fimplicit-none -fbounds-check
+FLAGS = -O2 -cpp # -g -fimplicit-none -fbounds-check
+
+
+ifdef HAVE_VOFI
+FFLAGS = -DHAVE_VOFI $(FLAGS) 
+VOFI_DIR =  $(HOME)/lib
+VOFI_LIBS = -L$(VOFI_DIR) -lvofi
+else
+FFLAGS = $(FLAGS) 
+endif
 
 CFLAGS = -O # -g -gstabs
 BINDIR = $(HOME)/bin
@@ -24,9 +33,9 @@ BINDIR = $(HOME)/bin
 # babbage
 # HYPRE_DIR = /share/apps/hypre
 # Local
-HYPRE_DIR = $(HOME)/cfd/libs/hypre-2.9.0b/src
-
-HYPRE_LIBS =  -L$(HYPRE_DIR)/lib -lHYPRE 
+HYPRE_DIR = $(HOME)/cfd/libs/hypre-2.9.0b/src/lib
+HYPRE_LIBS =  -L$(HYPRE_DIR) -lHYPRE 
+LIBS = $(HYPRE_LIBS) $(VOFI_LIBS)
 
 
 #------------------------No changes needed beyond this line----------------------------------------------
@@ -37,7 +46,7 @@ SRC = $(wildcard  *.f90)
 
 install: $(OBJ)
 #	@echo compiler is FC = $(FC), mpi override is OMPI_FC = $(OMPI_FC)
-	$(FC) -o paris $(FOPTS) $(OBJ) $(HYPRE_LIBS) 
+	$(FC) -o paris $(FOPTS) $(OBJ) $(LIBS) 
 	@if [ ! -d $(BINDIR) ] ; then echo "directory bin does not exist creating it" ; mkdir $(BINDIR) ; fi 
 	mv paris $(BINDIR)/paris
 	@find .  -name "*.sh" -exec chmod +x  {} \; 
@@ -76,7 +85,7 @@ paris.o:  paris.f90 solids.o modules.o vofmodules.o front.o surface_tension.o lp
 	$(FC) -c  $(FFLAGS) $<
 
 vofmodules.o: vofmodules.f90 modules.o
-	$(FC) -c  $(FFLAGS) $<
+	$(FC) -c $(FFLAGS) $<
 
 lppmodules.o: lppmodules.f90 vofmodules.o modules.o
 	$(FC) -c  $(FFLAGS) $<

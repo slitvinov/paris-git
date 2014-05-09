@@ -63,6 +63,8 @@ module module_VOF
   logical :: test_KHI2D = .false.
   logical :: linfunc_initialized = .false.
   logical :: DoMOF = .false.
+  logical :: use_Vofi
+
   real(8) :: b1,b2,b3,b4
   integer :: nfilter=0
 
@@ -179,7 +181,7 @@ contains
     namelist /vofparameters/ vofbdry_cond,test_type,VOF_advect,refinement, &
        cylinder_dir, normal_up, DoLPP, jetradius, jetcenter_yc2yLength, jetcenter_zc2zLength, & 
        FreeSurface, ViscMeanIsArith, DensMeanIsArith, MAXERROR_FS, MAXIT_FS, &
-       output_filtered_VOF, DoMOF
+       output_filtered_VOF, DoMOF, use_vofi
     
 !     vofbdry_cond=['periodic','periodic','periodic','periodic','periodic','periodic']
     vofbdry_cond=['undefined','undefined','undefined','undefined','undefined','undefined']
@@ -194,6 +196,7 @@ contains
     ViscMeanIsArith=.true.; DensMeanIsArith=.true.
     output_filtered_VOF=.false. ! redundant
     DoMOF = .false.
+    use_vofi = .false.
     
     in=31
 
@@ -404,14 +407,11 @@ or none at all")
     else if(NumBubble>0) then
        ! one cylinder in -ipar>0 direction otherwise spheres
        ipar=-cylinder_dir
-       if (test_cylinder_advection) then
-          call levelset2vof(shapes2lscylinder,ipar)
-       else
-          call levelset2vof(shapes2ls,ipar)
-      endif
+       if (test_cylinder_advection)  ipar=-3    ! replaces shapes2lscylinder function argument
+       call levelset2vof(shapes2ls,ipar)
     else 
-       if(bdry_cond(1) /= 3 ) write(*,*) &
-            "IVOF: Warning: Nothing set. cylinder_dir=0 set to 2"
+       if(bdry_cond(1) /= 3 .and. rank==0 ) write(*,*) &
+            "IVOF: Warning: initializes domain entirely to phase 1 (cvof=0)"
        cvof=0.d0
        vof_flag=0
     endif
@@ -448,7 +448,9 @@ or none at all")
   !=================================================================================================
   subroutine random_bubbles()
     use module_2phase
-    !use IFPORT
+#ifdef INTEL
+    use IFPORT
+#endif
     implicit none
     integer ib
 
@@ -485,28 +487,6 @@ or none at all")
        shapes2ls = MAX(shapes2ls,a)
     end do
   end function shapes2ls
-  !=================================================================================================
-  !DF: is it possible to construct cylinders with shapes2ls?
-  function shapes2lscylinder(xx,yy,zz,ipar)
-    use module_2phase
-    implicit none
-    real(8), intent(in) :: xx,zz,yy
-    integer, intent(in) :: ipar
-    real(8) :: a, cdir(0:3), shapes2lscylinder
-    integer ib
-
-    if(.not.(-3<=ipar.and.ipar<=0)) call pariserror("S: invalid ipar")
-    cdir(1:3) = 1.d0/(1.d0 + excentricity(1:3))
-    cdir(-ipar) = 0.d0
-    shapes2lscylinder = -2.d6
-    ! ipar < 0 cylinder case
-    ! ipar = 0 spheres
-    if(ipar < 0.and.NumBubble/=1) call pariserror("S: invalid NumBubbles")
-    do ib=1,NumBubble
-       a = rad(ib)**2 - (cdir(1)*(xx-xc(ib))**2+cdir(2)*(yy-yc(ib))**2) !fixme
-       shapes2lscylinder = MAX(shapes2lscylinder,a)
-    end do
-  end function shapes2lscylinder
   !=================================================================================================
   !  sine-wave interface
   !=================================================================================================
@@ -559,18 +539,68 @@ or none at all")
     include 'mpif.h'
     integer :: ierr, req(12),sta(MPI_STATUS_SIZE,12)
     integer , parameter :: ngh=2
-
-    call ls2vof_refined(lsfunction,ipar,1)
-    call ighost_x(vof_flag,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
-    call ighost_y(vof_flag,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
-    call ighost_z(vof_flag,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
-
-    call ghost_x(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
-    call ghost_y(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
-    call ghost_z(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
-    call setVOFBC(cvof,vof_flag)
-    call ls2vof_refined(lsfunction,ipar,refinement)
+    integer, parameter :: ndim0=3
+    integer :: i,j,k,itrue
+    real(8), dimension(3) :: xv,xloc
+    real(8) :: h0,fh
+    real(8), external :: get_cc,get_fh
+ 
+    if(.not.use_vofi) then
+       call ls2vof_refined(lsfunction,ipar,1)
+       call ighost_x(vof_flag,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+       call ighost_y(vof_flag,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+       call ighost_z(vof_flag,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+       
+       call ghost_x(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+       call ghost_y(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+       call ghost_z(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+       call setVOFBC(cvof,vof_flag)
+       call ls2vof_refined(lsfunction,ipar,refinement)
+    else
+#ifdef HAVE_VOFI
+       itrue = 1
+       ! starting point to get fh
+       h0 = dx(3)
+       xv(1) = x(1); xv(2) = y(1); xv(3) = z(1);
+       fh = get_fh(vofi_lsfunction,xv,h0,ndim0,itrue)
+       
+       ! xloc: minor vertex of each cell of the grid 
+       do k=kmin,kmax; do j=jmin,jmax; do i=imin,imax
+          xloc(1) = x(i) - 0.5d0*dx(i); xloc(2) = y(j) - 0.5*dy(j); xloc(3) = z(k) - 0.5d0*dz(k)
+          cvof(i,j,k) = get_cc(vofi_lsfunction,xloc,h0,fh,ndim0)
+       enddo; enddo; enddo
+#else
+       call pariserror("Vofi not avaible, change 'use_vofi' parameter in inputvof")
+#endif
+    endif
   end subroutine levelset2vof
+  
+  function vofi_lsfunction(xyz)
+    use module_2phase
+    real(8) vofi_lsfunction
+    real(8), intent(in) :: xyz(3)
+    real(8) :: x,y,z
+    integer :: ipar
+
+    x = xyz(1); y = xyz(2); z = xyz(3)
+    ! repeats the code in init cond
+    if(test_heights) then 
+       if(cylinder_dir==0) then
+          if(rank==0) print *, "IVOF: Warning: cylinder_dir=0 impossible for test_height, set to 2"
+          cylinder_dir=2
+       endif
+       ipar=cylinder_dir
+       vofi_lsfunction = wave2ls(x,y,z,ipar)
+    else if(NumBubble>0) then
+       ! A cylinder with axis in direction -ipar>0 otherwise a set of spheres
+       ipar=-cylinder_dir
+       if (test_cylinder_advection) ipar=-3
+       vofi_lsfunction = shapes2ls(x,y,z,ipar)
+    endif
+    vofi_lsfunction = - vofi_lsfunction
+  end function vofi_lsfunction
+
+
   !=================================================================================================
   !   Finds cells surrounded by all empty or all full cells
   !=================================================================================================

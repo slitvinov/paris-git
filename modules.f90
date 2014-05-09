@@ -1596,6 +1596,13 @@ module module_poisson
   save
   private
   public :: poi_initialize, poi_solve, poi_finalize
+  interface
+     integer FUNCTION GetNumIterations (isolver,inum) &
+          bind(C, name="HYPRE_StructPFMGGetNumIterations")
+       integer :: inum
+       integer*8 , VALUE :: isolver
+     END FUNCTION GetNumIterations
+  end interface
 
   integer :: nstencil
   integer*8 :: grid_obj, stencil, Amat, Bvec, Xvec, solver
@@ -1603,6 +1610,7 @@ module module_poisson
   integer :: mpi_comm_poi,is,ie,js,je,ks,ke,Mx,My,Mz
   integer, parameter :: ndim=3
   contains
+
 !=================================================================================================
 !=================================================================================================
   subroutine poi_initialize(mpi_comm_in,iis,iie,jjs,jje,kks,kke,Nx,Ny,Nz,bdry_cond)
@@ -1659,9 +1667,10 @@ module module_poisson
 !=================================================================================================
   subroutine poi_solve(A,p,maxError,maxit,num_iterations)
     use module_timer
+    use iso_c_binding, only: c_int,c_int8_t
     implicit none
     include 'mpif.h'
-    integer :: ierr, nvalues, ijk, i,j,k
+    integer :: ierr, nvalues, ijk, i,j,k,one
     real(8), dimension(:), allocatable :: values
     real(8), dimension(is:ie,js:je,ks:ke,8), intent(in) :: A
     real(8), dimension(is:ie,js:je,ks:ke), intent(inout) :: p
@@ -1669,6 +1678,7 @@ module module_poisson
     real(8), intent(in) :: maxError
     integer, intent(in) :: maxit
     integer, intent(out):: num_iterations
+    real(8) :: final_res_norm
 !----------------------------------------Fill in matrix Amat--------------------------------------
     num_iterations = 0
     nvalues = mx * my * mz * nstencil
@@ -1724,9 +1734,11 @@ module module_poisson
 
     call hypre_structPFMGsetLogging(solver, 1, ierr)
     call HYPRE_StructPFMGSetup(solver, Amat, Bvec, Xvec, ierr)
+    one = 1
+    call HYPRE_StructPFMGSetPrintLevel(solver,one,ierr) 
     call HYPRE_StructPFMGSolve(solver, Amat, Bvec, Xvec, ierr)
-    !call HYPRE_StructPFMGGetNumIterations(solver, num_iterations, ierr)
-    !call hypre_structPFMGgetfinalrelative(solver, final_res_norm, ierr)
+    ierr = GetNumIterations(solver, num_iterations)
+!    call hypre_structPFMGgetfinalrelative(solver, final_res_norm, ierr)
 !--------------------------------------Retrieve the solution--------------------------------------
     nvalues = mx * my * mz
     allocate(values(nvalues), stat=ierr)

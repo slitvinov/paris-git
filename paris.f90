@@ -334,7 +334,7 @@ Program paris
               call calcresidual(A,p,residual)
               if(rank==0)          write(*  ,    '("              pressure residual*dt:   ",e7.1,&
                    &" maxerror: ",e7.1)') residual*dt,maxerror
-              if(rank==0.and..not.hypre) write(*,'("              pressure iterations :",I9)')it
+              if(rank==0) write(*,'("              pressure iterations :",I9)')it
            endif
            do k=ks,ke;  do j=js,je; do i=is,ieu    ! CORRECT THE u-velocity 
               u(i,j,k)=u(i,j,k)-dt*(2.0*umask(i,j,k)/dxh(i))*(p(i+1,j,k)-p(i,j,k))/(rho(i+1,j,k)+rho(i,j,k))

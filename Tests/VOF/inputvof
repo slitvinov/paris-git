@@ -5,6 +5,8 @@ VOFBDRY_COND = 'periodic' 'periodic' 'periodic'
 
 TEST_TYPE = 'droplet'
 VOF_ADVECT = 'CIAM'
+USE_VOFI = T
+
 !=================================================================================================
 
 &end
