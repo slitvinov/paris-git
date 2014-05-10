@@ -24,7 +24,7 @@
 !-------------------------------------------------------------------------------------------------
 subroutine setuppoisson_fs(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask,cvof,n1,n2,n3)
   use module_grid
-  use module_hello
+  
   use module_BC
   use module_2phase
   implicit none

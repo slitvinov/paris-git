@@ -57,7 +57,7 @@ Program paris
   use module_solid
   use module_vof
   use module_output_vof
-  use module_hello
+  
   use module_surface_tension
   use module_st_testing
   use module_lag_part
@@ -963,7 +963,7 @@ subroutine surfaceForce(du,dv,dw,rho)
   use module_surface_tension
   use module_tmpvar
   use module_timer
-  use module_hello
+  
   implicit none
   real(8) :: kappa,deltax
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: du, dv, dw, rho
@@ -1050,7 +1050,7 @@ subroutine initialize
   use module_BC
   use module_IO
   use module_tmpvar
-  use module_hello
+  
   use module_timer
   implicit none
   include 'mpif.h'
@@ -1201,7 +1201,7 @@ end subroutine initialize
 !   called in:    program paris
 !-------------------------------------------------------------------------------------------------
 subroutine InitCondition
-  use module_hello
+  
   use module_grid
   use module_flow
   use module_BC
@@ -1433,7 +1433,7 @@ subroutine ReadParameters
   use module_BC
   use module_IO
   use module_front
-  use module_hello
+  
   implicit none
   include 'mpif.h'
   integer :: in, ierr
@@ -1561,7 +1561,7 @@ subroutine check_stability()
   use module_BC
   use module_IO
   use module_front
-  use module_hello
+  
   use module_2phase
   implicit none
   include 'mpif.h'
@@ -1623,3 +1623,13 @@ subroutine check_integers()
       mylog2=mylog2-1
     end function mylog2
 end subroutine check_integers
+
+subroutine hello_coucou
+  use module_grid
+  integer, parameter  :: debug=1
+  if(debug == 1) then 
+  if(rank==0) write(6,*) 'coucou ',hello_count, "Process0"
+  if(rank==nPdomain) write(6,*) 'coucou ',hello_count, "Front"
+  hello_count = hello_count + 1
+  end if
+end subroutine hello_coucou

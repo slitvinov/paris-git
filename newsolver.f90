@@ -33,7 +33,7 @@
 !-------------------------------------------------------------------------------------------------
 subroutine NewSolver(A,p,maxError,beta,maxit,it,ierr)
   use module_grid
-  use module_hello
+  
   use module_BC
   implicit none
   include 'mpif.h'
@@ -150,7 +150,7 @@ end subroutine check_poisson_setup
 !
 subroutine check_corrected_vel(u,v,w,umask,vmask,wmask,iout)
   use module_grid
-  use module_hello
+  
   use module_BC
   use module_IO
   implicit none

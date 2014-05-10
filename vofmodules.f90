@@ -371,7 +371,7 @@ or none at all")
   !=================================================================================================
   subroutine initconditions_VOF()
     use module_grid
-    use module_hello
+    
     use module_flow
     use module_BC
     use module_2phase
@@ -539,24 +539,23 @@ or none at all")
     include 'mpif.h'
     integer :: ierr, req(12),sta(MPI_STATUS_SIZE,12)
     integer , parameter :: ngh=2
-    integer, parameter :: ndim0=3
-    integer :: i,j,k,itrue
-    real(8), dimension(3) :: xv,xloc
-    real(8) :: h0,fh
-    real(8), external :: get_cc,get_fh
  
-    if(.not.use_vofi) then
-       call ls2vof_refined(lsfunction,ipar,1)
-       call ighost_x(vof_flag,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
-       call ighost_y(vof_flag,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
-       call ighost_z(vof_flag,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
-       
-       call ghost_x(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
-       call ghost_y(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
-       call ghost_z(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
-       call setVOFBC(cvof,vof_flag)
-       call ls2vof_refined(lsfunction,ipar,refinement)
-    else
+#ifdef HAVE_VOFI
+    integer :: i,j,k,itrue
+    integer, parameter :: ndim0=3
+    real(8), dimension(3) :: xv,xloc
+    real(8) :: h0,fh,cc
+    real(8), external :: get_cc,get_fh
+#else
+    if(use_vofi) then
+       if(rank==0) print*, "vofi not available, falling back on refined levelset2vof"
+       use_vofi=.false.
+    endif
+#endif
+
+   
+
+    if(use_vofi) then
 #ifdef HAVE_VOFI
        itrue = 1
        ! starting point to get fh
@@ -567,11 +566,31 @@ or none at all")
        ! xloc: minor vertex of each cell of the grid 
        do k=kmin,kmax; do j=jmin,jmax; do i=imin,imax
           xloc(1) = x(i) - 0.5d0*dx(i); xloc(2) = y(j) - 0.5*dy(j); xloc(3) = z(k) - 0.5d0*dz(k)
-          cvof(i,j,k) = get_cc(vofi_lsfunction,xloc,h0,fh,ndim0)
+          cc = get_cc(vofi_lsfunction,xloc,h0,fh,ndim0)
+          cvof(i,j,k) = cc
+          if(cc.gt.EPSC.and.cc.lt.1d0-EPSC) then
+             vof_flag(i,j,k) = 2
+          else if(cc.gt.-EPSC.and.cc.le.EPSC) then
+             vof_flag(i,j,k) = 0
+          else if(cc.ge.1d0-EPSC.and.cc.lt.1d0+EPSC) then
+             vof_flag(i,j,k) = 1
+          else
+             print *, i,j,k,cc
+             call pariserror("Vofi failed to initialize")
+          endif
        enddo; enddo; enddo
-#else
-       call pariserror("Vofi not avaible, change 'use_vofi' parameter in inputvof")
 #endif
+    else
+       call ls2vof_refined(lsfunction,ipar,1)
+       call ighost_x(vof_flag,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+       call ighost_y(vof_flag,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+       call ighost_z(vof_flag,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+       
+       call ghost_x(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+       call ghost_y(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+       call ghost_z(cvof,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+       call setVOFBC(cvof,vof_flag)
+       call ls2vof_refined(lsfunction,ipar,refinement)
     endif
   end subroutine levelset2vof
   
@@ -1730,7 +1749,7 @@ SUBROUTINE swpr(us,c,f,dir,vof1,cg,vof3)
     USE module_grid
     USE module_flow
     USE module_vof
-    use module_hello
+    
     IMPLICIT NONE
     include 'mpif.h'
     INTEGER :: i,j,k

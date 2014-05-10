@@ -1124,7 +1124,7 @@ end subroutine write_integer
   subroutine DistributeFront(dest,send_recv) !,request)
     use module_grid
     use module_BC
-    use module_hello
+    
     implicit none
     include 'mpif.h'
     character(len=4) :: send_recv
