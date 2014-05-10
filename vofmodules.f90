@@ -448,7 +448,7 @@ or none at all")
   !=================================================================================================
   subroutine random_bubbles()
     use module_2phase
-#ifdef INTEL
+#ifdef __INTEL_COMPILER
     use IFPORT
 #endif
     implicit none
