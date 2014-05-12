@@ -1918,7 +1918,7 @@ subroutine SetupPoisson(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask,cvof,n1
            endif
         endif
      enddo; enddo; enddo
-     call check_poisson_setup(A,pmask)
+     call check_poisson_setup(A,pmask,umask,vmask,wmask)
   endif
 end subroutine SetupPoisson
 !=================================================================================================

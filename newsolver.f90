@@ -185,7 +185,7 @@ end subroutine LineRelax
 !=================================================================================================
 !---------------------------------CHECK FOR WELL POSEDNESS --------------------------------------  
 !=================================================================================================
-subroutine check_poisson_setup(A,tmp)
+subroutine check_poisson_setup(A,tmp,umask,vmask,wmask)
   use module_grid
   use module_BC
   use module_IO
@@ -193,9 +193,11 @@ subroutine check_poisson_setup(A,tmp)
   include 'mpif.h'
   real(8), dimension(is:ie,js:je,ks:ke,8), intent(in) :: A
   real(8), dimension(is:ie,js:je,ks:ke), intent(out) :: tmp  ! dims: 
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: umask,vmask,wmask
+
   ! array used only for temp computations sp redimensioning to smaller size is allowed
   integer :: ierr
-  real(8) :: intsource,maxerr
+  real(8) :: intsource,maxerr,A7
   real(8) :: tintsource,maxtmp,mintmp
   integer :: i,j,k,l
   logical :: diverged=.false.
@@ -230,13 +232,20 @@ subroutine check_poisson_setup(A,tmp)
 !  endif
   if (tintsource>maxerr) call pariserror("large volume source")
 
-! Verify that 1 is in the kernel of the adjoint. 
+! Verify that 1 is in the kernel of the adjoint in the non solid regions. 
 
   tmp=0d0
   maxtmp=-1d50
   mintmp=1d50
   do k=ks,ke; do j=js,je; do i=is,ie
-     tmp(i,j,k) = sum(A(i,j,k,1:6)) - A(i,j,k,7)
+     A7 = A(i,j,k,7)
+     if(umask(i-1,j,k).lt.0.5d0.and.umask(i,j,k).lt.0.5d0.and.     &
+          vmask(i,j-1,k).lt.0.5d0.and.vmask(i,j,k).lt.0.5d0.and.   &
+          wmask(i,j,k-1).lt.0.5d0.and.wmask(i,j,k).lt.0.5d0 ) then 
+        ! we are in the solid or in an isolated fluid cell. 
+        A7 = 0d0
+     endif
+     tmp(i,j,k) = sum(A(i,j,k,1:6)) - A7
      maxtmp=max(maxtmp, tmp(i,j,k))
      mintmp=min(mintmp, tmp(i,j,k))
   enddo; enddo; enddo
