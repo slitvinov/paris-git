@@ -71,7 +71,7 @@ Program paris
   integer :: req(48),sta(MPI_STATUS_SIZE,48)
   INTEGER :: irank, ii, i, j, k
   real(8) :: residual,cflmax,get_cfl
-  real(8), parameter :: cflmax_allowed=0.5d0
+  real(8) :: cflmax_allowed=0.9d0
 
 
 !---------------------------------------INITIALIZATION--------------------------------------------

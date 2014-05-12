@@ -9,6 +9,7 @@ ViscMeanIsArith = T
 refinement = 8
 ViscMeanIsArith = T
 DoMOF = F
+use_vofi = T
 !=================================================================================================
 
 &end

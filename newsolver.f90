@@ -33,8 +33,8 @@
 !-------------------------------------------------------------------------------------------------
 subroutine NewSolver(A,p,maxError,beta,maxit,it,ierr)
   use module_grid
-  
   use module_BC
+  use module_IO
   implicit none
   include 'mpif.h'
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: p
@@ -47,14 +47,21 @@ subroutine NewSolver(A,p,maxError,beta,maxit,it,ierr)
   integer :: i,j,k
   integer :: req(12),sta(MPI_STATUS_SIZE,12)
   logical :: mask(imin:imax,jmin:jmax,kmin:kmax)
-!--------------------------------------ITERATION LOOP--------------------------------------------  
+  integer, parameter :: norm=1, relaxtype=1
+  logical, parameter :: recordconvergence=.false.
+  integer, save :: itime=0
+! Open file for convergence history
+  if(rank==0.and.recordconvergence) then
+     OPEN(UNIT=89,FILE=TRIM(out_path)//'/convergence_history-'//TRIM(int2text(itime,padding))//'.txt')
+  endif
+  itime=itime+1
+  !--------------------------------------ITERATION LOOP--------------------------------------------  
   do it=1,maxit
-    do k=ks,ke; do j=js,je; do i=is,ie
-      p(i,j,k)=(1d0-beta)*p(i,j,k)+beta* 1d0/A(i,j,k,7)*(              &
-        A(i,j,k,1) * p(i-1,j,k) + A(i,j,k,2) * p(i+1,j,k) +            &
-        A(i,j,k,3) * p(i,j-1,k) + A(i,j,k,4) * p(i,j+1,k) +            &
-        A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8))
-    enddo; enddo; enddo
+     if(relaxtype==2) then 
+        call LineRelax(A,p,beta)
+     elseif(relaxtype==1) then
+        call RedBlackRelax(A,p,beta)
+     endif
 !---------------------------------CHECK FOR CONVERGENCE-------------------------------------------
     res1 = 0d0; res2=0.d0; resinf=0.d0; intvol=0.d0
     call ghost_x(p,1,req( 1: 4)); call ghost_y(p,1,req( 5: 8)); call ghost_z(p,1,req( 9:12))
@@ -62,26 +69,30 @@ subroutine NewSolver(A,p,maxError,beta,maxit,it,ierr)
       res2=res2+abs(-p(i,j,k) * A(i,j,k,7) +                           &
         A(i,j,k,1) * p(i-1,j,k) + A(i,j,k,2) * p(i+1,j,k) +            &
         A(i,j,k,3) * p(i,j-1,k) + A(i,j,k,4) * p(i,j+1,k) +            &
-        A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8) )**2
+        A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8) )**norm
     enddo; enddo; enddo
-    !write(*,'(e14.5)')res2
-    !write(*,'(2i4)')ks,ke
     call MPI_WAITALL(12,req,sta,ierr)
     mask=.true.
     mask(is+1:ie-1,js+1:je-1,ks+1:ke-1)=.false.
     do k=ks,ke; do j=js,je; do i=is,ie
-      if(mask(i,j,k))res2=res2+abs(-p(i,j,k) * A(i,j,k,7) +            &
+      if(mask(i,j,k)) res2=res2+abs(-p(i,j,k) * A(i,j,k,7) +            &
         A(i,j,k,1) * p(i-1,j,k) + A(i,j,k,2) * p(i+1,j,k) +            &
         A(i,j,k,3) * p(i,j-1,k) + A(i,j,k,4) * p(i,j+1,k) +            &
-        A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8) )**2
+        A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8) )**norm
     enddo; enddo; enddo
     res2 = res2/dble(Nx*Ny*Nz)
     call catch_divergence(res2,ierr)
     call MPI_ALLREDUCE(res2, tres2, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr)
-    tres2=sqrt(tres2)
-    if (tres2<maxError) exit
+    if(norm==2) tres2=sqrt(tres2)
+    if(rank==0.and.mod(it,10) == 0.and.recordconvergence) write(89,310) it, tres2
+310 format(I6,'  ',(e14.5))
+    if (tres2<maxError) then 
+       if(rank==0.and.recordconvergence) close(89)
+       exit
+    endif
   enddo
-  if(it==maxit+1 .and. rank==0) write(*,*) 'Warning: LinearSolver reached maxit: ||res||_2: ',tres2
+  if(rank==0.and.recordconvergence) close(89)
+  if(it==maxit+1 .and. rank==0) write(*,*) 'Warning: LinearSolver reached maxit: ||res||: ',tres2
 contains
   subroutine catch_divergence(res2,ierr)
     real(8), intent(in) :: res2
@@ -97,7 +108,57 @@ contains
     endif
   end subroutine catch_divergence
 end subroutine NewSolver
-!=================================================================================================
+!--------------------------------------ONE RELAXATION ITERATION (SMMOTHER)----------------------------------
+subroutine RedBlackRelax(A,p,beta)
+  use module_grid
+  use module_BC
+  use module_IO
+  implicit none
+  include 'mpif.h'
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: p
+  real(8), dimension(is:ie,js:je,ks:ke,8), intent(in) :: A
+  real(8), intent(in) :: beta
+  integer :: req(12),sta(MPI_STATUS_SIZE,12)
+  integer :: i,j,k,ierr
+  integer :: isw,jsw,ksw,ipass
+  ksw=1
+  do ipass=1,2
+     jsw=ksw
+     do k=ks,ke
+        isw=jsw
+        do j=js,je
+           do i=isw+is-1,ie,2
+!           do i=is,ie
+              p(i,j,k)=(1d0-beta)*p(i,j,k)+ (beta/A(i,j,k,7))*(              &
+                   A(i,j,k,1) * p(i-1,j,k) + A(i,j,k,2) * p(i+1,j,k) +       &
+                   A(i,j,k,3) * p(i,j-1,k) + A(i,j,k,4) * p(i,j+1,k) +       &
+                   A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8))
+           enddo
+           isw=3-isw
+        enddo
+        jsw=3-jsw
+     enddo
+     ksw=3-ksw
+    call ghost_x(p,1,req( 1: 4)); call ghost_y(p,1,req( 5: 8)); call ghost_z(p,1,req( 9:12))
+    call MPI_WAITALL(12,req,sta,ierr)
+  enddo
+end subroutine RedBlackRelax
+!--------------------------------------ONE RELAXATION ITERATION (SMOOTHER)----------------------------------
+subroutine LineRelax(A,p,beta)
+  use module_grid
+  implicit none
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: p
+  real(8), dimension(is:ie,js:je,ks:ke,8), intent(in) :: A
+  real(8), intent(in) :: beta
+  integer :: i,j,k
+!--------------------------------------ITERATION LOOP--------------------------------------------  
+  do k=ks,ke; do j=js,je; do i=is,ie
+     p(i,j,k)=(1d0-beta)*p(i,j,k) + (beta/A(i,j,k,7))*(              &
+          A(i,j,k,1) * p(i-1,j,k) + A(i,j,k,2) * p(i+1,j,k) +        &
+          A(i,j,k,3) * p(i,j-1,k) + A(i,j,k,4) * p(i,j+1,k) +        &
+          A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8))
+  enddo; enddo; enddo
+end subroutine LineRelax
 !=================================================================================================
 !---------------------------------CHECK FOR WELL POSEDNESS --------------------------------------  
 !=================================================================================================
@@ -194,3 +255,4 @@ subroutine check_corrected_vel(u,v,w,umask,vmask,wmask,iout)
   endif
 310 format(I3,'  ',4(e14.5))
 end subroutine check_corrected_vel
+
