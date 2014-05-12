@@ -1627,6 +1627,7 @@ end subroutine check_integers
 subroutine hello_coucou
   use module_grid
   integer, parameter  :: debug=1
+  integer, save :: hello_count=1
   if(debug == 1) then 
   if(rank==0) write(6,*) 'coucou ',hello_count, "Process0"
   if(rank==nPdomain) write(6,*) 'coucou ',hello_count, "Front"
