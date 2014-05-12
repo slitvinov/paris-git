@@ -1909,7 +1909,7 @@ subroutine SetupPoisson(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask,cvof,n1
               if(A(i,j,k,8).gt.1d-50) then ! check A8 for debugging
                  call pariserror("A8 non zero in solid") 
               endif
-              if(maxval(A(i,j,k,1:6)).gt.1d50.or.minval(A(i,j,k,1:6)).lt.0d0) then
+              if(maxval(A(i,j,k,1:6)).gt.1d-50.or.minval(A(i,j,k,1:6)).lt.0d0) then
                  call pariserror("inconsistency in A1-6")
               endif
               A(i,j,k,7) = 1d0
