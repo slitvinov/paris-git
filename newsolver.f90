@@ -97,11 +97,34 @@ contains
   subroutine catch_divergence(res2,ierr)
     real(8), intent(in) :: res2
     integer, intent(out) :: ierr
+    logical :: diverged=.false.
+    logical :: extended=.true.
+    integer :: l
+    if(extended) then
+       do k=ks,ke; do j=js,je; do i=is,ie
+          do l=1,8
+             if(A(i,j,k,l)/=A(i,j,k,l).or.p(i,j,k)/=p(i,j,k)) then
+                diverged=.true.
+             endif
+          enddo
+          if(diverged) then
+             OPEN(UNIT=88,FILE=TRIM(out_path)//'/message-rank-'//TRIM(int2text(rank,padding))//'.txt')
+             write(88,*) "ijk rank",i,j,k,rank
+             write(88,*) "A",  A(i, j, k,:)
+             write(88,*) "p", p(i,j,k)
+             write(88,*) 'A or p is NaN after',it,'iterations at rank ',rank
+             close(88)
+             if(rank<=30) print*,'A or p is NaN after',it,'iterations at rank ',rank
+             call pariserror("A or p is NaN")
+             exit
+          endif
+       end do; end do; end do
+    endif
     if ((res2*npx*npy*npz)>1.d16 ) then
-       if(rank==0) print*,'Pressure solver diverged after',it,'iterations at rank ',rank
+       if(rank<=30) print*,'Pressure solver diverged after',it,'iterations at rank ',rank
        call pariserror("newsolver error")
     else if (res2 .ne. res2) then 
-       if(rank==0) print*, 'it:',it,'Pressure residual value is invalid at rank', rank
+       if(rank<=30) print*, 'it:',it,'Pressure residual value is invalid at rank', rank
        call pariserror("newsolver error")
     else
        ierr=0
@@ -165,6 +188,7 @@ end subroutine LineRelax
 subroutine check_poisson_setup(A,tmp)
   use module_grid
   use module_BC
+  use module_IO
   implicit none
   include 'mpif.h'
   real(8), dimension(is:ie,js:je,ks:ke,8), intent(in) :: A
@@ -173,7 +197,28 @@ subroutine check_poisson_setup(A,tmp)
   integer :: ierr
   real(8) :: intsource,maxerr
   real(8) :: tintsource,maxtmp,mintmp
-  integer :: i,j,k
+  integer :: i,j,k,l
+  logical :: diverged=.false.
+
+! verify that we shall not divide by zero
+
+  do k=ks,ke; do j=js,je; do i=is,ie
+     do l=1,8
+        if(A(i,j,k,l)/=A(i,j,k,l).or.A(i,j,k,7).lt.1d-55) then
+           diverged=.true.
+        endif
+     enddo
+     if(diverged) then
+        OPEN(UNIT=88,FILE=TRIM(out_path)//'/message-rank-'//TRIM(int2text(rank,padding))//'.txt')
+        write(88,*) "ijk rank",i,j,k,rank
+        write(88,*) "A",  A(i, j, k,:)
+        write(88,*) 'A trouble after setup at rank ',rank
+        close(88)
+        call pariserror("A is NaN or A7 is too close to 0")
+        exit
+     endif
+  end do; end do; end do
+
 ! verify that the rhs is orthogonal to the kernel of the adjoint
 
   maxerr=1d-10

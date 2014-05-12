@@ -1858,7 +1858,6 @@ end subroutine SetupDensity
 !-------------------------------------------------------------------------------------------------
 subroutine SetupPoisson(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask,cvof,n1,n2,n3,VolumeSource)
   use module_grid
-  
   use module_BC
   use module_2phase
   implicit none
@@ -1885,13 +1884,7 @@ subroutine SetupPoisson(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask,cvof,n1
   enddo; enddo; enddo
   if(FreeSurface) then
    call setuppoisson_fs(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask,cvof,n1,n2,n3)
-  else
-!      do k=ks,ke; do j=js,je; do i=is,ie
-!         if( A(i,j,k,7) .lt. 1d-49)   A(i,j,k,7) = 1d0
-!      enddo;enddo;enddo        
-     A(:,:,:,7) = A(:,:,:,7) + 1.0d-49 
-     if(check_setup) call check_poisson_setup(A,pmask)
-  endif !FreeSurface
+  endif
 
 ! dp/dn = 0 for inflow bc on face 1 == x- : do not correct u(is-1)
 ! inflow bc on other faces not implemented yet.  
@@ -1905,7 +1898,28 @@ subroutine SetupPoisson(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask,cvof,n1
      A(ie,:,:,7) = A(ie,:,:,7) - A(ie,:,:,2)
      A(ie,:,:,2) = 0d0
   endif
-!routine is basically copied here.     
+
+  if(check_setup.and..not.FreeSurface) then 
+     do k=ks,ke; do j=js,je; do i=is,ie
+        if(A(i,j,k,7) .lt. 1d-50)  then
+           ! check that we are in solid
+           if(umask(i-1,j,k).lt.0.5d0.and.umask(i,j,k).lt.0.5d0.and.     &
+                vmask(i,j-1,k).lt.0.5d0.and.vmask(i,j,k).lt.0.5d0.and.   &
+                wmask(i,j,k-1).lt.0.5d0.and.wmask(i,j,k).lt.0.5d0 ) then ! we are in solid
+              if(A(i,j,k,8).gt.1d-50) then ! check A8 for debugging
+                 call pariserror("A8 non zero in solid") 
+              endif
+              if(maxval(A(i,j,k,1:6)).gt.1d50.or.minval(A(i,j,k,1:6)).lt.0d0) then
+                 call pariserror("inconsistency in A1-6")
+              endif
+              A(i,j,k,7) = 1d0
+           else
+              call pariserror("A7 tiny outside of solid. Debug me.")
+           endif
+        endif
+     enddo; enddo; enddo
+     call check_poisson_setup(A,pmask)
+  endif
 end subroutine SetupPoisson
 !=================================================================================================
 !=================================================================================================
