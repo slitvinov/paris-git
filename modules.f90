@@ -1902,7 +1902,7 @@ subroutine SetupPoisson(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask,cvof,n1
   if(check_setup.and..not.FreeSurface) then 
      do k=ks,ke; do j=js,je; do i=is,ie
         if(A(i,j,k,7) .lt. 1d-50)  then
-           ! check that we are in solid
+           ! check that we are in solid. Remember we can't have an isolated fluid cell exactly on the entrance. 
            if(umask(i-1,j,k).lt.0.5d0.and.umask(i,j,k).lt.0.5d0.and.     &
                 vmask(i,j-1,k).lt.0.5d0.and.vmask(i,j,k).lt.0.5d0.and.   &
                 wmask(i,j,k-1).lt.0.5d0.and.wmask(i,j,k).lt.0.5d0 ) then ! we are in solid
