@@ -635,7 +635,6 @@ end subroutine output2
 subroutine output3(nf,i1,i2,j1,j2,k1,k2)
   use module_flow
   use module_grid
-  use module_hello
   !use IO_mod
   implicit none
   integer ::nf,i1,i2,j1,j2,k1,k2,i,j,k, itype=5

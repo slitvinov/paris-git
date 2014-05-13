@@ -51,7 +51,7 @@
       ! 3 marked as C node
       ! 4 marked as reference fluid 
       ! 5 marked as ghost layer
-   integer,parameter :: maxnum_diff_tag  = 22   ! ignore cases droplet spread over more than 1 block
+   integer,parameter :: maxnum_diff_tag  = 23   ! ignore cases droplet spread over more than 1 block
    integer :: total_num_tag,totalnum_drop,totalnum_drop_indep,num_new_drop
    integer, dimension(:), allocatable :: num_drop
    integer, dimension(:), allocatable :: num_drop_merge
@@ -122,6 +122,7 @@
    logical, dimension(:,:,:), allocatable :: RegAwayInterface
 
    integer, parameter :: CRAZY_INT = 3483129 
+   real(8), parameter :: CRAZY_REAl = 123456789.123456789d-16
 
    integer, parameter :: CriteriaRectangle = 1
    integer, parameter :: CriteriaCylinder  = 2
@@ -148,7 +149,6 @@
    integer :: CriteriaConvertCase
    real(8) :: vol_cut, xlpp_min,ylpp_min,zlpp_min, & 
                        xlpp_max,ylpp_max,zlpp_max
-   real(8) :: volcell 
    character(20) :: lppbdry_cond(6)
 
    integer :: max_num_drop 
@@ -209,8 +209,6 @@ contains
 
       sdu = 0.d0; sdv = 0.d0; sdw =0.d0
       sdu_work = 0.d0; sdv_work = 0.d0; sdw_work =0.d0
-
-      volcell = (yLength/dble(Ny))**3.d0
 
    end subroutine initialize_LPP
 
@@ -335,7 +333,7 @@ contains
     integer :: s_queue(Nx*Ny,3),c_queue(Nx*Ny,3) ! record i,j,k
     integer :: ns_queue,is_queue,nc_queue
     
-    real(8) :: cvof_scaled
+    real(8) :: volcell,cvof_scaled
 
     integer :: num_cell_drop,cell_list(3,maxnum_cell_drop)
     real(8) :: xc,yc,zc,uc,vc,wc,duc,dvc,dwc,vol 
@@ -424,6 +422,7 @@ contains
                   ksq >= ks .and. ksq <= ke ) then
                tag_flag(isq,jsq,ksq) = 1 ! mark S node as tagged
                ! perform droplet calculation
+               volcell = dx(isq)*dy(jsq)*dz(ksq)
                cvof_scaled = cvof(isq,jsq,ksq)*volcell
                vol = vol + cvof_scaled
                xc  = xc  + cvof_scaled*x(isq)
@@ -579,6 +578,7 @@ contains
       integer :: irank, irank1
       real(8) :: max_drop_merge_vol
       integer :: tag_max_drop_merge_vol
+      logical :: TagAlreadyListed
 
       ! Check ghost cells of droplet pieces
       if ( num_drop_merge(rank) > 0 ) then 
@@ -588,21 +588,30 @@ contains
             = tag_id(drops_merge_gcell_list(1,1,idrop), &
                      drops_merge_gcell_list(2,1,idrop), &
                      drops_merge_gcell_list(3,1,idrop))
-         if ( drops_merge(idrop,rank)%num_gcell > 1 ) then  
+         if ( drops_merge(idrop,rank)%num_gcell > 1 ) then 
+            ! Go through the ghost cells and list all different tags
             do iCell = 2,drops_merge(idrop,rank)%num_gcell
+               ! Check if the tag of the current cell is already list 
+               TagAlreadyListed = .false.
                do idiff_tag = 1, drops_merge(idrop,rank)%num_diff_tag
                   if ( tag_id(drops_merge_gcell_list(1,iCell,idrop), & 
                               drops_merge_gcell_list(2,iCell,idrop), & 
                               drops_merge_gcell_list(3,iCell,idrop)) &
-                    == drops_merge(idrop,rank)%diff_tag_list(idiff_tag)) exit
+                    == drops_merge(idrop,rank)%diff_tag_list(idiff_tag)) then 
+                     TagAlreadyListed = .true.
+                     exit
+                  end if ! tag_id
                end do ! idiff_tag
-               if ( idiff_tag == drops_merge(idrop,rank)%num_diff_tag + 1 ) then 
+               
+               if ( TagAlreadyListed ) then 
+                  cycle 
+               else  ! a new differet tag is found
                   drops_merge(idrop,rank)%num_diff_tag = &
                   drops_merge(idrop,rank)%num_diff_tag + 1
-! TEMPOARY 
-                  if ( drops_merge(idrop,rank)%num_diff_tag > maxnum_diff_tag ) & 
-                     call lpperror("Number of different tags of a droplet pieces exceeds the max number!") 
-! END TEMPORARY 
+! TEMPORARY 
+!                  if ( drops_merge(idrop,rank)%num_diff_tag > maxnum_diff_tag ) & 
+!                     call lpperror("Number of different tags of a droplet pieces exceeds the max number!") 
+! END TEMPORARY
                   drops_merge(idrop,rank)%diff_tag_list(drops_merge(idrop,rank)%num_diff_tag) &
                   = tag_id(drops_merge_gcell_list(1,iCell,idrop), &
                            drops_merge_gcell_list(2,iCell,idrop), &
@@ -1229,10 +1238,6 @@ contains
          call output_DP(tswap)
       end if
                                                                              
-!      ! Exit MPI gracefully
-!      call MPI_BARRIER(MPI_COMM_WORLD,ierr)
-!      call MPI_finalize(ierr)
-!      stop
    end subroutine test_Lag_part
 
 ! ===============================================
@@ -1386,9 +1391,10 @@ contains
 !               u(i,j,k) = uf*(1.d0-wt) + ufp*wt
 !               v(i,j,k) = vf*(1.d0-wt) + vfp*wt
 !               w(i,j,k) = wf*(1.d0-wt) + wfp*wt
-!               u(i,j,k) = uf 
-!               v(i,j,k) = vf
-!               w(i,j,k) = wf
+               
+               u(i,j,k) = uf 
+               v(i,j,k) = vf
+               w(i,j,k) = wf
             end do; end do; end do
 
             ! remove droplet vof structure
@@ -1496,6 +1502,7 @@ contains
       integer, intent(in ) :: CriteriaConvertCase
       logical, intent(out) :: ConvertDropFlag
 
+      real(8) :: volcell
       logical :: ConvertDropRegion = .false.
       logical :: ConvertDropShape  = .false.
 
@@ -1533,6 +1540,7 @@ contains
             end if !RegAwayInterface... 
       end select
 
+      volcell = xLength*yLength*zLength/dble(Nx*Ny*Nz)
       if ( vol < volcell*3.375d0 ) then   
          ConvertDropShape = .true. 
       ! Check aspect ratio for drop diameter larger 1.5dx
@@ -1887,8 +1895,8 @@ contains
 ! END TEMPORARY 
 
 ! TEMPORARY  
-         UseCreepingFlow = .true.
-         write(*,*) ' Creeping flow solution is used for LPP2VOF conversion!'
+!         UseCreepingFlow = .true.
+!         write(*,*) ' Creeping flow solution is used for LPP2VOF conversion!'
 ! END TEMPORARY
 
       radp = dp/2.d0
@@ -1969,12 +1977,9 @@ contains
                w(i,j,k) = wp
             end if ! vof_flag
          else ! Simply replace inside of droplet with point velocity
-            rx=x(i)-xp; ry=y(j)-yp; rz=z(k)-zp
-            rm = sqrt(rx*rx+ry*ry+rz*rz)
             if((cvof(i,j,k) + cvof(i+1,j,k)) > 0.0d0) u(i,j,k) = up
             if((cvof(i,j,k) + cvof(i,j+1,k)) > 0.0d0) v(i,j,k) = vp
             if((cvof(i,j,k) + cvof(i,j,k+1)) > 0.0d0) w(i,j,k) = wp
-
          end if ! UseCreepSolution
       end do; end do; end do
       
@@ -2005,6 +2010,15 @@ contains
             vp = parts(ipart,rank)%element%vc
             wp = parts(ipart,rank)%element%wc
 
+            rhof = rho1
+            rhop = rho2
+            muf  = mu1
+            mup  = mu2
+
+            dp = (parts(ipart,rank)%element%vol*6.d0/PI)**(1.d0/3.d0)
+            taup = rhop *dp*dp/18.0d0/muf & 
+                 *(3.d0 + 3.d0*muf/mup)/(3.d0 + 2.d0*muf/mup)
+
             call GetFluidProp(parts(ipart,rank)%ic, &
                               parts(ipart,rank)%jc, &
                               parts(ipart,rank)%kc, &
@@ -2013,20 +2027,20 @@ contains
                               parts(ipart,rank)%element%vol,&
                               tswap-parts(ipart,rank)%tstepConvert)
 
+            if ( taup < 5.d0*dt ) then 
+               ! If taup is much smaller than dt, no need to compute force,
+               ! particle velocity is set to fluid velocity directly
+               partforce(1:3) = CRAZY_REAL
+               parts(ipart,rank)%element%uc = uf 
+               parts(ipart,rank)%element%vc = vf
+               parts(ipart,rank)%element%wc = wf
+            else 
+
             relvel(1) = uf - up
             relvel(2) = vf - vp
             relvel(3) = wf - wp 
             relvel(4) = sqrt(relvel(1)**2.0d0 + relvel(2)**2.0d0 + relvel(3)**2.0)
-
-            dp = (parts(ipart,rank)%element%vol*6.d0/PI)**(1.d0/3.d0)
-
-            rhof = rho1
-            rhop = rho2
-            muf  = mu1
-            mup  = mu2
             Rep  = rhof*relvel(4)*dp/muf
-            taup = rhop *dp*dp/18.0d0/muf & 
-                 *(3.d0 + 3.d0*muf/mup)/(3.d0 + 2.d0*muf/mup)
 
             if ( WallEffectSettling ) then 
                dp2Lx = dp/xLength   ! assuming Lx=Lz, y is settling direction
@@ -2050,6 +2064,7 @@ contains
             if ( output_lpp_evolution .and. mod(tswap,nstats)==0 ) then
                call output_LPP_parameter(rank,ipart,xp,yp,zp,up,vp,wp,uf,vf,wf,dp,time)
             end if ! 
+            end if ! taup 
 
             parts(ipart,rank)%element%duc = partforce(1) 
             parts(ipart,rank)%element%dvc = partforce(2)
@@ -2090,24 +2105,12 @@ contains
             phi = 1.d0
          case ( dragmodel_SN ) 
             phi = 1.d0+0.15d0*Rep**0.687d0
-            if ( mu1 > mu2 ) then 
-               write(*,*) "Particle drag is used for Bubbles at rank=", rank
-               stop
-            end if !mu1 
          case ( dragmodel_CG ) 
             phi = 1.d0+0.15d0*Rep**0.687d0 & 
                   + 1.75d-2*Rep/(1.0d0 + 4.25d4/Rep**1.16d0)
-            if ( mu1 > mu2 ) then 
-               write(*,*) "Particle drag is used for Bubbles at rank=", rank
-               stop
-            end if !mu1 
          case ( dragmodel_MKL )
             phi = 1.d0 + 1.0d0/(8.d0/Rep & 
                               + 0.5d0 *(1.d0 + 3.315d0/Rep**0.5d0))
-            if ( mu1 < mu2 ) then 
-               write(*,*) "Bubble drag is used for particles at rank=", rank
-               stop
-            end if !mu1 
          case default
             call lpperror("wrong quasi-steady drag model!")
       end select ! dragmodel
@@ -2187,7 +2190,8 @@ contains
    subroutine UpdatePartSol(iStage)
       implicit none
       integer, intent (in) :: iStage
-  
+      integer :: ipart
+
       if ( num_part(rank) > 0 ) then 
          parts(1:num_part(rank),rank)%element%xc = parts(1:num_part(rank),rank)%element%xc +& 
                                                    parts(1:num_part(rank),rank)%element%uc*dt 
@@ -2196,12 +2200,37 @@ contains
          parts(1:num_part(rank),rank)%element%zc = parts(1:num_part(rank),rank)%element%zc +& 
                                                    parts(1:num_part(rank),rank)%element%wc*dt 
 
-         parts(1:num_part(rank),rank)%element%uc = parts(1:num_part(rank),rank)%element%uc +&
-                                                   parts(1:num_part(rank),rank)%element%duc*dt 
-         parts(1:num_part(rank),rank)%element%vc = parts(1:num_part(rank),rank)%element%vc +&
-                                                   parts(1:num_part(rank),rank)%element%dvc*dt 
-         parts(1:num_part(rank),rank)%element%wc = parts(1:num_part(rank),rank)%element%wc +&
-                                                   parts(1:num_part(rank),rank)%element%dwc*dt
+         do ipart = 1,num_part(rank)
+! DEBUG 
+         if ( parts(ipart,rank)%element%xc < 0.d0 .or. & 
+              parts(ipart,rank)%element%xc > xh(Nxt) ) then
+            write(*,*) ipart,rank,parts(ipart,rank)%xcOld,parts(ipart,rank)%element%xc,& 
+                        parts(ipart,rank)%element%uc,parts(ipart,rank)%element%duc, & 
+                        parts(ipart,rank)%element%vol
+            call lpperror("Particle location is out of bound in x direction!") 
+         else if ( parts(ipart,rank)%element%yc < 0.d0 .or. & 
+                   parts(ipart,rank)%element%yc > yh(Nyt) ) then
+            write(*,*) ipart,rank,parts(ipart,rank)%ycOld,parts(ipart,rank)%element%yc,& 
+                        parts(ipart,rank)%element%vc,parts(ipart,rank)%element%dvc,&
+                        parts(ipart,rank)%element%vol
+            call lpperror("Particle location is out of bound in y direction!") 
+         else if ( parts(ipart,rank)%element%zc < 0.d0 .or. & 
+                   parts(ipart,rank)%element%zc > zh(Nzt) ) then
+            write(*,*) ipart,rank,parts(ipart,rank)%zcOld,parts(ipart,rank)%element%zc,& 
+                        parts(ipart,rank)%element%wc,parts(ipart,rank)%element%dwc,&
+                        parts(ipart,rank)%element%vol
+            call lpperror("Particle location is out of bound in z direction!") 
+         end if ! i1
+! END DEBUG
+            if ( parts(ipart,rank)%element%duc /= CRAZY_REAL ) then 
+               parts(ipart,rank)%element%uc = parts(ipart,rank)%element%uc + &
+                                              parts(ipart,rank)%element%duc*dt 
+               parts(ipart,rank)%element%vc = parts(ipart,rank)%element%vc +&
+                                              parts(ipart,rank)%element%dvc*dt 
+               parts(ipart,rank)%element%wc = parts(ipart,rank)%element%wc +&
+                                              parts(ipart,rank)%element%dwc*dt
+            end if ! parts(ipart.rank)%element%duc
+         end do ! ipart
         
          if ( iStage == 1 ) call UpdatePartLocCell   
       end if ! num_part(rank)
@@ -2257,69 +2286,84 @@ contains
       integer :: i,j,k,ipart,i1,j1,k1
       real(8) :: xp,yp,zp
 
+      ! A fast version for uniform mesh
       do ipart = 1,num_part(rank)
          ! x direction 
          i  = parts(ipart,rank)%ic
          xp = parts(ipart,rank)%element%xc
-         if      ( i <= Ng+1 ) then
-            i1 = INT((xp + dble(Ng)*dx(2))/dx(2)) + 1
-         else if ( i > Nx+Ng ) then 
-            i1 = Nx+2*Ng - INT((xh(Nx+2*Ng)-xp)/dx(Nx+Ng+1)) 
-         else if ( xp > xh(i-1) .and. xp <= xh(i  ) ) then
-            i1 = i
-         else if ( xp > xh(i  ) .and. xp <= xh(i+1) ) then 
-            i1 = i+1
-         else if ( xp > xh(i+1) .and. xp <= xh(i+2) ) then 
-            i1 = i+2
-         else if ( xp > xh(i-2) .and. xp <= xh(i-1) ) then 
-            i1 = i-1
-         else if ( xp > xh(i-3) .and. xp <= xh(i-2) ) then 
-            i1 = i-2
-         else 
-            call lpperror("Particle moves out of tracking range in x direction !")
-         end if !xp
+         i1 = INT((xp + dble(Ng)*dx(2))/dx(2)) + 1
+! TEMPORARY
+         if ( i1 < 1 .or. i1 > Nxt ) then
+            write(*,*) ipart,rank,i,i1
+            write(*,*) parts(ipart,rank)%element%xc, parts(ipart,rank)%element%yc, parts(ipart,rank)%element%zc
+            write(*,*) parts(ipart,rank)%element%uc, parts(ipart,rank)%element%vc, parts(ipart,rank)%element%wc
+            write(*,*) parts(ipart,rank)%element%duc, parts(ipart,rank)%element%dvc, parts(ipart,rank)%element%dwc
+            call lpperror("Cell index is out of bound in x direction!") 
+         end if ! i1
+! END TEMPORARY
+!         if      ( i <= Ng+1 ) then
+!            i1 = INT((xp + dble(Ng)*dx(2))/dx(2)) + 1
+!         else if ( i > Nx+Ng ) then 
+!            i1 = Nx+2*Ng - INT((xh(Nx+2*Ng)-xp)/dx(Nx+Ng+1)) 
+!         else if ( xp > xh(i-1) .and. xp <= xh(i  ) ) then
+!            i1 = i
+!         else if ( xp > xh(i  ) .and. xp <= xh(i+1) ) then 
+!            i1 = i+1
+!         else if ( xp > xh(i+1) .and. xp <= xh(i+2) ) then 
+!            i1 = i+2
+!         else if ( xp > xh(i-2) .and. xp <= xh(i-1) ) then 
+!            i1 = i-1
+!         else if ( xp > xh(i-3) .and. xp <= xh(i-2) ) then 
+!            i1 = i-2
+!         else 
+!            call lpperror("Particle moves out of tracking range in x direction !")
+!         end if !xp
         
          ! y direction 
          j  = parts(ipart,rank)%jc
          yp = parts(ipart,rank)%element%yc 
-         if      ( j <= Ng+1 ) then
-            j1 = INT((yp + dble(Ng)*dy(2))/dy(2)) + 1
-         else if ( j > Ny+Ng ) then 
-            j1 = Ny+2*Ng - INT((yh(Ny+2*Ng)-yp)/dy(Ny+Ng+1)) 
-         else if ( yp > yh(j-1) .and. yp <= yh(j  ) ) then
-            j1 = j
-         else if ( yp > yh(j  ) .and. yp <= yh(j+1) ) then 
-            j1 = j+1
-         else if ( yp > yh(j+1) .and. yp <= yh(j+2) ) then 
-            j1 = j+2
-         else if ( yp > yh(j-2) .and. yp <= yh(j-1) ) then 
-            j1 = j-1
-         else if ( yp > yh(j-3) .and. yp <= yh(j-2) ) then 
-            j1 = j-2
-         else
-            call lpperror("Particle moves out of tracking range in y direction !")
-         end if !yp
+         j1 = INT((yp + dble(Ng)*dy(2))/dy(2)) + 1
+         if ( j1 < 1 .or. j1 > Nyt ) call lpperror("Cell index is out of bound in y direction!") 
+!         if      ( j <= Ng+1 ) then
+!            j1 = INT((yp + dble(Ng)*dy(2))/dy(2)) + 1
+!         else if ( j > Ny+Ng ) then 
+!            j1 = Ny+2*Ng - INT((yh(Ny+2*Ng)-yp)/dy(Ny+Ng+1)) 
+!         else if ( yp > yh(j-1) .and. yp <= yh(j  ) ) then
+!            j1 = j
+!         else if ( yp > yh(j  ) .and. yp <= yh(j+1) ) then 
+!            j1 = j+1
+!         else if ( yp > yh(j+1) .and. yp <= yh(j+2) ) then 
+!            j1 = j+2
+!         else if ( yp > yh(j-2) .and. yp <= yh(j-1) ) then 
+!            j1 = j-1
+!         else if ( yp > yh(j-3) .and. yp <= yh(j-2) ) then 
+!            j1 = j-2
+!         else
+!            call lpperror("Particle moves out of tracking range in y direction !")
+!         end if !yp
 
          ! z direction 
          k  = parts(ipart,rank)%kc
          zp = parts(ipart,rank)%element%zc 
-         if      ( k <= Ng+1 ) then
-            k1 = INT((zp + dble(Ng)*dz(2))/dz(2)) + 1
-         else if ( k > Nz+Ng ) then 
-            k1 = Nz+2*Ng - INT((zh(Nz+2*Ng)-zp)/dz(Nz+Ng+1)) 
-         else if ( zp > zh(k-1) .and. zp <= zh(k  ) ) then
-            k1 = k
-         else if ( zp > zh(k  ) .and. zp <= zh(k+1) ) then 
-            k1 = k+1
-         else if ( zp > zh(k+1) .and. zp <= zh(k+2) ) then 
-            k1 = k+2
-         else if ( zp > zh(k-2) .and. zp <= zh(k-1) ) then 
-            k1 = k-1
-         else if ( zp > zh(k-3) .and. zp <= zh(k-2) ) then 
-            k1 = k-2
-         else 
-            call lpperror("Particle moves out of tracking range in z direction !")
-         end if !zp
+         k1 = INT((zp + dble(Ng)*dz(2))/dz(2)) + 1
+         if ( k1 < 1 .or. k1 > Nzt ) call lpperror("Cell index is out of bound in z direction!") 
+!         if      ( k <= Ng+1 ) then
+!            k1 = INT((zp + dble(Ng)*dz(2))/dz(2)) + 1
+!         else if ( k > Nz+Ng ) then 
+!            k1 = Nz+2*Ng - INT((zh(Nz+2*Ng)-zp)/dz(Nz+Ng+1)) 
+!         else if ( zp > zh(k-1) .and. zp <= zh(k  ) ) then
+!            k1 = k
+!         else if ( zp > zh(k  ) .and. zp <= zh(k+1) ) then 
+!            k1 = k+1
+!         else if ( zp > zh(k+1) .and. zp <= zh(k+2) ) then 
+!            k1 = k+2
+!         else if ( zp > zh(k-2) .and. zp <= zh(k-1) ) then 
+!            k1 = k-1
+!         else if ( zp > zh(k-3) .and. zp <= zh(k-2) ) then 
+!            k1 = k-2
+!         else 
+!            call lpperror("Particle moves out of tracking range in z direction !")
+!         end if !zp
 
          parts(ipart,rank)%ic = i1 
          parts(ipart,rank)%jc = j1
@@ -2922,6 +2966,9 @@ module module_output_lpp
             xp = parts(ipart,rank)%element%xc
             yp = parts(ipart,rank)%element%yc
             zp = parts(ipart,rank)%element%zc
+            ic = parts(ipart,rank)%ic
+            jc = parts(ipart,rank)%jc
+            kc = parts(ipart,rank)%kc
             call FindCellIndexBdryConvertRegUnifMesh(ConvertRegSize, & 
                                              i1,ic,i2,j1,jc,j2,k1,kc,k2)
          

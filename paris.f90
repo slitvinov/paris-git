@@ -167,7 +167,8 @@ Program paris
         call MPI_BARRIER(MPI_COMM_WORLD, ierr)
         call MPI_finalize(ierr)
         if(rank==0) write(*,'("Paris exits succesfully")')
-        stop
+        call MPI_ABORT(MPI_COMM_WORLD, ierr)
+        call MPI_finalize(ierr)
      endif
  !-----------------------------------------MAIN TIME LOOP------------------------------------------
      call initialize_timer()
