@@ -589,8 +589,12 @@ subroutine calcStats
     if(DoVOF) CC=cvof(i,j,k) ;  mystats(11)=mystats(11)+CC*vol*x(i)
 ! kinetic energy
     kenergy = 0.5d0*(u(i,j,k)*u(i,j,k) + v(i,j,k)*v(i,j,k) + w(i,j,k)*w(i,j,k))
-    mystats(12)=mystats(12)+0.5*(rho(i,j,k)+rho(i+1,j,k))*kenergy*vol*cvof(i,j,k)
-    mystats(13)=mystats(13)+0.5*(rho(i,j,k)+rho(i+1,j,k))*kenergy*vol*(1.d0-cvof(i,j,k))
+    if(DoVOF) mystats(12)=mystats(12)+0.5*(rho(i,j,k)+rho(i+1,j,k))*kenergy*vol*cvof(i,j,k)
+    if(DoVOF) then
+       mystats(13)=mystats(13)+0.5*(rho(i,j,k)+rho(i+1,j,k))*kenergy*vol*(1.d0-cvof(i,j,k))
+    else 
+       mystats(13)=mystats(13)+0.5*(rho(i,j,k)+rho(i+1,j,k))*kenergy*vol
+    end if ! DoVOF
   enddo;  enddo;  enddo
 
 ! Shear stress on y=0,Ly
