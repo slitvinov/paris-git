@@ -49,12 +49,13 @@ int main (int argc, char * argv[])
   int returnscan2=0;
   double diff=0.;
   double scaling;
+  int ierr;
   while((returnscan1 = fscanf(fd1,"%g %g",x1,y1)) != EOF && nlines < MAXLINES && (returnscan2 = fscanf(fd2,"%g %g",x2,y2)) )
     { 
       nlines++;
       if(returnscan1 < 2 ) 
 	{ 
-	  fprintf(stderr,"In directory "); system("pwd");
+	  fprintf(stderr,"In directory "); ierr=system("pwd");
 	  fprintf(stderr,"%s: error on line %d \n"
 		  "counted only %d item instead of at least 2 in file %s\n", 
 		  argv[0],nlines,returnscan1,argv[1]);
@@ -62,7 +63,7 @@ int main (int argc, char * argv[])
 	}
       if(returnscan2 < 2) 
 	{ 
-	  fprintf(stderr,"In directory "); system("pwd");
+	  fprintf(stderr,"In directory "); ierr=system("pwd");
 	  fprintf(stderr,"%s: error on line %d \n"
 		  "counted only %d item instead of at least 2 in file %s\n", 
 		  argv[0],nlines,returnscan2,argv[2]);

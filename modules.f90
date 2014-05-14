@@ -1923,6 +1923,7 @@ subroutine SetupPoisson(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask,cvof,n1
   use module_grid
   use module_BC
   use module_2phase
+  use module_IO
   implicit none
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: utmp,vtmp,wtmp,rhot
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: umask,vmask,wmask
@@ -1977,7 +1978,19 @@ subroutine SetupPoisson(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask,cvof,n1
               endif
               A(i,j,k,7) = 1d0
            else
-              call pariserror("A7 tiny outside of solid. Debug me.")
+              call parismessage("A7 tiny outside of solid. Debug me")
+              OPEN(UNIT=88,FILE=TRIM(out_path)//'/error-rank-'//TRIM(int2text(rank,padding))//'.txt')
+              write(88,*) "umask(i-1,j,k),umask(i,j,k),vmask(i,j-1,k)",&
+                   "vmask(i,j,k),wmask(i,j,k-1),wmask(i,j,k)",         &
+                   umask(i-1,j,k),umask(i,j,k),vmask(i,j-1,k),         &
+                   vmask(i,j,k),wmask(i,j,k-1),wmask(i,j,k)
+              write(88,*) "dx(i),dxh(i-1),dxh(i),rhot(i-1,j,k),rhot(i,j,k),rhot(i+1,j,k)",&
+                   dx(i),dxh(i-1),dxh(i),rhot(i-1,j,k),rhot(i,j,k),rhot(i+1,j,k)
+              write(88,*) "dy(j),dyh(j-1),dyh(j),rhot(i,j-1,k),rhot(i,j,k),rhot(i,j+1,k)",&
+                   dy(j),dyh(j-1),dyh(j),rhot(i,j-1,k),rhot(i,j,k),rhot(i,j+1,k)
+              write(88,*) "dz(k),dzh(k-1),dzh(k),rhot(i,j,k-1),rhot(i,j,k),rhot(i,j,k+1)",&
+                   dz(k),dzh(k-1),dzh(k),rhot(i,j,k-1),rhot(i,j,k),rhot(i,j,k+1)
+              close(88)
            endif
         endif
      enddo; enddo; enddo

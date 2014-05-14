@@ -367,8 +367,11 @@ contains
               c0 = c(d) ! start of stack
               c1 = c0 + sign*ndepth ! middle of stack starting at c0 in direction sign
               limit_not_found=.true.
+              call verify_indices(c(1),c(2),c(3),index,0)
               height_found  = height(c(1),c(2),c(3),index)<D_HALF_BIGINT
               do while (limit_not_found) 
+                 call verify_indices(c(1),c(2),c(3),index,1)
+                 call verify_indices(i,j,k,1,2)
                  same_flag = s>0.and.vof_flag(c(1),c(2),c(3))==vof_flag(i,j,k)
                  height_p = height_p + (cvof(c(1),c(2),c(3)) - 0.5d0)*normalsign
                  limit_not_found = .not.(vof_flag(c(1),c(2),c(3))==flag_other_end &
@@ -388,6 +391,7 @@ contains
                        ! necessarily reached. Add these terms. Here s = c(d) - c0
                        height_p = height_p + (2*ndepth-s)*(cvof(c(1),c(2),c(3))-0.5d0)*normalsign
                        do while (c(d)/=(c0-sign))
+                          call verify_indices(c(1),c(2),c(3),index,3)
                           height(c(1),c(2),c(3),index) = height_p + c1 - c(d)
                           !                    call check_all(c(1),c(2),c(3),index)
                           c(d) = c(d) - sign ! go back down
@@ -397,6 +401,7 @@ contains
                        height_p = height_p + (- cvof(c(1),c(2),c(3)) + 0.5d0)*normalsign ! remove last addition
                        c(d) = c(d) - sign ! go back one step to climit
                        ! (**) here s = c(d) - c0 + 1 and s=1 for c(d)=c0=climit
+                       call verify_indices(c(1),c(2),c(3),index,4)
                        height(c(1),c(2),c(3),index) = height_p + BIGINT*s 
                        !                call check_all(c(1),c(2),c(3),index)
                     endif        ! last possible case: reached ndepth and no proper height : do nothing
@@ -405,6 +410,28 @@ contains
            enddo ! sign
         endif ! vof_flag
      enddo; enddo; enddo;  ! i,j,k
+     contains
+       subroutine verify_indices(i,j,k,index,pass)
+         implicit none
+         include 'mpif.h'
+         integer, intent(in) :: i,j,k
+         integer, intent(in) :: index,pass
+         integer :: ierr
+         if(i.lt.imin.or.i.gt.imax.or.   &
+              j.lt.jmin.or.j.gt.jmax.or. &
+              k.lt.kmin.or.k.gt.kmax.or. &
+              index.lt.1.or.index.gt.6) then 
+            OPEN(UNIT=88,FILE=TRIM(out_path)//'/error-rank-'//TRIM(int2text(rank,padding))//'.txt')
+            write(88,*) "imin,imax,jmin,jmax,kmin,kmax",imin,imax,jmin,jmax,kmin,kmax
+            write(88,*) "i,j,k,index,pass",i,j,k,index,pass
+            close(88)
+            close(out)
+            if(rank==0) print *, "index error in get_heights"
+            call MPI_abort(MPI_COMM_WORLD, ierr)
+            call MPI_finalize(ierr)
+            stop 
+         end if
+       end subroutine verify_indices
    end subroutine get_heights_pass1  
 !
 !  Enable parallel computation: exchange information accross boundaries. 

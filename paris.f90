@@ -1542,6 +1542,19 @@ subroutine ReadParameters
 end subroutine ReadParameters
 !=================================================================================================
 !=================================================================================================
+subroutine parismessage(message) 
+  use module_IO
+  use module_grid
+  implicit none
+  include 'mpif.h'
+  integer ierr
+  character(*) :: message
+  OPEN(UNIT=88,FILE=TRIM(out_path)//'/message-rank-'//TRIM(int2text(rank,padding))//'.txt')
+  write(88,*) message
+  if(rank==0) print*,message
+  close(88)
+end subroutine parismessage
+!=================================================================================================
 !=================================================================================================
 subroutine pariserror(message) 
   use module_IO
@@ -1560,7 +1573,7 @@ subroutine pariserror(message)
   call MPI_finalize(ierr)
   stop 
 end subroutine pariserror
-
+!=================================================================================================
 !=================================================================================================
 subroutine check_stability() 
   use module_grid
@@ -1641,3 +1654,4 @@ subroutine hello_coucou
   hello_count = hello_count + 1
   end if
 end subroutine hello_coucou
+
