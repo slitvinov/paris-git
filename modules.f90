@@ -1971,8 +1971,9 @@ subroutine SetupPoisson(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask,cvof,n1
                 vmask(i,j-1,k).lt.0.5d0.and.vmask(i,j,k).lt.0.5d0.and.   &
                 wmask(i,j,k-1).lt.0.5d0.and.wmask(i,j,k).lt.0.5d0 ) then ! we are in solid
               if(A(i,j,k,8).gt.1d-50) then ! check A8 for debugging
-                 OPEN(UNIT=88,FILE=TRIM(out_path)//'/error-rank-'//TRIM(int2text(rank,padding))//'.txt')
-                 write(88,*) "VolumeSource,dt",VolumeSource,dt
+                 OPEN(UNIT=88,FILE=TRIM(out_path)//'/message-rank-'//TRIM(int2text(rank,padding))//'.txt')
+                 write(88,*) "A8 non zero in solid at ijk + minmax = ",i,j,k,imin,imax,jmin,jmax,kmin,kmax
+                 write(88,*) "VolumeSource",VolumeSource
                  write(88,*) "umask(i-1,j,k),umask(i,j,k),vmask(i,j-1,k)",&
                       "vmask(i,j,k),wmask(i,j,k-1),wmask(i,j,k)",         &
                       umask(i-1,j,k),umask(i,j,k),vmask(i,j-1,k),         &
@@ -1986,8 +1987,9 @@ subroutine SetupPoisson(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask,cvof,n1
               endif
               A(i,j,k,7) = 1d0
            else
-              OPEN(UNIT=88,FILE=TRIM(out_path)//'/error-rank-'//TRIM(int2text(rank,padding))//'.txt')
-              write(88,*) "VolumeSource,dt",VolumeSource,dt
+              OPEN(UNIT=88,FILE=TRIM(out_path)//'/message-rank-'//TRIM(int2text(rank,padding))//'.txt')
+              write(88,*) "A7 tiny outside of solid at ijk minmax = ",i,j,k,imin,imax,jmin,jmax,kmin,kmax
+              write(88,*) "dt",dt
               write(88,*) "umask(i-1,j,k),umask(i,j,k),vmask(i,j-1,k)",&
                    "vmask(i,j,k),wmask(i,j,k-1),wmask(i,j,k)",         &
                    umask(i-1,j,k),umask(i,j,k),vmask(i,j-1,k),         &
