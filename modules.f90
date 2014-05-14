@@ -1971,6 +1971,14 @@ subroutine SetupPoisson(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask,cvof,n1
                 vmask(i,j-1,k).lt.0.5d0.and.vmask(i,j,k).lt.0.5d0.and.   &
                 wmask(i,j,k-1).lt.0.5d0.and.wmask(i,j,k).lt.0.5d0 ) then ! we are in solid
               if(A(i,j,k,8).gt.1d-50) then ! check A8 for debugging
+                 OPEN(UNIT=88,FILE=TRIM(out_path)//'/error-rank-'//TRIM(int2text(rank,padding))//'.txt')
+                 write(88,*) "VolumeSource,dt",VolumeSource,dt
+                 write(88,*) "umask(i-1,j,k),umask(i,j,k),vmask(i,j-1,k)",&
+                      "vmask(i,j,k),wmask(i,j,k-1),wmask(i,j,k)",         &
+                      umask(i-1,j,k),umask(i,j,k),vmask(i,j-1,k),         &
+                      vmask(i,j,k),wmask(i,j,k-1),wmask(i,j,k)
+                 write(88,*) "dx(i),dy(j),dz(k)",dx(i),dy(j),dz(k)
+                 close(88)
                  call pariserror("A8 non zero in solid") 
               endif
               if(maxval(A(i,j,k,1:6)).gt.1d-50.or.minval(A(i,j,k,1:6)).lt.0d0) then
@@ -1978,8 +1986,8 @@ subroutine SetupPoisson(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask,cvof,n1
               endif
               A(i,j,k,7) = 1d0
            else
-              call parismessage("A7 tiny outside of solid. Debug me")
               OPEN(UNIT=88,FILE=TRIM(out_path)//'/error-rank-'//TRIM(int2text(rank,padding))//'.txt')
+              write(88,*) "VolumeSource,dt",VolumeSource,dt
               write(88,*) "umask(i-1,j,k),umask(i,j,k),vmask(i,j-1,k)",&
                    "vmask(i,j,k),wmask(i,j,k-1),wmask(i,j,k)",         &
                    umask(i-1,j,k),umask(i,j,k),vmask(i,j-1,k),         &
@@ -1991,6 +1999,7 @@ subroutine SetupPoisson(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask,cvof,n1
               write(88,*) "dz(k),dzh(k-1),dzh(k),rhot(i,j,k-1),rhot(i,j,k),rhot(i,j,k+1)",&
                    dz(k),dzh(k-1),dzh(k),rhot(i,j,k-1),rhot(i,j,k),rhot(i,j,k+1)
               close(88)
+              call pariserror("A7 tiny outside of solid. Debug me")
            endif
         endif
      enddo; enddo; enddo
