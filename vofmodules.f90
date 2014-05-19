@@ -1065,9 +1065,11 @@ or none at all")
           fb(orientation) = 3  !  will do nothing
        else if(cond=='outflow') then
           fb(orientation) = 4  ! will copy inflow
-        else if(cond=='jet') then
-           if(orientation /= 1) call pariserror("jet only at x-")
-           fb(orientation) = 2
+       else if(cond=='jet') then
+          if(orientation /= 1) call pariserror("jet only at x-")
+          fb(orientation) = 2
+       else if(cond=='90deg') then 
+          fb(orientation) = 5
        else
           call pariserror("this vofbc not implemented")
        endif
@@ -1118,6 +1120,26 @@ or none at all")
                    c(d) = c(d) + sign
                    cv(c(1),c(2),c(3))=cvhere
                    fl(c(1),c(2),c(3))=flhere
+                elseif(flag==5) then !90deg 
+                   if (d==1 .and. sign==-1) then 
+                     cv(c(1),c(2),c(3))=cv(c(1)+1,c(2),c(3))
+                     fl(c(1),c(2),c(3))=fl(c(1)+1,c(2),c(3))
+                   else if (d==1 .and. sign==1) then
+                     cv(c(1),c(2),c(3))=cv(c(1)-1,c(2),c(3))
+                     fl(c(1),c(2),c(3))=fl(c(1)-1,c(2),c(3))
+                   else if (d==2 .and. sign==-1) then 
+                     cv(c(1),c(2),c(3))=cv(c(1),c(2)+1,c(3))
+                     fl(c(1),c(2),c(3))=fl(c(1),c(2)+1,c(3))
+                   else if (d==2 .and. sign==1) then
+                     cv(c(1),c(2),c(3))=cv(c(1),c(2)-1,c(3))
+                     fl(c(1),c(2),c(3))=fl(c(1),c(2)-1,c(3))
+                   else if (d==3 .and. sign==-1) then 
+                     cv(c(1),c(2),c(3))=cv(c(1),c(2),c(3)+1)
+                     fl(c(1),c(2),c(3))=fl(c(1),c(2),c(3)+1)
+                   else if (d==3 .and. sign==1) then
+                     cv(c(1),c(2),c(3))=cv(c(1),c(2),c(3)-1)
+                     fl(c(1),c(2),c(3))=fl(c(1),c(2),c(3)-1)
+                   end if !d
                 endif
              enddo
           enddo
