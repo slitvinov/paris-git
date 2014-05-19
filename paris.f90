@@ -1305,7 +1305,6 @@ subroutine InitCondition
 
         ! -------------------------------------------------------------------
         ! Test: Test 2d (Quasi-2d) Kelvin-Helmoltz Instability
-        ! ====================================================================
          if ( test_KHI2D ) then 
             do i=imin,imax-1; do j=jmin,jmax-1; do k=kmin,kmax-1
                if( y(j) > yLength*0.5d0 ) & 
@@ -1322,6 +1321,15 @@ subroutine InitCondition
                ! perturbation thickness = 0.05*yLength, wavenum(x) = 1
             enddo; enddo; enddo
          end if ! test_KHI_2D 
+        
+        ! -------------------------------------------------------------------
+        ! Test: 2d planar jet with finite length nozzle
+         if (test_jet .and. inject_type == 3 ) then
+            do i = is,ie; do j=js,je; do k = ks,ke
+               if((cvof(i,j,k) + cvof(i+1,j,k)) > 0.0d0) u(i,j,k) = uliq_inject 
+            end do; end do; end do
+         end if ! test_jet
+     
      endif
 
      if(DoFront) then

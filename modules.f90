@@ -786,7 +786,7 @@ module module_BC
     v = v*vmask
     w = w*wmask
 
-    ! wall boundary condition
+    ! wall boundary condition x-
     if(bdry_cond(1)==0 .and. coords(1)==0    ) then
         u(is-1,:,:)=0d0
         u(is-2,:,:)=-u(is,:,:)
@@ -798,8 +798,8 @@ module module_BC
     if(bdry_cond(1)==3 .and. coords(1)==0    ) then
        do j=jmin,jmax
           do k=kmin,kmax
-             u(is-1,j,k)=WallVel(1,1)*uinject(j,k,t)
-             u(is-2,j,k)=WallVel(1,1)*uinject(j,k,t)
+             u(is-1,j,k)=WallVel(1,1)*uinject(j,k,t)*umask(is-1,j,k)
+             u(is-2,j,k)=WallVel(1,1)*uinject(j,k,t)*umask(is-2,j,k)
              v(is-1,j,k)=0d0
              w(is-1,j,k)=0d0
           enddo
@@ -864,7 +864,8 @@ module module_BC
        enddo
     endif    
 
-    if(bdry_cond(4)==0 .and. coords(1)==nPx-1) then  ! @@@ ???
+    ! wall boundary condition x+
+    if(bdry_cond(4)==0 .and. coords(1)==nPx-1) then  
         u(ie  ,:,:)=0d0
         u(ie+1,:,:)=-u(ie-1,:,:)
         v(ie+1,:,:)=2*WallVel(2,2)-v(ie,:,:)
@@ -880,24 +881,28 @@ module module_BC
     endif
 
 
+    ! wall boundary condition y-
     if(bdry_cond(2)==0 .and. coords(2)==0    ) then
         v(:,js-1,:)=0d0
         v(:,js-2,:)=-v(:,js,:)
         u(:,js-1,:)=2*WallVel(3,1)-u(:,js,:)
         w(:,js-1,:)=2*WallVel(3,3)-w(:,js,:)
     endif
+    ! wall boundary condition y+
     if(bdry_cond(5)==0 .and. coords(2)==nPy-1) then
         v(:,je  ,:)=0d0
         v(:,je+1,:)=-v(:,je-1,:)
         u(:,je+1,:)=2*WallVel(4,1)-u(:,je,:)
         w(:,je+1,:)=2*WallVel(4,3)-w(:,je,:)
     endif
+    ! wall boundary condition z-
     if(bdry_cond(3)==0 .and. coords(3)==0    ) then
         w(:,:,ks-1)=0d0
         w(:,:,ks-2)=-w(:,:,ks)
         u(:,:,ks-1)=2*WallVel(5,1)-u(:,:,ks)
         v(:,:,ks-1)=2*WallVel(5,2)-v(:,:,ks)
     endif
+    ! wall boundary condition z+
     if(bdry_cond(6)==0 .and. coords(3)==nPz-1) then
         w(:,:,ke  )=0d0
         w(:,:,ke+1)=-w(:,:,ke-1)
@@ -1247,7 +1252,7 @@ module module_BC
       integer :: j,k
       real(8) :: t
       real(8) :: uinject
-      real(8) :: BLliq = 2.d-3 !1.d-3 ! 0.567d-3
+      real(8) :: BLliq = 8.d-4 !1.d-3 ! 0.567d-3
       real(8) :: tshift = 1.d-5   !1.d0-2
       real(8) :: ryz
       real(8), parameter :: PI = 3.14159265359d0
@@ -1268,7 +1273,7 @@ module module_BC
             uinject=uliq_inject
          end if ! y(j)
       else if ( inject_type == 3 ) then ! 2d coaxial jet
-         tshift = 1.d-1
+         tshift = 1.d-2
          !tshift = 0.5d0*jetradius/uliq_inject
          !tshift = jetradius/uliq_inject
          if ( y(j) <= jetradius ) then 

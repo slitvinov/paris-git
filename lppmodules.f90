@@ -165,7 +165,13 @@
    real(8) :: AspRatioTol
 
    logical :: WallEffectSettling
-   logical :: output_lpp_evolution 
+   logical :: output_lpp_evolution
+   
+   integer :: TwoWayCouplingFlag
+   integer, parameter :: TwoWayCouplingIgnore  = 0
+   integer, parameter :: TwoWayCouplingClassic = 1
+   integer, parameter :: TwoWayCouplingMonoPole = 2
+
 contains
 !=================================================================================================
    subroutine initialize_LPP()
@@ -227,7 +233,7 @@ contains
          vol_cut,xlpp_min,xlpp_max,ylpp_min,ylpp_max,zlpp_min,zlpp_max,    &
          max_num_drop, maxnum_cell_drop, max_num_part, max_num_part_cross, &
          outputlpp_format,NumStepAfterVOFConversionForAve, &
-         WallEffectSettling,output_lpp_evolution,lppbdry_cond 
+         WallEffectSettling,output_lpp_evolution,lppbdry_cond,TwoWayCouplingFlag 
 
       in=32
 
@@ -254,6 +260,7 @@ contains
       WallEffectSettling = .false.
       output_lpp_evolution = .false.
       lppbdry_cond=['undefined','undefined','undefined','undefined','undefined','undefined']
+      TwoWayCouplingFlag = 0 
 
       call MPI_COMM_RANK(MPI_COMM_WORLD, rank, ierr)
       inquire(file='inputlpp',exist=file_is_there)
@@ -295,6 +302,8 @@ contains
       real(8), intent(in) :: time
 
       call ComputePartForce(tswap,time)
+      if ( TwoWayCouplingFlag /= TwoWayCouplingIgnore ) & 
+         call TwoWayCouplingForce(TwoWayCouplingFlag) 
       call UpdatePartSol(iStage)
 
    end subroutine lppsweeps
@@ -1843,7 +1852,8 @@ contains
                               parts(ipart,rank)%element%zc, & 
                               uf,vf,wf,dummyreal,dummyreal,dummyreal,& 
                               parts(ipart,rank)%element%vol,&
-                              tswap-parts(ipart,rank)%tstepConvert)
+                              tswap-parts(ipart,rank)%tstepConvert,& 
+                              TwoWayCouplingFlag)
 
             mu2tomu1 = mu2/mu1
             vmf = sqrt(uf*uf+vf*vf+wf*wf)
@@ -2025,7 +2035,8 @@ contains
                               xp,yp,zp, & 
                               uf,vf,wf,DufDt,DvfDt,DwfDt,   & 
                               parts(ipart,rank)%element%vol,&
-                              tswap-parts(ipart,rank)%tstepConvert)
+                              tswap-parts(ipart,rank)%tstepConvert,& 
+                              TwoWayCouplingFlag)
 
             if ( taup < 5.d0*dt ) then 
                ! If taup is much smaller than dt, no need to compute force,
@@ -2064,6 +2075,7 @@ contains
             if ( output_lpp_evolution .and. mod(tswap,nstats)==0 ) then
                call output_LPP_parameter(rank,ipart,xp,yp,zp,up,vp,wp,uf,vf,wf,dp,time)
             end if ! 
+
             end if ! taup 
 
             parts(ipart,rank)%element%duc = partforce(1) 
@@ -2116,12 +2128,13 @@ contains
       end select ! dragmodel
    end function phi
 
-   subroutine GetFluidProp(ip,jp,kp,xp,yp,zp,uf,vf,wf,DufDt,DvfDt,DwfDt,volp,TimeStepAfterVOFConversion) 
+   subroutine GetFluidProp(ip,jp,kp,xp,yp,zp,uf,vf,wf,DufDt,DvfDt,DwfDt,volp,TimeStepAfterVOFConversion,TwoWayCouplingFlag) 
 
       integer, intent(in)  :: ip,jp,kp,TimeStepAfterVOFConversion
       real(8), intent(in)  :: xp,yp,zp 
       real(8), intent(in)  :: volp 
       real(8), intent(out) :: uf,vf,wf,DufDt,DvfDt,DwfDt
+      integer, intent(in)  :: TwoWayCouplingFlag
       
       real(8) :: dp, dxi,dyj,dzk,max_gridsize,min_gridsize
       real(8) :: Lx,Ly,Lz
@@ -2129,63 +2142,98 @@ contains
       real(8), parameter :: large = 1.d0+40
 
       real(8) :: ConvertRegSize
+      real(8) :: xh1,xh2,x1,x2,yh1,yh2,y1,y2,zh1,zh2,z1,z2
+      integer :: i1,i2,j1,j2,k1,k2
 
-      dp = (6.d0*volp/PI)**(1.d0/3.d0)
-      dxi = xh(ip)-xh(ip-1)
-      dyj = yh(jp)-yh(jp-1)
-      dzk = zh(kp)-zh(kp-1)
-      max_gridsize = max(dxi,dyj,dzk)
-      min_gridsize = min(dxi,dyj,dzk)
+      dp = (6.d0*volp/PI)**0.3333333333333333d0
 
-      if ( dp < min_gridsize ) then ! Interploation
-         call TrilinearIntrplFluidVel(xp,yp,zp,ip,jp,kp,uf,DufDt,1)
-         call TrilinearIntrplFluidVel(xp,yp,zp,ip,jp,kp,vf,DvfDt,2)
-         call TrilinearIntrplFluidVel(xp,yp,zp,ip,jp,kp,wf,DwfDt,3)
-      else if ( dp > max_gridsize ) then  ! Check flow scale scale
-!         if ( u(ip,jp,kp)-u(ip-1,jp,kp) /= 0.d0 ) then 
-!            Lx = ABS(dxi*(u(ip-1,jp,kp)+u(ip,jp,kp))/(u(ip,jp,kp)-u(ip-1,jp,kp)))
-!         else 
-!            Lx = large
-!         end if ! up(ip,jp,kp)
-!         if ( v(ip,jp,kp)-v(ip,jp-1,kp) /= 0.d0 ) then 
-!            Ly = ABS(dyj*(v(ip,jp-1,kp)+v(ip,jp,kp))/(v(ip,jp,kp)-v(ip,jp-1,kp)))
-!         else 
-!            Ly = large
-!         end if ! v(ip,jp,kp)
-!         if ( w(ip,jp,kp)-w(ip,jp,kp-1) /= 0.d0 ) then 
-!            Lz = ABS(dzk*(w(ip,jp,kp-1)+w(ip,jp,kp))/(w(ip,jp,kp)-w(ip,jp,kp-1)))
-!         else 
-!            Lz = large
-!         end if ! w(ip,jp,kp) 
+      if ( TwoWayCouplingFlag == TwoWayCouplingIgnore .or. & 
+           TWoWayCouplingFlag == TwoWayCouplingClassic )  then 
 
-! TEMPORARY   ! NOTE: require a better estimate of the Lx,Ly,Lz later
          if ( NumStepAfterVOFConversionForAve > 0 .and. & 
               TimeStepAfterVOFConversion < NumStepAfterVOFConversionForAve ) then 
             ConvertRegSize = ConvertRegSizeToDiam*dp
             call ComputeAveFluidVel(xp,yp,zp,ip,jp,kp,uf,vf,wf,DufDt,DvfDt,DwfDt,ConvertRegSize)
          else 
-            Lx = large; Ly = large; Lz = large
-            if ( Lx > dp ) then 
-               call TrilinearIntrplFluidVel(xp,yp,zp,ip,jp,kp,uf,DufDt,1)
-            else 
-               call lpperror("average fluid velocity needed") !ComputeAveFluidVel
-            end if ! Lx
-            if ( Ly > dp ) then 
-               call TrilinearIntrplFluidVel(xp,yp,zp,ip,jp,kp,vf,DvfDt,2)
-            else 
-               call lpperror("average fluid velocity needed") !ComputeAveFluidVel
-            end if ! Lx
-            if ( Lz > dp ) then 
-               call TrilinearIntrplFluidVel(xp,yp,zp,ip,jp,kp,wf,DwfDt,3)
-            else 
-               call lpperror("average fluid velocity needed") !ComputeAveFluidVel
-            end if ! Lz
+            call TrilinearIntrplFluidVel(xp,yp,zp,ip,jp,kp,uf,DufDt,1)
+            call TrilinearIntrplFluidVel(xp,yp,zp,ip,jp,kp,vf,DvfDt,2)
+            call TrilinearIntrplFluidVel(xp,yp,zp,ip,jp,kp,wf,DwfDt,3)
          end if
-! END TEMPOARY 
-      else ! interploation & averaging
+      else if ( TwoWayCouplingFlag == TwoWayCouplingMonoPole ) then 
+         ConvertRegSize = ConvertRegSizeToDiam*dp
+         call FindCellIndexBdryConvertRegUnifMesh(ConvertRegSize,i1,ip,i2,j1,jp,j2,k1,kp,k2)
+         xh1 = xp-xh(i1); xh2 = xh(i2)-xp; x1  = xp-x(i1); x2  = x(i2)-xp
+         yh1 = yp-yh(j1); yh2 = yh(j2)-yp; y1  = yp-y(j1); y2  = y(j2)-yp            
+         zh1 = zp-zh(k1); zh2 = zh(k2)-zp; z1  = zp-z(k1); z2  = z(k2)-zp
+         call Surface2VolumeIntrpl(u(i1,jp,kp),u(i2,jp,kp), &
+                                   u(ip,j1,kp),u(ip,j2,kp), &
+                                   u(ip,jp,k1),u(ip,jp,k2), &
+                                   xh1,xh2,y1,y2,z1,z2,uf)
+         call Surface2VolumeIntrpl(sdu(i1,jp,kp),sdu(i2,jp,kp), &
+                                   sdu(ip,j1,kp),sdu(ip,j2,kp), &
+                                   sdu(ip,jp,k1),sdu(ip,jp,k2), &
+                                   xh1,xh2,y1,y2,z1,z2,DufDt)
+         call Surface2VolumeIntrpl(v(i1,jp,kp),v(i2,jp,kp), &
+                                   v(ip,j1,kp),v(ip,j2,kp), &
+                                   v(ip,jp,k1),v(ip,jp,k2), &
+                                   x1,x2,yh1,yh2,z1,z2,vf)
+         call Surface2VolumeIntrpl(sdv(i1,jp,kp),sdv(i2,jp,kp), &
+                                   sdv(ip,j1,kp),sdv(ip,j2,kp), &
+                                   sdv(ip,jp,k1),sdv(ip,jp,k2), &
+                                   x1,x2,yh1,yh2,z1,z2,DvfDt)
+         call Surface2VolumeIntrpl(w(i1,jp,kp),w(i2,jp,kp), &
+                                   w(ip,j1,kp),w(ip,j2,kp), &
+                                   w(ip,jp,k1),w(ip,jp,k2), &
+                                   x1,x2,y1,y2,zh1,zh2,wf)
+         call Surface2VolumeIntrpl(sdw(i1,jp,kp),sdw(i2,jp,kp), &
+                                   sdw(ip,j1,kp),sdw(ip,j2,kp), &
+                                   sdw(ip,jp,k1),sdw(ip,jp,k2), &
+                                   x1,x2,y1,y2,zh1,zh2,DwfDt)
+! DEBUG
+         uf=0.d0;vf=0.d0;wf=0.d0; DufDt=0.d0;DvfDt=0.d0;DwfDt=0.d0
+! END DEBUG
       end if ! dp 
 
    end subroutine GetFluidProp
+
+   subroutine TwoWayCouplingForce(TwoWayCouplingFlag) 
+
+      implicit none 
+      integer, intent(in) :: TwoWayCouplingFlag
+
+      integer :: i,j,k,ipart
+      real(8) :: mp,dp,xp,yp,zp,fx,fy,fz,x2,y2,z2,s0,sigma
+
+      if (TwoWayCouplingFlag == TwoWayCouplingMonoPole) then
+         if ( num_part(rank) > 0 ) then
+            do k=kmin,kmax; do j=jmin,jmax; do i=imin,imax
+               do ipart = 1,num_part(rank) 
+                  mp =  rho2*parts(ipart,rank)%element%vol
+                  dp = (6.d0*parts(ipart,rank)%element%vol/PI)**0.3333333333333333d0
+                  xp =  parts(ipart,rank)%element%xc
+                  yp =  parts(ipart,rank)%element%yc
+                  zp =  parts(ipart,rank)%element%zc
+                  fx = mp * (parts(ipart,rank)%element%duc - (1.d0-rho1/rho2)*Gx )  
+                  fy = mp * (parts(ipart,rank)%element%dvc - (1.d0-rho1/rho2)*Gy )  
+                  fz = mp * (parts(ipart,rank)%element%dwc - (1.d0-rho1/rho2)*Gz ) 
+
+                  x2 = (xh(i)-xp)*(xh(i)-xp) + (y(j)-yp)*(y(j)-yp) + (z(k)-zp)*(z(k)-zp)
+                  y2 = (x(i)-xp)*(x(i)-xp) + (yh(j)-yp)*(yh(j)-yp) + (z(k)-zp)*(z(k)-zp)
+                  z2 = (x(i)-xp)*(x(i)-xp) + (y(j)-yp)*(y(j)-yp) + (zh(k)-zp)*(zh(k)-zp)
+
+                  sigma = 0.5d0*dp/sqrt(PI)
+                  s0 = (2.d0*PI*sigma*sigma)**(-1.5d0)
+                  du(i,j,k) = du(i,j,k) - fx*s0*exp(-x2*0.5d0/sigma/sigma)
+                  dv(i,j,k) = dv(i,j,k) - fy*s0*exp(-y2*0.5d0/sigma/sigma)
+                  dw(i,j,k) = dw(i,j,k) - fz*s0*exp(-z2*0.5d0/sigma/sigma)
+               end do ! ipart
+            end do; end do; end do
+         end if ! num_part(rank) 
+      else 
+         call lpperror("Unknow two-way coupling flag!")
+      end if ! TwoWayCouplingFlag
+
+   end subroutine TwoWayCouplingForce
 
    subroutine UpdatePartSol(iStage)
       implicit none
@@ -2201,27 +2249,27 @@ contains
                                                    parts(1:num_part(rank),rank)%element%wc*dt 
 
          do ipart = 1,num_part(rank)
-! DEBUG 
-         if ( parts(ipart,rank)%element%xc < 0.d0 .or. & 
-              parts(ipart,rank)%element%xc > xh(Nxt) ) then
-            write(*,*) ipart,rank,parts(ipart,rank)%xcOld,parts(ipart,rank)%element%xc,& 
-                        parts(ipart,rank)%element%uc,parts(ipart,rank)%element%duc, & 
-                        parts(ipart,rank)%element%vol
-            call lpperror("Particle location is out of bound in x direction!") 
-         else if ( parts(ipart,rank)%element%yc < 0.d0 .or. & 
-                   parts(ipart,rank)%element%yc > yh(Nyt) ) then
-            write(*,*) ipart,rank,parts(ipart,rank)%ycOld,parts(ipart,rank)%element%yc,& 
-                        parts(ipart,rank)%element%vc,parts(ipart,rank)%element%dvc,&
-                        parts(ipart,rank)%element%vol
-            call lpperror("Particle location is out of bound in y direction!") 
-         else if ( parts(ipart,rank)%element%zc < 0.d0 .or. & 
-                   parts(ipart,rank)%element%zc > zh(Nzt) ) then
-            write(*,*) ipart,rank,parts(ipart,rank)%zcOld,parts(ipart,rank)%element%zc,& 
-                        parts(ipart,rank)%element%wc,parts(ipart,rank)%element%dwc,&
-                        parts(ipart,rank)%element%vol
-            call lpperror("Particle location is out of bound in z direction!") 
-         end if ! i1
-! END DEBUG
+! TEMPORARY - Check particle location inside domain or not  
+            if ( parts(ipart,rank)%element%xc < 0.d0 .or. & 
+                 parts(ipart,rank)%element%xc > xh(Nxt) ) then
+               write(*,*) ipart,rank,parts(ipart,rank)%xcOld,parts(ipart,rank)%element%xc,& 
+                           parts(ipart,rank)%element%uc,parts(ipart,rank)%element%duc, & 
+                           parts(ipart,rank)%element%vol
+               call lpperror("Particle location is out of bound in x direction!") 
+            else if ( parts(ipart,rank)%element%yc < 0.d0 .or. & 
+                      parts(ipart,rank)%element%yc > yh(Nyt) ) then
+               write(*,*) ipart,rank,parts(ipart,rank)%ycOld,parts(ipart,rank)%element%yc,& 
+                           parts(ipart,rank)%element%vc,parts(ipart,rank)%element%dvc,&
+                           parts(ipart,rank)%element%vol
+               call lpperror("Particle location is out of bound in y direction!") 
+            else if ( parts(ipart,rank)%element%zc < 0.d0 .or. & 
+                      parts(ipart,rank)%element%zc > zh(Nzt) ) then
+               write(*,*) ipart,rank,parts(ipart,rank)%zcOld,parts(ipart,rank)%element%zc,& 
+                           parts(ipart,rank)%element%wc,parts(ipart,rank)%element%dwc,&
+                           parts(ipart,rank)%element%vol
+               call lpperror("Particle location is out of bound in z direction!") 
+            end if ! i1
+! END TEMPORARY
             if ( parts(ipart,rank)%element%duc /= CRAZY_REAL ) then 
                parts(ipart,rank)%element%uc = parts(ipart,rank)%element%uc + &
                                               parts(ipart,rank)%element%duc*dt 
