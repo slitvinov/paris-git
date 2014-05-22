@@ -160,7 +160,7 @@ contains
          if ( MeanFlag == ArithMean ) then  
             field(i,j,k) = cfiltered*(a2-a1)+a1
          else if ( MeanFlag == HarmMean ) then 
-            field(i,j,k) = 1.d0/(cfiltered**(inva2-inva1)+inva1)
+            field(i,j,k) = 1.d0/(cfiltered*(inva2-inva1)+inva1)
          end if ! MeanFlag
        enddo; enddo; enddo
     endif
