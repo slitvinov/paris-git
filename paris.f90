@@ -219,15 +219,9 @@ Program paris
               call explicitMomDiff(u,v,w,rho,mu,du,dv,dw)
            endif
            call my_timer(3)
-!----------------------------------EXTRAPOLATION FOR FREE SURFACE---------------------------------
-           if (DoVOF .and. FreeSurface) then
-              u_cold = u !initialize cavity velocities to that of calculated field
-              v_cold = v
-              w_cold = w
-              call get_normals()
-              call extrapolate_velocities()
-           endif !Extrapolation
+
            if(DoVOF) then
+              if (FreeSurface) call get_normals()
              if (DoMOF) then
               call vofandmomsweeps(itimestep)
              else
@@ -308,6 +302,15 @@ Program paris
               v = v + dt * dv
               w = w + dt * dw
            endif
+!----------------------------------VELOCITY EXTRAPOLATION FOR FREE SURFACE------------------------
+           if (DoVOF .and. FreeSurface) then
+              u_cold = u !initialize cavity velocities to that of calculated field
+              v_cold = v
+              w_cold = w
+              !call get_normals() !Global normals read in VOF section
+              call extrapolate_velocities()
+           endif !Extrapolation
+!-------------------------------------------------------------------------------------------------
            call my_timer(3)
            call SetVelocityBC(u,v,w,umask,vmask,wmask,time)
 

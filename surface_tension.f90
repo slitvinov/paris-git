@@ -163,19 +163,80 @@ contains
      use module_grid
      use module_flow
      use module_2phase
-     !use module_surface_tension
      implicit none
      include 'mpif.h'
-     integer :: i,j,k, iter_FS
+     integer :: i,j,k, iter_FS, q, r
      real(8) :: n_x, n_y, n_z
+     real(8) :: n_1, n_2, n_3, x_cut, y_cut, xz_cut
+     real(8) :: alpha, al3d, P_a
      real(8) :: dtau, SS_error
      real(8) :: du_x, du_y, du_z, dv_x, dv_y, dv_z, dw_x, dw_y, dw_z
      real(8), dimension(imin:imax,jmin:jmax,kmin:kmax) :: u_cmask,v_cmask,w_cmask
+     real(8) :: n_avg, count
 
      u_cmask = 0d0; v_cmask = 0d0; w_cmask =0d0
 
-     !this loop sets all cavity cells neighbouring a cut cell
+     !this loop masks extrapolated velocity locations 
      do k=ks,ke; do j=js,je; do i=is,ie
+        if (vof_flag(i,j,k) == 2) then
+           n_1 = ABS(n1(i,j,k)); n_2 = ABS(n2(i,j,k)); n_3 = ABS(n3(i,j,k))
+           alpha = al3d(n_1,n_2,n_3,cvof(i,j,k))
+           !=========Set mask for u-velocity in cut-cells          
+           if (n_1 < 1d-49) n_1 = 1d-49
+           x_cut = (alpha - n_3/2d0)/n_1
+           if (x_cut>0.5d0) then
+              if (n2(i,j,k)>0d0) then
+                 v_cmask(i,j-1,k) = 1d0
+              else
+                 v_cmask(i,j,k) = 1d0
+              endif
+           endif
+           x_cut = (alpha - n_2 - n_3/2d0)/n_1
+           if (x_cut>0.5d0) then
+              if (n2(i,j,k)>0d0) then
+                 v_cmask(i,j,k) = 1d0
+              else
+                 v_cmask(i,j-1,k) = 1d0
+              endif
+           endif
+           !=========Set mask for v-velocity in cut-cells
+           if (n_2 < 1d-49) n_2 = 1d-49
+           y_cut = (alpha - n_3/2d0)/n_2
+           if (y_cut>0.5d0) then
+              if (n1(i,j,k)>0d0) then
+                 u_cmask(i-1,j,k) = 1d0
+              else
+                 u_cmask(i,j,k) = 1d0
+              endif
+           endif
+           y_cut = (alpha - n_1 - n_3/2d0)/n_2
+           if (y_cut>0.5d0) then
+              if (n1(i,j,k)>0d0) then
+                 u_cmask(i,j,k) = 1d0
+              else
+                 u_cmask(i-1,j,k) = 1d0
+              endif
+           endif
+           !=========Set mask for w-velocity in cut-cells
+           if (n_1 < 1d-49) n_1 = 1d-49
+           xz_cut = (alpha - n_2/2d0)/n_1
+           if (x_cut>0.5d0) then
+              if (n3(i,j,k)>0d0) then
+                 w_cmask(i,j,k-1) = 1d0
+              else
+                 w_cmask(i,j,k) = 1d0
+              endif
+           endif
+           xz_cut = (alpha - n_3 - n_2/2d0)/n_1
+           if (xz_cut>0.5d0) then
+              if (n3(i,j,k)>0d0) then
+                 w_cmask(i,j,k) = 1d0
+              else
+                 w_cmask(i,j,k-1) = 1d0
+              endif
+           endif
+        endif
+        !=========Set mask for all velocities in cavity cells neighbouring cut cells
         if ((vof_flag(i,j,k) == 1) .and. ((vof_flag(i-1,j,k) == 2) .or. (vof_flag(i+1,j,k) == 2) .or. &
              (vof_flag(i,j-1,k) == 2) .or. (vof_flag(i,j+1,k) == 2) .or. &
              (vof_flag(i,j,k-1) == 2) .or. (vof_flag(i,j,k+1) == 2))) then
@@ -186,77 +247,210 @@ contains
      enddo; enddo; enddo
 
      do iter_FS = 1, MAXIT_FS
-
         SS_error = 0d0
         do k=ks,ke; do j=js,je; do i=is,ie
            dtau = 0.3*min(dx(i),dy(j),dz(k))
-
-           !-----Calc extrapolated u-velocity
            n_x = (n1(i+1,j,k) + n1(i,j,k))/2d0
-           n_y = (n2(i,j+1,k) + n2(i,j,k))/2d0 !need to improve this
-           n_z = (n3(i,j,k+1) + n3(i,j,k))/2d0 !need to improve this
+           n_y = (n2(i,j+1,k) + n2(i,j,k))/2d0
+           n_z = (n3(i,j,k+1) + n3(i,j,k))/2d0
+           !-----Calc extrapolated u-velocity
+           if (u_cmask(i,j,k) .ne. 0d0) then
+              if (n_x .gt. 0d0) then 
+                 du_x = n1(i+1,j,k)*(u_cold(i+1,j,k)-u_cold(i,j,k))/dx(i+1)
+              else
+                 du_x = n1(i,j,k)*(u_cold(i,j,k)-u_cold(i-1,j,k))/dx(i)
+              endif
 
-           if (n_x .gt. 0d0) then 
-              du_x = n1(i+1,j,k)*(u_cold(i+1,j,k)-u_cold(i,j,k))/dx(i+1)
-           else
-              du_x = n1(i,j,k)*(u_cold(i,j,k)-u_cold(i-1,j,k))/dx(i)
+              if (n_y .gt. 0d0) then 
+                 count = 0d0; n_avg = 0d0
+                 do q=0,1; do r=0,1
+                    if (n2(i+r,j+q,k) .ne. 0d0) then
+                       count = count + 1d0
+                       n_avg = n_avg + n2(i+r,j+q,k) 
+                    endif
+                 enddo; enddo
+                 if (count < 1d0) then
+                    du_y = 0d0
+                 else
+                    du_y = n_avg/count*(u_cold(i,j+1,k)-u_cold(i,j,k))/dyh(j+1)
+                 endif
+              else
+                 count = 0d0; n_avg = 0d0
+                 do q=0,1; do r=-1,0
+                    if (n2(i+q,j+r,k) .ne. 0d0) then
+                       count = count + 1d0
+                       n_avg = n_avg + n2(i+q,j+r,k) 
+                    endif
+                 enddo; enddo
+                 if (count < 1d0) then                   
+                    du_y = 0d0
+                 else
+                    du_y = n_avg/count*(u_cold(i,j,k)-u_cold(i,j-1,k))/dyh(j)
+                 endif
+              endif
+
+              if (n_z .gt. 0d0) then 
+                 count = 0d0; n_avg = 0d0
+                 do q=0,1; do r=0,1
+                    if (n3(i+r,j,k+q) .ne. 0d0) then
+                       count = count + 1d0
+                       n_avg = n_avg + n3(i+r,j,k+q) 
+                    endif
+                 enddo; enddo
+                 if (count < 1d0) then
+                    du_z = 0d0
+                 else
+                    du_z = n_avg/count*(u_cold(i,j,k+1)-u_cold(i,j,k))/dzh(k+1)
+                 endif
+              else
+                 count = 0d0; n_avg = 0d0
+                 do q=-1,0; do r=0,1
+                    if (n3(i+r,j,k+q) .ne. 0d0) then
+                       count = count + 1d0
+                       n_avg = n_avg + n3(i+r,j,k+q) 
+                    endif
+                 enddo; enddo
+                 if (count < 1d0) then
+                    du_z = 0d0
+                 else
+                    du_z = n_avg/count*(u_cold(i,j,k)-u_cold(i,j,k-1))/dzh(k)
+                 endif
+              endif
+
+              du_c(i,j,k) = u_cmask(i,j,k)*dtau*(du_x + du_y + du_z) !mask multiplication redundant
            endif
+           !Calc extrapolated v-velocity
+           if (v_cmask(i,j,k) .ne. 0d0) then
+              if (n_x .gt. 0d0) then
+                 count = 0d0; n_avg = 0d0
+                 do q=0,1; do r=0,1
+                    if (n1(i+r,j+q,k) .ne. 0d0) then
+                       count = count + 1d0
+                       n_avg = n_avg + n1(i+r,j+q,k) 
+                    endif
+                 enddo; enddo
+                 if (count < 0d0) then
+                    dv_x = 0d0
+                 else
+                    dv_x = n_avg/count*(v_cold(i+1,j,k)-v_cold(i,j,k))/dxh(i+1) 
+                 endif
+              else
+                 count = 0d0; n_avg = 0d0
+                 do q=0,1; do r=-1,0
+                    if (n1(i+r,j+q,k) .ne. 0d0) then
+                       count = count + 1d0
+                       n_avg = n_avg + n1(i+r,j+q,k) 
+                    endif
+                 enddo; enddo
+                 if (count < 0d0) then
+                    dv_x = 0d0
+                 else
+                    dv_x = n_avg/count*(v_cold(i,j,k)-v_cold(i-1,j,k))/dxh(i)
+                 endif
+              endif
 
-           if (n_y .gt. 0d0) then 
-              du_y = n2(i,j+1,k)*(u_cold(i,j+1,k)-u_cold(i,j,k))/dyh(j+1)
-           else
-              du_y = n2(i,j,k)*(u_cold(i,j,k)-u_cold(i,j-1,k))/dyh(j)
+              if (n_y .gt. 0d0) then 
+                 dv_y = n2(i,j+1,k)*(v_cold(i,j+1,k)-v_cold(i,j,k))/dy(j+1)
+              else
+                 dv_y = n2(i,j,k)*(v_cold(i,j,k)-v_cold(i,j-1,k))/dy(j)
+              endif
+
+              if (n_z .gt. 0d0) then 
+                 count = 0d0; n_avg = 0d0
+                 do q=0,1; do r=0,1
+                    if (n3(i,j+q,k+r) .ne. 0d0) then
+                       count = count + 1d0
+                       n_avg = n_avg + n3(i,j+q,k+r) 
+                    endif
+                 enddo; enddo
+                 if (count < 1d0) then
+                    dv_z = 0d0
+                 else
+                    dv_z = n_avg/count*(v_cold(i,j,k+1)-v_cold(i,j,k))/dzh(k+1)
+                 endif
+              else
+                 count = 0d0; n_avg = 0d0
+                 do q=0,1; do r=-1,0
+                    if (n3(i,j+q,k+r) .ne. 0d0) then
+                       count = count + 1d0
+                       n_avg = n_avg + n3(i,j+q,k+r) 
+                    endif
+                 enddo; enddo
+                 if (count < 1d0) then
+                    dv_z = 0d0
+                 else
+                    dv_z = n_avg/count*(v_cold(i,j,k)-v_cold(i,j,k-1))/dzh(k)
+                 endif
+              endif
+
+              dv_c(i,j,k) = v_cmask(i,j,k)*dtau*(dv_x + dv_y + dv_z) !mask multiplication redundant
            endif
-
-           if (n_z .gt. 0d0) then 
-              du_z = n3(i,j,k+1)*(u_cold(i,j,k+1)-u_cold(i,j,k))/dzh(k+1)
-           else
-              du_z = n3(i,j,k)*(u_cold(i,j,k)-u_cold(i,j,k-1))/dzh(k)
-           endif
-
-           du_c(i,j,k) = u_cmask(i,j,k)*dtau*(du_x + du_y + du_z)
-
-           !-----Calc extrapolated v-velocity
-           if (n_x .gt. 0d0) then 
-              dv_x = n1(i+1,j,k)*(v_cold(i+1,j,k)-v_cold(i,j,k))/dxh(i+1)
-           else
-              dv_x = n1(i,j,k)*(v_cold(i,j,k)-v_cold(i-1,j,k))/dxh(i)
-           endif
-
-           if (n_y .gt. 0d0) then 
-              dv_y = n2(i,j+1,k)*(v_cold(i,j+1,k)-v_cold(i,j,k))/dy(j+1)
-           else
-              dv_y = n2(i,j,k)*(v_cold(i,j,k)-v_cold(i,j-1,k))/dy(j)
-           endif
-
-           if (n_z .gt. 0d0) then 
-              dv_z = n3(i,j,k+1)*(v_cold(i,j,k+1)-v_cold(i,j,k))/dzh(k+1)
-           else
-              dv_z = n3(i,j,k)*(v_cold(i,j,k)-v_cold(i,j,k-1))/dzh(k)
-           endif
-
-           dv_c(i,j,k) = v_cmask(i,j,k)*dtau*(dv_x + dv_y + dv_z) 
-
            !-----Calc extrapolated w-velocity
-           if (n_x .gt. 0d0) then 
-              dw_x = n1(i+1,j,k)*(w_cold(i+1,j,k)-w_cold(i,j,k))/dxh(i+1)
-           else
-              dw_x = n1(i,j,k)*(w_cold(i,j,k)-w_cold(i-1,j,k))/dxh(i)
-           endif
+           if (w_cmask(i,j,k) .ne. 0d0) then
+              if (n_x .gt. 0d0) then 
+                 count = 0d0; n_avg = 0d0
+                 do q=0,1; do r=0,1
+                    if (n1(i+q,j,k+r) .ne. 0d0) then
+                       count = count + 1d0
+                       n_avg = n_avg + n1(i+q,j,k+r) 
+                    endif
+                 enddo; enddo
+                 if (count < 1d0) then
+                    dw_x = 0d0
+                 else
+                    dw_x = n_avg/count*(w_cold(i+1,j,k)-w_cold(i,j,k))/dxh(i+1)
+                 endif
+              else
+                 count = 0d0; n_avg = 0d0
+                 do q=-1,0; do r=0,1
+                    if (n1(i+q,j,k+r) .ne. 0d0) then
+                       count = count + 1d0
+                       n_avg = n_avg + n1(i+q,j,k+r) 
+                    endif
+                 enddo; enddo
+                 if (count < 1d0) then
+                    dw_x = 0d0
+                 else
+                    dw_x = n_avg/count*(w_cold(i,j,k)-w_cold(i-1,j,k))/dxh(i)
+                 endif
+              endif
 
-           if (n_y .gt. 0d0) then 
-              dw_y = n2(i,j+1,k)*(w_cold(i,j+1,k)-w_cold(i,j,k))/dyh(j+1)
-           else
-              dw_y = n2(i,j,k)*(w_cold(i,j,k)-w_cold(i,j-1,k))/dyh(j)
-           endif
+              if (n_y .gt. 0d0) then 
+                 count = 0d0; n_avg = 0d0
+                 do q=0,1; do r=0,1
+                    if (n2(i,j+q,k+r) .ne. 0d0) then
+                       count = count + 1d0
+                       n_avg = n_avg + n2(i,j+q,k+r) 
+                    endif
+                 enddo; enddo
+                 if (count < 1d0) then
+                    dw_y = 0d0
+                 else
+                    dw_y = n_avg/count*(w_cold(i,j+1,k)-w_cold(i,j,k))/dyh(j+1)
+                 endif
+              else
+                 count = 0d0; n_avg = 0d0
+                 do q=-1,0; do r=0,1
+                    if (n2(i,j+q,k+r) .ne. 0d0) then
+                       count = count + 1d0
+                       n_avg = n_avg + n2(i,j+q,k+r) 
+                    endif
+                 enddo; enddo
+                 if (count < 1d0) then
+                    dw_y = 0d0
+                 else
+                    dw_y = n_avg/count*(w_cold(i,j,k)-w_cold(i,j-1,k))/dyh(j)
+                 endif
+              endif
 
-           if (n_z .gt. 0d0) then 
-              dw_z = n3(i,j,k+1)*(w_cold(i,j,k+1)-w_cold(i,j,k))/dz(k+1)
-           else
-              dw_z = n3(i,j,k)*(w_cold(i,j,k)-w_cold(i,j,k-1))/dz(k)
-           endif
+              if (n_z .gt. 0d0) then 
+                 dw_z = n3(i,j,k+1)*(w_cold(i,j,k+1)-w_cold(i,j,k))/dz(k+1)
+              else
+                 dw_z = n3(i,j,k)*(w_cold(i,j,k)-w_cold(i,j,k-1))/dz(k)
+              endif
 
-           dw_c(i,j,k) = w_cmask(i,j,k)*dtau*(dw_x + dw_y + dw_z)  
+              dw_c(i,j,k) = w_cmask(i,j,k)*dtau*(dw_x + dw_y + dw_z)  
+           endif
 
            SS_error = SS_error + (du_c(i,j,k)**2d0) + (dv_c(i,j,k)**2d0) + (dw_c(i,j,k)**2d0)
         enddo; enddo; enddo
@@ -266,24 +460,18 @@ contains
         v_c = v_cold + dv_c
         w_c = w_cold + dw_c
 
-        if (SS_error < MAXERROR_FS) exit
-
+        if (SS_error < MAXERROR_FS) then
+           write(*,'(a19,i4)')'FS iterations :',iter_FS
+           exit
+        endif
         u_cold = u_c
         v_cold = v_c
         w_cold = w_c
 
         if(iter_FS==MAXIT_FS .and. rank==0) write(*,*) 'Warning: FS extrapolation reached maxit_FS.'
-
      enddo
 
      do k=ks,ke; do j=js,je; do i=is,ie
-        !     if ((vof_flag(i,j,k) == 1) .and. ((vof_flag(i-1,j,k) == 2) .or. (vof_flag(i+1,j,k) == 2) .or. &
-        ! 	(vof_flag(i,j-1,k) == 2) .or. (vof_flag(i,j+1,k) == 2) .or. &
-        ! 	(vof_flag(i,j,k-1) == 2) .or. (vof_flag(i,j,k+1) == 2))) then
-        ! 	u(i,j,k) = u_c(i,j,k); u(i-1,j,k) = u_c(i-1,j,k)
-        ! 	v(i,j,k) = v_c(i,j,k); v(i,j-1,k) = v_c(i,j-1,k)
-        ! 	w(i,j,k) = w_c(i,j,k); w(i,j,k-1) = w_c(i,j,k-1)
-        !       endif
         if (u_cmask(i,j,k) == 1d0) u(i,j,k) = u_c(i,j,k)
         if (v_cmask(i,j,k) == 1d0) v(i,j,k) = v_c(i,j,k)
         if (w_cmask(i,j,k) == 1d0) w(i,j,k) = w_c(i,j,k)    
