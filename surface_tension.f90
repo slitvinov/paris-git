@@ -168,11 +168,12 @@ contains
      integer :: i,j,k, iter_FS, q, r
      real(8) :: n_x, n_y, n_z
      real(8) :: n_1, n_2, n_3, x_cut, y_cut, xz_cut
-     real(8) :: alpha, al3d, P_a
+     real(8) :: alpha, al3d, P_a, Src
      real(8) :: dtau, SS_error
      real(8) :: du_x, du_y, du_z, dv_x, dv_y, dv_z, dw_x, dw_y, dw_z
-     real(8), dimension(imin:imax,jmin:jmax,kmin:kmax) :: u_cmask,v_cmask,w_cmask
+     real(8) :: a_l, a_rt, a_t, a_b, a_f, a_rr
      real(8) :: n_avg, count
+     real(8), dimension(imin:imax,jmin:jmax,kmin:kmax) :: u_cmask,v_cmask,w_cmask
 
      u_cmask = 0d0; v_cmask = 0d0; w_cmask =0d0
 
@@ -251,8 +252,8 @@ contains
         do k=ks,ke; do j=js,je; do i=is,ie
            dtau = 0.3*min(dx(i),dy(j),dz(k))
            n_x = (n1(i+1,j,k) + n1(i,j,k))/2d0
-           n_y = (n2(i,j+1,k) + n2(i,j,k))/2d0
-           n_z = (n3(i,j,k+1) + n3(i,j,k))/2d0
+           n_y = (n2(i,j+1,k) + n2(i,j,k))/2d0 
+           n_z = (n3(i,j,k+1) + n3(i,j,k))/2d0 
            !-----Calc extrapolated u-velocity
            if (u_cmask(i,j,k) .ne. 0d0) then
               if (n_x .gt. 0d0) then 
@@ -470,11 +471,25 @@ contains
 
         if(iter_FS==MAXIT_FS .and. rank==0) write(*,*) 'Warning: FS extrapolation reached maxit_FS.'
      enddo
-
+     Src = 0d0
      do k=ks,ke; do j=js,je; do i=is,ie
+        a_l = 0d0; a_rt = 0d0; a_t = 0d0; a_b = 0d0; a_f = 0d0; a_rr = 0d0
         if (u_cmask(i,j,k) == 1d0) u(i,j,k) = u_c(i,j,k)
         if (v_cmask(i,j,k) == 1d0) v(i,j,k) = v_c(i,j,k)
         if (w_cmask(i,j,k) == 1d0) w(i,j,k) = w_c(i,j,k)    
+        Src = (u(i-1,j,k)-u(i,j,k))*dz(k)*dy(j) + (v(i,j-1,k)-v(i,j,k))*dx(i)*dz(k) + (w(i,j,k-1)-w(i,j,k))*dx(i)*dy(j)
+        if (n1(i,j,k) > 0d0) a_l = u_cmask(i-1,j,k); if (n1(i,j,k) < 0d0) a_rt = u_cmask(i,j,k)
+        if (n2(i,j,k) > 0d0) a_b = v_cmask(i,j-1,k); if (n2(i,j,k) < 0d0) a_t = v_cmask(i,j,k)
+        if (n3(i,j,k) > 0d0) a_rr = w_cmask(i,j,k-1); if (n3(i,j,k) < 0d0) a_f = w_cmask(i,j,k)
+        P_a = (a_l+a_rt)*abs(n1(i,j,k))*dy(j)*dz(k) + &
+             (a_t + a_b)*abs(n2(i,j,k))*dx(i)*dz(k) + &
+             (a_f + a_rr)*abs(n3(i,j,k))*dx(i)*dy(j)
+        if (P_a .ne. 0) u(i,j,k) = u(i,j,k) + a_rt*Src/P_a*abs(n1(i,j,k)) 
+        if (P_a .ne. 0) v(i,j,k) = v(i,j,k) + a_t*Src/P_a*abs(n2(i,j,k))  
+        if (P_a .ne. 0) w(i,j,k) = w(i,j,k) + a_f*Src/P_a*abs(n3(i,j,k))
+        if (P_a .ne. 0) u(i-1,j,k) = u(i-1,j,k) - a_l*Src/P_a*abs(n1(i,j,k)) 
+        if (P_a .ne. 0) v(i,j-1,k) = v(i,j-1,k) - a_b*Src/P_a*abs(n2(i,j,k))  
+        if (P_a .ne. 0) w(i,j,k-1) = w(i,j,k-1) - a_rr*Src/P_a*abs(n3(i,j,k))
      enddo; enddo; enddo
 
    end subroutine extrapolate_velocities
