@@ -800,8 +800,8 @@ module module_BC
           do k=kmin,kmax
              u(is-1,j,k)=WallVel(1,1)*uinject(j,k,t)*umask(is-1,j,k)
              u(is-2,j,k)=WallVel(1,1)*uinject(j,k,t)*umask(is-2,j,k)
-             !v(is-1,j,k)=0d0
-             !w(is-1,j,k)=0d0
+             v(is-1,j,k)=0d0
+             w(is-1,j,k)=0d0
           enddo
        enddo
        flux=sum(u(is-1,js:je,ks:ke))
