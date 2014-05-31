@@ -34,6 +34,7 @@ module module_VOF
   real(8), dimension(:,:,:,:), allocatable, target :: workmom
   real(8), dimension(:,:,:), allocatable :: cvofold 
   integer, dimension(:,:,:), allocatable :: vof_flag ! 
+  integer, dimension(:,:,:), allocatable :: mom_flag ! 
   !   0 empty
   !   1 full
   !   2 fractional
@@ -273,7 +274,10 @@ contains
        endif
     endif
     allocate(cvof(imin:imax,jmin:jmax,kmin:kmax),vof_flag(imin:imax,jmin:jmax,kmin:kmax))
-    if (DoMOF) allocate(workmom(imin:imax,jmin:jmax,kmin:kmax,4))
+    if (DoMOF) then
+      allocate(workmom(imin:imax,jmin:jmax,kmin:kmax,4))
+      allocate(mom_flag(imin:imax,jmin:jmax,kmin:kmax))
+    endif
     cvof = 0.d0
     vof_flag = 3
     !allocate matrices for Free Surface
@@ -963,7 +967,7 @@ or none at all")
   real(8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: momh1,momh2
   real(8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: cvofh1,cvofh2
   real(8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: us
-  real(8) :: mom, tmpreal, rhoavg, ccell
+  real(8) :: mom, tmpreal, rhoavg
 
   call do_all_ghost(momh1)
   call do_all_ghost(momh2)
@@ -971,67 +975,67 @@ or none at all")
   call do_all_ghost(cvofh2)
 
   if (d.eq.1) then
-      do k=ks,ke
-          do j=js,je
-              do i=is,ie
+      do k=ks-1,ke+1
+          do j=js-1,je+1
+              do i=is-1,ie+1
                   mom = (momh1(i,j,k)*dxh(i) + momh2(i-1,j,k)*dxh(i-1)) &
                       /(dxh(i) + dxh(i-1))
                   ! if interface rewrite interface velocity
-                  tmpreal = 0.5d0*(cvofh1(i,j,k)+cvofh2(i-1,j,k))
-                  ccell   = 0.5d0*(cvofh1(i,j,k)+cvofh2(i,j,k))
-                  if (((tmpreal.gt.0.d0).and.(tmpreal.lt.1.d0)) &
-                  .or.((ccell.gt.0.d0).and.ccell.lt.1.d0)) then
+                  tmpreal =  (cvof(i-1,j,k)+ cvof(i,j,k) + cvof(i-2,j,k) &
+                             +cvof(i,j-1,k)+ cvof(i,j,k) + cvof(i,j-2,k) &
+                             +cvof(i,j,k-1)+ cvof(i,j,k) + cvof(i,j,k-2))/9.d0
+                  mom_flag(i,j,k) = 0
+                 if ((tmpreal.gt.0.d0).and.(tmpreal.lt.1.d0)) then
                     rhoavg    = cvofh1(i,j,k)*dxh(i) + cvofh2(i-1,j,k)*dxh(i-1) 
                     rhoavg    = rhoavg/(dxh(i) + dxh(i-1))
                     rhoavg    = rho1*rhoavg + rho2*(1.d0 - rhoavg)
-                    us(i,j,k) = mom/rhoavg
-!                    if (abs(us(i,j,k)-1.d-2).gt.1.d-4) then
-!                        print *, i,j,k,us(i,j,k)
-!                        print *, momh1(i,j,k),momh2(i-1,j,k),momh2(ie,j,k)
-!                        print *, momh2(18,j,k)
-!                        stop
-!                    endif
-                    du(i,j,k) = 0.d0
+                    tmpreal = mom/rhoavg
+                    du(i-1,j,k) = du(i-1,j,k) + (tmpreal-us(i-1,j,k))/dt
+                    mom_flag(i,j,k) = 1
                   endif
               enddo
           enddo
       enddo
   elseif (d.eq.2) then
-      do k=ks,ke
-          do j=js,je
-              do i=is,ie
+      do k=ks-1,ke+1
+          do j=js-1,je+1
+              do i=is-1,ie+1
                   mom = (momh1(i,j,k)*dyh(j) + momh2(i,j-1,k)*dyh(j-1)) &
                       /(dyh(j) + dyh(j-1))
                   ! if interface rewrite interface velocity
-                  tmpreal = 0.5d0*(cvofh1(i,j,k)+cvofh2(i-1,j,k))
-                  ccell   = 0.5d0*(cvofh1(i,j,k)+cvofh2(i,j,k))
-                  if (((tmpreal.gt.0.d0).and.(tmpreal.lt.1.d0)) &
-                  .or.((ccell.gt.0.d0).and.ccell.lt.1.d0)) then
+                  tmpreal =  (cvof(i-1,j,k)+ cvof(i,j,k) + cvof(i-2,j,k) &
+                             +cvof(i,j-1,k)+ cvof(i,j,k) + cvof(i,j-2,k) &
+                             +cvof(i,j,k-1)+ cvof(i,j,k) + cvof(i,j,k-2))/9.d0
+                  mom_flag(i,j,k) = 0
+                  if ((tmpreal.gt.0.d0).and.(tmpreal.lt.1.d0)) then
                     rhoavg    = cvofh1(i,j,k)*dyh(j) + cvofh2(i,j-1,k)*dyh(j-1) 
                     rhoavg    = rhoavg/(dyh(j) + dyh(j-1))
                     rhoavg    = rho1*rhoavg + rho2*(1.d0 - rhoavg)
-                    us(i,j,k) = mom/rhoavg
-                    dv(i,j,k) = 0.d0
+                    tmpreal = mom/rhoavg
+                    dv(i,j-1,k) = dv(i,j-1,k) + (tmpreal-us(i,j-1,k))/dt
+                    mom_flag(i,j,k) = 1
                   endif
               enddo
           enddo
       enddo
   elseif (d.eq.3) then
-      do k=ks,ke
-          do j=js,je
-              do i=is,ie
+      do k=ks-1,ke+1
+          do j=js-1,je+1
+              do i=is-1,ie+1
                   mom = (momh1(i,j,k)*dzh(k) + momh2(i,j,k-1)*dzh(k-1)) &
                       /(dzh(k) + dzh(k-1))
                   ! if interface rewrite interface velocity
-                  tmpreal = 0.5d0*(cvofh1(i,j,k)+cvofh2(i-1,j,k))
-                  ccell   = 0.5d0*(cvofh1(i,j,k)+cvofh2(i,j,k))
-                  if (((tmpreal.gt.0.d0).and.(tmpreal.lt.1.d0)) &
-                  .or.((ccell.gt.0.d0).and.ccell.lt.1.d0)) then
+                  tmpreal =  (cvof(i-1,j,k)+ cvof(i,j,k) + cvof(i-2,j,k) &
+                             +cvof(i,j-1,k)+ cvof(i,j,k) + cvof(i,j-2,k) &
+                             +cvof(i,j,k-1)+ cvof(i,j,k) + cvof(i,j,k-2))/9.d0
+                  mom_flag(i,j,k) = 0
+                  if ((tmpreal.gt.0.d0).and.(tmpreal.lt.1.d0)) then
                     rhoavg    = cvofh1(i,j,k)*dzh(k) + cvofh2(i,j,k-1)*dzh(k-1) 
                     rhoavg    = rhoavg/(dzh(k) + dzh(k-1))
                     rhoavg    = rho1*rhoavg + rho2*(1.d0 - rhoavg)
-                    us(i,j,k) = mom/rhoavg
-                    dw(i,j,k) = 0.d0
+                    tmpreal = mom/rhoavg
+                    dw(i,j,k-1) = dw(i,j,k-1) + (tmpreal-us(i,j,k-1))/dt
+                    mom_flag(i,j,k) = 1
                   endif
               enddo
           enddo
@@ -1717,8 +1721,6 @@ subroutine swpzmom(us,c,f,d,mom1,momh1,momh2,mom3,vof1,cvofh1,cvofh2,vof3)
                   cvofh2(i,j,k) = 2.d0*(vof1(i+1,j,k) + cvofh2(i,j,k))
                   momh1(i,j,k)  = 2.d0*(mom3(i-1,j,k) + momh1(i,j,k))
                   momh2(i,j,k)  = 2.d0*(mom1(i+1,j,k) + momh2(i,j,k))
-                  c(i,j,k) = 0.5d0*(cvofh1(i,j,k) + cvofh2(i,j,k))
-                  c(i,j,k) = dmax1(0.0d0,dmin1(1.0d0,c(i,j,k)))
               enddo
           enddo
       enddo
@@ -1730,8 +1732,6 @@ subroutine swpzmom(us,c,f,d,mom1,momh1,momh2,mom3,vof1,cvofh1,cvofh2,vof3)
                   cvofh2(i,j,k) = 2.d0*(vof1(i,j+1,k) + cvofh2(i,j,k))
                   momh1(i,j,k)  = 2.d0*(mom3(i,j-1,k) + momh1(i,j,k))
                   momh2(i,j,k)  = 2.d0*(mom1(i,j+1,k) + momh2(i,j,k))
-                  c(i,j,k) = 0.5d0*(cvofh1(i,j,k) + cvofh2(i,j,k))
-                  c(i,j,k) = dmax1(0.0d0,dmin1(1.0d0,c(i,j,k)))
               enddo
           enddo
       enddo
@@ -1743,13 +1743,19 @@ subroutine swpzmom(us,c,f,d,mom1,momh1,momh2,mom3,vof1,cvofh1,cvofh2,vof3)
                   cvofh2(i,j,k) = 2.d0*(vof1(i,j,k+1) + cvofh2(i,j,k))
                   momh1(i,j,k)  = 2.d0*(mom3(i,j,k-1) + momh1(i,j,k))
                   momh2(i,j,k)  = 2.d0*(mom1(i,j,k+1) + momh2(i,j,k))
-                  c(i,j,k) = 0.5d0*(cvofh1(i,j,k) + cvofh2(i,j,k))
-                  c(i,j,k) = dmax1(0.0d0,dmin1(1.0d0,c(i,j,k)))
               enddo
           enddo
       enddo
-
   endif
+
+  do k=ks,ke
+      do j=js,je
+          do i=is,ie
+              c(i,j,k) = 0.5d0*(cvofh1(i,j,k) + cvofh2(i,j,k))
+              c(i,j,k) = dmax1(0.0d0,dmin1(1.0d0,c(i,j,k)))
+          enddo
+      enddo
+  enddo
 
   call setvofbc(c,f)
   call SetMomentumBC(us,c,momh1,d,umask,rho1/2.d0,rho2/2.d0) !fixme: to use vmask, wmask

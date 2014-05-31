@@ -682,7 +682,7 @@ subroutine momentumConvection(u,v,w,du,dv,dw)
    if (DoMOF) then
     do k=ks,ke;  do j=js,je; do i=is,ieu
       !DF: check where to apply standard advection?
-      if ((cvof(i,j,k).eq.0.d0).or.(cvof(i,j,k).eq.1.d0)) then
+      if (mom_flag(i,j,k).eq.1) then
         du(i,j,k)=du(i,j,k) &
         -    ( work(i+1,j  ,k  ,1)**2 - work(i  ,j  ,k  ,1)**2 )/dxh(i) &
         -0.5*((v(i,j  ,k  )+v(i+1,j  ,k  ))*work(i  ,j  ,k  ,2)-        &
@@ -725,7 +725,7 @@ subroutine momentumConvection(u,v,w,du,dv,dw)
   enddo; enddo; enddo
   if (DoMOF) then
     do k=ks,ke;  do j=js,jev; do i=is,ie
-      if ((cvof(i,j,k).eq.0.d0).or.(cvof(i,j,k).eq.1.d0)) then
+      if (mom_flag(i,j,k).eq.1) then
         dv(i,j,k)=dv(i,j,k) &
         -0.5*((u(i  ,j,k  )+u(i  ,j+1,k  ))*work(i  ,j  ,k  ,1)-        &
         (u(i-1,j,k  )+u(i-1,j+1,k  ))*work(i-1,j  ,k  ,1))/dx(i)  &
@@ -767,7 +767,7 @@ subroutine momentumConvection(u,v,w,du,dv,dw)
     endif
   enddo; enddo; enddo
   if (DoMOF) then
-    if ((cvof(i,j,k).eq.0.d0).or.(cvof(i,j,k).eq.1.d0)) then
+    if (mom_flag(i,j,k).eq.1) then
       dw(i,j,k)=dw(i,j,k) &
       -0.5*((u(i  ,j  ,k)+u(i  ,j  ,k+1))*work(i  ,j  ,k  ,1)-        &
       (u(i-1,j  ,k)+u(i-1,j  ,k+1))*work(i-1,j  ,k  ,1))/dx(i)  &
