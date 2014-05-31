@@ -68,7 +68,7 @@ module module_VOF
   logical :: use_Vofi
 
   real(8) :: b1,b2,b3,b4
-  integer :: nfilter=1
+  integer :: nfilter
 
   logical :: DoLPP = .false.
   logical :: output_filtered_VOF = .false.
@@ -183,7 +183,7 @@ contains
     namelist /vofparameters/ vofbdry_cond,test_type,VOF_advect,refinement, &
        cylinder_dir, normal_up, DoLPP, jetradius, jetcenter_yc2yLength, jetcenter_zc2zLength, & 
        FreeSurface, ViscMeanIsArith, DensMeanIsArith, MAXERROR_FS, MAXIT_FS, &
-       output_filtered_VOF, DoMOF, use_vofi
+       output_filtered_VOF, DoMOF, use_vofi,nfilter
     
 !     vofbdry_cond=['periodic','periodic','periodic','periodic','periodic','periodic']
     vofbdry_cond=['undefined','undefined','undefined','undefined','undefined','undefined']
@@ -199,6 +199,7 @@ contains
     output_filtered_VOF=.false. ! redundant
     DoMOF = .false.
     use_vofi = .false.
+    nfilter = 1 
     
     in=31
 

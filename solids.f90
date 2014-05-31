@@ -160,6 +160,9 @@ contains
              else
                s1 =-1.d0
              end if ! x(i),y(j)
+          else if (solid_type == 'pipe') then
+             radius = 0.5d0*xLength
+             s1 = ((x(i) - radius)*(x(i) -radius) + (z(k) - radius)*(z(k) - radius)) - radius*radius
           else
              call pariserror("invalid type")
           endif

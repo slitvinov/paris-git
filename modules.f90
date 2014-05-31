@@ -713,6 +713,7 @@ module module_BC
   ! LM: The same convention is used for BoundaryPressure
   ! SZ: alternately may contain the velocity of the flow for inflow boundary conditions on x+
   real(8) :: ugas_inject,uliq_inject
+  real(8) :: blayer_gas_inject, tdelay_gas_inject 
   logical :: check_setup=.true.
   contains
 !=================================================================================================
@@ -1227,20 +1228,18 @@ module module_BC
       integer :: j,k
       real(8) :: t
       real(8) :: uinject
-      real(8) :: BLliq = 8.d-4 !1.d-3 ! 0.567d-3
-      real(8) :: tshift = 1.d-5   !1.d0-2
       real(8) :: ryz
       real(8), parameter :: PI = 3.14159265359d0
       uinject=0d0
       if (inject_type==1) then
          uinject = 1.d0
       elseif( inject_type==2 ) then
-         tshift = 0.01d0
+         !tdelay_gas_inject = 0.01d0
          if( (y(j) - jetcenter_yc)**2.d0 + (z(k) - jetcenter_zc)**2.d0 .lt. jetradius**2.d0 ) then 
-            if ( t<=tshift ) then  
+            if ( t<=tdelay_gas_inject ) then  
                uinject=uliq_inject
             else 
-               uinject=uliq_inject*(1.d0+0.05d0*SIN(10.d0*2.d0*PI*(t-tshift)))
+               uinject=uliq_inject*(1.d0+0.05d0*SIN(10.d0*2.d0*PI*(t-tdelay_gas_inject)))
             end if ! t
          end if ! y(j)
       elseif( inject_type==5 ) then 
@@ -1248,32 +1247,30 @@ module module_BC
             uinject=uliq_inject
          end if ! y(j)
       else if ( inject_type == 3 ) then ! 2d coaxial jet
-         tshift = 1.d-2
-         !tshift = 0.5d0*jetradius/uliq_inject
-         !tshift = jetradius/uliq_inject
+         !tdelay_gas_inject = 1.d-2
          if ( y(j) <= jetradius ) then 
             uinject = uliq_inject & 
-                     *erf( (jetradius - y(j))/BLliq )  
+                     *erf( (jetradius - y(j))/blayer_gas_inject )  
          else if ( y(j) > jetradius .and. y(j) <= 2.d0*jetradius ) then
             uinject = ugas_inject & 
-                     *erf( (y(j) -      jetradius)/BLliq ) & 
-                     !*erf( (2.d0*jetradius - y(j))/BLliq ) & 
-                     !*erf(max(time-tshift,0.d0)/tshift) 
-                     *erf(time/tshift) 
+                     *erf( (y(j) -      jetradius)/blayer_gas_inject ) & 
+                     !*erf( (2.d0*jetradius - y(j))/blayer_gas_inject ) & 
+                     !*erf(max(time-tdelay_gas_inject,0.d0)/tdelay_gas_inject) 
+                     *erf(time/tdelay_gas_inject) 
          else 
             uinject = 0.d0 
          end if  !
       else if ( inject_type == 4 ) then ! 3d coaxial jet
-         tshift = 0.d-2
+         tdelay_gas_inject = 0.d-2
          ryz = sqrt( (y(j) - jetcenter_yc)**2.d0 + (z(k) - jetcenter_zc)**2.d0 )
          if ( ryz <= jetradius ) then 
             uinject = 0.173d0 !& 
-                     !*erf( (jetradius - ryz)/BLliq ) & 
+                     !*erf( (jetradius - ryz)/blayer_gas_inject ) & 
          else if ( ryz > jetradius .and. ryz <= 2.d0*jetradius ) then
             uinject = 2.0d+0 & 
-                     *erf( (ryz -      jetradius)/BLliq ) & 
-                     *erf( (2.d0*jetradius - ryz)/BLliq ) & 
-                     *erf(max(time-tshift,0.d0)/tshift) 
+                     *erf( (ryz -      jetradius)/blayer_gas_inject ) & 
+                     *erf( (2.d0*jetradius - ryz)/blayer_gas_inject ) & 
+                     *erf(max(time-tdelay_gas_inject,0.d0)/tdelay_gas_inject) 
          else 
             uinject = 0.d0 
          end if  !

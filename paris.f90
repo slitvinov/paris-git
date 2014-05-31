@@ -158,7 +158,7 @@ Program paris
         if(rank==0) then
            end_time =  MPI_WTIME()
            open(unit=121,file='stats',access='append')
-           write(121,'(20es14.6e2)')time,stats(1:13),dpdx,(stats(8)-stats(9))/dt,end_time-start_time
+           write(121,'(22es14.6e2)')time,stats(1:15),dpdx,(stats(8)-stats(9))/dt,end_time-start_time
            close(121)
            write(out,'("Step:",I9," Iterations:",I9," cpu(s):",f10.2)')-1,0,end_time-start_time
            write(*,'("Step:",I6," dt=",es16.5e2," time=",es16.5e2," cpu(s):",f11.3)')   &
@@ -452,7 +452,7 @@ Program paris
               !        write(121,'("            Iterations:",I7," cpu(s):",f10.2)')it,end_time-start_time
               !        close(121)
            open(unit=121,file='stats',access='append')
-           write(121,'(20es14.6e2)')time,stats(1:13),dpdx,(stats(8)-stats(9))/dt,end_time-start_time
+           write(121,'(22es14.6e2)')time,stats(1:15),dpdx,(stats(8)-stats(9))/dt,end_time-start_time
            close(121)
         endif
         call my_timer(11)
@@ -598,12 +598,17 @@ subroutine calcStats
     if(DoVOF) CC=cvof(i,j,k) ;  mystats(11)=mystats(11)+CC*vol*x(i)
 ! kinetic energy
     kenergy = 0.5d0*(u(i,j,k)*u(i,j,k) + v(i,j,k)*v(i,j,k) + w(i,j,k)*w(i,j,k))
-    if(DoVOF) mystats(12)=mystats(12)+0.5*(rho(i,j,k)+rho(i+1,j,k))*kenergy*vol*cvof(i,j,k)
     if(DoVOF) then
+       mystats(12)=mystats(12)+0.5*(rho(i,j,k)+rho(i+1,j,k))*kenergy*vol*cvof(i,j,k)
        mystats(13)=mystats(13)+0.5*(rho(i,j,k)+rho(i+1,j,k))*kenergy*vol*(1.d0-cvof(i,j,k))
     else 
        mystats(13)=mystats(13)+0.5*(rho(i,j,k)+rho(i+1,j,k))*kenergy*vol
     end if ! DoVOF
+! y-momentum 
+    if(DoVOF) then
+      mystats(14)=mystats(14)+rho(i,j,k)*0.5d0*(v(i,j,k)+v(i,j+1,k))*vol*(     cvof(i,j,k))
+      mystats(15)=mystats(15)+rho(i,j,k)*0.5d0*(v(i,j,k)+v(i,j+1,k))*vol*(1.d0-cvof(i,j,k))
+    end if ! (DoVOF)
   enddo;  enddo;  enddo
 
 ! Shear stress on y=0,Ly
@@ -1478,7 +1483,8 @@ subroutine ReadParameters
                         xyzrad,        hypre,         dtFlag,        ICOut,         WallVel,     &
                         inject_type,   maxErrorVol,   restartFront,  nstats,        WallShear,   &
                         BoundaryPressure,             ZeroReynolds,  restartAverages,termout,    &  
-                        excentricity,  tout,          zip_data,      ugas_inject,   uliq_inject
+                        excentricity,  tout,          zip_data,      ugas_inject,   uliq_inject, &  
+                        blayer_gas_inject, tdelay_gas_inject 
  
   Nx = 0; Ny = 4; Nz = 4 ! cause absurd input file that lack nx value to fail. 
   Ng=2;xLength=1d0;yLength=1d0;zLength=1d0
@@ -1500,6 +1506,7 @@ subroutine ReadParameters
   BoundaryPressure=0d0;   ZeroReynolds=.false.;   restartAverages=.false.;   termout=0
   excentricity=0d0;   tout = -1.d0;          zip_data=.false.
   ugas_inject=0.d0;   uliq_inject=1.d0
+  blayer_gas_inject=8.d-2; tdelay_gas_inject=1.d-2 
 
   in=1
   out=2
@@ -1545,6 +1552,11 @@ subroutine ReadParameters
   if(mod(Nz,nPz) /= 0) call pariserror("ReadParameters: Nz not divisible by nPz!")
   Mx = Nx/nPx; My = Ny/nPy; Mz = Nz/nPz
   nPdomain = nPx*nPy*nPz
+
+  ! Check if mesh is uniform
+  if ( abs(xLength*dble(Ny)/yLength/dble(Nx) - 1.d0) > 1.d-8 .or. &  
+       abs(xLength*dble(Nz)/zLength/dble(Nx) - 1.d0) > 1.d-8 ) & 
+       call pariserror("Mesh is not uniform!")
 
 !--- output frequency
   if ( tout > 0.d0 .and. dtFlag == 1) then 

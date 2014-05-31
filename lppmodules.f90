@@ -111,6 +111,12 @@
    end type particle 
    type (particle), dimension(:,:), allocatable :: parts
 
+   type particle_collect
+      real(8) :: xc,yc,zc,hfx,hfy,hfz
+      integer :: ic,jc,kc,dummyint  
+   end type particle_collect 
+   type (particle_collect), dimension(:,:), allocatable :: parts_collect
+
    integer, dimension(:,:), allocatable :: parts_cross_id
    integer, dimension(:,:), allocatable :: parts_cross_newrank
    integer, dimension(:), allocatable :: num_part_cross
@@ -168,9 +174,10 @@
    logical :: output_lpp_evolution
    
    integer :: TwoWayCouplingFlag
-   integer, parameter :: TwoWayCouplingIgnore  = 0
-   integer, parameter :: TwoWayCouplingClassic = 1
-   integer, parameter :: TwoWayCouplingMonoPole = 2
+   integer, parameter :: TwoWayCouplingIgnore      = 0
+   integer, parameter :: TwoWayCouplingFilterForce = 1
+   integer, parameter :: TwoWayCouplingFilterVel   = 2
+   real(8) :: FilterLengthLPP2Lcut, FilterLengthLPP
 
 contains
 !=================================================================================================
@@ -204,6 +211,9 @@ contains
       if ( CriteriaConvertCase == CriteriaInterface ) & 
          allocate( RegAwayInterface(imin:imax,jmin:jmax,kmin:kmax) )
 
+      if ( TwoWayCouplingFlag == TwoWayCouplingFilterForce) & 
+         allocate( parts_collect(max_num_part,0:nPdomain-1) )
+
       ! set default values
       num_tag  = 0
       num_part = 0
@@ -233,7 +243,8 @@ contains
          vol_cut,xlpp_min,xlpp_max,ylpp_min,ylpp_max,zlpp_min,zlpp_max,    &
          max_num_drop, maxnum_cell_drop, max_num_part, max_num_part_cross, &
          outputlpp_format,NumStepAfterVOFConversionForAve, &
-         WallEffectSettling,output_lpp_evolution,lppbdry_cond,TwoWayCouplingFlag 
+         WallEffectSettling,output_lpp_evolution,lppbdry_cond,& 
+         TwoWayCouplingFlag,FilterLengthLPP2Lcut 
 
       in=32
 
@@ -261,6 +272,7 @@ contains
       output_lpp_evolution = .false.
       lppbdry_cond=['undefined','undefined','undefined','undefined','undefined','undefined']
       TwoWayCouplingFlag = 0 
+      FilterLengthLPP2Lcut = 8.d0 
 
       call MPI_COMM_RANK(MPI_COMM_WORLD, rank, ierr)
       inquire(file='inputlpp',exist=file_is_there)
@@ -292,6 +304,9 @@ contains
             if ( rank == 0 ) write(*,*) 'undefined lpp condition in direction', i,' now is set to periodic by default!' 
          end if ! lppbdry_cond 
       end do !i
+
+      ! Compute dependent parameters
+      FilterLengthLPP = FilterLengthLPP2Lcut*(6.d0*vol_cut/PI)**0.333333333333333d0 
    end subroutine ReadLPPParameters
 
 
@@ -2004,7 +2019,7 @@ contains
       real(8), parameter :: Cm = 0.5d0
 
       real(8) :: relvel(4), partforce(3)
-      real(8) :: dp, Rep, muf, mup, rhof, rhop, taup
+      real(8) :: dp, mp,Rep, muf, mup, rhof, rhop, taup
       real(8) :: xp,yp,zp, up,vp,wp, uf,vf,wf, DufDt,DvfDt,DwfDt
       real(8) :: fhx,fhy,fhz
       
@@ -2081,6 +2096,22 @@ contains
             parts(ipart,rank)%element%duc = partforce(1) 
             parts(ipart,rank)%element%dvc = partforce(2)
             parts(ipart,rank)%element%dwc = partforce(3)
+
+            if ( TwoWayCouplingFlag == TwoWayCouplingFilterForce) then 
+               parts_collect(ipart,rank)%xc = xp
+               parts_collect(ipart,rank)%yc = yp
+               parts_collect(ipart,rank)%zc = zp
+               parts_collect(ipart,rank)%ic = parts(ipart,rank)%ic
+               parts_collect(ipart,rank)%jc = parts(ipart,rank)%jc
+               parts_collect(ipart,rank)%kc = parts(ipart,rank)%kc
+               mp =  rho2*parts(ipart,rank)%element%vol
+               parts_collect(ipart,rank)%hfx = &
+                  mp*(partforce(1) - (1.d0-rho1/rho2)*Gx )  
+               parts_collect(ipart,rank)%hfx = &
+                  mp*(partforce(2) - (1.d0-rho1/rho2)*Gy )  
+               parts_collect(ipart,rank)%hfx = &
+                  mp*(partforce(3) - (1.d0-rho1/rho2)*Gz ) 
+            end if ! TwoWayCouplingFlag
          end do ! ipart
       end if ! num_part(rank) 
    end subroutine ComputePartForce
@@ -2148,7 +2179,7 @@ contains
       dp = (6.d0*volp/PI)**0.3333333333333333d0
 
       if ( TwoWayCouplingFlag == TwoWayCouplingIgnore .or. & 
-           TWoWayCouplingFlag == TwoWayCouplingClassic )  then 
+           TWoWayCouplingFlag == TwoWayCouplingFilterForce )  then 
 
          if ( NumStepAfterVOFConversionForAve > 0 .and. & 
               TimeStepAfterVOFConversion < NumStepAfterVOFConversionForAve ) then 
@@ -2159,7 +2190,8 @@ contains
             call TrilinearIntrplFluidVel(xp,yp,zp,ip,jp,kp,vf,DvfDt,2)
             call TrilinearIntrplFluidVel(xp,yp,zp,ip,jp,kp,wf,DwfDt,3)
          end if
-      else if ( TwoWayCouplingFlag == TwoWayCouplingMonoPole ) then 
+      else if ( TwoWayCouplingFlag == TwoWayCouplingFilterVel ) then 
+         call lpperror("Two way coupling with filtered fluid veloicty is not ready yet!")
          ConvertRegSize = ConvertRegSizeToDiam*dp
          call FindCellIndexBdryConvertRegUnifMesh(ConvertRegSize,i1,ip,i2,j1,jp,j2,k1,kp,k2)
          xh1 = xp-xh(i1); xh2 = xh(i2)-xp; x1  = xp-x(i1); x2  = x(i2)-xp
@@ -2189,9 +2221,6 @@ contains
                                    sdw(ip,j1,kp),sdw(ip,j2,kp), &
                                    sdw(ip,jp,k1),sdw(ip,jp,k2), &
                                    x1,x2,y1,y2,zh1,zh2,DwfDt)
-! DEBUG
-         uf=0.d0;vf=0.d0;wf=0.d0; DufDt=0.d0;DvfDt=0.d0;DwfDt=0.d0
-! END DEBUG
       end if ! dp 
 
    end subroutine GetFluidProp
@@ -2199,36 +2228,74 @@ contains
    subroutine TwoWayCouplingForce(TwoWayCouplingFlag) 
 
       implicit none 
+      include 'mpif.h'
       integer, intent(in) :: TwoWayCouplingFlag
+     
+      integer :: ierr,irank
+      integer :: MPI_part_collect_type,MPI_part_collect_row, & 
+                 oldtypes(0:3), blockcounts(0:3), & 
+                 offsets(0:3), intextent,r8extent
 
-      integer :: i,j,k,ipart
-      real(8) :: mp,dp,xp,yp,zp,fx,fy,fz,x2,y2,z2,s0,sigma
+      integer :: i,j,k,ipart,ip,jp,kp
+      real(8) :: xp,yp,zp,fx,fy,fz,x2,y2,z2,s0,s1
+      integer :: Ncf
 
-      if (TwoWayCouplingFlag == TwoWayCouplingMonoPole) then
-         if ( num_part(rank) > 0 ) then
-            do k=kmin,kmax; do j=jmin,jmax; do i=imin,imax
-               do ipart = 1,num_part(rank) 
-                  mp =  rho2*parts(ipart,rank)%element%vol
-                  dp = (6.d0*parts(ipart,rank)%element%vol/PI)**0.3333333333333333d0
-                  xp =  parts(ipart,rank)%element%xc
-                  yp =  parts(ipart,rank)%element%yc
-                  zp =  parts(ipart,rank)%element%zc
-                  fx = mp * (parts(ipart,rank)%element%duc - (1.d0-rho1/rho2)*Gx )  
-                  fy = mp * (parts(ipart,rank)%element%dvc - (1.d0-rho1/rho2)*Gy )  
-                  fz = mp * (parts(ipart,rank)%element%dwc - (1.d0-rho1/rho2)*Gz ) 
+      s1 = FilterLengthLPP*0.25d0
+      Ncf   = NINT(FilterLengthLPP*0.5d0/xLength*dble(Nx))
+      if (TwoWayCouplingFlag == TwoWayCouplingFilterForce) then
+         
+         !  Setup MPI derived type for particle 
+         call MPI_TYPE_EXTENT(MPI_REAL8,   r8extent,  ierr) 
+         call MPI_TYPE_EXTENT(MPI_INTEGER, intextent, ierr)
 
-                  x2 = (xh(i)-xp)*(xh(i)-xp) + (y(j)-yp)*(y(j)-yp) + (z(k)-zp)*(z(k)-zp)
-                  y2 = (x(i)-xp)*(x(i)-xp) + (yh(j)-yp)*(yh(j)-yp) + (z(k)-zp)*(z(k)-zp)
-                  z2 = (x(i)-xp)*(x(i)-xp) + (y(j)-yp)*(y(j)-yp) + (zh(k)-zp)*(zh(k)-zp)
+         offsets    (0) = 0 
+         oldtypes   (0) = MPI_REAL8 
+         blockcounts(0) = 6 
+         offsets    (1) = offsets(0) + blockcounts(0)*r8extent 
+         oldtypes   (1) = MPI_INTEGER  
+         blockcounts(1) = 4  
+         
+         call MPI_TYPE_STRUCT(2, blockcounts, offsets, oldtypes, & 
+                              MPI_part_collect_type, ierr) 
+         call MPI_TYPE_COMMIT(MPI_part_collect_type, ierr)
+         call MPI_TYPE_CONTIGUOUS (max_num_part, MPI_part_collect_type, MPI_part_collect_row, ierr)
+         call MPI_TYPE_COMMIT(MPI_part_collect_row, ierr)
 
-                  sigma = 0.5d0*dp/sqrt(PI)
-                  s0 = (2.d0*PI*sigma*sigma)**(-1.5d0)
-                  du(i,j,k) = du(i,j,k) - fx*s0*exp(-x2*0.5d0/sigma/sigma)
-                  dv(i,j,k) = dv(i,j,k) - fy*s0*exp(-y2*0.5d0/sigma/sigma)
-                  dw(i,j,k) = dw(i,j,k) - fz*s0*exp(-z2*0.5d0/sigma/sigma)
+         call MPI_ALLGATHER(parts_collect(1:max_num_part,rank), 1, MPI_part_collect_row, &
+                            parts_collect(1:max_num_part,:),    1, MPI_part_collect_row, & 
+                            MPI_Comm_World, ierr)
+
+         do k=ks,ke; do j=js,je; do i=is,ie
+            do irank = 0,nPdomain-1
+               if ( num_part(irank) > 0 ) then
+               do ipart = 1,num_part(irank) 
+                  ip = parts_collect(ipart,irank)%ic
+                  jp = parts_collect(ipart,irank)%jc
+                  kp = parts_collect(ipart,irank)%kc
+                  
+                  if ( i > ip-Ncf .and. i < ip+Ncf .and. & 
+                       j > jp-Ncf .and. j < jp+Ncf .and. &
+                       k > kp-Ncf .and. k < kp+Ncf ) then 
+                     xp = parts_collect(ipart,irank)%xc
+                     yp = parts_collect(ipart,irank)%yc
+                     zp = parts_collect(ipart,irank)%zc
+                     fx = parts_collect(ipart,irank)%hfx
+                     fy = parts_collect(ipart,irank)%hfy
+                     fz = parts_collect(ipart,irank)%hfz
+   
+                     x2 = (xh(i)-xp)*(xh(i)-xp) + (y(j)-yp)*(y(j)-yp) + (z(k)-zp)*(z(k)-zp)
+                     y2 = (x(i)-xp)*(x(i)-xp) + (yh(j)-yp)*(yh(j)-yp) + (z(k)-zp)*(z(k)-zp)
+                     z2 = (x(i)-xp)*(x(i)-xp) + (y(j)-yp)*(y(j)-yp) + (zh(k)-zp)*(zh(k)-zp)
+
+                     s0 = (2.d0*PI*s1*s1)**(-1.5d0)
+                     du(i,j,k) = du(i,j,k) - fx*s0*exp(-x2*0.5d0/s1/s1)
+                     dv(i,j,k) = dv(i,j,k) - fy*s0*exp(-y2*0.5d0/s1/s1)
+                     dw(i,j,k) = dw(i,j,k) - fz*s0*exp(-z2*0.5d0/s1/s1)
+                  end if ! i,j,k
                end do ! ipart
-            end do; end do; end do
-         end if ! num_part(rank) 
+               end if ! num_part(irank)
+            end do ! irank
+         end do; end do; end do
       else 
          call lpperror("Unknow two-way coupling flag!")
       end if ! TwoWayCouplingFlag
@@ -2494,7 +2561,7 @@ contains
          call MPI_ALLGATHER(parts_cross_newrank(1:maxnum_part_cross,rank), 1, MPI_int_row, &
                             parts_cross_newrank(1:maxnum_part_cross,:),    1, MPI_int_row, & 
                             MPI_Comm_World, ierr)
-      !  Setup MPI derived type for drop_merge_comm
+      !  Setup MPI derived type for particle 
       call MPI_TYPE_EXTENT(MPI_REAL8,   r8extent,  ierr) 
       call MPI_TYPE_EXTENT(MPI_INTEGER, intextent, ierr) 
       offsets    (0) = 0 
