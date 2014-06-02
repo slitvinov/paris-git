@@ -879,24 +879,24 @@ or none at all")
     if (VOF_advect=='Dick_Yue') call c_mask(work(:,:,:,2))
     if (MOD(tswap,3).eq.0) then  ! do z then x then y 
        call swpmom(w,cvof,vof_flag,3, &
-           workmom(:,:,:,1),workmom(:,:,:,2), workmom(:,:,:,3),workmom(:,:,:,4), &
-           work(:,:,:,1), work(:,:,:,2),work(:,:,:,3),tmp(:,:,:))
+           workmom(:,:,:,1),workmom(:,:,:,2), workmom(:,:,:,3),workmom(:,:,:,4))
+       call swphalf(w,cvof,vof_flag,3,work(:,:,:,1), work(:,:,:,2),work(:,:,:,3),tmp(:,:,:))
        call do_all_ghost(cvof)
        call do_all_ighost(vof_flag)
        call get_velocity_from_momentum (workmom(:,:,:,2),workmom(:,:,:,3), &
                    work(:,:,:,2),work(:,:,:,3),3,w)
 
        call swpmom(u,cvof,vof_flag,1, &
-           workmom(:,:,:,1),workmom(:,:,:,2), workmom(:,:,:,3),workmom(:,:,:,4), &
-           work(:,:,:,1), work(:,:,:,2),work(:,:,:,3),tmp(:,:,:))
+           workmom(:,:,:,1),workmom(:,:,:,2), workmom(:,:,:,3),workmom(:,:,:,4))
+       call swphalf(u,cvof,vof_flag,1,work(:,:,:,1), work(:,:,:,2),work(:,:,:,3),tmp(:,:,:))
        call do_all_ghost(cvof)
        call do_all_ighost(vof_flag)
        call get_velocity_from_momentum (workmom(:,:,:,2),workmom(:,:,:,3), &
                    work(:,:,:,2),work(:,:,:,3),1,u)
 
        call swpmom(v,cvof,vof_flag,2, &
-           workmom(:,:,:,1),workmom(:,:,:,2), workmom(:,:,:,3),workmom(:,:,:,4), &
-           work(:,:,:,1), work(:,:,:,2),work(:,:,:,3),tmp(:,:,:))
+           workmom(:,:,:,1),workmom(:,:,:,2), workmom(:,:,:,3),workmom(:,:,:,4))
+       call swphalf(v,cvof,vof_flag,2,work(:,:,:,1), work(:,:,:,2),work(:,:,:,3),tmp(:,:,:))
        call do_all_ghost(cvof)
        call do_all_ighost(vof_flag)
        call get_velocity_from_momentum (workmom(:,:,:,2),workmom(:,:,:,3), &
@@ -905,24 +905,24 @@ or none at all")
     elseif (MOD(tswap,3).eq.1) then ! do y z x
 
        call swpmom(v,cvof,vof_flag,2, &
-           workmom(:,:,:,1),workmom(:,:,:,2), workmom(:,:,:,3),workmom(:,:,:,4), &
-           work(:,:,:,1), work(:,:,:,2),work(:,:,:,3),tmp(:,:,:))
+           workmom(:,:,:,1),workmom(:,:,:,2), workmom(:,:,:,3),workmom(:,:,:,4))
+       call swphalf(v,cvof,vof_flag,2,work(:,:,:,1), work(:,:,:,2),work(:,:,:,3),tmp(:,:,:))
        call do_all_ghost(cvof)
        call do_all_ighost(vof_flag)
        call get_velocity_from_momentum (workmom(:,:,:,2),workmom(:,:,:,3), &
                    work(:,:,:,2),work(:,:,:,3),2,v)
 
        call swpmom(w,cvof,vof_flag,3, &
-           workmom(:,:,:,1),workmom(:,:,:,2), workmom(:,:,:,3),workmom(:,:,:,4), &
-           work(:,:,:,1), work(:,:,:,2),work(:,:,:,3),tmp(:,:,:))
+           workmom(:,:,:,1),workmom(:,:,:,2), workmom(:,:,:,3),workmom(:,:,:,4))
+       call swphalf(w,cvof,vof_flag,3,work(:,:,:,1), work(:,:,:,2),work(:,:,:,3),tmp(:,:,:))
        call do_all_ghost(cvof)
        call do_all_ighost(vof_flag)
        call get_velocity_from_momentum (workmom(:,:,:,2),workmom(:,:,:,3), &
                    work(:,:,:,2),work(:,:,:,3),3,w)
 
        call swpmom(u,cvof,vof_flag,1, &
-           workmom(:,:,:,1),workmom(:,:,:,2), workmom(:,:,:,3),workmom(:,:,:,4), &
-           work(:,:,:,1), work(:,:,:,2),work(:,:,:,3),tmp(:,:,:))
+           workmom(:,:,:,1),workmom(:,:,:,2), workmom(:,:,:,3),workmom(:,:,:,4))
+       call swphalf(u,cvof,vof_flag,1,work(:,:,:,1), work(:,:,:,2),work(:,:,:,3),tmp(:,:,:))
        call do_all_ghost(cvof)
        call do_all_ighost(vof_flag)
        call get_velocity_from_momentum (workmom(:,:,:,2),workmom(:,:,:,3), &
@@ -931,24 +931,24 @@ or none at all")
     else ! do x y z
 
        call swpmom(u,cvof,vof_flag,1, &
-           workmom(:,:,:,1),workmom(:,:,:,2), workmom(:,:,:,3),workmom(:,:,:,4), &
-           work(:,:,:,1), work(:,:,:,2),work(:,:,:,3),tmp(:,:,:))
+           workmom(:,:,:,1),workmom(:,:,:,2), workmom(:,:,:,3),workmom(:,:,:,4))
+       call swphalf(u,cvof,vof_flag,1,work(:,:,:,1), work(:,:,:,2),work(:,:,:,3),tmp(:,:,:))
        call do_all_ghost(cvof)
        call do_all_ighost(vof_flag)
        call get_velocity_from_momentum (workmom(:,:,:,2),workmom(:,:,:,3), &
                    work(:,:,:,2),work(:,:,:,3),1,u)
 
        call swpmom(v,cvof,vof_flag,2, &
-           workmom(:,:,:,1),workmom(:,:,:,2), workmom(:,:,:,3),workmom(:,:,:,4), &
-           work(:,:,:,1), work(:,:,:,2),work(:,:,:,3),tmp(:,:,:))
+           workmom(:,:,:,1),workmom(:,:,:,2), workmom(:,:,:,3),workmom(:,:,:,4))
+       call swphalf(v,cvof,vof_flag,2,work(:,:,:,1), work(:,:,:,2),work(:,:,:,3),tmp(:,:,:))
        call do_all_ghost(cvof)
        call do_all_ighost(vof_flag)
        call get_velocity_from_momentum (workmom(:,:,:,2),workmom(:,:,:,3), &
                    work(:,:,:,2),work(:,:,:,3),2,v)
 
        call swpmom(w,cvof,vof_flag,3, &
-           workmom(:,:,:,1),workmom(:,:,:,2), workmom(:,:,:,3),workmom(:,:,:,4), &
-           work(:,:,:,1), work(:,:,:,2),work(:,:,:,3),tmp(:,:,:))
+           workmom(:,:,:,1),workmom(:,:,:,2), workmom(:,:,:,3),workmom(:,:,:,4))
+       call swphalf(w,cvof,vof_flag,3,work(:,:,:,1), work(:,:,:,2),work(:,:,:,3),tmp(:,:,:))
        call do_all_ghost(cvof)
        call do_all_ighost(vof_flag)
        call get_velocity_from_momentum (workmom(:,:,:,2),workmom(:,:,:,3), &
@@ -1395,26 +1395,44 @@ subroutine swp(us,c,f,d,vof1,vof2,vof3)
   endif
   call get_flags_and_clip()
 end subroutine swp
+
+subroutine swphalf(us,c,f,d,vof1,vofh1,vofh2,vof3)
+  use module_vof
+  implicit none
+  real (8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: us
+  integer, intent(in) :: d
+  real (8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: c
+  real(8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout)  :: vofh1,vofh2,vof1,vof3
+  integer, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout)    :: f
+  if (VOF_advect=='Dick_Yue') then  ! Yue-Weymouth = Eulerian Implicit + central cell stuff
+     call pariserror("***Dick_Yue + conserving momentum not implemented yet")
+  elseif (VOF_advect=='CIAM') then  ! CIAM == Lagrangian Explicit
+     call swpzhalf(us,c,f,d,vof1,vofh1,vofh2,vof3)
+  else
+     call pariserror("*** unknown vof scheme")
+  endif
+  call get_flags_and_clip()
+end subroutine swphalf
 !
-subroutine swpmom(us,c,f,d,mom1,momh1,momh2,mom3,vof1,cvofh1,cvofh2,vof3)
+subroutine swpmom(us,c,f,d,mom1,momh1,momh2,mom3)
   use module_vof
   implicit none
   integer, intent(in) :: d
   real(8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: us
   real(8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: c
   real(8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: mom1,momh1,momh2,mom3
-  real(8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: cvofh1,cvofh2,vof1,vof3
   integer, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: f
 
   if (VOF_advect=='Dick_Yue') then  ! Yue-Weymouth = Eulerian Implicit + central cell stuff
      call pariserror("***Dick_Yue + conserving momentum not implemented yet")
   elseif (VOF_advect=='CIAM') then  ! CIAM == Lagrangian Explicit
-     call swpzmom(us,c,f,d,mom1,momh1,momh2,mom3,vof1,cvofh1,cvofh2,vof3)
+     call swpzmom(us,c,f,d,mom1,momh1,momh2,mom3)
   else
      call pariserror("*** unknown vof scheme")
   endif
   call get_flags_and_clip()
 end subroutine swpmom
+
 !  Implements the CIAM (Lagrangian Explicit, onto square)
 !  advection method of Jie Li. 
 ! 
@@ -1428,16 +1446,15 @@ subroutine swpz(us,c,f,d,vof1,vof2,vof3)
   use module_flow
   use module_vof
   implicit none
+  logical error
   integer i,j,k
-  integer i0,j0,k0
-  integer inv(3)
-  real (8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: us
   integer, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: f
   integer, intent(in) :: d
+  real (8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: us
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: c,vof1,vof2,vof3
   real(8) mm1,mm2
-  real(8) a1,a2,alpha,al3d,fl3d
-  real(8) mxyz(3), dm(3),stencil3x3(-1:1,-1:1,-1:1)
+  real(8) a1,a2,alpha,fl3d
+  real(8) dm(3)
   intrinsic dmax1,dmin1
   !***
   if(ng.lt.2) call pariserror("wrong ng")
@@ -1469,52 +1486,12 @@ subroutine swpz(us,c,f,d,vof1,vof2,vof3)
               vof3(i,j,k) = dmax1(a2,0.d0)
 
            else if (c(i,j,k) .gt. 0.d0) then
-              !***
-              !     (1) normal vector: dmx,dmy,dmz, and |dmx|+|dmy|+|dmz| = 1.
-              !     (2) dmx,dmy,dmz>0.
-              !     (3) get alpha;               (4) back to original plane;
-              !     (5) lagrangian advection;    (6) get fluxes
-              !*(1)*
 
-              do i0=-1,1; do j0=-1,1; do k0=-1,1
-                 stencil3x3(i0,j0,k0) = c(i+i0,j+j0,k+k0)
-              enddo;enddo;enddo
-              call mycs(stencil3x3,mxyz)
-              !*(2)*  
-              inv(:) = 1
-              do i0=1,3
-                if (mxyz(i0) .lt. 0.0d0) then
-                   mxyz(i0) = -mxyz(i0)
-                   inv(i0) = -1
-                endif
-              enddo
-              !*(3)*
-! TEMPORARY - Note: avoid calculating alpha when mxyz is zero, which occurs when cvof is 
-!                   a very small non-zero number in an isolated cell  
-              if ( mxyz(1) == 0.d0 .and. mxyz(2) == 0.d0 .and. mxyz(3) == 0.d0 ) cycle
-! END TEMPORARY  
-              alpha = al3d(mxyz(1),mxyz(2),mxyz(3),c(i,j,k))
-              !*(4)*  
-              mxyz(:) = inv*mxyz
-              alpha = alpha + dmin1(0.d0,mxyz(1)) + dmin1(0.d0,mxyz(2)) + &
-                   dmin1(0.d0,mxyz(3))
-              !*(5)*  
-              mxyz(d) = mxyz(d)/(1.0d0 - a1 + a2)
-              alpha = alpha + mxyz(d)*a1
+              call fit_plane(i,j,k,c,d,a1,a2,dm,alpha,error)
+              if (error) cycle
 
               mm1 = dmax1(a1,0.0d0)
               mm2 = 1.d0 - mm1 + dmin1(0.d0,a2)
-              if (d.eq.1) then
-                dm = mxyz
-              elseif (d.eq.2) then
-                dm(1) = mxyz(2)
-                dm(2) = mxyz(3)
-                dm(3) = mxyz(1)
-              elseif (d.eq.3) then
-                dm(1) = mxyz(3)
-                dm(2) = mxyz(1)
-                dm(3) = mxyz(2)
-              endif
 
               if (a1 .lt. 0.d0) &
                    vof1(i,j,k) = fl3d(dm(1),dm(2),dm(3),alpha,a1  ,-a1)
@@ -1556,13 +1533,128 @@ subroutine swpz(us,c,f,d,vof1,vof2,vof3)
   !***
 end subroutine swpz
 
-subroutine swpzmom(us,c,f,d,mom1,momh1,momh2,mom3,vof1,cvofh1,cvofh2,vof3)
+subroutine swpzhalf(us,c,f,d,vof1,cvofh1,cvofh2,vof3)
 !  !***
   use module_grid
   use module_flow
   use module_vof
   use module_BC
   implicit none
+  logical error
+  integer i,j,k
+  integer, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: f
+  integer, intent(in) :: d
+  real(8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: us
+  real(8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: c
+  real(8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: vof1,cvofh1,cvofh2,vof3
+  real(8) mm1,mm2,tmpreal
+  real(8) a1,a2,alpha,fl3d
+  real(8) dm(3)
+  intrinsic dmax1,dmin1
+  !***
+  if(ng.lt.2) call pariserror("wrong ng")
+  do k=ks-1,ke+1
+     do j=js-1,je+1
+        do i=is-1,ie+1
+           if (d.eq.1) then
+              a2 = us(i,j,k)*dt/dxh(i)
+              a1 = us(i-1,j,k)*dt/dxh(i-1)
+           elseif (d.eq.2) then
+              a2 = us(i,j,k)*dt/dyh(j)
+              a1 = us(i,j-1,k)*dt/dyh(j-1)
+           elseif (d.eq.3) then
+              a2 = us(i,j,k)*dt/dzh(k)
+              a1 = us(i,j,k-1)*dt/dzh(k-1)
+           endif
+           !***
+           !     3 cases: 1: default (c=0. and fluxes=0.); 2: c=1.; 3:c>0.
+           !***
+           vof1(i,j,k)   = 0.0d0
+           vof3(i,j,k)   = 0.0d0
+           cvofh1(i,j,k) = 0.0d0
+           cvofh2(i,j,k) = 0.0d0
+ 
+           mm1 = dmax1(a1,0.0d0)
+           mm2 = 1.d0 - mm1 + dmin1(0.d0,a2)
+
+           ! we need to introduce full/empty flags
+           if (c(i,j,k) .eq. 1.0d0) then
+              vof1(i,j,k) = dmax1(-a1,0.d0)
+              vof3(i,j,k) = dmax1(a2,0.d0)
+              tmpreal = 1.d0 - dmax1(a1,0.d0) + dmin1(a2,0.d0)
+              cvofh1(i,j,k) = tmpreal*(0.5d0-mm1)/mm2
+              cvofh2(i,j,k) = tmpreal*(mm1+mm2-0.5d0)/mm2
+
+           else if (c(i,j,k) .gt. 0.d0) then
+           
+              call fit_plane(i,j,k,c,d,a1,a2,dm,alpha,error)
+              if (error) cycle
+
+              if (a1 .lt. 0.d0) then
+                     vof1(i,j,k) = fl3d(dm(1),dm(2),dm(3),alpha,a1  ,-a1)
+              endif
+              if (a2 .gt. 0.d0) then
+                     vof3(i,j,k) = fl3d(dm(1),dm(2),dm(3),alpha,1.d0,a2)
+              endif
+
+              cvofh1(i,j,k) = fl3d(dm(1),dm(2),dm(3),alpha,mm1,0.5d0-mm1)
+              cvofh2(i,j,k) = fl3d(dm(1),dm(2),dm(3),alpha,0.5d0,mm1+mm2-0.5d0)
+
+           endif
+        enddo
+     enddo
+  enddo
+  
+  if (d.eq.1) then
+      do k=ks,ke
+          do j=js,je
+              do i=is,ie
+                  cvofh1(i,j,k) = 2.d0*(vof3(i-1,j,k) + cvofh1(i,j,k))
+                  cvofh2(i,j,k) = 2.d0*(vof1(i+1,j,k) + cvofh2(i,j,k))
+              enddo
+          enddo
+      enddo
+  elseif (d.eq.2) then
+      do k=ks,ke
+          do j=js,je
+              do i=is,ie
+                  cvofh1(i,j,k) = 2.d0*(vof3(i,j-1,k) + cvofh1(i,j,k))
+                  cvofh2(i,j,k) = 2.d0*(vof1(i,j+1,k) + cvofh2(i,j,k))
+              enddo
+          enddo
+      enddo
+  elseif (d.eq.3) then
+      do k=ks,ke
+          do j=js,je
+              do i=is,ie
+                  cvofh1(i,j,k) = 2.d0*(vof3(i,j,k-1) + cvofh1(i,j,k))
+                  cvofh2(i,j,k) = 2.d0*(vof1(i,j,k+1) + cvofh2(i,j,k))
+              enddo
+          enddo
+      enddo
+  endif
+
+  do k=ks,ke
+      do j=js,je
+          do i=is,ie
+              c(i,j,k) = 0.5d0*(cvofh1(i,j,k) + cvofh2(i,j,k))
+              c(i,j,k) = dmax1(0.0d0,dmin1(1.0d0,c(i,j,k)))
+          enddo
+      enddo
+  enddo
+
+  call setvofbc(c,f)
+
+end subroutine swpzhalf
+
+subroutine swpzmom(us,c,f,d,mom1,momh1,momh2,mom3)
+!  !***
+  use module_grid
+  use module_flow
+  use module_vof
+  use module_BC
+  implicit none
+  logical error
   integer i,j,k
   integer i0,j0,k0
   integer inv(3)
@@ -1571,9 +1663,8 @@ subroutine swpzmom(us,c,f,d,mom1,momh1,momh2,mom3,vof1,cvofh1,cvofh2,vof3)
   real(8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: us
   real(8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: c
   real(8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: mom1,momh1,momh2,mom3
-  real(8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: vof1,cvofh1,cvofh2,vof3
-  real(8) mm1,mm2,tmpreal
-  real(8) a1,a2,alpha,al3d,fl3d,uavg,rhoavg
+  real(8) mm1,mm2,vof
+  real(8) a1,a2,alpha,fl3d,uavg,rhoavg
   real(8) facevel(2)
   real(8) mxyz(3), dm(3), stencil3x3(-1:1,-1:1,-1:1)
   intrinsic dmax1,dmin1
@@ -1596,16 +1687,6 @@ subroutine swpzmom(us,c,f,d,mom1,momh1,momh2,mom3,vof1,cvofh1,cvofh2,vof3)
               a1 = us(i,j,k-1)*dt/dzh(k-1)
               facevel(1)=us(i,j,k-1)
            endif
-           !***
-           !     3 cases: 1: default (c=0. and fluxes=0.); 2: c=1.; 3:c>0.
-           !***
-           vof1(i,j,k)   = 0.0d0
-           vof3(i,j,k)   = 0.0d0
-           cvofh1(i,j,k) = 0.0d0
-           cvofh2(i,j,k) = 0.0d0
- 
-           !DF: The subroutine for the averaged concentration should be modified
-           !to allow for cell-by-cell density calculation
             
            !momentum for full cells
            mm1 = dmax1(a1,0.0d0)
@@ -1621,104 +1702,44 @@ subroutine swpzmom(us,c,f,d,mom1,momh1,momh2,mom3,vof1,cvofh1,cvofh2,vof3)
            momh2(i,j,k)= (mm1 + mm2 - 0.5d0)/mm2*(rhoavg*uavg-mom1(i,j,k)-mom3(i,j,k))
 
            ! we need to introduce full/empty flags
-           if (c(i,j,k) .eq. 1.0d0) then
-              vof1(i,j,k) = dmax1(-a1,0.d0)
-              vof3(i,j,k) = dmax1(a2,0.d0)
-              tmpreal = 1.d0 - dmax1(a1,0.d0) + dmin1(a2,0.d0)
-              cvofh1(i,j,k) = tmpreal*(0.5d0-mm1)/mm2
-              cvofh2(i,j,k) = tmpreal*(mm1+mm2-0.5d0)/mm2
+           if (c(i,j,k) .gt. 0.d0) then
 
-           else if (c(i,j,k) .gt. 0.d0) then
-              !***
-              !     (1) normal vector: dmx,dmy,dmz, and |dmx|+|dmy|+|dmz| = 1.
-              !     (2) dmx,dmy,dmz>0.
-              !     (3) get alpha;               (4) back to original plane;
-              !     (5) lagrangian advection;    (6) get fluxes
-              !*(1)*
+              call fit_plane(i,j,k,c,d,a1,a2,dm,alpha,error)
+              if (error) cycle
 
-              do i0=-1,1; do j0=-1,1; do k0=-1,1
-                 stencil3x3(i0,j0,k0) = c(i+i0,j+j0,k+k0)
-              enddo;enddo;enddo
-              call mycs(stencil3x3,mxyz)
-              !*(2)*  
-              inv(:) = 1
-              do i0=1,3
-                if (mxyz(i0) .lt. 0.0d0) then
-                   mxyz(i0) = -mxyz(i0)
-                   inv(i0) = -1
-                endif
-              enddo
-              !*(3)*  
-              alpha = al3d(mxyz(1),mxyz(2),mxyz(3),c(i,j,k))
-              !*(4)*  
-              mxyz(:) = inv*mxyz
-              alpha = alpha + dmin1(0.d0,mxyz(1)) + dmin1(0.d0,mxyz(2)) + &
-                   dmin1(0.d0,mxyz(3))
-              !*(5)*  
-              mxyz(d) = mxyz(d)/(1.0d0 - a1 + a2)
-              alpha = alpha + mxyz(d)*a1
-              
-              if (d.eq.1) then
-                dm = mxyz
-              elseif (d.eq.2) then
-                dm(1) = mxyz(2)
-                dm(2) = mxyz(3)
-                dm(3) = mxyz(1)
-              elseif (d.eq.3) then
-                dm(1) = mxyz(3)
-                dm(2) = mxyz(1)
-                dm(3) = mxyz(2)
-              endif
-         
               if (a1 .lt. 0.d0) then
-                     vof1(i,j,k) = fl3d(dm(1),dm(2),dm(3),alpha,a1  ,-a1)
-                     mom1(i,j,k) = rho1*vof1(i,j,k) + rho2*(-a1 - vof1(i,j,k))
+                     vof = fl3d(dm(1),dm(2),dm(3),alpha,a1  ,-a1)
+                     mom1(i,j,k) = rho1*vof + rho2*(-a1 - vof)
                      !mid-point rule integration for the velocity
                      mom1(i,j,k) = mom1(i,j,k)*(facevel(1)*(1.d0+a1*0.5) + facevel(2)*(-a1*0.5))
               else
                     mom1(i,j,k) = 0.0d0
               endif
               if (a2 .gt. 0.d0) then
-                     vof3(i,j,k) = fl3d(dm(1),dm(2),dm(3),alpha,1.d0,a2)
-                     mom3(i,j,k) = rho1*vof3(i,j,k) + rho2*(a2 - vof3(i,j,k))
+                     vof = fl3d(dm(1),dm(2),dm(3),alpha,1.d0,a2)
+                     mom3(i,j,k) = rho1*vof + rho2*(a2 - vof)
                      mom3(i,j,k) = mom3(i,j,k)*(facevel(1)*a2*0.5 + facevel(2)*(1.d0-a2*0.5))
               else
                      mom3(i,j,k) = 0.0d0
               endif
 
-              !vof in half cells
-              !check:
-              !cvofh1(i,j,k) = 2.0d0*fl3d(dmx,dmy,dmz,alpha,0.0d0,0.5d0)
-              !cvofh2(i,j,k) = 2.0d0*fl3d(dmx,dmy,dmz,alpha,0.5d0,0.5d0)
-
-              cvofh1(i,j,k) = fl3d(dm(1),dm(2),dm(3),alpha,mm1,0.5d0-mm1)
-              cvofh2(i,j,k) = fl3d(dm(1),dm(2),dm(3),alpha,0.5d0,mm1+mm2-0.5d0)
-
-              momh1(i,j,k) = rho1*cvofh1(i,j,k) + rho2*((0.5d0-mm1) - cvofh1(i,j,k))
+              vof = fl3d(dm(1),dm(2),dm(3),alpha,mm1,0.5d0-mm1)
+              momh1(i,j,k) = rho1*vof + rho2*((0.5d0-mm1) - vof)
               momh1(i,j,k) = momh1(i,j,k)*(facevel(1)*0.75 + facevel(2)*0.25)
-              momh2(i,j,k) = rho1*cvofh2(i,j,k) + rho2*((mm1+mm2-0.5d0) - cvofh2(i,j,k))
+
+              vof = fl3d(dm(1),dm(2),dm(3),alpha,0.5d0,mm1+mm2-0.5d0)
+              momh2(i,j,k) = rho1*vof + rho2*((mm1+mm2-0.5d0) - vof)
               momh2(i,j,k) = momh2(i,j,k)*(facevel(1)*0.25 + facevel(2)*0.75)
-              !           elseif (c(i,j,k).ne.0.d0) then
-              !              call pariserror("case not allowed")
+
            endif
         enddo
      enddo
   enddo
-  !
-  ! assume that ghost layers take care of the boundary conditions. 
-  ! so i-1, i+1 needs to be computed. 
-  ! at least the ghost layers is-2, is-1, ie+1,ie+2  need to be there
-  ! at the beginning of the subroutine, so that fluxes vof1,vof3 are computed
-  ! for is-1, ie+1. 
-  !    (1) new values of c and  clip it: 0. <= c <= 1.
-  !    (2) apply proper boundary conditions to c
-  !*(1)* 
+
   if (d.eq.1) then
       do k=ks,ke
           do j=js,je
               do i=is,ie
-                  cvofh1(i,j,k) = 2.d0*(vof3(i-1,j,k) + cvofh1(i,j,k))
-                  cvofh2(i,j,k) = 2.d0*(vof1(i+1,j,k) + cvofh2(i,j,k))
                   momh1(i,j,k)  = 2.d0*(mom3(i-1,j,k) + momh1(i,j,k))
                   momh2(i,j,k)  = 2.d0*(mom1(i+1,j,k) + momh2(i,j,k))
               enddo
@@ -1728,8 +1749,6 @@ subroutine swpzmom(us,c,f,d,mom1,momh1,momh2,mom3,vof1,cvofh1,cvofh2,vof3)
       do k=ks,ke
           do j=js,je
               do i=is,ie
-                  cvofh1(i,j,k) = 2.d0*(vof3(i,j-1,k) + cvofh1(i,j,k))
-                  cvofh2(i,j,k) = 2.d0*(vof1(i,j+1,k) + cvofh2(i,j,k))
                   momh1(i,j,k)  = 2.d0*(mom3(i,j-1,k) + momh1(i,j,k))
                   momh2(i,j,k)  = 2.d0*(mom1(i,j+1,k) + momh2(i,j,k))
               enddo
@@ -1739,8 +1758,6 @@ subroutine swpzmom(us,c,f,d,mom1,momh1,momh2,mom3,vof1,cvofh1,cvofh2,vof3)
       do k=ks,ke
           do j=js,je
               do i=is,ie
-                  cvofh1(i,j,k) = 2.d0*(vof3(i,j,k-1) + cvofh1(i,j,k))
-                  cvofh2(i,j,k) = 2.d0*(vof1(i,j,k+1) + cvofh2(i,j,k))
                   momh1(i,j,k)  = 2.d0*(mom3(i,j,k-1) + momh1(i,j,k))
                   momh2(i,j,k)  = 2.d0*(mom1(i,j,k+1) + momh2(i,j,k))
               enddo
@@ -1748,21 +1765,74 @@ subroutine swpzmom(us,c,f,d,mom1,momh1,momh2,mom3,vof1,cvofh1,cvofh2,vof3)
       enddo
   endif
 
-  do k=ks,ke
-      do j=js,je
-          do i=is,ie
-              c(i,j,k) = 0.5d0*(cvofh1(i,j,k) + cvofh2(i,j,k))
-              c(i,j,k) = dmax1(0.0d0,dmin1(1.0d0,c(i,j,k)))
-          enddo
-      enddo
-  enddo
-
-  call setvofbc(c,f)
   call SetMomentumBC(us,c,momh1,d,umask,rho1/2.d0,rho2/2.d0) !fixme: to use vmask, wmask
   call SetMomentumBC(us,c,momh2,d,umask,rho1/2.d0,rho2/2.d0) !fixme: to use vmask, wmask
 !
   !***
 end subroutine swpzmom
+
+subroutine fit_plane(i,j,k,c,d,a1,a2,dm,alpha,error)
+  use module_grid
+  !***
+  !     (1) normal vector: dmx,dmy,dmz, and |dmx|+|dmy|+|dmz| = 1.
+  !     (2) dmx,dmy,dmz>0.
+  !     (3) get alpha;               (4) back to original plane;
+  !     (5) lagrangian advection;    (6) get fluxes
+  !*(1)*
+  integer i,j,k
+  integer i0,j0,k0
+  integer inv(3)
+  integer, intent(in) :: d
+  real(8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: c
+  real(8) a1,a2,alpha,al3d
+  real(8) mxyz(3), dm(3), stencil3x3(-1:1,-1:1,-1:1)
+  logical error
+  intrinsic dmax1,dmin1
+
+  error=.TRUE.
+  do i0=-1,1; do j0=-1,1; do k0=-1,1
+    stencil3x3(i0,j0,k0) = c(i+i0,j+j0,k+k0)
+  enddo;enddo;enddo
+  call mycs(stencil3x3,mxyz)
+  !*(2)*  
+  inv(:) = 1
+  do i0=1,3
+    if (mxyz(i0) .lt. 0.0d0) then
+      mxyz(i0) = -mxyz(i0)
+      inv(i0) = -1
+    endif
+  enddo
+  !*(3)*  
+! TEMPORARY - Note: avoid calculating alpha when mxyz is zero, which occurs when cvof is 
+!                   a very small non-zero number in an isolated cell  
+  if ( mxyz(1) == 0.d0 .and. mxyz(2) == 0.d0 .and. mxyz(3) == 0.d0 ) return
+! END TEMPORARY  
+
+  alpha = al3d(mxyz(1),mxyz(2),mxyz(3),c(i,j,k))
+  !*(4)*  
+  mxyz(:) = inv*mxyz
+  alpha = alpha + dmin1(0.d0,mxyz(1)) + dmin1(0.d0,mxyz(2)) + &
+        dmin1(0.d0,mxyz(3))
+  !*(5)*  
+  mxyz(d) = mxyz(d)/(1.0d0 - a1 + a2)
+  alpha = alpha + mxyz(d)*a1
+
+  if (d.eq.1) then
+    dm = mxyz
+    elseif (d.eq.2) then
+    dm(1) = mxyz(2)
+    dm(2) = mxyz(3)
+    dm(3) = mxyz(1)
+    elseif (d.eq.3) then
+    dm(1) = mxyz(3)
+    dm(2) = mxyz(1)
+    dm(3) = mxyz(2)
+  endif
+  
+  error=.FALSE.
+
+end subroutine fit_plane
+
 !
 !=================================================================================================
 ! split 1D advection of the interface along the x,y,z (d=1,2,3) directions
