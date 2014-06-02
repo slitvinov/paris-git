@@ -1746,8 +1746,6 @@ module module_poisson
 !----------------------------------------Fill in matrix Amat--------------------------------------
     num_iterations = 0
     nvalues = mx * my * mz * nstencil
-    call hello_coucou()
-    call pariserror("attempted stop")
     allocate(values(nvalues), stat=ierr)
     call add_2_my_sizer_2(nvalues,8)
 
