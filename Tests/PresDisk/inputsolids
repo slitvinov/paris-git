@@ -1,0 +1,9 @@
+&SOLIDPARAMETERS
+
+dosolids = T
+solid_type ='SingleDisk'
+solid_radius=0.3
+!=================================================================================================
+
+&end
+! end of the namelist

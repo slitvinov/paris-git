@@ -110,8 +110,8 @@ contains
           if(diverged) then
              OPEN(UNIT=88,FILE=TRIM(out_path)//'/message-rank-'//TRIM(int2text(rank,padding))//'.txt')
              write(88,*) "ijk rank",i,j,k,rank
-             write(88,*) "A",  A(i, j, k,:)
-             write(88,*) "p", p(i,j,k)
+             write(88,*) "A",  A(i,j,k,:)
+             write(88,*) "p",  p(i,j,k)
              write(88,*) 'A or p is NaN after',it,'iterations at rank ',rank
              close(88)
              if(rank<=30) print*,'A or p is NaN after',it,'iterations at rank ',rank
@@ -151,7 +151,6 @@ subroutine RedBlackRelax(A,p,beta)
         isw=jsw
         do j=js,je
            do i=isw+is-1,ie,2
-!           do i=is,ie
               p(i,j,k)=(1d0-beta)*p(i,j,k)+ (beta/A(i,j,k,7))*(              &
                    A(i,j,k,1) * p(i-1,j,k) + A(i,j,k,2) * p(i+1,j,k) +       &
                    A(i,j,k,3) * p(i,j-1,k) + A(i,j,k,4) * p(i,j+1,k) +       &
