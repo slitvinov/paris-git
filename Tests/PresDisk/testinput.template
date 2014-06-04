@@ -108,7 +108,7 @@ BoundaryPressure(5) = 0d0
 BoundaryPressure(6) = 0d0
 
 
-BDRY_COND = 5  1    1   5   1   1
+BDRY_COND =  5   1   1   5   1   1
                    !Type of boundary condition in x,y,z direction: 
 		   ! 0:wall  1:periodic  2:shear 3:inflow 4:outflow 5:pressure
                    !x- y- z- x+ y+ z+

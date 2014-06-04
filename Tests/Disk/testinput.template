@@ -89,17 +89,17 @@ ZLENGTH  = ZLTEMP
 ! Flow parameters
 
 U_init = 1d-12
-GX      = 1.0
+GX      = 0.0
 GY      = 0.0
 GZ      = 0.0
                    ! Components of the gravity in x,y,z direction
 
-dPdX      = 0.0
+dPdX      = -1.0
 dPdY      = 0.0
 dPdZ      = 0.0
                    ! Px, Py, Pz: pressure gradients in case of pressure driven channel flow
                    ! Px = (P(xLength)-P(0))/xLength
-BDRY_COND = 1  1    1   1   1   1
+BDRY_COND = 1  1  1  1  1  1
                    !Type of boundary condition in x,y,z direction: 0:wall  1:periodic  2:shear
                    !x- y- z- x+ y+ z+
 

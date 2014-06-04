@@ -726,46 +726,20 @@ module module_BC
     real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: umask,vmask,wmask, p
 
 
-  ! for walls set the mask to zero
-    if(bdry_cond(1)==0)then
+  ! for walls set the mask to zero  ! @@@ Aijk coefficients should be changed too. 
+    if(bdry_cond(1)==0) then
       if(coords(1)==0    ) umask(is-1,js-1:je+1,ks-1:ke+1)=0d0
       if(coords(1)==nPx-1) umask(ie,js-1:je+1,ks-1:ke+1)=0d0
     endif
 
-    if(bdry_cond(2)==0)then
+    if(bdry_cond(2)==0) then
       if(coords(2)==0    ) vmask(is-1:ie+1,js-1,ks-1:ke+1)=0d0
       if(coords(2)==nPy-1) vmask(is-1:ie+1,je,ks-1:ke+1)=0d0
-    endif
+    endif 
 
-    if(bdry_cond(3)==0)then
+    if(bdry_cond(3)==0) then
       if(coords(3)==0    ) wmask(is-1:ie+1,js-1:je+1,ks-1)=0d0
       if(coords(3)==nPz-1) wmask(is-1:ie+1,js-1:je+1,ke)=0d0
-    endif
-    
-    !pressure boundary condition 
-    ! Is this compatible with the bc in the pressure solver ? @@@@
-    if (bdry_cond(1)==5 .and. coords(1)==0)then
-      p(is-1,:,:) = 2*BoundaryPressure(1) - p(is,:,:)
-    endif
-    
-    if (bdry_cond(4)==5 .and. coords(1)==nPx-1)then
-      p(ie+1,:,:) = 2*BoundaryPressure(2) - p(ie,:,:)
-    endif
-    
-    if (bdry_cond(2)==5 .and. coords(2)==0)then
-      p(:,js-1,:) = 2*BoundaryPressure(3) - p(:,js,:)
-    endif
-    
-    if (bdry_cond(5)==5 .and. coords(2)==nPy-1)then
-      p(:,je+1,:) = 2*BoundaryPressure(4) - p(:,je,:)
-    endif
-    
-    if (bdry_cond(3)==5 .and. coords(3)==0)then
-      p(:,:,ks-1) = 2*BoundaryPressure(5) - p(:,:,ks)
-    endif
-    
-    if (bdry_cond(6)==5 .and. coords(3)==nPz-1)then
-      p(:,:,ke+1) = 2*BoundaryPressure(6) - p(:,:,ke)
     endif
   end subroutine SetPressureBC
 !=================================================================================================
@@ -1956,18 +1930,34 @@ subroutine SetupPoisson(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask,cvof,n1
 
 ! dp/dn = 0 for inflow bc on face 1 == x- : do not correct u(is-1)
 ! inflow bc on other faces not implemented yet.  
-  if(bdry_cond(1)==3 .and. coords(1)==0) then
-     A(is,:,:,7) = A(is,:,:,7) - A(is,:,:,1)
-     A(is,:,:,1) = 0d0
+  if(coords(1)==0) then
+     if(bdry_cond(1)==3) then
+        A(is,:,:,7) = A(is,:,:,7) - A(is,:,:,1)
+        A(is,:,:,1) = 0d0
+! pressure boundary condition
+     else if(bdry_cond(1)==5) then 
+         A(is,:,:,8) = (2d0/3d0)*BoundaryPressure(1)  ! P_0 =  1/3 (Pinner - P_b) + P_b
+         A(is,:,:,7) = 1d0                      ! P_0  - 1/3 Pinner =  2/3 P_b
+         A(is,:,:,1:6) = 0d0                    ! A7 P_is + A2 P_is+1 = A8 
+         A(is,:,:,2) = -1d0/3d0
+      endif
   endif
 ! dp/dn = 0 for outflow/fixed velocity bc on face 4 == x+
 ! outflow/fixed velocity bc on other faces not implemented yet.  
-  if(bdry_cond(4)==4 .and. coords(1)==Npx - 1) then
-     A(ie,:,:,7) = A(ie,:,:,7) - A(ie,:,:,2)
-     A(ie,:,:,2) = 0d0
+  if(coords(1)==Npx-1) then
+     if(bdry_cond(4)==4) then
+        A(ie,:,:,7) = A(ie,:,:,7) - A(ie,:,:,2)
+        A(ie,:,:,2) = 0d0
+! pressure boundary condition
+     else if(bdry_cond(4)==5) then
+        A(ie,:,:,8) = (2d0/3d0)*BoundaryPressure(2)
+        A(ie,:,:,7) = 1d0  ! P_0 =  -1/2 (Pinner - P_b) + P_b
+        A(ie,:,:,2:6) = 0d0
+        A(ie,:,:,1) =  -1d0/3d0
+     endif
   endif
 
-  if(check_setup.and..not.FreeSurface) then 
+  if(.not.FreeSurface) then 
      do k=ks,ke; do j=js,je; do i=is,ie
         if(A(i,j,k,7) .lt. 1d-50)  then
            ! check that we are in solid. Remember we can't have an isolated fluid cell exactly on the entrance. 
@@ -1990,7 +1980,7 @@ subroutine SetupPoisson(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask,cvof,n1
                  call pariserror("inconsistency in A1-6")
               endif
               A(i,j,k,7) = 1d0
-           else
+           else ! we are not in solid: error.
               OPEN(UNIT=88,FILE=TRIM(out_path)//'/message-rank-'//TRIM(int2text(rank,padding))//'.txt')
               write(88,*) "A7 tiny outside of solid at ijk minmax = ",i,j,k,imin,imax,jmin,jmax,kmin,kmax
               write(88,*) "dt",dt
@@ -2009,7 +1999,7 @@ subroutine SetupPoisson(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask,cvof,n1
            endif
         endif
      enddo; enddo; enddo
-     call check_poisson_setup(A,pmask,umask,vmask,wmask)
+     if(check_setup) call check_poisson_setup(A,pmask,umask,vmask,wmask)
   endif
 end subroutine SetupPoisson
 !=================================================================================================
