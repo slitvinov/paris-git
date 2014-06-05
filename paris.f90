@@ -195,7 +195,7 @@ Program paris
            wold = w
            rhoo = rho
            muold  = mu
-           cvofold  = cvof
+           if(DoVOF) cvofold  = cvof
            if ( DoLPP ) call StoreOldPartSol()
         endif
  !------------------------------------ADVECTION & DIFFUSION----------------------------------------
@@ -406,8 +406,8 @@ Program paris
            w = 0.5*(w+wold)
            rho = 0.5*(rho+rhoo)
            mu  = 0.5*(mu +muold)
-           cvof  = 0.5*(cvof +cvofold)
-           call get_flags_and_clip()
+           if(DoVOF) cvof  = 0.5*(cvof +cvofold)
+           if(DoVOF) call get_flags_and_clip()
            if ( DoLPP ) call AveragePartSol()
         endif
         if (DoLPP) then
