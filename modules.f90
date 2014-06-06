@@ -330,7 +330,7 @@ end module module_2phase
 module module_IO
   implicit none
   save
-  integer :: padding=5
+  integer :: padding=6
   integer :: opened=0;
   integer :: nout, out, output_format, nbackup, nstats, termout, nfile
   character(len=20) :: out_path, x_file, y_file, z_file
@@ -1231,18 +1231,14 @@ module module_BC
       real(8) :: ryz
       real(8), parameter :: PI = 3.14159265359d0
       uinject=0d0
-      if (inject_type==1) then
+      if (inject_type==1) then      ! uniform inflow
          uinject = 1.d0
-      elseif( inject_type==2 ) then
+      elseif( inject_type==2 ) then ! pulsed round jet
          !tdelay_gas_inject = 0.01d0
          if( (y(j) - jetcenter_yc)**2.d0 + (z(k) - jetcenter_zc)**2.d0 .lt. jetradius**2.d0 ) then 
-            if ( t<=tdelay_gas_inject ) then  
-               uinject=uliq_inject
-            else 
-               uinject=uliq_inject*(1.d0+0.05d0*SIN(10.d0*2.d0*PI*(t-tdelay_gas_inject)))
-            end if ! t
+            uinject=uliq_inject*(1.d0+0.05d0*SIN(10.d0*2.d0*PI*t))
          end if ! y(j)
-      elseif( inject_type==5 ) then 
+      elseif( inject_type==5 ) then ! round jet 
          if( (y(j) - jetcenter_yc)**2.d0 + (z(k) - jetcenter_zc)**2.d0 .lt. jetradius**2.d0 ) then 
             uinject=uliq_inject
          end if ! y(j)

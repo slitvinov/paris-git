@@ -1592,6 +1592,9 @@ subroutine pariserror(message)
   include 'mpif.h'
   integer ierr
   character(*) :: message
+! DEBUG
+  write(*,*) rank, padding, int2text(rank,padding)
+! END DEBUG
   OPEN(UNIT=89,FILE=TRIM(out_path)//'/error-rank-'//TRIM(int2text(rank,padding))//'.txt')
   write(89,*) message
   if(rank==0) print*,message

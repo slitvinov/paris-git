@@ -103,7 +103,7 @@
 
    type particle
       type(element) :: element
-      real(8) :: xcOld,ycOld,zcOld,ucOld,vcOld,wcOld
+      real(8) :: xcOld,ycOld,zcOld,ucOld,vcOld,wcOld,uf,vf,wf
       integer :: ic,jc,kc,tstepConvert,dummyint  
       ! Note: open_mpi sometimes failed to communicate the last varialbe in 
       !       MPI_TYPE_STRUCt correctly, dummyint is included to go around 
@@ -112,7 +112,7 @@
    type (particle), dimension(:,:), allocatable :: parts
 
    type particle_collect
-      real(8) :: xc,yc,zc,hfx,hfy,hfz
+      real(8) :: xc,yc,zc,hfx,hfy,hfz,vol
       integer :: ic,jc,kc,dummyint  
    end type particle_collect 
    type (particle_collect), dimension(:,:), allocatable :: parts_collect
@@ -145,7 +145,7 @@
 
    integer, parameter :: DropStatistics_PlotElement      = 1
    integer, parameter :: DropStatistics_ElementSizePDF   = 2
-   integer, parameter :: DropStatistics_PlotParticle     = 3
+   integer, parameter :: DropStatistics_WriteElementData = 3
 
    integer :: DropStatisticsMethod 
    logical :: DoConvertVOF2LPP 
@@ -297,6 +297,8 @@ contains
          call pariserror("Particle drag law is used for bubbles!")
       if ( (dragmodel == dragmodel_MKL) .and. mu1<mu2 ) & 
          call pariserror("Bubble drag law is used for particles!")
+      if ( MOD(nstats,nTimeStepTag) /= 0 ) & 
+         call pariserror("nstats must be integer times fo nTimeStepTag!")
 
       do i=1,6
          if(lppbdry_cond(i) == 'undefined') then 
@@ -305,8 +307,6 @@ contains
          end if ! lppbdry_cond 
       end do !i
 
-      ! Compute dependent parameters
-      FilterLengthLPP = FilterLengthLPP2Lcut*(6.d0*vol_cut/PI)**0.333333333333333d0 
    end subroutine ReadLPPParameters
 
 
@@ -336,7 +336,8 @@ contains
          call CreateTag2DropTable
          if ( nPdomain > 1 ) call merge_drop_pieces 
 
-         if ( DropStatisticsMethod > 0 ) call drop_statistics(tswap,time) 
+         if ( DropStatisticsMethod > 0 .and. & 
+              MOD(tswap,nstats) == 0 ) call drop_statistics(tswap,time) 
 
          if ( (DoConvertVOF2LPP .or. DoConvertLPP2VOF) .and. & 
                CriteriaConvertCase == CriteriaInterface )  call MarkRegAwayInterface()
@@ -757,7 +758,7 @@ contains
       integer :: req(2),sta(MPI_STATUS_SIZE,2),MPI_Comm,ireq,ierr
       integer :: MPI_element_type, oldtypes(0:1), blockcounts(0:1), & 
                  offsets(0:1), extent,r8extent, MPI_element_row 
-      integer :: maxnum_element 
+      integer :: maxnum_element, total_num_element
       integer :: irank, idrop, ielement, ielem_plot
       integer :: num_element_estimate(0:nPdomain-1)
       type(element) :: element_NULL
@@ -909,6 +910,27 @@ contains
                   write(101,*) (dble(igap)-0.5d0)*gap,count_element(igap)
                end do ! igap
                close(101)
+            case(DropStatistics_WriteElementData)
+               total_num_element = sum(num_element)
+               open(unit=102,file=TRIM(out_path)//'/element-stats_'//TRIM(int2text(tswap,padding))//'.dat')
+               write(102,'(11(E15.6,1X))')   time, total_num_element 
+               do irank = 0,nPdomain-1
+                  if ( num_element(irank) > 0 ) then 
+                     do ielement = 1, num_element(irank)
+                        write(102,'(11(E15.6,1X))')   element_stat(ielement,irank)%xc, & 
+                                                      element_stat(ielement,irank)%yc, &
+                                                      element_stat(ielement,irank)%zc, &
+                                                      element_stat(ielement,irank)%uc, &
+                                                      element_stat(ielement,irank)%vc, &
+                                                      element_stat(ielement,irank)%wc, &
+                                                      element_stat(ielement,irank)%duc, &
+                                                      element_stat(ielement,irank)%dvc, &
+                                                      element_stat(ielement,irank)%dwc, &
+                                                      element_stat(ielement,irank)%vol
+                     end do ! ielement
+                  end if ! num_element_irank) 
+               end do ! irank
+               close(102)
             case default
                call lpperror("unknown drop statistics method!")
          end select 
@@ -2053,6 +2075,10 @@ contains
                               tswap-parts(ipart,rank)%tstepConvert,& 
                               TwoWayCouplingFlag)
 
+! DEBUG
+!            uf=0.d0;vf=0.d0;wf=0.d0;DufDt=0.d0;DvfDt=0.d0;DwfDt=0.d0
+! END DEBUG
+
             if ( taup < 5.d0*dt ) then 
                ! If taup is much smaller than dt, no need to compute force,
                ! particle velocity is set to fluid velocity directly
@@ -2087,6 +2113,12 @@ contains
                          + (1.d0+Cm)*rhof/rhop*DwfDt                 &
                          + fhz )/(1.d0+Cm*rhof/rhop)
             
+! DEBUG
+!            write(102,*) & 
+!               time,vp,Rep, &
+!               (vf-vp)/taup*phi(dragmodel,Rep), &
+!               (vf-vp),taup,phi(dragmodel,Rep)
+! END DEBUG
             if ( output_lpp_evolution .and. mod(tswap,nstats)==0 ) then
                call output_LPP_parameter(rank,ipart,xp,yp,zp,up,vp,wp,uf,vf,wf,dp,time)
             end if ! 
@@ -2096,6 +2128,10 @@ contains
             parts(ipart,rank)%element%duc = partforce(1) 
             parts(ipart,rank)%element%dvc = partforce(2)
             parts(ipart,rank)%element%dwc = partforce(3)
+
+            parts(ipart,rank)%uf = uf
+            parts(ipart,rank)%vf = vf
+            parts(ipart,rank)%wf = wf
 
             if ( TwoWayCouplingFlag == TwoWayCouplingFilterForce) then 
                parts_collect(ipart,rank)%xc = xp
@@ -2107,10 +2143,11 @@ contains
                mp =  rho2*parts(ipart,rank)%element%vol
                parts_collect(ipart,rank)%hfx = &
                   mp*(partforce(1) - (1.d0-rho1/rho2)*Gx )  
-               parts_collect(ipart,rank)%hfx = &
+               parts_collect(ipart,rank)%hfy = &
                   mp*(partforce(2) - (1.d0-rho1/rho2)*Gy )  
-               parts_collect(ipart,rank)%hfx = &
+               parts_collect(ipart,rank)%hfz = &
                   mp*(partforce(3) - (1.d0-rho1/rho2)*Gz ) 
+               parts_collect(ipart,rank)%vol = parts(ipart,rank)%element%vol
             end if ! TwoWayCouplingFlag
          end do ! ipart
       end if ! num_part(rank) 
@@ -2240,8 +2277,6 @@ contains
       real(8) :: xp,yp,zp,fx,fy,fz,x2,y2,z2,s0,s1
       integer :: Ncf
 
-      s1 = FilterLengthLPP*0.25d0
-      Ncf   = NINT(FilterLengthLPP*0.5d0/xLength*dble(Nx))
       if (TwoWayCouplingFlag == TwoWayCouplingFilterForce) then
          
          !  Setup MPI derived type for particle 
@@ -2250,7 +2285,7 @@ contains
 
          offsets    (0) = 0 
          oldtypes   (0) = MPI_REAL8 
-         blockcounts(0) = 6 
+         blockcounts(0) = 7 
          offsets    (1) = offsets(0) + blockcounts(0)*r8extent 
          oldtypes   (1) = MPI_INTEGER  
          blockcounts(1) = 4  
@@ -2272,6 +2307,11 @@ contains
                   ip = parts_collect(ipart,irank)%ic
                   jp = parts_collect(ipart,irank)%jc
                   kp = parts_collect(ipart,irank)%kc
+
+                  FilterLengthLPP = FilterLengthLPP2Lcut& 
+                                 *(6.d0*parts_collect(ipart,irank)%vol/PI)**0.333333333333333d0 
+                  s1 = FilterLengthLPP*0.25d0
+                  Ncf   = NINT(FilterLengthLPP*0.5d0/xLength*dble(Nx))
                   
                   if ( i > ip-Ncf .and. i < ip+Ncf .and. & 
                        j > jp-Ncf .and. j < jp+Ncf .and. &
@@ -2572,7 +2612,7 @@ contains
       blockcounts(1) = 1  
       offsets    (2) = offsets(1) + blockcounts(1)*intextent 
       oldtypes   (2) = MPI_REAL8  
-      blockcounts(2) = 6
+      blockcounts(2) = 9
       offsets    (3) = offsets(2) + blockcounts(2)*r8extent 
       oldtypes   (3) = MPI_INTEGER  
       blockcounts(3) = 5  
@@ -2983,6 +3023,7 @@ end module module_Lag_part
 ! ==================================================================================================
 module module_output_lpp
    use module_IO
+   use module_flow
    use module_Lag_part
    implicit none
    integer :: lpp_opened=0
@@ -3040,6 +3081,7 @@ module module_output_lpp
       character(len=30) :: rootname
       integer :: ipart
 
+      ! output lpp data in plot3d formate 
       rootname=trim(out_path)//'/VTK/LPP'//TRIM(int2text(nf,padding))//'-'
       if(rank==0) call append_LPP_visit_file(TRIM(rootname))
 
@@ -3059,6 +3101,28 @@ module module_output_lpp
       end if ! num_part(rank)
 320   format(e14.5,e14.5,e14.5,e14.5)
       close(8)
+
+      ! write complete lpp data for other post-processing treatment
+      rootname=trim(out_path)//'/VTK/LPPDATA'//TRIM(int2text(nf,padding))//'-'
+      OPEN(UNIT=8,FILE=TRIM(rootname)//TRIM(int2text(rank,padding))//'.dat')
+      write(8,*) time,num_part(rank) 
+      if ( num_part(rank) > 0 ) then 
+         do ipart = 1,num_part(rank) 
+            write(8,'(10(E15.8,1X))') & 
+            parts(ipart,rank)%element%xc,& 
+            parts(ipart,rank)%element%yc, & 
+            parts(ipart,rank)%element%zc, &  
+            parts(ipart,rank)%element%uc, &  
+            parts(ipart,rank)%element%vc, &  
+            parts(ipart,rank)%element%wc, &  
+            parts(ipart,rank)%uf, &  
+            parts(ipart,rank)%vf, &  
+            parts(ipart,rank)%wf, &  
+            parts(ipart,rank)%element%vol
+         enddo
+      end if ! num_part(rank)
+      close(8)
+
    end subroutine output_LPP_Plot3D
 
    subroutine output_LPP_VOFVTK(nf)
@@ -3076,6 +3140,7 @@ module module_output_lpp
       if ( num_part(rank) > 0 ) then 
          do ipart = 1,num_part(rank)
             dp = (6.d0*parts(ipart,rank)%element%vol/PI)**(1.d0/3.d0)
+            if ( dp < dx(is)*0.5 ) cycle  ! Note: not plot drops to small
             rp = 0.5d0*dp
             ConvertRegSize = ConvertRegSizeToDiam*dp
             xp = parts(ipart,rank)%element%xc
@@ -3136,12 +3201,32 @@ module module_output_lpp
 210   format(e14.5)
       close(8)
          
-! TEMPORARY 
       if ( zip_data ) then 
          filename = TRIM(rootname)//TRIM(int2text(rank,padding))//'.vtk'
          call system('gzip '//trim(filename))
       end if ! zip_data
-! END TEMPORARY 
+      
+      ! write complete lpp data for other post-processing treatment
+      rootname=trim(out_path)//'/VTK/LPPDATA'//TRIM(int2text(nf,padding))//'-'
+      OPEN(UNIT=8,FILE=TRIM(rootname)//TRIM(int2text(rank,padding))//'.dat')
+      write(8,*) time,num_part(rank) 
+      if ( num_part(rank) > 0 ) then 
+         do ipart = 1,num_part(rank) 
+            write(8,'(10(E15.8,1X))') & 
+            parts(ipart,rank)%element%xc,& 
+            parts(ipart,rank)%element%yc, & 
+            parts(ipart,rank)%element%zc, &  
+            parts(ipart,rank)%element%uc, &  
+            parts(ipart,rank)%element%vc, &  
+            parts(ipart,rank)%element%wc, &  
+            parts(ipart,rank)%uf, &  
+            parts(ipart,rank)%vf, &  
+            parts(ipart,rank)%wf, &  
+            parts(ipart,rank)%element%vol
+         enddo
+      end if ! num_part(rank)
+      close(8)
+
    end subroutine output_LPP_VOFVTK
 
 !-------------------------------------------------------------------------------------------------
