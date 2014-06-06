@@ -1469,7 +1469,7 @@ end subroutine swp
 subroutine swphalf(us,c,f,d,vof1,vofh1,vofh2,vof3)
   use module_vof
   implicit none
-  real (8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: us
+  real (8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: us
   integer, intent(in) :: d
   real (8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: c
   real(8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout)  :: vofh1,vofh2,vof1,vof3
