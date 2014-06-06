@@ -129,12 +129,14 @@
 
    integer, parameter :: CRAZY_INT = 3483129 
    real(8), parameter :: CRAZY_REAl = 123456789.123456789d-16
+   real(8), parameter :: OneThird = 0.3333333333333333d0
 
    integer, parameter :: CriteriaRectangle = 1
    integer, parameter :: CriteriaCylinder  = 2
    integer, parameter :: CriteriaSphere    = 3
    integer, parameter :: CriteriaJet       = 4
    integer, parameter :: CriteriaInterface = 5
+   integer, parameter :: CriteriaIsoDrop   = 6
 
    ! Stokes drag covers bubbles to particles limit. Finite Reynolds number
    ! extensions SN & CG are only for particles while MKL is only for bubbles
@@ -1370,7 +1372,6 @@ contains
                               drops(idrop,rank)%element%yc,  & 
                               drops(idrop,rank)%element%zc,  &
                               ic,jc,kc) 
-
          call CheckConvertDropCriteria(drops(idrop,rank)%element%vol, & 
                                        drops(idrop,rank)%element%xc,  & 
                                        drops(idrop,rank)%element%yc,  & 
@@ -1395,7 +1396,7 @@ contains
             parts(num_part(rank),rank)%tstepConvert = tswap
 
             ! Define conversion region
-            dp = (6.d0*drops(idrop,rank)%element%vol/PI)**(1.d0/3.d0)
+            dp = (6.d0*drops(idrop,rank)%element%vol/PI)**OneThird
             ConvertRegSize = ConvertRegSizeToDiam*dp
             call FindCellIndexBdryConvertRegUnifMesh(ConvertRegSize, & 
                                              i1,ic,i2,j1,jc,j2,k1,kc,k2)
@@ -1548,10 +1549,25 @@ contains
       integer, intent(in ) :: CriteriaConvertCase
       logical, intent(out) :: ConvertDropFlag
 
-      real(8) :: volcell
+      real(8) :: volcell,dp,ConvertRegSize
+      integer :: i1,i,i2,j1,j,j2,k1,k,k2
+      integer :: tag0
       logical :: ConvertDropRegion = .false.
       logical :: ConvertDropShape  = .false.
 
+      ConvertDropFlag = .false.
+
+      ! Shape criteria
+      volcell = xLength*yLength*zLength/dble(Nx*Ny*Nz)
+      if ( vol < volcell*3.375d0 ) then   
+         ConvertDropShape = .true. 
+      ! Check aspect ratio for drop diameter larger 1.5dx
+      else if ( (vol < vol_cut) .and. (AspRatio < AspRatioTol) ) then 
+         ConvertDropShape = .true.
+      end if ! vol, AspRatio
+
+      ! Location criteria, only checked if shape criteria is satisfied
+      if ( ConvertDropShape ) then 
       select case (CriteriaConvertCase) 
          case (CriteriaRectangle)
             if ( (xc  > xlpp_min) .and. (xc  < xlpp_max) .and. & 
@@ -1583,16 +1599,22 @@ contains
          case (CriteriaInterface)
             if ( RegAwayInterface(ic,jc,kc) ) then 
                ConvertDropRegion = .true.
-            end if !RegAwayInterface... 
+            end if !RegAwayInterface...
+         case (CriteriaIsoDrop)
+            dp = (6.d0*vol/PI)**OneThird
+            ConvertRegSize = ConvertRegSizeToDiam*dp
+            call FindCellIndexBdryConvertRegUnifMesh(ConvertRegSize,&
+                                                     i1,ic,i2,j1,jc,j2,k1,kc,k2)
+            tag0 = tag_id(ic,jc,kc)
+            ConvertDropRegion = .true.
+            do i=i1,i2; do j=j1,j2; do k=k1,k2
+               if ( tag_id(i,j,k) /= 0 .and. tag_id(i,j,k) /= tag0 ) then 
+                  ConvertDropRegion = .false.
+                  exit 
+               end if ! tag_id
+            end do; end do; end do
       end select
-
-      volcell = xLength*yLength*zLength/dble(Nx*Ny*Nz)
-      if ( vol < volcell*3.375d0 ) then   
-         ConvertDropShape = .true. 
-      ! Check aspect ratio for drop diameter larger 1.5dx
-      else if ( (vol < vol_cut) .and. (AspRatio < AspRatioTol) ) then 
-         ConvertDropShape = .true. 
-      end if ! vol, AspRatio
+      end if ! ConvertDropShape 
 
       ConvertDropFlag = ConvertDropRegion .and. ConvertDropShape
 
@@ -1612,7 +1634,7 @@ contains
       integer :: shift,i1,i2,j1,j2,k1,k2   
 
       RegAwayInterface = .true.
-      d_cut = (6.d0*vol_cut/PI)**0.333333d0
+      d_cut = (6.d0*vol_cut/PI)**OneThird
       shift = INT(dble(ConvertRegSizeToDiam)*0.5d0*d_cut/(xh(is+1)-xh(is)))
 
       do k=ks,ke; do j=js,je; do i=is,ie
@@ -1824,6 +1846,12 @@ contains
       k1 = kc - ncl2
       k2 = kc + ncl2
 
+      i1 = max(is,i1)
+      i2 = min(ie,i2)
+      j1 = max(js,j1)
+      j2 = min(je,j2)
+      k1 = max(ks,k1)
+      k2 = min(ke,k2)
    end subroutine FindCellIndexBdryConvertRegUnifMesh
 
    subroutine ConvertLPP2VOF(tswap) 
@@ -2113,12 +2141,6 @@ contains
                          + (1.d0+Cm)*rhof/rhop*DwfDt                 &
                          + fhz )/(1.d0+Cm*rhof/rhop)
             
-! DEBUG
-!            write(102,*) & 
-!               time,vp,Rep, &
-!               (vf-vp)/taup*phi(dragmodel,Rep), &
-!               (vf-vp),taup,phi(dragmodel,Rep)
-! END DEBUG
             if ( output_lpp_evolution .and. mod(tswap,nstats)==0 ) then
                call output_LPP_parameter(rank,ipart,xp,yp,zp,up,vp,wp,uf,vf,wf,dp,time)
             end if ! 
@@ -2213,7 +2235,7 @@ contains
       real(8) :: xh1,xh2,x1,x2,yh1,yh2,y1,y2,zh1,zh2,z1,z2
       integer :: i1,i2,j1,j2,k1,k2
 
-      dp = (6.d0*volp/PI)**0.3333333333333333d0
+      dp = (6.d0*volp/PI)**OneThird
 
       if ( TwoWayCouplingFlag == TwoWayCouplingIgnore .or. & 
            TWoWayCouplingFlag == TwoWayCouplingFilterForce )  then 
@@ -2309,7 +2331,7 @@ contains
                   kp = parts_collect(ipart,irank)%kc
 
                   FilterLengthLPP = FilterLengthLPP2Lcut& 
-                                 *(6.d0*parts_collect(ipart,irank)%vol/PI)**0.333333333333333d0 
+                                 *(6.d0*parts_collect(ipart,irank)%vol/PI)**OneThird 
                   s1 = FilterLengthLPP*0.25d0
                   Ncf   = NINT(FilterLengthLPP*0.5d0/xLength*dble(Nx))
                   
