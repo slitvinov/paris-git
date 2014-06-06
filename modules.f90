@@ -466,7 +466,7 @@ subroutine backup_write
   integer ::i,j,k
   character(len=100) :: filename
   filename = trim(out_path)//'/backup_'//int2text(rank,padding)
-  call system('mv '//trim(filename)//' '//trim(filename)//'.old')
+  call system('touch '//trim(filename)//'; mv '//trim(filename)//' '//trim(filename)//'.old')
   OPEN(UNIT=7,FILE=trim(filename),status='unknown',action='write')
   write(7,1100)time,itimestep,is,ie,js,je,ks,ke
   do k=ks,ke; do j=js,je; do i=is,ie

@@ -13,8 +13,8 @@
 !=================================================================================================
 ! General parameters
 
-TwoPhase  = F         ! TwoPhase: Is the flow two-phase?
-DoVOF 	  = F
+TwoPhase  = T         ! TwoPhase: Is the flow two-phase?
+DoVOF 	  = T
 DoFront   = F
 GetPropertiesFromFront = F ! T: uses Front-Tracking data to compute mu, rho and Surface Tension. 
 		           ! F: uses VOF data to compute mu and rho. 
@@ -25,7 +25,7 @@ hypre    = F       ! T: uses hyprepackage, F: uses SOR solver
 restart  = F       ! T: start the domain from a previous simulation
 restartFront = F   ! T: start the frontfrom  a previous simulation
 restartAverages = F
-nBackup = 90000   ! number of time steps between  backups are kept.
+nBackup = 8000   ! number of time steps between  backups are kept.
 
 NSTEP   = 80000       ! maximum number of time steps
 EndTime = 0.4       ! When to stop simulation

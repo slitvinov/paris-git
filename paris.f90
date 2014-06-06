@@ -53,6 +53,7 @@ Program paris
   use module_front
 
   use module_poisson
+  use module_averages
   use module_IO
   use module_solid
   use module_vof
@@ -84,6 +85,10 @@ Program paris
 
   call ReadParameters
   if(rank==0) write(out,*)'Parameters read successfully'
+
+  call ReadAveParameters
+  if(rank==0) write(out,*)'Averaging Parameters read successfully'
+
 
   !Check consistency of options
   if(rank==0) then
@@ -416,6 +421,7 @@ Program paris
         end if ! DoLPP
 !--------------------------------------------OUTPUT-----------------------------------------------
         if(mod(itimestep,nstats)==0) call calcStats
+        if(mod(itimestep,nbackup)==0) call ComputeAverages(itimestep)
         call my_timer(2)
         if(mod(itimestep,nbackup)==0) then 
            if ( DoFront ) then 

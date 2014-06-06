@@ -41,7 +41,7 @@ LIBS = $(HYPRE_LIBS) $(VOFI_LIBS)
 #------------------------No changes needed beyond this line----------------------------------------------
 
 
-OBJ = paris.o solids.o modules.o vofmodules.o front.o surface_tension.o lppmodules.o st_testing.o newsolver.o freesurface.o
+OBJ = paris.o solids.o modules.o vofmodules.o front.o surface_tension.o lppmodules.o st_testing.o newsolver.o freesurface.o averages.o
 SRC = $(wildcard  *.f90) 
 
 install: $(OBJ)
@@ -81,7 +81,7 @@ tags:	$(SRC)
 # @SZ On MacOS tags and TAGS are identical ! 
 # @SZ	ctags paris.f90 
 
-paris.o:  paris.f90 solids.o modules.o vofmodules.o front.o surface_tension.o lppmodules.o st_testing.o newsolver.o freesurface.o
+paris.o:  paris.f90 solids.o modules.o vofmodules.o front.o surface_tension.o lppmodules.o st_testing.o newsolver.o freesurface.o averages.o
 	$(FC) -c  $(FFLAGS) $<
 
 vofmodules.o: vofmodules.f90 modules.o
@@ -106,6 +106,9 @@ newsolver.o:  newsolver.f90 modules.o
 	$(FC) -c   $(FFLAGS) $<
 
 freesurface.o: freesurface.f90 modules.o
+	$(FC) -c   $(FFLAGS) $<
+
+averages.o: averages.f90 modules.o solids.o vofmodules.o
 	$(FC) -c   $(FFLAGS) $<
 
 %.o : %.f90
