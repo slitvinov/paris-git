@@ -1484,7 +1484,7 @@ subroutine ReadParameters
                         inject_type,   maxErrorVol,   restartFront,  nstats,        WallShear,   &
                         BoundaryPressure,             ZeroReynolds,  restartAverages,termout,    &  
                         excentricity,  tout,          zip_data,      ugas_inject,   uliq_inject, &  
-                        blayer_gas_inject, tdelay_gas_inject 
+                        blayer_gas_inject,            tdelay_gas_inject,            padding
  
   Nx = 0; Ny = 4; Nz = 4 ! cause absurd input file that lack nx value to fail. 
   Ng=2;xLength=1d0;yLength=1d0;zLength=1d0
@@ -1506,7 +1506,8 @@ subroutine ReadParameters
   BoundaryPressure=0d0;   ZeroReynolds=.false.;   restartAverages=.false.;   termout=0
   excentricity=0d0;   tout = -1.d0;          zip_data=.false.
   ugas_inject=0.d0;   uliq_inject=1.d0
-  blayer_gas_inject=8.d-2; tdelay_gas_inject=1.d-2 
+  blayer_gas_inject=8.d-2; tdelay_gas_inject=1.d-2
+  padding=5
 
   in=1
   out=2

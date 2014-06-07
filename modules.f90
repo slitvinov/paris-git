@@ -330,7 +330,7 @@ end module module_2phase
 module module_IO
   implicit none
   save
-  integer :: padding=6
+  integer :: padding
   integer :: opened=0;
   integer :: nout, out, output_format, nbackup, nstats, termout, nfile
   character(len=20) :: out_path, x_file, y_file, z_file
