@@ -1462,7 +1462,6 @@ subroutine ReadParameters
   include 'mpif.h'
   integer :: in, ierr
   real(8) :: xyzrad(4,10000)
-  logical :: check_cubic=.false.
   namelist /parameters/ out_path,      Nx,            Ny,            Nz,            Ng,          &
                         xLength,       yLength,       zLength,       gx,            gy,          &
                         gz,            bdry_cond,     dPdx,          dPdy,          dPdz,        &
@@ -1553,10 +1552,11 @@ subroutine ReadParameters
   nPdomain = nPx*nPy*nPz
 
   ! Check if mesh is uniform in the VOF case
-  if(DoVOF.and.check_cubic) then
+  if(DoVOF.and.rank==0) then
      if ( abs(xLength*dble(Ny)/yLength/dble(Nx) - 1.d0) > 1.d-8 .or. &  
           abs(xLength*dble(Nz)/zLength/dble(Nx) - 1.d0) > 1.d-8 ) & 
-          call pariserror("Mesh is not cubic!")
+          !call pariserror("Mesh is not cubic!")
+          write(*,*) "*** WARNING: Mesh is not cubic, and non-uniform VOF is not ready! ***"
   endif
 
 !--- output frequency
