@@ -1,0 +1,17 @@
+&SOLIDPARAMETERS
+
+dosolids = T
+solid_type ='List_of_Spheres'
+solid_radius=0.0
+!=================================================================================================
+
+NumSpheres = 1
+
+sxyzrad(1,1) = 5
+sxyzrad(2,1) = 5
+sxyzrad(3,1) = 5
+sxyzrad(4,1) = 0.01
+
+
+&end
+! end of the namelist

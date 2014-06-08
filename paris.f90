@@ -74,7 +74,7 @@ Program paris
 !---------------------------------------INITIALIZATION--------------------------------------------
   ! Initialize MPI
   call MPI_INIT(ierr)
-  if (ierr /= 0) call pariserror("*** Main: unsuccessful MPI-initialization")
+  if (ierr /= 0) call err_no_out_dir("*** Main: unsuccessful MPI-initialization")
   call MPI_COMM_RANK(MPI_COMM_WORLD, rank, ierr)
   call MPI_COMM_SIZE(MPI_COMM_WORLD, numProcess, ierr)
   start_time = MPI_Wtime(ierr)

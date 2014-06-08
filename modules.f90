@@ -1935,7 +1935,7 @@ subroutine SetupPoisson(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask,cvof,n1
         A(is,:,:,8) =  BoundaryPressure(1)  ! P_0 =  1/3 (Pinner - P_b) + P_b
         A(is,:,:,7) = 1d0                      ! P_0  - 1/3 Pinner =  2/3 P_b
         A(is,:,:,1:6) = 0d0                    ! A7 P_is + A2 P_is+1 = A8 
-#ifdef notdef
+#ifdef EXTRAPO
          A(is,:,:,8) = (2d0/3d0)*BoundaryPressure(1)  ! P_0 =  1/3 (Pinner - P_b) + P_b
          A(is,:,:,7) = 1d0                      ! P_0  - 1/3 Pinner =  2/3 P_b
          A(is,:,:,1:6) = 0d0                    ! A7 P_is + A2 P_is+1 = A8 
@@ -1954,7 +1954,7 @@ subroutine SetupPoisson(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask,cvof,n1
         A(ie,:,:,8) = BoundaryPressure(2)
         A(ie,:,:,7) = 1d0  
         A(ie,:,:,1:6) = 0d0
-#ifdef notdef
+#ifdef EXTRAPO
         A(ie,:,:,8) = (2d0/3d0)*BoundaryPressure(2)
         A(ie,:,:,7) = 1d0  ! P_0 =  -1/2 (Pinner - P_b) + P_b
         A(ie,:,:,2:6) = 0d0

@@ -354,7 +354,12 @@ module module_averages
     endif
     close(in)
 
-
+    if(.not.dosolids) then 
+       if (rank == 0) then
+          write(*,*) "ReadAveParameters: cannot work without solids."
+          do_averages= .false.
+       endif
+    endif
 
     if(mod(Nx,av_div(1)) /= 0) call pariserror("Number of nodes in X not divisible by requested average units in X")
     if(mod(Ny,av_div(2)) /= 0) call pariserror("Number of nodes in Y not divisible by requested average units in Y")

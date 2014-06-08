@@ -1,7 +1,7 @@
 #!/bin/bash
 #set -x
 
-/bin/rm -fr out input
+/bin/rm -fr out input stats
 let npstart=4
 if [ $# -gt 0 ]; then
     if [ $1 == mono ]; then
