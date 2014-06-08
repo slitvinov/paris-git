@@ -85,13 +85,13 @@ contains
   end subroutine check_sanity_in_depth
 !
   subroutine check_sanity()
-    if(nx < 1) call pariserror("wrong nx")
-    if(npx < 1) call pariserror("wrong npx")
-    if(ny < 1) call pariserror("wrong ny")
-    if(npy < 1) call pariserror("wrong npy")
-    if(nz < 1) call pariserror("wrong nz")
-    if(npz < 1) call pariserror("wrong npz")
-    if(nx > 32767) call pariserror("nx too large")  ! why ? INTEGER*4 goes to 2**32-1 but NX*NY*NZ then too large ? 
+    if(nx < 1) call err_no_out_dir("wrong nx")
+    if(npx < 1) call err_no_out_dir("wrong npx")
+    if(ny < 1) call err_no_out_dir("wrong ny")
+    if(npy < 1) call err_no_out_dir("wrong npy")
+    if(nz < 1) call err_no_out_dir("wrong nz")
+    if(npz < 1) call err_no_out_dir("wrong npz")
+    if(nx > 32767) call err_no_out_dir("nx too large")  ! why ? INTEGER*4 goes to 2**32-1 but NX*NY*NZ then too large ? 
   end subroutine check_sanity
 !
   function EndProc(d)

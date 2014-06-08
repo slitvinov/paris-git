@@ -1511,14 +1511,14 @@ subroutine ReadParameters
   out=2
 
   open(unit=in, file='input', status='old', action='read', iostat=ierr)
-  if (ierr .ne. 0) call pariserror("ReadParameters: error opening input file")
+  if (ierr .ne. 0) call err_no_out_dir("ReadParameters: error opening 'input' file --- perhaps it does not exist ?")
   read(UNIT=in,NML=parameters)
   close(in)
   call check_sanity()
   bdry_read=.true.
-  if(MaxFront>10000) call pariserror("Error: ReadParameters: increase size of xyzrad array")
+  if(MaxFront>10000) call err_no_out_dir("Error: ReadParameters: increase size of xyzrad array")
 
-  if(numBubble>MaxFront) call pariserror("Error: ReadParameters: increase size of xyzrad array (MaxFront)")
+  if(numBubble>MaxFront) call err_no_out_dir("Error: ReadParameters: increase size of xyzrad array (MaxFront)")
 
   allocate(xc(MaxFront), yc(MaxFront), zc(MaxFront))
   allocate(FrontProps(1:14,MaxFront),rad(MaxFront))
@@ -1586,6 +1586,29 @@ subroutine parismessage(message)
 end subroutine parismessage
 !=================================================================================================
 !=================================================================================================
+subroutine err_no_out_dir(message) 
+! same as pariserror but when out_path directory is not yet created
+  use module_IO
+  use module_grid
+  implicit none
+  include 'mpif.h'
+  integer ierr
+  character(*) :: message
+#ifdef DEBUG
+  write(*,*) rank, padding, int2text(rank,padding)
+#endif
+  OPEN(UNIT=89,FILE='error-rank-'//TRIM(int2text(rank,padding))//'.txt')
+  write(89,*) message
+  if(rank==0) print*,message
+  ! Exit MPI gracefully
+  close(89)
+  close(out)
+  call MPI_abort(MPI_COMM_WORLD, ierr)
+  call MPI_finalize(ierr)
+  stop 
+end subroutine err_no_out_dir
+!=================================================================================================
+!=================================================================================================
 subroutine pariserror(message) 
   use module_IO
   use module_grid
@@ -1593,9 +1616,9 @@ subroutine pariserror(message)
   include 'mpif.h'
   integer ierr
   character(*) :: message
-! DEBUG
+#ifdef DEBUG
   write(*,*) rank, padding, int2text(rank,padding)
-! END DEBUG
+#endif
   OPEN(UNIT=89,FILE=TRIM(out_path)//'/error-rank-'//TRIM(int2text(rank,padding))//'.txt')
   write(89,*) message
   if(rank==0) print*,message
