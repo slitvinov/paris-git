@@ -27,13 +27,14 @@ restartFront = F   ! T: start the front from  a previous simulation
 restartAverages = F
 nBackup = 100   ! number of time steps between backups are kept.
 
-NSTEP   = 100    ! maximum number of time steps
+NSTEP   = 10    ! maximum number of time steps
 EndTime = 2000.0   ! When to stop simulation
 
 MaxDt   = 0.1  ! maximum size of time step
 dtFlag  = 1        ! 1: fixed dt;  2: fixed CFL
 dt      = 1.     ! dt in case of dtFlag=1
 CFL     = 0.9
+CFLMAX_ALLOWED = 20d0
 MAXERROR= 1d-6     ! Residual for Poisson solver
 MAXERRORVOL = 1d-4
                    ! Numerical parameters
