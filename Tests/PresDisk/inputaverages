@@ -1,7 +1,7 @@
 &aveparameters
 
 AVERAGES_TO_DO = 'P' 'P' 
-AV_DIV =  16 1 1
+AV_DIV =  16 16 1
 AV_ON_NODES = 'xyz' 'xyz' 
 SELECTED_PHASE = 1 2
 OUTPUT_VTK = T T 

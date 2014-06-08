@@ -67,13 +67,9 @@ Program paris
   implicit none
   include 'mpif.h'
   integer :: ierr, icolor
-  ! Locals for marching and timing are now in module_timer
-  ! real(8) :: start_time, end_time=0.d0
   integer :: req(48),sta(MPI_STATUS_SIZE,48)
   INTEGER :: irank, ii, i, j, k
   real(8) :: residual,cflmax,get_cfl
-  real(8) :: cflmax_allowed=0.9d0
-
 
 !---------------------------------------INITIALIZATION--------------------------------------------
   ! Initialize MPI
@@ -170,10 +166,9 @@ Program paris
         ! Exit MPI gracefully
         close(out)
         call MPI_BARRIER(MPI_COMM_WORLD, ierr)
-        call MPI_finalize(ierr)
         if(rank==0) write(*,'("Paris exits succesfully")')
-        call MPI_ABORT(MPI_COMM_WORLD, ierr)
         call MPI_finalize(ierr)
+        stop
      endif
  !-----------------------------------------MAIN TIME LOOP------------------------------------------
      call initialize_timer()
@@ -1467,6 +1462,7 @@ subroutine ReadParameters
   include 'mpif.h'
   integer :: in, ierr
   real(8) :: xyzrad(4,10000)
+  logical :: check_cubic=.false.
   namelist /parameters/ out_path,      Nx,            Ny,            Nz,            Ng,          &
                         xLength,       yLength,       zLength,       gx,            gy,          &
                         gz,            bdry_cond,     dPdx,          dPdy,          dPdz,        &
@@ -1484,7 +1480,8 @@ subroutine ReadParameters
                         inject_type,   maxErrorVol,   restartFront,  nstats,        WallShear,   &
                         BoundaryPressure,             ZeroReynolds,  restartAverages,termout,    &  
                         excentricity,  tout,          zip_data,      ugas_inject,   uliq_inject, &  
-                        blayer_gas_inject,            tdelay_gas_inject,            padding
+                        blayer_gas_inject,            tdelay_gas_inject,            padding,     &
+                        cflmax_allowed
  
   Nx = 0; Ny = 4; Nz = 4 ! cause absurd input file that lack nx value to fail. 
   Ng=2;xLength=1d0;yLength=1d0;zLength=1d0
@@ -1508,6 +1505,7 @@ subroutine ReadParameters
   ugas_inject=0.d0;   uliq_inject=1.d0
   blayer_gas_inject=8.d-2; tdelay_gas_inject=1.d-2
   padding=5
+  cflmax_allowed=0.5d0
 
   in=1
   out=2
@@ -1554,10 +1552,12 @@ subroutine ReadParameters
   Mx = Nx/nPx; My = Ny/nPy; Mz = Nz/nPz
   nPdomain = nPx*nPy*nPz
 
-  ! Check if mesh is uniform
-  if ( abs(xLength*dble(Ny)/yLength/dble(Nx) - 1.d0) > 1.d-8 .or. &  
-       abs(xLength*dble(Nz)/zLength/dble(Nx) - 1.d0) > 1.d-8 ) & 
-       call pariserror("Mesh is not uniform!")
+  ! Check if mesh is uniform in the VOF case
+  if(DoVOF.and.check_cubic) then
+     if ( abs(xLength*dble(Ny)/yLength/dble(Nx) - 1.d0) > 1.d-8 .or. &  
+          abs(xLength*dble(Nz)/zLength/dble(Nx) - 1.d0) > 1.d-8 ) & 
+          call pariserror("Mesh is not cubic!")
+  endif
 
 !--- output frequency
   if ( tout > 0.d0 .and. dtFlag == 1) then 

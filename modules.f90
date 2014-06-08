@@ -290,7 +290,7 @@ module module_flow
   logical :: ZeroReynolds,DoVOF, DoFront, Implicit, hypre, GetPropertiesFromFront
   logical :: dosolids = .false.
   real(8) :: rho1, rho2, s
-  real(8) :: U_init, VolumeSource
+  real(8) :: U_init, VolumeSource, cflmax_allowed
   real(8) :: dpdx, dpdy, dpdz, W_ave  !pressure gradients in case of pressure driven channel flow
   real(8) :: dpdx_stat, dpdy_stat, dpdz_stat
   real(8) :: beta, MaxError
@@ -390,10 +390,13 @@ contains
     !
     OPEN(UNIT=89,FILE=TRIM(out_path)//'/P-'//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout,padding))//'.txt')
     k=(ks+ke)/2
-    do i=is,ie
-       do j=js,je
+
+    do j=js,je
+       do i=is,ie
           write(89,310) x(i),y(j),p(i,j,k)
+!          write(89,310) p(i,j,k)
        enddo 
+       WRITE(89,*) " "
     enddo
     close(unit=89)
 310 format(4e14.5)
@@ -1929,10 +1932,15 @@ subroutine SetupPoisson(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask,cvof,n1
         A(is,:,:,1) = 0d0
 ! pressure boundary condition
      else if(bdry_cond(1)==5) then 
+        A(is,:,:,8) =  BoundaryPressure(1)  ! P_0 =  1/3 (Pinner - P_b) + P_b
+        A(is,:,:,7) = 1d0                      ! P_0  - 1/3 Pinner =  2/3 P_b
+        A(is,:,:,1:6) = 0d0                    ! A7 P_is + A2 P_is+1 = A8 
+#ifdef notdef
          A(is,:,:,8) = (2d0/3d0)*BoundaryPressure(1)  ! P_0 =  1/3 (Pinner - P_b) + P_b
          A(is,:,:,7) = 1d0                      ! P_0  - 1/3 Pinner =  2/3 P_b
          A(is,:,:,1:6) = 0d0                    ! A7 P_is + A2 P_is+1 = A8 
          A(is,:,:,2) = -1d0/3d0
+#endif
       endif
   endif
 ! dp/dn = 0 for outflow/fixed velocity bc on face 4 == x+
@@ -1943,10 +1951,15 @@ subroutine SetupPoisson(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask,cvof,n1
         A(ie,:,:,2) = 0d0
 ! pressure boundary condition
      else if(bdry_cond(4)==5) then
+        A(ie,:,:,8) = BoundaryPressure(2)
+        A(ie,:,:,7) = 1d0  
+        A(ie,:,:,1:6) = 0d0
+#ifdef notdef
         A(ie,:,:,8) = (2d0/3d0)*BoundaryPressure(2)
         A(ie,:,:,7) = 1d0  ! P_0 =  -1/2 (Pinner - P_b) + P_b
         A(ie,:,:,2:6) = 0d0
         A(ie,:,:,1) =  -1d0/3d0
+#endif
      endif
   endif
 
