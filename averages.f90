@@ -4,9 +4,8 @@
 ! and Surfer. 
 ! 
 ! Authors: Sadegh Dabiri, Gretar Tryggvason
-! author for VOF extenstions Stephane Zaleski (zaleski@dalembert.upmc.fr) 
-! Contact: sdabiri@gmail.com
-!
+! author for VOF extensions Stephane Zaleski (zaleski@dalembert.upmc.fr) 
+! !
 ! This program is free software; you can redistribute it and/or
 ! modify it under the terms of the GNU General Public License as
 ! published by the Free Software Foundation; either version 2 of the
@@ -23,6 +22,7 @@
 ! 02111-1307, USA.  
 !=================================================================================================
 ! module_averages: Contains subroutines to compute several averages of the flow
+! author: Tomas Arrufat
 !-------------------------------------------------------------------------------------------------
 module module_averages
   implicit none 
@@ -72,7 +72,7 @@ module module_averages
           bounds(3) = arr_div(3)
         endif
         if(averages_to_do(i)=='UDarcy') then
-          if (rank==0) write(*,*) 'Attempting to compute UDarcy'
+!          if (rank==0) write(*,*) 'Attempting to compute UDarcy'
           call AverageField(u,loc_av_field,.true.,.false.,selected_phase(i),bounds)
         
           call MPI_ALLREDUCE( loc_av_field,  av_field1, arr_div(1)*arr_div(2)*arr_div(3), &
