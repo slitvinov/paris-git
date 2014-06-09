@@ -279,10 +279,12 @@ module module_flow
   implicit none
   save
   real(8), dimension(:,:,:), allocatable :: u, v, w, uold, vold, wold, fx, fy, fz, color
+  real(8), dimension(:,:,:,:), allocatable :: momentum
   real(8), dimension(:,:,:), allocatable :: p, rho, rhoo, muold, mu, dIdx, dIdy, dIdz
   real(8), dimension(:,:,:), allocatable :: umask,vmask,wmask
   real(8), dimension(:,:,:), allocatable :: du,dv,dw,drho,du_c,dv_c,dw_c
   real(8), dimension(:,:), allocatable :: averages,oldaverages, allaverages
+  integer, dimension(:,:,:), allocatable :: mom_flag 
   logical, allocatable, dimension(:,:,:) :: mask
 
   real(8) :: gx, gy, gz, mu1, mu2, r_avg, dt, dtFlag, rho_ave, p_ave, vdt
@@ -1222,6 +1224,23 @@ module module_BC
     endif
     
   end subroutine SetMomentumBC
+
+  subroutine do_ghost_vector(us1,us2,us3)
+    implicit none
+    real(8), dimension(:,:,:) :: us1,us2,us3
+    include 'mpif.h'
+    integer :: req(48),sta(MPI_STATUS_SIZE,48)
+    integer :: ierr
+
+    call ghost_x(us1  ,2,req( 1: 4));  call ghost_x(us2,2,req( 5: 8)); call ghost_x(us3,2,req( 9:12)) 
+    call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
+    call ghost_y(us1  ,2,req( 1: 4));  call ghost_y(us2,2,req( 5: 8)); call ghost_y(us3,2,req( 9:12)) 
+    call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
+    call ghost_z(us1  ,2,req( 1: 4));  call ghost_z(us2,2,req( 5: 8)); call ghost_z(us3,2,req( 9:12))
+    call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
+
+  end subroutine do_ghost_vector
+
 
     function uinject(j,k,t)
       use module_2phase

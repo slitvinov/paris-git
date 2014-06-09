@@ -134,7 +134,8 @@ Program paris
   if(HYPRE .and. rank==0) write(out,*)'hypre initialized'
   if(HYPRE .and. rank==0) write(*  ,*)'hypre initialized'
 
-    call InitCondition
+  call InitCondition
+
     if(rank<nPdomain) then
 !-------------------------------------------------------------------------------------------------
 !------------------------------------------Begin domain-------------------------------------------
@@ -240,7 +241,7 @@ Program paris
            end if ! DoLPP
 
            if( DoLPP ) call StoreBeforeConvectionTerms()
-           if(.not.ZeroReynolds) call momentumConvection(u,v,w,du,dv,dw)
+           if(.not.ZeroReynolds) call momentumConvection(u,v,w,du,dv,dw,mom_flag)
            if( DoLPP ) call StoreAfterConvectionTerms()
            call my_timer(9)
 
@@ -313,13 +314,7 @@ Program paris
 !-------------------------------------------------------------------------------------------------
            call my_timer(3)
            call SetVelocityBC(u,v,w,umask,vmask,wmask,time)
-
-           call ghost_x(u  ,2,req( 1: 4));  call ghost_x(v,2,req( 5: 8)); call ghost_x(w,2,req( 9:12)) 
-           call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
-           call ghost_y(u  ,2,req( 1: 4));  call ghost_y(v,2,req( 5: 8)); call ghost_y(w,2,req( 9:12)) 
-           call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
-           call ghost_z(u  ,2,req( 1: 4));  call ghost_z(v,2,req( 5: 8)); call ghost_z(w,2,req( 9:12))
-           call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
+           call do_ghost_vector(u,v,w)
            call my_timer(1)
 !-----------------------------------------PROJECTION STEP-----------------------------------------
            call SetPressureBC(umask,vmask,wmask,p)
@@ -652,13 +647,13 @@ end subroutine calcStats
 ! calculates the convection terms in the momentum equations using a QUICK scheme
 ! and returns them in du, dv, dw
 !-------------------------------------------------------------------------------------------------
-subroutine momentumConvection(u,v,w,du,dv,dw)
+subroutine momentumConvection(u,v,w,du,dv,dw,flag)
   use module_grid
   use module_tmpvar
-  use module_VOF
   implicit none
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: u, v, w
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: du, dv, dw
+  integer, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: flag
   real(8), external :: minabs
   integer :: i,j,k
 !  real(8), external :: inter
@@ -684,30 +679,16 @@ subroutine momentumConvection(u,v,w,du,dv,dw)
     else
       work(i,j,k,3) = inter(z(k+1),z(k),z(k+2),zh(k),u(i,j,k+1),u(i,j,k),u(i,j,k+2))  !
     endif
-    enddo; enddo; enddo
-   if (DoMOF) then
-    do k=ks,ke;  do j=js,je; do i=is,ieu
-      !DF: check where to apply standard advection?
-      if (mom_flag(i,j,k).eq.1) then
-        du(i,j,k)=du(i,j,k) &
-        -    ( work(i+1,j  ,k  ,1)**2 - work(i  ,j  ,k  ,1)**2 )/dxh(i) &
-        -0.5*((v(i,j  ,k  )+v(i+1,j  ,k  ))*work(i  ,j  ,k  ,2)-        &
-        (v(i,j-1,k  )+v(i+1,j-1,k  ))*work(i  ,j-1,k  ,2))/dy(j)  &
-        -0.5*((w(i,j  ,k  )+w(i+1,j  ,k  ))*work(i  ,j  ,k  ,3)-        &
-        (w(i,j  ,k-1)+w(i+1,j  ,k-1))*work(i  ,j  ,k-1,3))/dz(k)
-      endif
-    enddo; enddo; enddo
-  else
-    do k=ks,ke;  do j=js,je; do i=is,ieu
+  enddo; enddo; enddo
+  do k=ks,ke;  do j=js,je; do i=is,ieu
       du(i,j,k)=du(i,j,k) &
-      -    ( work(i+1,j  ,k  ,1)**2 - work(i  ,j  ,k  ,1)**2 )/dxh(i) &
-      -0.5*((v(i,j  ,k  )+v(i+1,j  ,k  ))*work(i  ,j  ,k  ,2)-        &
+      - flag(i,j,k)*( work(i+1,j  ,k  ,1)**2 - work(i  ,j  ,k  ,1)**2 )/dxh(i) &
+      -0.5*flag(i,j,k)*((v(i,j  ,k  )+v(i+1,j  ,k  ))*work(i  ,j  ,k  ,2)-        &
       (v(i,j-1,k  )+v(i+1,j-1,k  ))*work(i  ,j-1,k  ,2))/dy(j)  &
-      -0.5*((w(i,j  ,k  )+w(i+1,j  ,k  ))*work(i  ,j  ,k  ,3)-        &
+      -0.5*flag(i,j,k)*((w(i,j  ,k  )+w(i+1,j  ,k  ))*work(i  ,j  ,k  ,3)-        &
       (w(i,j  ,k-1)+w(i+1,j  ,k-1))*work(i  ,j  ,k-1,3))/dz(k)
-    enddo; enddo; enddo
-  endif
-!-----------------------------------QUICK interpolation v-velocity--------------------------------
+  enddo; enddo; enddo
+  !-----------------------------------QUICK interpolation v-velocity--------------------------------
   do k=ks,ke; do j=js,jev+1; do i=is,ie
     if (v(i,j-1,k)+v(i,j,k)>0.0) then
       work(i,j,k,2) = inter(yh(j-1),yh(j),yh(j-2),y(j),v(i,j-1,k),v(i,j,k),v(i,j-2,k))  !
@@ -729,28 +710,15 @@ subroutine momentumConvection(u,v,w,du,dv,dw)
       work(i,j,k,3) = inter(z(k+1),z(k),z(k+2),zh(k),v(i,j,k+1),v(i,j,k),v(i,j,k+2))  !
     endif
   enddo; enddo; enddo
-  if (DoMOF) then
-    do k=ks,ke;  do j=js,jev; do i=is,ie
-      if (mom_flag(i,j,k).eq.1) then
-        dv(i,j,k)=dv(i,j,k) &
-        -0.5*((u(i  ,j,k  )+u(i  ,j+1,k  ))*work(i  ,j  ,k  ,1)-        &
-        (u(i-1,j,k  )+u(i-1,j+1,k  ))*work(i-1,j  ,k  ,1))/dx(i)  &
-        -    ( work(i  ,j+1,k  ,2)**2 - work(i  ,j  ,k  ,2)**2 )/dyh(j) &
-        -0.5*((w(i  ,j,k  )+w(i  ,j+1,k  ))*work(i  ,j  ,k  ,3)-        &
-        (w(i  ,j,k-1)+w(i  ,j+1,k-1))*work(i  ,j  ,k-1,3))/dz(k)
-      endif
-    enddo; enddo; enddo
-  else
-    do k=ks,ke;  do j=js,jev; do i=is,ie
-      dv(i,j,k)=dv(i,j,k) &
-      -0.5*((u(i  ,j,k  )+u(i  ,j+1,k  ))*work(i  ,j  ,k  ,1)-        &
+  do k=ks,ke;  do j=js,jev; do i=is,ie
+     dv(i,j,k)=dv(i,j,k) &
+      -0.5*flag(i,j,k)*((u(i  ,j,k  )+u(i  ,j+1,k  ))*work(i  ,j  ,k  ,1)-        &
       (u(i-1,j,k  )+u(i-1,j+1,k  ))*work(i-1,j  ,k  ,1))/dx(i)  &
-      -    ( work(i  ,j+1,k  ,2)**2 - work(i  ,j  ,k  ,2)**2 )/dyh(j) &
-      -0.5*((w(i  ,j,k  )+w(i  ,j+1,k  ))*work(i  ,j  ,k  ,3)-        &
+      -   flag(i,j,k)*( work(i  ,j+1,k  ,2)**2 - work(i  ,j  ,k  ,2)**2 )/dyh(j) &
+      -0.5*flag(i,j,k)*((w(i  ,j,k  )+w(i  ,j+1,k  ))*work(i  ,j  ,k  ,3)-        &
       (w(i  ,j,k-1)+w(i  ,j+1,k-1))*work(i  ,j  ,k-1,3))/dz(k)
-    enddo; enddo; enddo
-  endif
-!-----------------------------------QUICK interpolation w-velocity--------------------------------
+  enddo; enddo; enddo
+  !-----------------------------------QUICK interpolation w-velocity--------------------------------
   do k=ks,kew+1; do j=js,je; do i=is,ie
     if (w(i,j,k-1)+w(i,j,k)>0.0) then
       work(i,j,k,3) = inter(zh(k-1),zh(k),zh(k-2),z(k),w(i,j,k-1),w(i,j,k),w(i,j,k-2))  !
@@ -772,25 +740,15 @@ subroutine momentumConvection(u,v,w,du,dv,dw)
       work(i,j,k,2) = inter(y(j+1),y(j),y(j+2),yh(j),w(i,j+1,k),w(i,j,k),w(i,j+2,k))  !
     endif
   enddo; enddo; enddo
-  if (DoMOF) then
-    if (mom_flag(i,j,k).eq.1) then
+
+  do k=ks,kew;  do j=js,je; do i=is,ie
       dw(i,j,k)=dw(i,j,k) &
-      -0.5*((u(i  ,j  ,k)+u(i  ,j  ,k+1))*work(i  ,j  ,k  ,1)-        &
+      -0.5*flag(i,j,k)*((u(i  ,j  ,k)+u(i  ,j  ,k+1))*work(i  ,j  ,k  ,1)-        &
       (u(i-1,j  ,k)+u(i-1,j  ,k+1))*work(i-1,j  ,k  ,1))/dx(i)  &
-      -0.5*((v(i  ,j  ,k)+v(i  ,j  ,k+1))*work(i  ,j  ,k  ,2)-        &
+      -0.5*flag(i,j,k)*((v(i  ,j  ,k)+v(i  ,j  ,k+1))*work(i  ,j  ,k  ,2)-        &
       (v(i  ,j-1,k)+v(i  ,j-1,k+1))*work(i  ,j-1,k  ,2))/dy(j)  &
-      -    ( work(i  ,j  ,k+1,3)**2 - work(i  ,j  ,k  ,3)**2 )/dzh(k)
-    endif
-  else
-    do k=ks,kew;  do j=js,je; do i=is,ie
-      dw(i,j,k)=dw(i,j,k) &
-      -0.5*((u(i  ,j  ,k)+u(i  ,j  ,k+1))*work(i  ,j  ,k  ,1)-        &
-      (u(i-1,j  ,k)+u(i-1,j  ,k+1))*work(i-1,j  ,k  ,1))/dx(i)  &
-      -0.5*((v(i  ,j  ,k)+v(i  ,j  ,k+1))*work(i  ,j  ,k  ,2)-        &
-      (v(i  ,j-1,k)+v(i  ,j-1,k+1))*work(i  ,j-1,k  ,2))/dy(j)  &
-      -    ( work(i  ,j  ,k+1,3)**2 - work(i  ,j  ,k  ,3)**2 )/dzh(k)
-    enddo; enddo; enddo
-  endif
+      -flag(i,j,k)*( work(i  ,j  ,k+1,3)**2 - work(i  ,j  ,k  ,3)**2 )/dzh(k)
+  enddo; enddo; enddo
 contains
 !-------------------------------------------------------------------------------------------------
 real(8) function inter(x0,x1,x2,x,y0,y1,y2)
@@ -817,6 +775,7 @@ real(8) function inter(x0,x1,x2,x,y0,y1,y2)
 end function inter
 !-------------------------------------------------------------------------------------------------
 end subroutine momentumConvection
+
 !=================================================================================================
 !=================================================================================================
 ! Calculates the diffusion terms in the momentum equation and adds them to du,dv,dw
@@ -1138,6 +1097,8 @@ subroutine initialize
                A(is:ie,js:je,ks:ke,1:8), averages(10,Ng:Ny+Ng+1), oldaverages(10,Ng:Ny+Ng+1), &
                allaverages(10,Ng:Ny+Ng+1))  ! 39
 
+    allocate(mom_flag(imin:imax,jmin:jmax,kmin:kmax))
+
     allocate(mask(imin:imax,jmin:jmax,kmin:kmax)) ! 40
     call add_2_my_sizer(40,8)
 
@@ -1145,6 +1106,7 @@ subroutine initialize
     u=0.0;v=0.0;w=0.0;p=0.0;tmp=0.0;fx=0.0;fy=0.0;fz=0.0;drho=0.0;rho=0.0;mu=0.0;work=0.0;A=0.0
     averages=0.0; oldaverages=0.0; allaverages=0d0
     uold=0.d0;vold=0.d0;wold=0.d0
+    mom_flag = 1
     umask = 1d0; vmask = 1d0; wmask = 1d0
 
   else  !   if(rank<nPdomain)then
@@ -1296,6 +1258,7 @@ subroutine InitCondition
 !            if((cvof(i,j,k) + cvof(i+1,j,k)) > 0.0d0) then
             u(i,j,k) = 1.d-2!*cvof(i,j,k)
             v(i,j,k) = 1.d-2!*cvof(i,j,k)
+            w(i,j,k) = 0.d0
 !           endif
             enddo; enddo; enddo
          endif
@@ -1407,6 +1370,7 @@ subroutine InitCondition
   endif
   iTimeStepRestart = iTimeStep
 end subroutine InitCondition
+
 !=================================================================================================
 ! function minabs
 !   used for ENO interpolations
