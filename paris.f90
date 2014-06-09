@@ -1558,9 +1558,6 @@ subroutine err_no_out_dir(message)
   include 'mpif.h'
   integer ierr
   character(*) :: message
-#ifdef DEBUG
-  write(*,*) rank, padding, int2text(rank,padding)
-#endif
   OPEN(UNIT=89,FILE='error-rank-'//TRIM(int2text(rank,padding))//'.txt')
   write(89,*) message
   if(rank==0) print*,message

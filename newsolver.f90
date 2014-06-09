@@ -207,9 +207,6 @@ subroutine check_poisson_setup(A,tmp,umask,vmask,wmask)
      do l=1,8
         if(A(i,j,k,l)/=A(i,j,k,l).or.A(i,j,k,7).lt.1d-55) then
            diverged=.true.
-! DEBUG
-            write(rank,*) i,j,k,A(i,j,k,1:8)
-! END DEBUG
         endif
      enddo
      if(diverged) then

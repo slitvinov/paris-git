@@ -1856,19 +1856,22 @@ contains
 
    subroutine ConvertLPP2VOF(tswap) 
       implicit none
-    
+      include 'mpif.h'
+
       integer, intent (in) :: tswap
 
       real(8) :: rp,dp,uf,vf,wf,dummyreal,ConvertRegSize,mu2tomu1
       logical :: ConvertDropFlag
       integer :: i1,ic,i2,j1,jc,j2,k1,kc,k2
-      integer :: ipart,ipart1
+      integer :: ipart,ipart1,num_part_old
       integer :: i,j,k
       logical :: PartAtBlockEdge = .true.
       real(8) :: Re,vmf,vmp
+      integer :: ierr
 
-      if ( num_part(rank) > 0 ) then 
-      do ipart = 1,num_part(rank)
+      if ( num_part(rank) > 0 ) then
+      num_part_old = num_part(rank)
+      do ipart = 1,num_part_old
 
          ! Check if LPP locates at "LPP region"
          call CheckConvertDropCriteria(parts(ipart,rank)%element%vol, & 
@@ -1944,10 +1947,13 @@ contains
          end if ! ConvertDropFlag
 
          ! Note: num_part(rank) has been updated
-         if ( ipart >= num_part(rank) ) exit
+         if ( ipart > num_part(rank) ) exit
       end do ! ipart
       end if ! num_part(rank)
 
+      ! Update num_part to all ranks
+      call MPI_ALLGATHER(num_part(rank), 1, MPI_INTEGER, &
+                         num_part(:)   , 1, MPI_INTEGER, MPI_Comm_World, ierr)
    end subroutine ConvertLPP2VOF
 
    subroutine BuildFlowFieldVOF(i1,i2,j1,j2,k1,k2,dp,mu,xp,yp,zp,up,vp,wp,uf,vf,wf,Re)
@@ -2102,10 +2108,6 @@ contains
                               parts(ipart,rank)%element%vol,&
                               tswap-parts(ipart,rank)%tstepConvert,& 
                               TwoWayCouplingFlag)
-
-! DEBUG
-!            uf=0.d0;vf=0.d0;wf=0.d0;DufDt=0.d0;DvfDt=0.d0;DwfDt=0.d0
-! END DEBUG
 
             if ( taup < 5.d0*dt ) then 
                ! If taup is much smaller than dt, no need to compute force,
