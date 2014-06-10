@@ -831,7 +831,7 @@ subroutine get_velocity_from_momentum (mom,d,us,der)
   integer, intent(in) :: d
   real(8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: mom
   real(8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: us,der
-  real(8) tmpreal, rhoavg1,rhoavg2,mom1,mom2, uavg
+  real(8) tmpreal, rhoavg1,rhoavg2,mom1,mom2, uavg, cflag
   real(8) alpha,fl3d,stencil3x3(-1:1,-1:1,-1:1)
   real(8) dm(3)
 
@@ -866,24 +866,24 @@ subroutine get_velocity_from_momentum (mom,d,us,der)
     do j=js-1,je+1
       do i=is-1,ie+1
         ! if interface rewrite interface velocity
-        tmpreal =  (cvof(i-1,j,k)+ cvof(i,j,k) + cvof(i-2,j,k) &
+        cflag =  (cvof(i-1,j,k)+ cvof(i,j,k) + cvof(i-2,j,k) &
         +cvof(i,j-1,k)+ cvof(i,j,k) + cvof(i,j-2,k) &
         +cvof(i,j,k-1)+ cvof(i,j,k) + cvof(i,j,k-2))/9.d0
 !        tmpreal = cvof(i-i0,j-j0,k-k0)
         mom_flag(i,j,k) = 1
-        rhoavg1   = rho1*cvof(i,j,k) + rho2*(1.d0 - cvof(i,j,k))
+        rhoavg1   = rho2*cvof(i,j,k) + rho1*(1.d0 - cvof(i,j,k))
         uavg      = mom(i,j,k)/rhoavg1
 
-        rhoavg1   = rho1*work(i,j,k,1) + rho2*(1.d0 - work(i,j,k,1))
+        rhoavg1   = rho2*work(i,j,k,1) + rho1*(1.d0 - work(i,j,k,1))
         mom1      = rhoavg1*uavg
 
-        rhoavg2   = rho1*work(i-i0,j-j0,k-k0,2) + rho2*(1.d0 - work(i-i0,j-j0,k-k0,2))
-        tmpreal   = rho1*cvof(i-i0,j-j0,k-k0) + rho2*(1.d0 - cvof(i-i0,j-j0,k-k0))
+        rhoavg2   = rho2*work(i-i0,j-j0,k-k0,2) + rho1*(1.d0 - work(i-i0,j-j0,k-k0,2))
+        tmpreal   = rho2*cvof(i-i0,j-j0,k-k0) + rho1*(1.d0 - cvof(i-i0,j-j0,k-k0))
         uavg      = mom(i-i0,j-j0,k-k0)/tmpreal
         mom2      = rhoavg2*uavg
 
         tmpreal = (mom1+mom2)/(rhoavg1+rhoavg2)
-        if ((tmpreal.gt.0.d0).and.(tmpreal.lt.1.d0)) then
+        if ((cflag.gt.0.d0).and.(cflag.lt.1.d0)) then
           mom_flag(i,j,k) = 0
           der(i-i0,j-j0,k-k0) = der(i-i0,j-j0,k-k0) + &
                                 (tmpreal - us(i-i0,j-j0,k-k0))/dt
@@ -1522,7 +1522,7 @@ subroutine swpzmom(us,c,f,d,mom1,mom2,mom3,mom)
            mom1(i,j,k)  = dmax1(-a1,0.d0)*mom(i,j,k)
            mom3(i,j,k)  = dmax1(a2,0.d0) *mom(i,j,k)
            mom2(i,j,k)  = mom(i,j,k) - mom1(i,j,k) - mom3(i,j,k)
-           uavg = mom(i,j,k)/(rho1*c(i,j,k)+rho2*(1.d0-c(i,j,k)))
+           uavg = mom(i,j,k)/(rho2*c(i,j,k)+rho1*(1.d0-c(i,j,k)))
 
            if ((c(i,j,k) .gt. 0.d0).and.(c(i,j,k) .lt. 1.d0)) then
 
@@ -1534,15 +1534,15 @@ subroutine swpzmom(us,c,f,d,mom1,mom2,mom3,mom)
 
               if (a1 .lt. 0.d0) then
                      vof = fl3d(dm(1),dm(2),dm(3),alpha,a1  ,-a1)
-                     mom1(i,j,k) = (rho1*vof + rho2*(-a1 - vof))*uavg
+                     mom1(i,j,k) = (rho2*vof + rho1*(-a1 - vof))*uavg
               endif
               if (a2 .gt. 0.d0) then
                      vof = fl3d(dm(1),dm(2),dm(3),alpha,1.d0,a2)
-                     mom3(i,j,k) = (rho1*vof + rho2*(a2 - vof))*uavg
+                     mom3(i,j,k) = (rho2*vof + rho1*(a2 - vof))*uavg
               endif
               
               vof = fl3d(dm(1),dm(2),dm(3),alpha,mm1,mm2)
-              mom2(i,j,k) = (rho1*vof + rho2*(mm2 - vof))*uavg
+              mom2(i,j,k) = (rho2*vof + rho1*(mm2 - vof))*uavg
 
            endif
         enddo
@@ -1579,7 +1579,7 @@ subroutine get_momentum(c,us,d,mom)
   do k=ks-1,ke+1
       do j=js-1,je+1
           do i=is-1,ie+1
-              rhoavg = c(i,j,k)*rho1 + (1.d0-c(i,j,k))*rho2 
+              rhoavg = c(i,j,k)*rho2 + (1.d0-c(i,j,k))*rho1 
               mom(i,j,k) = 0.5d0*(us(i,j,k)+us(i-i0,j-j0,k-k0))*rhoavg
           enddo
       enddo
