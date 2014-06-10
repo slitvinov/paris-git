@@ -818,6 +818,56 @@ or none at all")
 
   end subroutine do_all_ighost
   !=================================================================================================
+
+subroutine get_momentum(c,us,d,mom)
+
+  use module_grid
+  use module_flow
+  use module_tmpvar
+
+  logical error
+  integer i,j,k,d
+  integer i0,j0,k0
+  integer i1,j1,k1
+  real(8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), intent(in)  :: c
+  real(8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), intent(in)  :: us
+  real(8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), intent(out) :: mom
+  real(8) rhoavg
+  real(8) alpha,fl3d,stencil3x3(-1:1,-1:1,-1:1)
+  real(8) dm(3)
+
+  call init_i0j0k0 (d,i0,j0,k0)
+
+  do k=ks-1,ke+1
+    do j=js-1,je+1
+      do i=is-1,ie+1
+        work(i,j,k,1) = cvof(i,j,k)
+        work(i,j,k,2) = cvof(i,j,k)
+        if ((cvof(i,j,k).gt.0.d0).and.(cvof(i,j,k).lt.1.d0)) then
+          do i1=-1,1; do j1=-1,1; do k1=-1,1
+            stencil3x3(i1,j1,k1) = cvof(i+i1,j+j1,k+k1)
+          enddo;enddo;enddo
+          call fit_plane(cvof(i,j,k),d,0.d0,0.d0,stencil3x3,dm,alpha,error)
+          if (error) then
+            work(i,j,k,1) = cvof(i,j,k)
+            work(i,j,k,2) = cvof(i,j,k)
+          else
+            work(i,j,k,1) = 2.0d0*fl3d(dm(1),dm(2),dm(3),alpha,0.0d0,0.5d0)
+            work(i,j,k,2) = 2.0d0*fl3d(dm(1),dm(2),dm(3),alpha,0.5d0,0.5d0)
+          endif
+        endif
+
+        rhoavg = work(i,j,k,2)*rho2 + (1.d0-work(i,j,k,2))*rho1 
+        mom(i,j,k) = 0.5d0*us(i,j,k)*rhoavg
+        rhoavg = work(i,j,k,1)*rho2 + (1.d0-work(i,j,k,1))*rho1 
+        mom(i,j,k) = mom(i,j,k) + 0.5d0*us(i-i0,j-j0,k-k0)*rhoavg
+
+      enddo
+    enddo
+  enddo
+
+end subroutine get_momentum
+
 subroutine get_velocity_from_momentum (mom,d,us,der)
   use module_grid
   use module_flow
@@ -1560,32 +1610,6 @@ subroutine swpzmom(us,c,f,d,mom1,mom2,mom3,mom)
   call SetMomentumBC(us,c,mom,d,umask,rho1,rho2) 
   !***
 end subroutine swpzmom
-
-subroutine get_momentum(c,us,d,mom)
-
-  use module_grid
-  use module_flow
-  use module_tmpvar
-
-  integer i,j,k,d
-  integer i0,j0,k0
-  real(8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), intent(in)  :: c
-  real(8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), intent(in)  :: us
-  real(8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), intent(out) :: mom
-  real(8) rhoavg
-
-  call init_i0j0k0 (d,i0,j0,k0)
-
-  do k=ks-1,ke+1
-      do j=js-1,je+1
-          do i=is-1,ie+1
-              rhoavg = c(i,j,k)*rho2 + (1.d0-c(i,j,k))*rho1 
-              mom(i,j,k) = 0.5d0*(us(i,j,k)+us(i-i0,j-j0,k-k0))*rhoavg
-          enddo
-      enddo
-  enddo
-  
-end subroutine get_momentum
 
 subroutine fit_plane(vof,d,a1,a2,stencil3x3,dm,alpha,error)
   use module_grid
