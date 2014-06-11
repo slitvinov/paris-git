@@ -25,16 +25,16 @@ hypre    = F       ! T: uses hyprepackage, F: uses SOR solver
 restart  = F       ! T: start the domain from a previous simulation
 restartFront = F   ! T: start the frontfrom  a previous simulation
 restartAverages = F
-nBackup = 2000   ! number of time steps between  backups are kept.
+nBackup = 8000   ! number of time steps between  backups are kept.
 
-NSTEP   = 3000       ! maximum number of time steps
+NSTEP   = 80000       ! maximum number of time steps
 EndTime = 0.4       ! When to stop simulation
 
 MaxDt   = 0.1  ! maximum size of time step
 dtFlag  = 1        ! 1: fixed dt;  2: fixed CFL
 dt      = DTTEMP    ! dt in case of dtFlag=1
 CFL     = 0.9
-MAXERROR= 1d-7    ! Residual for Poisson solver
+MAXERROR= 1d-10     ! Residual for Poisson solver
 MAXERRORVOL = 1d-4
                    ! Numerical parameters
 
@@ -47,11 +47,11 @@ BETA     = 1.3     ! parameters for linear solver
 ! Output parameters
 
 ICOut    = T        ! output initial condition
-NOUT     = 100     ! write the solution to file every nout time steps
+NOUT     = 1000      ! write the solution to file every nout time steps
 output_format = 2   ! 1:tecplot 2:vtk
 out_path = 'out'    ! name of the output directory
 
-nstats   = 10      ! number of time steps between flow statistics calculations
+nstats   = 100      ! number of time steps between flow statistics calculations
 
 !=================================================================================================
 !Grid parameters

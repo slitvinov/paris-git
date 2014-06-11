@@ -21,11 +21,11 @@ GetPropertiesFromFront = F ! T: uses Front-Tracking data to compute mu, rho and 
 		           ! F: uses VOF data to compute mu and rho. 
 
 Implicit = F     
-hypre    = T       ! T: uses hyprepackage, F: uses SOR solver 
+hypre    = F       ! T: uses hyprepackage, F: uses SOR solver 
 restart  = F       ! T: start the domain from a previous simulation
 restartFront = F   ! T: start the front from  a previous simulation
 restartAverages = F
-nBackup = 10000   ! number of time steps between backups are kept.
+nBackup = 11000   ! number of time steps between backups are kept.
 
 NSTEP   = 10000    ! maximum number of time steps
 EndTime = 2000.0   ! When to stop simulation
@@ -35,7 +35,7 @@ dtFlag  = 1        ! 1: fixed dt;  2: fixed CFL
 dt      = 1.d-4     ! dt in case of dtFlag=1
 CFL     = 0.9
 CFLMAX_ALLOWED = 20d0
-MAXERROR= 1d-9     ! Residual for Poisson solver
+MAXERROR= 1d-7     ! Residual for Poisson solver
 MAXERRORVOL = 1d-4
                    ! Numerical parameters
 
@@ -115,7 +115,7 @@ WallVel(4, 3)  = 0.0
 ! boundary condition for pressure if bdry_cond=5
 !x- x+ y- y+ z- z+
 
-BoundaryPressure(1) = 0.875d0   ! 7/8
+BoundaryPressure(1) = 1d0
 BoundaryPressure(2) = 0d0
 
 RHO1     = 1.0
