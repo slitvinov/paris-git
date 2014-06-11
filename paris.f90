@@ -1506,7 +1506,7 @@ subroutine ReadParameters
      if (ierr .ne. 0) call pariserror("ReadParameters: error opening output file")
      write(UNIT=out,NML=parameters)
   endif
-  call mpi_barrier(MPI_COMM_CART, ierr)
+  call mpi_barrier(MPI_COMM_WORLD, ierr)
   ! Number of grid points in streamwise and transverse directions must
   ! be integral multiples of total number of processors
   if(mod(Nx,nPx) /= 0) call pariserror("ReadParameters: Nx not divisible by nPx!")

@@ -25,14 +25,14 @@ hypre    = F       ! T: uses hyprepackage, F: uses SOR solver
 restart  = F       ! T: start the domain from a previous simulation
 restartFront = F   ! T: start the front from  a previous simulation
 restartAverages = F
-nBackup = 11000   ! number of time steps between backups are kept.
+nBackup = 900   ! number of time steps between backups are kept.
 
-NSTEP   = 10000    ! maximum number of time steps
+NSTEP   = 1000    ! maximum number of time steps
 EndTime = 2000.0   ! When to stop simulation
 
 MaxDt   = 0.1  ! maximum size of time step
 dtFlag  = 1        ! 1: fixed dt;  2: fixed CFL
-dt      = 1.d-4     ! dt in case of dtFlag=1
+dt      = 1d-3     ! dt in case of dtFlag=1
 CFL     = 0.9
 CFLMAX_ALLOWED = 20d0
 MAXERROR= 1d-7     ! Residual for Poisson solver
