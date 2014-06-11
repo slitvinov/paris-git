@@ -1943,43 +1943,93 @@ subroutine SetupPoisson(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask,cvof,n1
    call setuppoisson_fs(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask,cvof,n1,n2,n3)
   endif
 
-! dp/dn = 0 for inflow bc on face 1 == x- : do not correct u(is-1)
-! inflow bc on other faces not implemented yet.  
+  ! dp/dn = 0 for inflow bc on face 1 == x- : do not correct u(is-1)
+  ! inflow bc on other faces not implemented yet.  
   if(coords(1)==0) then
      if(bdry_cond(1)==3) then
         A(is,:,:,7) = A(is,:,:,7) - A(is,:,:,1)
         A(is,:,:,1) = 0d0
-! pressure boundary condition
+        ! pressure boundary condition
      else if(bdry_cond(1)==5) then 
-        A(is,:,:,8) =  BoundaryPressure(1)  ! P_0 =  1/3 (Pinner - P_b) + P_b
+        A(is,:,:,8) =  BoundaryPressure(1)  
+        A(is,:,:,7) = 1d0                      
+        A(is,:,:,1:6) = 0d0                     
+#ifdef EXTRAPO
+        A(is,:,:,8) = (2d0/3d0)*BoundaryPressure(1)  ! P_0 =  1/3 (Pinner - P_b) + P_b
         A(is,:,:,7) = 1d0                      ! P_0  - 1/3 Pinner =  2/3 P_b
         A(is,:,:,1:6) = 0d0                    ! A7 P_is + A2 P_is+1 = A8 
-#ifdef EXTRAPO
-         A(is,:,:,8) = (2d0/3d0)*BoundaryPressure(1)  ! P_0 =  1/3 (Pinner - P_b) + P_b
-         A(is,:,:,7) = 1d0                      ! P_0  - 1/3 Pinner =  2/3 P_b
-         A(is,:,:,1:6) = 0d0                    ! A7 P_is + A2 P_is+1 = A8 
-         A(is,:,:,2) = -1d0/3d0
+        A(is,:,:,2) = 1d0/3d0 !sign due to definition in Poisson solver
 #endif
-      endif
+     endif
   endif
-! dp/dn = 0 for outflow/fixed velocity bc on face 4 == x+
-! outflow/fixed velocity bc on other faces not implemented yet.  
+  ! dp/dn = 0 for outflow/fixed velocity bc on face 4 == x+
+  ! outflow/fixed velocity bc on other faces not implemented yet.  
   if(coords(1)==Npx-1) then
      if(bdry_cond(4)==4) then
         A(ie,:,:,7) = A(ie,:,:,7) - A(ie,:,:,2)
         A(ie,:,:,2) = 0d0
-! pressure boundary condition
+        ! pressure boundary condition
      else if(bdry_cond(4)==5) then
         A(ie,:,:,8) = BoundaryPressure(2)
         A(ie,:,:,7) = 1d0  
         A(ie,:,:,1:6) = 0d0
 #ifdef EXTRAPO
         A(ie,:,:,8) = (2d0/3d0)*BoundaryPressure(2)
-        A(ie,:,:,7) = 1d0  ! P_0 =  -1/2 (Pinner - P_b) + P_b
+        A(ie,:,:,7) = 1d0  
         A(ie,:,:,2:6) = 0d0
-        A(ie,:,:,1) =  -1d0/3d0
+        A(ie,:,:,1) =  1d0/3d0
 #endif
      endif
+  endif
+
+  ! Pressure BC for y-
+  if(coords(2)==0 .and. (bdry_cond(2)==5)) then
+     A(is,:,:,8) =  BoundaryPressure(3)  
+     A(is,:,:,7) = 1d0                      
+     A(is,:,:,1:6) = 0d0                     
+#ifdef EXTRAPO
+     A(is,:,:,8) = (2d0/3d0)*BoundaryPressure(3)  
+     A(is,:,:,7) = 1d0                      
+     A(is,:,:,1:6) = 0d0                     
+     A(is,:,:,4) = 1d0/3d0
+#endif
+  endif
+  ! Pressure BC for y+
+  if(coords(2)==Npy-1 .and. (bdry_cond(5)==5) ) then
+     A(ie,:,:,8) = BoundaryPressure(4)
+     A(ie,:,:,7) = 1d0  
+     A(ie,:,:,1:6) = 0d0
+#ifdef EXTRAPO
+     A(ie,:,:,8) = (2d0/3d0)*BoundaryPressure(4)
+     A(ie,:,:,7) = 1d0  
+     A(ie,:,:,2:6) = 0d0
+     A(ie,:,:,3) =  1d0/3d0
+#endif
+  endif
+
+  ! Pressure BC for z-
+  if(coords(3)==0 .and. (bdry_cond(3)==5)) then
+     A(is,:,:,8) =  BoundaryPressure(5)  
+     A(is,:,:,7) = 1d0                      
+     A(is,:,:,1:6) = 0d0                     
+#ifdef EXTRAPO
+     A(is,:,:,8) = (2d0/3d0)*BoundaryPressure(5)  
+     A(is,:,:,7) = 1d0                      
+     A(is,:,:,1:6) = 0d0                     
+     A(is,:,:,6) = 1d0/3d0
+#endif
+  endif
+  ! Pressure BC for z+
+  if(coords(3)==Npz-1 .and. (bdry_cond(6)==5) ) then
+     A(ie,:,:,8) = BoundaryPressure(6)
+     A(ie,:,:,7) = 1d0  
+     A(ie,:,:,1:6) = 0d0
+#ifdef EXTRAPO
+     A(ie,:,:,8) = (2d0/3d0)*BoundaryPressure(6)
+     A(ie,:,:,7) = 1d0  
+     A(ie,:,:,2:6) = 0d0
+     A(ie,:,:,5) =  1d0/3d0
+#endif
   endif
 
   if(.not.FreeSurface) then 
