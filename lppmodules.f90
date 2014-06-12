@@ -635,10 +635,10 @@ contains
                else  ! a new differet tag is found
                   drops_merge(idrop,rank)%num_diff_tag = &
                   drops_merge(idrop,rank)%num_diff_tag + 1
-! TEMPORARY 
-!                  if ( drops_merge(idrop,rank)%num_diff_tag > maxnum_diff_tag ) & 
-!                     call lpperror("Number of different tags of a droplet pieces exceeds the max number!") 
-! END TEMPORARY
+#ifdef DEBUG
+                  if ( drops_merge(idrop,rank)%num_diff_tag > maxnum_diff_tag ) & 
+                     call lpperror("Number of different tags of a droplet pieces exceeds the max number!") 
+#endif
                   drops_merge(idrop,rank)%diff_tag_list(drops_merge(idrop,rank)%num_diff_tag) &
                   = tag_id(drops_merge_gcell_list(1,iCell,idrop), &
                            drops_merge_gcell_list(2,iCell,idrop), &
@@ -1363,6 +1363,7 @@ contains
       real(8) :: x1,x2,y1,y2,z1,z2
       real(8) :: ufp,vfp,wfp,dist2,wt
       logical :: ConvertMergeDrop=.false.
+      real(8) :: volcell
 
       if ( num_drop(rank) > 0 ) then 
       do idrop = 1,num_drop(rank)
@@ -1381,8 +1382,10 @@ contains
                                        CriteriaConvertCase,           &
                                        drops(idrop,rank)%AspRatio)
 
+         volcell = dx(ic)*dy(jc)*dz(kc)
          if ( ConvertDropFlag ) then
-            write(*,*) 'Drop is converted to particle', idrop,rank,tswap
+            write(*,*) 'Drop is converted to particle', idrop,rank,tswap, &
+               drops(idrop,rank)%element%vol/volcell
             
             ! transfer droplet properties to particle
             num_part(rank) = num_part(rank) + 1
@@ -1464,9 +1467,7 @@ contains
                                        AspRatioSphere)
 
          if ( ConvertDropFlag ) then
-! TEMPORARY
             write(*,*) 'Drop_merge is converted to particle', idrop,rank,tswap
-! END TEMPORARY
 
             ! compute average fluid quantities
             ! Note: XXX temporary, need to be improved later 
@@ -1558,7 +1559,7 @@ contains
       ConvertDropFlag = .false.
 
       ! Shape criteria
-      volcell = xLength*yLength*zLength/dble(Nx*Ny*Nz)
+      volcell = dx(ic)*dy(jc)*dz(kc) 
       if ( vol < volcell*3.375d0 ) then   
          ConvertDropShape = .true. 
       ! Check aspect ratio for drop diameter larger 1.5dx
@@ -1896,9 +1897,7 @@ contains
               PartAtBlockEdge = .false.
 
          if ( .not.ConvertDropFlag .and. .not.PartAtBlockEdge ) then
-! TEMPORARY
-            write(*,*) 'Particle is converted to drop', ipart,rank,tswap
-! END TEMPORARY
+            write(*,*) 'Particle is converted to drop', ipart,rank,tswap,parts(ipart,rank)%element%vol
             ! transfer droplet properties to particle
             num_drop(rank) = num_drop(rank) + 1
             drops(num_drop(rank),rank)%element = parts(ipart,rank)%element
@@ -2142,7 +2141,7 @@ contains
             partforce(3) =(relvel(3)/taup*phi(dragmodel,Rep) + (1.d0-rhof/rhop)*Gz  &
                          + (1.d0+Cm)*rhof/rhop*DwfDt                 &
                          + fhz )/(1.d0+Cm*rhof/rhop)
-            
+
             if ( output_lpp_evolution .and. mod(tswap,nstats)==0 ) then
                call output_LPP_parameter(rank,ipart,xp,yp,zp,up,vp,wp,uf,vf,wf,dp,time)
             end if ! 
@@ -2245,6 +2244,7 @@ contains
          if ( NumStepAfterVOFConversionForAve > 0 .and. & 
               TimeStepAfterVOFConversion < NumStepAfterVOFConversionForAve ) then 
             ConvertRegSize = ConvertRegSizeToDiam*dp
+            if ( ConvertRegSize > 2.d0*dx(ip) ) &  
             call ComputeAveFluidVel(xp,yp,zp,ip,jp,kp,uf,vf,wf,DufDt,DvfDt,DwfDt,ConvertRegSize)
          else 
             call TrilinearIntrplFluidVel(xp,yp,zp,ip,jp,kp,uf,DufDt,1)
@@ -2381,21 +2381,21 @@ contains
 
          do ipart = 1,num_part(rank)
 ! TEMPORARY - Check particle location inside domain or not  
-            if ( parts(ipart,rank)%element%xc < 0.d0 .or. & 
+            if ( parts(ipart,rank)%element%xc < xh(1)-dx(1) .or. & 
                  parts(ipart,rank)%element%xc > xh(Nxt) ) then
-               write(*,*) ipart,rank,parts(ipart,rank)%xcOld,parts(ipart,rank)%element%xc,& 
+               write(*,*) ipart,rank,iStage,parts(ipart,rank)%xcOld,parts(ipart,rank)%element%xc,& 
                            parts(ipart,rank)%element%uc,parts(ipart,rank)%element%duc, & 
                            parts(ipart,rank)%element%vol
                call lpperror("Particle location is out of bound in x direction!") 
-            else if ( parts(ipart,rank)%element%yc < 0.d0 .or. & 
+            else if ( parts(ipart,rank)%element%yc < yh(1)-dy(1) .or. & 
                       parts(ipart,rank)%element%yc > yh(Nyt) ) then
-               write(*,*) ipart,rank,parts(ipart,rank)%ycOld,parts(ipart,rank)%element%yc,& 
+               write(*,*) ipart,rank,iStage,parts(ipart,rank)%ycOld,parts(ipart,rank)%element%yc,& 
                            parts(ipart,rank)%element%vc,parts(ipart,rank)%element%dvc,&
                            parts(ipart,rank)%element%vol
                call lpperror("Particle location is out of bound in y direction!") 
-            else if ( parts(ipart,rank)%element%zc < 0.d0 .or. & 
+            else if ( parts(ipart,rank)%element%zc < zh(1)-dz(1) .or. & 
                       parts(ipart,rank)%element%zc > zh(Nzt) ) then
-               write(*,*) ipart,rank,parts(ipart,rank)%zcOld,parts(ipart,rank)%element%zc,& 
+               write(*,*) ipart,rank,iStage,parts(ipart,rank)%zcOld,parts(ipart,rank)%element%zc,& 
                            parts(ipart,rank)%element%wc,parts(ipart,rank)%element%dwc,&
                            parts(ipart,rank)%element%vol
                call lpperror("Particle location is out of bound in z direction!") 
@@ -2450,6 +2450,9 @@ contains
 
       call UpdatePartLocCell   
       
+   end subroutine AveragePartSol
+
+   subroutine PartBCWrapper
       ! Transfer particles crossing blocks 
       if ( nPdomain > 1 ) then  
          call CollectPartCrossBlocks   
@@ -2457,7 +2460,7 @@ contains
       end if ! nPdomain
 
       call SetPartBC
-   end subroutine AveragePartSol
+   end subroutine PartBCWrapper
 
    subroutine UpdatePartLocCell   
       implicit none
@@ -2471,15 +2474,7 @@ contains
          i  = parts(ipart,rank)%ic
          xp = parts(ipart,rank)%element%xc
          i1 = INT((xp + dble(Ng)*dx(2))/dx(2)) + 1
-! TEMPORARY
-         if ( i1 < 1 .or. i1 > Nxt ) then
-            write(*,*) ipart,rank,i,i1
-            write(*,*) parts(ipart,rank)%element%xc, parts(ipart,rank)%element%yc, parts(ipart,rank)%element%zc
-            write(*,*) parts(ipart,rank)%element%uc, parts(ipart,rank)%element%vc, parts(ipart,rank)%element%wc
-            write(*,*) parts(ipart,rank)%element%duc, parts(ipart,rank)%element%dvc, parts(ipart,rank)%element%dwc
-            call lpperror("Cell index is out of bound in x direction!") 
-         end if ! i1
-! END TEMPORARY
+         if ( i1 < 1 .or. i1 > Nxt ) call lpperror("Cell index is out of bound in x direction!") 
 !         if      ( i <= Ng+1 ) then
 !            i1 = INT((xp + dble(Ng)*dx(2))/dx(2)) + 1
 !         else if ( i > Nx+Ng ) then 
@@ -3158,21 +3153,24 @@ module module_output_lpp
       integer :: i1,ic,i2,j1,jc,j2,k1,kc,k2,i,j,k,i0,j0,k0
       real(8) :: dp,rp,ConvertRegSize,xp,yp,zp,c,stencil3x3(-1:1,-1:1,-1:1)
       integer :: nflag
+      real(8) :: volcell
+
 
       lppvof = 0.d0
 
       if ( num_part(rank) > 0 ) then 
          do ipart = 1,num_part(rank)
+            ic = parts(ipart,rank)%ic
+            jc = parts(ipart,rank)%jc
+            kc = parts(ipart,rank)%kc
+            volcell = dx(ic)*dy(jc)*dz(kc)
+            if ( parts(ipart,rank)%element%vol < volcell ) cycle  ! Note: not plot drops to small
             dp = (6.d0*parts(ipart,rank)%element%vol/PI)**(1.d0/3.d0)
-            if ( dp < dx(is)*0.5 ) cycle  ! Note: not plot drops to small
             rp = 0.5d0*dp
             ConvertRegSize = ConvertRegSizeToDiam*dp
             xp = parts(ipart,rank)%element%xc
             yp = parts(ipart,rank)%element%yc
             zp = parts(ipart,rank)%element%zc
-            ic = parts(ipart,rank)%ic
-            jc = parts(ipart,rank)%jc
-            kc = parts(ipart,rank)%kc
             call FindCellIndexBdryConvertRegUnifMesh(ConvertRegSize, & 
                                              i1,ic,i2,j1,jc,j2,k1,kc,k2)
          

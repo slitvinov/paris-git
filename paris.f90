@@ -404,6 +404,7 @@ Program paris
            if ( DoLPP ) call AveragePartSol()
         endif
         if (DoLPP) then
+            call PartBCWrapper
             call lppvofsweeps(itimestep,time)  
             call my_timer(14)
         end if ! DoLPP
