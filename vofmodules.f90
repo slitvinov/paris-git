@@ -912,6 +912,8 @@ subroutine get_velocity_from_momentum (mom,d,us,der)
 
   call init_i0j0k0 (d,i0,j0,k0)
 
+  mom_flag = 1
+
   do k=ks-1,ke+1
     do j=js-1,je+1
       do i=is-1,ie+1
@@ -919,8 +921,7 @@ subroutine get_velocity_from_momentum (mom,d,us,der)
         cflag =  (cvof(i-1,j,k)+ cvof(i,j,k) + cvof(i-2,j,k) &
         +cvof(i,j-1,k)+ cvof(i,j,k) + cvof(i,j-2,k) &
         +cvof(i,j,k-1)+ cvof(i,j,k) + cvof(i,j,k-2))/9.d0
-!        tmpreal = cvof(i-i0,j-j0,k-k0)
-        mom_flag(i,j,k) = 1
+!        cflag = cvof(i-i0,j-j0,k-k0)
         rhoavg1   = rho2*cvof(i,j,k) + rho1*(1.d0 - cvof(i,j,k))
         uavg      = mom(i,j,k)/rhoavg1
 
@@ -941,6 +942,10 @@ subroutine get_velocity_from_momentum (mom,d,us,der)
       enddo
     enddo
   enddo
+
+  call do_all_ighost(mom_flag)
+  call do_all_ghost(der)
+
 end subroutine get_velocity_from_momentum
 
   subroutine vofsweeps(tswap)
