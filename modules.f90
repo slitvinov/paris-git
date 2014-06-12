@@ -333,10 +333,11 @@ module module_IO
   implicit none
   save
   integer :: padding
-  integer :: opened=0;
+  integer :: opened=0, opened_p=0
   integer :: nout, out, output_format, nbackup, nstats, termout, nfile
   character(len=20) :: out_path, x_file, y_file, z_file
   logical :: read_x, read_y, read_z, restart, ICOut, restartFront, restartAverages, zip_data
+  logical :: out_P
   real(8) :: tout
 contains
     !=================================================================================================
@@ -447,6 +448,29 @@ contains
   subroutine close_visit_file()
     close(90)
   end subroutine close_visit_file
+!=================================================================================================
+  SUBROUTINE append_visit_pressure(rootname)
+    use module_flow
+    use module_grid
+    implicit none
+    character(*) :: rootname
+    integer prank
+    !if(rank.ne.0) call pariserror("rank.ne.0 in append")
+    
+    if(opened_p==0) then
+       OPEN(UNIT=91,FILE='pressure.visit')
+       write(91,10) nPdomain
+       opened_p=1
+    else
+       OPEN(UNIT=91,FILE='pressure.visit',access='append')
+    endif
+    do prank=0,NpDomain-1
+       write(91,11) rootname//TRIM(int2text(prank,padding))//'.vtk'
+    enddo
+    close(unit=91)
+10  format('!NBLOCKS ',I4)
+11  format(A)
+  end subroutine  append_visit_pressure
 !=================================================================================================
 ! function int2text
 !   Returns 'number' as a string with length of 'length'
@@ -595,17 +619,10 @@ subroutine output2(nf,i1,i2,j1,j2,k1,k2)
     write(8,13)
     write(8,14)i2-i1+1,j2-j1+1,k2-k1+1
     write(8,15)(i2-i1+1)*(j2-j1+1)*(k2-k1+1)
-10  format('# vtk DataFile Version 2.0')
-11  format('grid, time ',F16.8)
-12  format('ASCII')
-13  format('DATASET STRUCTURED_GRID')
-14  format('DIMENSIONS ',I5,I5,I5)
-15  format('POINTS ',I17,' float' )
 
     do k=k1,k2; do j=j1,j2; do i=i1,i2;
       write(8,320) x(i),y(j),z(k)
     enddo; enddo; enddo
-320 format(e14.5,e14.5,e14.5)
 
     write(8,19)(i2-i1+1)*(j2-j1+1)*(k2-k1+1)
     if (itype .le. 4)then
@@ -614,17 +631,12 @@ subroutine output2(nf,i1,i2,j1,j2,k1,k2)
     else
       write(8,20)
     endif
-19  format('POINT_DATA ',I17)
-17  format('SCALARS ',A20,' float 1')
 20  format('VECTORS uv float')
-18  format('LOOKUP_TABLE default')
-
     do k=k1,k2; do j=j1,j2; do i=i1,i2;
       if (itype .eq. 1)write(8,210)rho(i,j,k)
       if (itype .eq. 5)write(8,310)0.5*(u(i,j,k)+u(i-1,j,k)), &
          0.5*(v(i,j,k)+v(i,j-1,k)),0.5*(w(i,j,k)+w(i,j,k-1))
     enddo; enddo; enddo
-210 format(e14.5)
 310 format(e14.5,e14.5,e14.5)
 
     close(8)
@@ -635,6 +647,45 @@ subroutine output2(nf,i1,i2,j1,j2,k1,k2)
       call system('gzip '//trim(filename))
     end if ! zip_data
 ! END TEMPORARY 
+
+    if(out_P) then
+       rootname=TRIM(out_path)//'/VTK/pressure'//TRIM(int2text(nf,padding))//'-'
+       if(rank==0) call append_visit_pressure(TRIM(rootname))
+
+       OPEN(UNIT=8,FILE=TRIM(rootname)//TRIM(int2text(rank,padding))//'.vtk')
+       write(8,10)
+       write(8,11) time
+       write(8,12)
+       write(8,13)
+       write(8,14)i2-i1+1,j2-j1+1,k2-k1+1
+       write(8,15)(i2-i1+1)*(j2-j1+1)*(k2-k1+1)
+!       write(8,16) x(i1+1)-x(i1),y(j1+1)-y(j1),z(k1+1)-z(k1)
+       
+       do k=k1,k2; do j=j1,j2; do i=i1,i2;
+          write(8,320) x(i),y(j),z(k)
+       enddo; enddo; enddo
+
+       write(8,19)(i2-i1+1)*(j2-j1+1)*(k2-k1+1)
+       write(8,17)'P'
+       write(8,18)
+
+       do k=k1,k2; do j=j1,j2; do i=i1,i2;
+          write(8,210) P(i,j,k)
+       enddo; enddo; enddo
+210    format(e14.5)
+    endif
+10  format('# vtk DataFile Version 2.0')
+11  format('grid, time ',F16.8)
+12  format('ASCII')
+13  format('DATASET STRUCTURED_GRID')
+14  format('DIMENSIONS ',I5,I5,I5)
+15  format('POINTS ',I17,' float' )
+!16  format('SPACING ',F16.8,F16.8,F16.8)
+19  format('POINT_DATA ',I17)
+17  format('SCALARS ',A20,' float 1')
+18  format('LOOKUP_TABLE default')
+
+320 format(e14.5,e14.5,e14.5)
 end subroutine output2
 !-------------------------------------------------------------------------------------------------
 subroutine output3(nf,i1,i2,j1,j2,k1,k2)

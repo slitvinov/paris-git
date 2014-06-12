@@ -220,14 +220,22 @@ Program paris
               call explicitMomDiff(u,v,w,rho,mu,du,dv,dw)
            endif
            call my_timer(3)
-
+!----------------------------------EXTRAPOLATION FOR FREE SURFACE---------------------------------
+           if (DoVOF .and. FreeSurface) then
+              u_cold = u !initialize cavity velocities to that of calculated field
+              v_cold = v
+              w_cold = w
+              call get_normals()
+              call extrapolate_velocities()
+           endif !Extrapolation
+!-------------------------------------------------------------------------------------------------
            if(DoVOF) then
+              if (DoMOF) then
+                 call vofandmomsweeps(itimestep)
+              else
+                 call vofsweeps(itimestep)
+              endif
               if (FreeSurface) call get_normals()
-             if (DoMOF) then
-              call vofandmomsweeps(itimestep)
-             else
-              call vofsweeps(itimestep)
-             endif
               call my_timer(4)
               call get_all_heights()
               call my_timer(5)
@@ -303,15 +311,6 @@ Program paris
               v = v + dt * dv
               w = w + dt * dw
            endif
-!----------------------------------VELOCITY EXTRAPOLATION FOR FREE SURFACE------------------------
-           if (DoVOF .and. FreeSurface) then
-              u_cold = u !initialize cavity velocities to that of calculated field
-              v_cold = v
-              w_cold = w
-              !call get_normals() !Global normals read in VOF section
-              call extrapolate_velocities()
-           endif !Extrapolation
-!-------------------------------------------------------------------------------------------------
            call my_timer(3)
            call SetVelocityBC(u,v,w,umask,vmask,wmask,time)
            call do_ghost_vector(u,v,w)
@@ -1444,14 +1443,15 @@ subroutine ReadParameters
                         BoundaryPressure,             ZeroReynolds,  restartAverages,termout,    &  
                         excentricity,  tout,          zip_data,      ugas_inject,   uliq_inject, &  
                         blayer_gas_inject,            tdelay_gas_inject,            padding,     &
-                        cflmax_allowed
+                        cflmax_allowed, out_P
  
   Nx = 0; Ny = 4; Nz = 4 ! cause absurd input file that lack nx value to fail. 
   Ng=2;xLength=1d0;yLength=1d0;zLength=1d0
   gx = 0d0; gy=0d0; gz=0d0; bdry_cond = 0
   dPdx = 0d0;  dPdy = 0d0; dPdz = 0d0
   itime_scheme = 1;  nstep = 0; maxit = 50; maxError = 1d-3  
-  beta = 1.2; nout = 1; TwoPhase = .false.; rho1 = 1d0; mu1 = 0d0
+  beta = 1.2; nout = 1; out_P = .false. 
+  TwoPhase = .false.; rho1 = 1d0; mu1 = 0d0
   rho2 = 1d0; mu2 = 0d0; sigma = 0d0; BuoyancyCase = 0; nPx = 1
   nPy = 1; nPz = 1; amin = 0.32; amax = 0.96; aspmax = 1.54
   MaxPoint = 1000000; MaxElem  = 2000000; MaxFront = 100; xform=0d0; yform=0d0; zform=0d0
