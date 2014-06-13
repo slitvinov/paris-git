@@ -1975,6 +1975,7 @@ subroutine SetupPoisson(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask,cvof,n1
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: cvof,n1,n2,n3
   real(8), dimension(is:ie,js:je,ks:ke,8), intent(out) :: A
   real(8), intent(in) :: dt, VolumeSource
+  real(8), dimension(4) :: P_bc
   integer :: i,j,k,l
   do k=ks,ke; do j=js,je; do i=is,ie;
 !    if(mask(i,j,k))then
@@ -1993,7 +1994,7 @@ subroutine SetupPoisson(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask,cvof,n1
   if(FreeSurface) then
    call setuppoisson_fs(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask,cvof,n1,n2,n3)
   endif
-
+  P_bc = 0d0
   ! dp/dn = 0 for inflow bc on face 1 == x- : do not correct u(is-1)
   ! inflow bc on other faces not implemented yet.  
   if(coords(1)==0) then
@@ -2006,6 +2007,7 @@ subroutine SetupPoisson(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask,cvof,n1
         A(is,:,:,7) = 1d0                      ! P_0  - 1/3 Pinner =  2/3 P_b
         A(is,:,:,1:6) = 0d0                    ! A7 P_is + A2 P_is+1 = A8 
         A(is,:,:,2) = 1d0/3d0 !sign due to definition in Poisson solver
+        P_bc(1) = 1d0
      endif
   endif
   ! dp/dn = 0 for outflow/fixed velocity bc on face 4 == x+
@@ -2019,38 +2021,77 @@ subroutine SetupPoisson(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask,cvof,n1
         A(ie,:,:,8) = (2d0/3d0)*BoundaryPressure(2)
         A(ie,:,:,7) = 1d0  
         A(ie,:,:,2:6) = 0d0
-        A(ie,:,:,1) =  1d0/3d0
+        A(ie,:,:,1) = 1d0/3d0
+        P_bc(2) = 1d0
      endif
   endif
 
   ! Pressure BC for y-
   if(coords(2)==0 .and. (bdry_cond(2)==5)) then
-     A(is,:,:,8) = (2d0/3d0)*BoundaryPressure(3)  
-     A(is,:,:,7) = 1d0                      
-     A(is,:,:,1:6) = 0d0                     
-     A(is,:,:,4) = 1d0/3d0
+     A(:,js,:,8) = (2d0/3d0)*BoundaryPressure(3)
+     A(is,js,:,8) = (2d0/3d0)*(BoundaryPressure(3)+BoundaryPressure(1)*P_bc(1))
+     A(ie,js,:,8) = (2d0/3d0)*(BoundaryPressure(3)+BoundaryPressure(2)*P_bc(2))
+     A(:,js,:,7) = 1d0
+     A(is,js,:,7) = 1d0 + P_bc(1)
+     A(ie,js,:,7) = 1d0 + P_bc(2)
+     A(:,js,:,1:6) = 0d0      
+     A(is,js,:,2) = 1d0/3d0*P_bc(1)
+     A(ie,js,:,1) = 1d0/3d0*P_bc(2)
+     A(:,js,:,4) = 1d0/3d0
+     P_bc(3) = 1d0
   endif
   ! Pressure BC for y+
   if(coords(2)==Npy-1 .and. (bdry_cond(5)==5) ) then
-     A(ie,:,:,8) = (2d0/3d0)*BoundaryPressure(4)
-     A(ie,:,:,7) = 1d0  
-     A(ie,:,:,2:6) = 0d0
-     A(ie,:,:,3) =  1d0/3d0
+     A(:,je,:,8) = (2d0/3d0)*BoundaryPressure(4)
+     A(is,je,:,8) = (2d0/3d0)*(BoundaryPressure(4)+BoundaryPressure(1)*P_bc(1))
+     A(ie,je,:,8) = (2d0/3d0)*(BoundaryPressure(4)+BoundaryPressure(2)*P_bc(2))
+     A(:,je,:,7) = 1d0  
+     A(is,je,:,7) = 1d0 + P_bc(1)
+     A(ie,je,:,7) = 1d0 + P_bc(2)
+     A(:,je,:,1:6) = 0d0
+     A(is,je,:,2) = 1d0/3d0*P_bc(1)
+     A(ie,je,:,1) = 1d0/3d0*P_bc(2)
+     A(:,je,:,3) = 1d0/3d0
+     P_bc(4) = 1d0
   endif
 
   ! Pressure BC for z-
   if(coords(3)==0 .and. (bdry_cond(3)==5)) then
-     A(is,:,:,8) = (2d0/3d0)*BoundaryPressure(5)  
-     A(is,:,:,7) = 1d0                      
-     A(is,:,:,1:6) = 0d0                     
-     A(is,:,:,6) = 1d0/3d0
+     A(:,:,ks,8) = (2d0/3d0)*BoundaryPressure(5)
+     A(is,js,ks,8) = (2d0/3d0)*(BoundaryPressure(5)+BoundaryPressure(1)*P_bc(1)+BoundaryPressure(3)*P_bc(3))
+     A(ie,js,ks,8) = (2d0/3d0)*(BoundaryPressure(5)+BoundaryPressure(2)*P_bc(2)+BoundaryPressure(3)*P_bc(3))
+     A(is,je,ks,8) = (2d0/3d0)*(BoundaryPressure(5)+BoundaryPressure(1)*P_bc(1)+BoundaryPressure(4)*P_bc(4))
+     A(ie,je,ks,8) = (2d0/3d0)*(BoundaryPressure(5)+BoundaryPressure(2)*P_bc(2)+BoundaryPressure(4)*P_bc(4))
+     A(:,:,ks,7) = 1d0
+     A(is,js,ks,7) = 1d0 + P_bc(1) + P_bc(3)
+     A(ie,js,ks,7) = 1d0 + P_bc(2) + P_bc(3)
+     A(is,je,ks,7) = 1d0 + P_bc(1) + P_bc(4)
+     A(ie,je,ks,7) = 1d0 + P_bc(2) + P_bc(4)
+     A(:,:,ks,1:6) = 0d0   
+     A(is,js,ks,2) = 1d0/3d0*P_bc(1); A(is,js,ks,4) = 1d0/3d0*P_bc(3)
+     A(ie,js,ks,1) = 1d0/3d0*P_bc(2); A(ie,js,ks,4) = 1d0/3d0*P_bc(3)
+     A(is,je,ks,2) = 1d0/3d0*P_bc(1); A(is,je,ks,3) = 1d0/3d0*P_bc(4)
+     A(ie,je,ks,1) = 1d0/3d0*P_bc(2); A(ie,je,ks,3) = 1d0/3d0*P_bc(4)
+     A(:,:,ks,6) = 1d0/3d0
   endif
   ! Pressure BC for z+
   if(coords(3)==Npz-1 .and. (bdry_cond(6)==5) ) then
-     A(ie,:,:,8) = (2d0/3d0)*BoundaryPressure(6)
-     A(ie,:,:,7) = 1d0  
-     A(ie,:,:,2:6) = 0d0
-     A(ie,:,:,5) =  1d0/3d0
+     A(:,:,ke,8) = (2d0/3d0)*BoundaryPressure(6)
+     A(is,js,ke,8) = (2d0/3d0)*(BoundaryPressure(6)+BoundaryPressure(1)*P_bc(1)+BoundaryPressure(3)*P_bc(3))
+     A(ie,js,ke,8) = (2d0/3d0)*(BoundaryPressure(6)+BoundaryPressure(2)*P_bc(2)+BoundaryPressure(3)*P_bc(3))
+     A(is,je,ke,8) = (2d0/3d0)*(BoundaryPressure(6)+BoundaryPressure(1)*P_bc(1)+BoundaryPressure(4)*P_bc(4))
+     A(ie,je,ke,8) = (2d0/3d0)*(BoundaryPressure(6)+BoundaryPressure(2)*P_bc(2)+BoundaryPressure(4)*P_bc(4))
+     A(:,:,ke,7) = 1d0  
+     A(is,js,ke,7) = 1d0 + P_bc(1) + P_bc(3)
+     A(ie,js,ke,7) = 1d0 + P_bc(2) + P_bc(3)
+     A(is,je,ke,7) = 1d0 + P_bc(1) + P_bc(4)
+     A(ie,je,ke,7) = 1d0 + P_bc(2) + P_bc(4)
+     A(:,:,ke,1:6) = 0d0
+     A(is,js,ke,2) = 1d0/3d0*P_bc(1); A(is,js,ks,4) = 1d0/3d0*P_bc(3)
+     A(ie,js,ke,1) = 1d0/3d0*P_bc(2); A(ie,js,ks,4) = 1d0/3d0*P_bc(3)
+     A(is,je,ke,2) = 1d0/3d0*P_bc(1); A(is,je,ks,3) = 1d0/3d0*P_bc(4)
+     A(ie,je,ke,1) = 1d0/3d0*P_bc(2); A(ie,je,ks,3) = 1d0/3d0*P_bc(4)
+     A(:,:,ke,5) = 1d0/3d0
   endif
 
 ! What follows is a lot of debugging for small A7 values and checking the matrix 
