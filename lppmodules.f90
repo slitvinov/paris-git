@@ -3121,28 +3121,29 @@ module module_output_lpp
       close(88)
    end subroutine  append_LPP_visit_file
 
-   subroutine output_LPP(nf)
+   subroutine output_LPP(nf,i1,i2,j1,j2,k1,k2)
 
       implicit none
-      integer,intent(in)  :: nf
+      integer,intent(in)  :: nf,i1,i2,j1,j2,k1,k2
       integer, parameter :: LPPformatPlot3D = 1
       integer, parameter :: LPPformatVOFVTK = 2
 
       if ( outputlpp_format == LPPformatPlot3D ) then 
-         call output_LPP_Plot3D(nf)
+         call output_LPP_Plot3D(nf,i1,i2,j1,j2,k1,k2)
       else if ( outputlpp_format == LPPformatVOFVTK ) then
-         call output_LPP_VOFVTK(nf)
+         call output_LPP_VOFVTK(nf,i1,i2,j1,j2,k1,k2)
       else 
          call pariserror("Unknow LPP output format!")
       end if ! outputlpp_format
 
    end subroutine output_LPP
 
-   subroutine output_LPP_Plot3D(nf)
+   subroutine output_LPP_Plot3D(nf,i1,i2,j1,j2,k1,k2)
       implicit none
-      integer,intent(in)  :: nf
+      integer,intent(in)  :: nf,i1,i2,j1,j2,k1,k2
       character(len=30) :: rootname
       integer :: ipart
+      real(8), parameter :: volsmall=1.0d-60
 
       ! output lpp data in plot3d formate 
       rootname=trim(out_path)//'/VTK/LPP'//TRIM(int2text(nf,padding))//'-'
@@ -3161,9 +3162,17 @@ module module_output_lpp
             parts(ipart,rank)%element%zc, &  
             parts(ipart,rank)%element%vol
          enddo
-         ! XXX add 8 corners of the block with very small vol, so that moledule
-         ! plot would be in the sam scale of vof
       end if ! num_part(rank)
+      ! add virtual particles at the 8 corners of the block, so that
+      ! moledular plot in VisIt would work in the same scale of vof
+      write(8,320) x(i1),y(j1),z(k1),volsmall 
+      write(8,320) x(i1),y(j1),z(k2),volsmall 
+      write(8,320) x(i1),y(j2),z(k1),volsmall 
+      write(8,320) x(i1),y(j2),z(k2),volsmall 
+      write(8,320) x(i2),y(j1),z(k1),volsmall 
+      write(8,320) x(i2),y(j1),z(k2),volsmall 
+      write(8,320) x(i2),y(j2),z(k1),volsmall 
+      write(8,320) x(i2),y(j2),z(k2),volsmall 
 320   format(e14.5,e14.5,e14.5,e14.5)
       close(8)
 
@@ -3190,9 +3199,9 @@ module module_output_lpp
 
    end subroutine output_LPP_Plot3D
 
-   subroutine output_LPP_VOFVTK(nf)
+   subroutine output_LPP_VOFVTK(nf,il,ir,jl,jr,kl,kr)
       implicit none
-      integer,intent(in)  :: nf
+      integer,intent(in)  :: nf,il,ir,jl,jr,kl,kr
       character(len=30) :: rootname,filename
       integer :: ipart
       real(8) :: lppvof(imin:imax,jmin:jmax,kmin:kmax)
@@ -3242,8 +3251,8 @@ module module_output_lpp
       write(8,11) time
       write(8,12)
       write(8,13)
-      write(8,14)imax-imin+1,jmax-jmin+1,kmax-kmin+1
-      write(8,15)(imax-imin+1)*(jmax-jmin+1)*(kmax-kmin+1)
+      write(8,14)ir-il+1,jr-jl+1,kr-kl+1
+      write(8,15)(ir-il+1)*(jr-jl+1)*(kr-kl+1)
 10    format('# vtk DataFile Version 2.0')
 11    format('grid, time ',F16.8)
 12    format('ASCII')
@@ -3251,19 +3260,19 @@ module module_output_lpp
 14    format('DIMENSIONS ',I5,I5,I5)
 15    format('POINTS ',I17,' float' )
 
-      do k=kmin,kmax; do j=jmin,jmax; do i=imin,imax;
+      do k=kl,kr; do j=jl,jr; do i=il,ir;
          write(8,320) x(i),y(j),z(k)
       enddo; enddo; enddo
 320   format(e14.5,e14.5,e14.5)
 
-      write(8,16)(imax-imin+1)*(jmax-jmin+1)*(kmax-kmin+1)
+      write(8,16)(ir-il+1)*(jr-jl+1)*(kr-kl+1)
       write(8,17)'LPPVOF'
       write(8,18)
 16    format('POINT_DATA ',I17)
 17    format('SCALARS ',A20,' float 1')
 18    format('LOOKUP_TABLE default')
 
-      do k=kmin,kmax; do j=jmin,jmax; do i=imin,imax;
+      do k=kl,kr; do j=jl,jr; do i=il,ir;
          write(8,210) lppvof(i,j,k)
       enddo; enddo; enddo
 210   format(e14.5)

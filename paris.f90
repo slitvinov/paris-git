@@ -145,7 +145,7 @@ Program paris
      if(ICOut .and. rank<nPdomain) then
         if (.not.restart) call output(0,is,ie+1,js,je+1,ks,ke+1)
         if(DoVOF .and. .not.restart) call output_VOF(0,is,ie+1,js,je+1,ks,ke+1)
-        if(DoLPP .and. .not.restart) call output_LPP(0)
+        if(DoLPP .and. .not.restart) call output_LPP(0,is,ie+1,js,je+1,ks,ke+1)
         if(test_droplet) call output_droplet(w,time)
         call setvelocityBC(u,v,w,umask,vmask,wmask,time)
         call write_vec_gnuplot(u,v,cvof,p,itimestep,DoVOF)
@@ -428,7 +428,6 @@ Program paris
            call output(nfile,is,ie+1,js,je+1,ks,ke+1)
            if(DoVOF) call output_VOF(nfile,is,ie+1,js,je+1,ks,ke+1)
            if(DoLPP) call output_LPP(nfile)
-           call ComputeAverages(itimestep)
            if(test_droplet) call output_droplet(w,time)
            if(rank==0)then
               end_time =  MPI_WTIME()
