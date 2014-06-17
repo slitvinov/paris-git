@@ -149,7 +149,7 @@ subroutine setuppoisson_fs(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask,cvof
 
         if (n_z .ne. 0.d0) then
            z_test = (alpha - (n_x+n_y)/2d0)/n_z
-           if (z_test<1.d0 .and. y_test>0d0) then
+           if (z_test<1.d0 .and. z_test>0d0) then
               if (n3(i,j,k) > 0d0) then 
                  z_int(i,j,k) = zh(k-1) + z_test*dz(k)
                  z_r = z(k) - z_int(i,j,k)
@@ -158,7 +158,7 @@ subroutine setuppoisson_fs(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask,cvof
                  A(i,j,k,6) = 2d0*dt*wmask(i,j,k)/((dz(k)+z_r)/2d0*dzh(k+1)*(rhot(i,j,k)+rhot(i,j,k+1)))
               else 
                  z_int(i,j,k) = zh(k) - z_test*dz(k)
-                 z_f = z_int(i,j,k) - z(k-1)
+                 z_f = z_int(i,j,k) - z(k)
                  if (z_f < limit) z_f = limit !arbitrary small limit, to be evaluated
                  A(i,j,k,5) = 2d0*dt*wmask(i,j,k-1)/((dz(k)+z_f)/2d0*dzh(k-1)*(rhot(i,j,k)+rhot(i,j,k-1)))
                  A(i,j,k,6) = 2d0*dt*wmask(i,j,k)/((dz(k)+z_f)/2d0*z_f*(rhot(i,j,k+1)+rhot(i,j,k)))
