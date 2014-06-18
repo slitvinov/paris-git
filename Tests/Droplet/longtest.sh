@@ -1,6 +1,21 @@
 #!/bin/bash
 #set -x
 
+
+moftrue=F
+nfilter=1
+
+if [ $# -gt 1 ]; then
+    if [ $1 == MoF ]; then
+	echo "using Mof"
+	moftrue=T
+	nfilter=0
+    fi
+fi
+
+
+sed s/MOFTEMP/$moftrue/g inputvof.template | sed s/NFILTERTEMP/$nfilter/g > inputvof 
+
 mv input input.bkp
 cp inputlong input
 rm -fR out

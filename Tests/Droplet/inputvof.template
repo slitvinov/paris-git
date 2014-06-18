@@ -8,8 +8,9 @@ VOF_ADVECT = 'CIAM'
 ViscMeanIsArith = T
 refinement = 8
 ViscMeanIsArith = T
-DoMOF = F
+DoMOF = MOFTEMP
 use_vofi = T
+nfilter = NFILTERTEMP
 !=================================================================================================
 
 &end

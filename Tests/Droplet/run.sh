@@ -1,6 +1,21 @@
 #!/bin/bash
 #set -x
 
+moftrue=F
+nfilter=1
+
+if [ $# -gt 0 ]; then
+    if [ $1 == MoF ]; then
+	echo "using Mof"
+	moftrue=T
+	nfilter=0
+    fi
+fi
+
+
+sed s/MOFTEMP/$moftrue/g inputvof.template | sed s/NFILTERTEMP/$nfilter/g > inputvof 
+
+
 rm -fR out
 mpirun -np 8 paris > tmpout
 echo `awk ' /Step:/ { cpu = $8 } END { print "cpu = " cpu } ' < tmpout`
