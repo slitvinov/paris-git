@@ -864,6 +864,7 @@ subroutine get_momentum(c,us,d,mom)
 
         rhoavg = cvof(i,j,k)*rho2 + (1.d0-cvof(i,j,k))*rho1
         mom(i,j,k) =0.5d0*(us(i,j,k)+us(i-i0,j-j0,k-k0))*rhoavg
+        mom_flag(i,j,k) = 0
 
       enddo
     enddo
@@ -915,8 +916,6 @@ subroutine get_velocity_from_momentum (mom,d,us,der)
 
   call init_i0j0k0 (d,i0,j0,k0)
 
-  mom_flag = 1
-
   do k=ks-1,ke+1
     do j=js-1,je+1
       do i=is-1,ie+1
@@ -924,7 +923,7 @@ subroutine get_velocity_from_momentum (mom,d,us,der)
         cflag =  (cvof(i-1,j,k)+ cvof(i,j,k) + cvof(i-2,j,k) &
         +cvof(i,j-1,k)+ cvof(i,j,k) + cvof(i,j-2,k) &
         +cvof(i,j,k-1)+ cvof(i,j,k) + cvof(i,j,k-2))/9.d0
-!        cflag = cvof(i-i0,j-j0,k-k0)
+        cflag = cvof(i-i0,j-j0,k-k0)
 !        rhoavg1   = rho2*cvof(i,j,k) + rho1*(1.d0 - cvof(i,j,k))
 !        uavg      = mom(i,j,k)/rhoavg1
 !
@@ -989,6 +988,7 @@ end subroutine get_velocity_from_momentum
     integer i
     integer, intent(in) :: tswap
 
+    mom_flag = 1
     call get_momentum(cvof,u,1,momentum(:,:,:,1))
     call get_momentum(cvof,v,2,momentum(:,:,:,2))
     call get_momentum(cvof,w,3,momentum(:,:,:,3))
