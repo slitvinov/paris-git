@@ -905,7 +905,7 @@ module module_BC
     endif
     
     ! outflow/velocity boundary condition
-    ! same velocity as opposing inflow. 
+    ! same velocity as opposing inflow. ! @generalize this !!
     if(bdry_cond(4)==4 .and. coords(1)==nPx-1) then
         u(ie  ,:,:)=uaverage
         v(ie+1,:,:)=v(ie-1,:,:)
@@ -1996,9 +1996,9 @@ subroutine SetupPoisson(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask,cvof,n1
   endif
   P_bc = 0d0
   ! dp/dn = 0 for inflow bc on face 1 == x- : do not correct u(is-1)
-  ! inflow bc on other faces not implemented yet.  
+  ! inflow bc on other faces not implemented yet.  !@@ generalize this ! 
   if(coords(1)==0) then
-     if(bdry_cond(1)==3) then
+     if(bdry_cond(1)==3) then  
         A(is,:,:,7) = A(is,:,:,7) - A(is,:,:,1)
         A(is,:,:,1) = 0d0
         ! pressure boundary condition

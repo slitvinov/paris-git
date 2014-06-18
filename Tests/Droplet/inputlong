@@ -21,8 +21,8 @@ GetPropertiesFromFront = F ! T: uses Front-Tracking data to compute mu, rho and 
 		           ! F: uses VOF data to compute mu and rho. 
 
 ZeroReynolds = F
-Implicit  = F     
-hypre     = T      ! T: uses hyprepackage, F: uses SOR solver 
+Implicit  = T     
+hypre     = F      ! T: uses hyprepackage, F: uses SOR solver 
 restart   = F       ! T: start the domain from a previous simulation
 restartFront = F    ! T: start the front from  a previous simulation
 restartAverages = F
