@@ -922,18 +922,25 @@ subroutine get_velocity_from_momentum (mom,d,us,der)
         +cvof(i,j-1,k)+ cvof(i,j,k) + cvof(i,j-2,k) &
         +cvof(i,j,k-1)+ cvof(i,j,k) + cvof(i,j,k-2))/9.d0
 !        cflag = cvof(i-i0,j-j0,k-k0)
+!        rhoavg1   = rho2*cvof(i,j,k) + rho1*(1.d0 - cvof(i,j,k))
+!        uavg      = mom(i,j,k)/rhoavg1
+!
+!        rhoavg1   = rho2*work(i,j,k,1) + rho1*(1.d0 - work(i,j,k,1))
+!        mom1      = rhoavg1*uavg
+!
+!        rhoavg2   = rho2*work(i-i0,j-j0,k-k0,2) + rho1*(1.d0 - work(i-i0,j-j0,k-k0,2))
+!        tmpreal   = rho2*cvof(i-i0,j-j0,k-k0) + rho1*(1.d0 - cvof(i-i0,j-j0,k-k0))
+!        uavg      = mom(i-i0,j-j0,k-k0)/tmpreal
+!        mom2      = rhoavg2*uavg
+!
+!        tmpreal = (mom1+mom2)/(rhoavg1+rhoavg2)
+
         rhoavg1   = rho2*cvof(i,j,k) + rho1*(1.d0 - cvof(i,j,k))
         uavg      = mom(i,j,k)/rhoavg1
-
-        rhoavg1   = rho2*work(i,j,k,1) + rho1*(1.d0 - work(i,j,k,1))
         mom1      = rhoavg1*uavg
+        rhoavg2   = rho2*cvof(i-i0,j-j0,k-k0) + rho1*(1.d0 - cvof(i-i0,j-j0,k-k0))
+        tmpreal   = 0.5d0*(uavg + mom(i-i0,j-j0,k-k0)/rhoavg2)
 
-        rhoavg2   = rho2*work(i-i0,j-j0,k-k0,2) + rho1*(1.d0 - work(i-i0,j-j0,k-k0,2))
-        tmpreal   = rho2*cvof(i-i0,j-j0,k-k0) + rho1*(1.d0 - cvof(i-i0,j-j0,k-k0))
-        uavg      = mom(i-i0,j-j0,k-k0)/tmpreal
-        mom2      = rhoavg2*uavg
-
-        tmpreal = (mom1+mom2)/(rhoavg1+rhoavg2)
         if ((cflag.gt.0.d0).and.(cflag.lt.1.d0)) then
           mom_flag(i,j,k) = 0
           der(i-i0,j-j0,k-k0) = der(i-i0,j-j0,k-k0) + &
