@@ -32,6 +32,7 @@ module module_averages
   logical :: averages_on_nodes(SIZEARR,3), do_averages= .true., output_vtk(SIZEARR)
   integer :: av_div(3), arr_div(3)
   integer :: selected_phase(SIZEARR)
+  logical :: debug = .false.
 !**************************************************************************************************
   contains
 !**************************************************************************************************
@@ -46,16 +47,25 @@ module module_averages
     integer :: i, timeout, ierr
     integer :: l, m, n, bounds(3)
     integer :: req(2),sta(MPI_STATUS_SIZE,2)
-    real(8), dimension(:,:,:), allocatable :: loc_av_field, loc_av_field2, av_field1, av_field2
+    real(8), dimension(:,:,:), allocatable :: loc_av_field, loc_av_field2, av_field1, av_field2, unitary_field
+    
  
     if(do_averages) then
+      if (rank==0 .and. debug) write(*,*) 'Starting averages'
+
       ALLOCATE(av_field1(1:arr_div(1),1:arr_div(2),1:arr_div(3)), av_field2(1:arr_div(1),1:arr_div(2),1:arr_div(3)), &
-               loc_av_field(1:arr_div(1),1:arr_div(2),1:arr_div(3)), loc_av_field2(1:arr_div(1),1:arr_div(2),1:arr_div(3)))
-    
-      av_field1(1:arr_div(1),1:arr_div(2),1:arr_div(3)) = 0d0      
-      av_field2(1:arr_div(1),1:arr_div(2),1:arr_div(3)) = 0d0      
+               loc_av_field(1:arr_div(1),1:arr_div(2),1:arr_div(3)), loc_av_field2(1:arr_div(1),1:arr_div(2),1:arr_div(3)), &
+                unitary_field(is:ie,js:je,ks:ke))
+      
+      unitary_field(is:ie,js:je,ks:ke) = 1d0
 
       do i=1,SIZEARR
+      
+      av_field1(1:arr_div(1),1:arr_div(2),1:arr_div(3)) = 0d0      
+      av_field2(1:arr_div(1),1:arr_div(2),1:arr_div(3)) = 0d0  
+      loc_av_field(1:arr_div(1),1:arr_div(2),1:arr_div(3)) = 0d0 
+      loc_av_field2(1:arr_div(1),1:arr_div(2),1:arr_div(3)) = 0d0
+
         if(averages_on_nodes(i,1)) then
           bounds(1) = av_div(1)
         else 
@@ -71,97 +81,128 @@ module module_averages
         else 
           bounds(3) = arr_div(3)
         endif
+        ! Computing the averages of Darcy velocity
         if(averages_to_do(i)=='UDarcy') then
-!          if (rank==0) write(*,*) 'Attempting to compute UDarcy'
-          call AverageField(u,loc_av_field,.true.,.false.,selected_phase(i),bounds)
-        
+          if (rank==0 .and. debug) write(*,*) 'Attempting to compute UDarcy'
+          if(dosolids) then
+             call AverageField(u,loc_av_field,.true.,.false.,selected_phase(i),bounds)
+          else
+             call AverageField(u,loc_av_field,.false.,.false.,selected_phase(i),bounds)
+          endif     
           call MPI_ALLREDUCE( loc_av_field,  av_field1, arr_div(1)*arr_div(2)*arr_div(3), &
                                        MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_Domain,req(1), ierr)
-        
-          call MPI_WAITALL(1,req(1),sta(:,1),ierr)
           if(rank==0) then
 
             do n=1,bounds(3)
               do m=1,bounds(2)
                 do l=1,bounds(1)
-                  av_field1(l,m,n) = av_field1(l,m,n)*av_div(1)*av_div(2)*av_div(3)/(XLength*YLength*ZLength)
+                  av_field1(l,m,n) = av_field1(l,m,n)*bounds(1)*bounds(2)*bounds(3)/(XLength*YLength*ZLength)
                 enddo
               enddo
             enddo
-
+            ! Printng results
             call print_results('UDarcyPhase'//int2text(selected_phase(i),2), av_field1, timeout, bounds)
             if(output_vtk(i))then
               call printVTK('UDarcyPhase'//int2text(selected_phase(i),2),timeout,bounds,av_field1)
             endif
           endif
-
-        
-          av_field1(1:arr_div(1),1:arr_div(2),1:arr_div(3)) = 0d0 
-          av_field2(1:arr_div(1),1:arr_div(2),1:arr_div(3)) = 0d0  
-   
+        ! Computing averages of pressure
         elseif(averages_to_do(i)=='P') then
-          ! if (rank==0) write(*,*) 'Attempting to compute P in rank', rank  
-          call AverageField(p,loc_av_field,.true.,.false.,selected_phase(i), bounds)
-          !write(*,*) 'P succesfully added in rank', rank 
-          !write(*,*) 'In rank ', rank,' local vel: ', loc_av_field
-          call MPI_ALLREDUCE( loc_av_field,  av_field1, arr_div(1)*arr_div(2)*arr_div(3), &
-                                       MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_Domain,req(1), ierr)
-          !write(*,*) 'Global P added in rank', rank 
-          call AverageField(solids,loc_av_field2,.false.,.true.,selected_phase(i),bounds)
-          !write(*,*) 'Solid addition succesfull in rank ', rank 
-
-          call MPI_ALLREDUCE( loc_av_field2,  av_field2, arr_div(1)*arr_div(2)*arr_div(3), &
-                                       MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_Domain,req(2), ierr)
-          !write(*,*) 'Global solid addition in rank', rank 
-          call MPI_WAITALL(2,req(1:2),sta(:,1:2),ierr)
-          if(rank==0) then
-            do n=1,bounds(3)
-              do m=1,bounds(2)
-                do l=1,bounds(1)
-                  if((av_field1(l,m,n) < 1d-4).or.(av_field2(l,m,n) < 1d-4)) then
-                    av_field1(l,m,n) = 0d0
-                  else
-                    av_field1(l,m,n) = av_field1(l,m,n) / av_field2(l,m,n)
-                  endif
-                enddo
-              enddo
-            enddo
-            !write(*,*) 'Finishing procces in rank ', rank 
-            call print_results('PressuPhase'//int2text(selected_phase(i),2), av_field1, timeout, bounds)
-            if(output_vtk(i))then
-              call printVTK('PressuPhase'//int2text(selected_phase(i),2),timeout,bounds,av_field1)
-            endif            
+        if (rank==0 .and. debug) write(*,*) 'Attempting to compute Pressure'
+          !Computing pressure when there is solid
+          if(dosolids) then 
+          if (debug) call outputmessage('Attempting to compute Pressure with solids')
+             call AverageField(p,loc_av_field,.true.,.false.,selected_phase(i), bounds)
+          if (rank==0 .and. debug) write(*,*) 'Step 1'
+             call AverageField(solids,loc_av_field2,.false.,.true.,selected_phase(i),bounds)
+          if (debug) call outputmessage('Step 2')
+             call MPI_ALLREDUCE( loc_av_field,  av_field1, arr_div(1)*arr_div(2)*arr_div(3), &
+                                          MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_Domain, ierr)
+          if (debug) call outputmessage('Step 3')
+             call MPI_ALLREDUCE( loc_av_field2,  av_field2, arr_div(1)*arr_div(2)*arr_div(3), &
+                                          MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_Domain, ierr)
+          if (debug) call outputmessage('Step 4')
+             if(rank==0) then
+               do n=1,bounds(3)
+                 do m=1,bounds(2)
+                   do l=1,bounds(1)
+                     if(av_field2(l,m,n) > 1d-10) then
+                       av_field1(l,m,n) = av_field1(l,m,n) / av_field2(l,m,n)
+                     endif
+                   enddo
+                 enddo
+               enddo           
+             endif
+          if (debug) call outputmessage('Step 5')
+          !Computing pressure when there is no solid
+          else
+             if (rank==0 .and. debug) write(*,*) 'Attempting to compute Pressure with out solids'
+             call AverageField(p,loc_av_field,.false.,.false.,selected_phase(i), bounds)
+             if (rank==0 .and. debug) write(*,*) '1'
+             call MPI_ALLREDUCE( loc_av_field,  av_field1, arr_div(1)*arr_div(2)*arr_div(3), &
+                                          MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_Domain, ierr)
+             if (rank==0 .and. debug) write(*,*) '2'
+             if(rank==0) then
+               do n=1,bounds(3)
+                 do m=1,bounds(2)
+                   do l=1,bounds(1)
+                      av_field1(l,m,n) = av_field1(l,m,n)*bounds(1)*bounds(2)*bounds(3)/(XLength*YLength*ZLength)
+                   enddo
+                 enddo
+               enddo           
+             endif       
           endif
-          av_field1(1:arr_div(1),1:arr_div(2),1:arr_div(3)) = 0d0      
-          av_field2(1:arr_div(1),1:arr_div(2),1:arr_div(3)) = 0d0  
-    
+          ! Printing results
+          if(rank==0) then
+             if (debug) call outputmessage('Printing results')
+             call print_results('PressuPhase'//int2text(selected_phase(i),2), av_field1, timeout, bounds)
+             if (debug) call outputmessage('Printing results in vtk')
+             if(output_vtk(i))then
+                call printVTK('PressuPhase'//int2text(selected_phase(i),2),timeout,bounds,av_field1)
+             endif
+          endif   
+        ! Computing saturation   
         elseif(averages_to_do(i)=='Saturation') then
-          !if (rank==0) write(*,*) 'Attempting to compute Saturation'    
-          call AverageField(solids,loc_av_field,.false.,.true.,selected_phase(i), bounds)
-          call AverageField(solids,loc_av_field2,.false.,.true.,0, bounds)
-          !write(*,*) 'Solid succesfully added in rank', rank 
-          !write(*,*) 'In rank ', rank,' local vel: ', loc_av_field
-          call MPI_ALLREDUCE( loc_av_field,  av_field1, arr_div(1)*arr_div(2)*arr_div(3), &
-                                       MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_Domain,req(1), ierr)
-          call MPI_ALLREDUCE( loc_av_field2,  av_field2, arr_div(1)*arr_div(2)*arr_div(3), &
-                                       MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_Domain,req(2), ierr)
-          !write(*,*) 'Global Solid succesfully added in rank', rank 
-          call MPI_WAITALL(2,req(1:2),sta(:,1:2),ierr)
-          if(rank==0) then
-            do n=1,bounds(3)
-              do m=1,bounds(2)
-                do l=1,bounds(1)
-                  av_field1(l,m,n) = av_field1(l,m,n)/av_field2(l,m,n)
-                enddo
-              enddo
-            enddo
-            call print_results('SaturaPhase'//int2text(selected_phase(i),2), av_field1, timeout, bounds)
-            if(output_vtk(i))then
-              call printVTK('SaturaPhase'//int2text(selected_phase(i),2),timeout,bounds,av_field1)
-            endif
+          if (rank==0 .and. debug) write(*,*) 'Attempting to compute Saturation'
+          ! Computing saturation when there is solid.
+          if(dosolids) then
+             call AverageField(solids,loc_av_field,.false.,.true.,selected_phase(i), bounds)
+             call AverageField(solids,loc_av_field2,.false.,.true.,0, bounds)
+             call MPI_ALLREDUCE( loc_av_field,  av_field1, arr_div(1)*arr_div(2)*arr_div(3), &
+                                          MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_Domain,req(1), ierr)
+             call MPI_ALLREDUCE( loc_av_field2,  av_field2, arr_div(1)*arr_div(2)*arr_div(3), &
+                                          MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_Domain,req(2), ierr)
+             if(rank==0) then
+               do n=1,bounds(3)
+                 do m=1,bounds(2)
+                   do l=1,bounds(1)
+                     av_field1(l,m,n) = av_field1(l,m,n)/av_field2(l,m,n)
+                   enddo
+                 enddo
+               enddo
+             endif
+          ! Computing saturation when there is no solid (To be corrected!)
+          else
+             call AverageField(unitary_field,loc_av_field,.false.,.false.,selected_phase(i), bounds)
+             call MPI_ALLREDUCE( loc_av_field,  av_field1, arr_div(1)*arr_div(2)*arr_div(3), &
+                                          MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_Domain,req(1), ierr)
+             if(rank==0) then
+               do n=1,bounds(3)
+                 do m=1,bounds(2)
+                   do l=1,bounds(1)
+                     av_field1(l,m,n) = av_field1(l,m,n)*bounds(1)*bounds(2)*bounds(3)/(XLength*YLength*ZLength)
+                   enddo
+                 enddo
+               enddo
+             endif
           endif
-          av_field1(1:arr_div(1),1:arr_div(2),1:arr_div(3)) = 0d0      
-          av_field2(1:arr_div(1),1:arr_div(2),1:arr_div(3)) = 0d0  
+          ! Printing results
+          if(rank==0) then
+             call print_results('SaturaPhase'//int2text(selected_phase(i),2), av_field1, timeout, bounds)
+             if(output_vtk(i))then
+                call printVTK('SaturaPhase'//int2text(selected_phase(i),2),timeout,bounds,av_field1)
+             endif
+          endif
         endif  
           
       enddo
@@ -172,11 +213,12 @@ module module_averages
     use module_grid
     use module_solid
     use module_VOF
+    use module_flow
     implicit none
     include 'mpif.h'
     real(8), dimension(:,:,:), allocatable, intent(in) :: original_field
     real(8), dimension(:,:,:), allocatable :: localaveraged_field
-    real(8) :: vol, field, solid, colour
+    real(8) :: vol, field, solidwall, colour
 
     integer :: colourFilter
     integer :: l, m, n, i, j, k, ierr, gap(3), bounds(3)
@@ -184,15 +226,19 @@ module module_averages
     integer :: coreis, corejs, coreks, coreie, coreje, coreke
     integer :: isf, ief, jsf, jef, ksf, kef
     logical :: out_of_range, solidFilter, complementary
-
+    !if (rank==0 .and. debug) write(*,*) 'Averages 1'
     if(colourFilter /= 0 .and. colourFilter /= 1 .and. colourFilter /= 2) then
       call parisError('Colour filter option not valid')
     endif
-
+    !if (rank==0 .and. debug) write(*,*) 'Averages 2'
+    !if((.not.dosolids) .and. solidFilter) then
+    !   solidFilter = .false.
+    !endif
+    !if (rank==0 .and. debug) write(*,*) 'Averages 3'
     cubedim(1) = Nx / av_div(1)
     cubedim(2) = Ny / av_div(2)
     cubedim(3) = Nz / av_div(3)
-
+    !if (rank==0 .and. debug) write(*,*) 'Averages 4'
     if(bounds(1) == av_div(1)) then
       gap(1) = 0    
     else 
@@ -209,7 +255,7 @@ module module_averages
       gap(3) = cubedim(3) / 2 - cubedim(3)
     endif
   
-
+    !if (rank==0 .and. debug) write(*,*) 'Averages 5'
 
     coreis = coords(1)*Nx/nPx + 1
     coreie = (coords(1) + 1)*Nx/nPx
@@ -219,9 +265,9 @@ module module_averages
 
     coreks = coords(3)*Nz/nPz + 1
     coreke = (coords(3) + 1)*Nz/nPz
-
+    !if (rank==0 .and. debug) write(*,*) 'Averages 6'
     localaveraged_field(1:arr_div(1),1:arr_div(2),1:arr_div(3)) = 0d0
-
+    !if (rank==0 .and. debug) write(*,*) 'Averages 7'
     do n=1,bounds(3)
 
       do m=1,bounds(2)
@@ -279,7 +325,7 @@ module module_averages
             do i=isf,ief
               do j=jsf,jef
                 do k=ksf,kef 
-                
+                !if (rank==0 .and. debug) write(*,*) 'Averages 8'
                   vol = dx(i)*dy(j)*dz(k)
                   if(colourFilter == 0) then
                     colour = 1d0
@@ -288,20 +334,20 @@ module module_averages
                   elseif(colourFilter == 2) then  
                     colour = 1d0 - cvof(i,j,k)
                   endif
-                  
+                  !if (rank==0 .and. debug) write(*,*) 'Averages 9'
                   if(solidFilter) then
-                    solid = 1d0 - solids(i,j,k)
+                    solidwall = 1d0 - solids(i,j,k)
                   else
-                    solid = 1d0
+                    solidwall = 1d0
                   endif
-                  
+                  !if (rank==0 .and. debug) write(*,*) 'Averages 10'
                   if(complementary) then
                     field = 1d0 - original_field(i,j,k)
                   else 
                     field = original_field(i,j,k)
                   endif
-
-                  localaveraged_field(l,m,n) = localaveraged_field(l,m,n) + field*solid*vol*colour
+                  !if (rank==0 .and. debug) write(*,*) 'Averages 11'
+                  localaveraged_field(l,m,n) = localaveraged_field(l,m,n) + field*solidwall*vol*colour
 
                 enddo
               enddo
@@ -354,12 +400,12 @@ module module_averages
     endif
     close(in)
 
-    if(.not.dosolids) then 
-       if (rank == 0) then
-          write(*,*) "ReadAveParameters: cannot work without solids."
-          do_averages= .false.
-       endif
-    endif
+    !if(.not.dosolids) then 
+    !   if (rank == 0) then
+    !      write(*,*) "ReadAveParameters: cannot work without solids."
+    !      do_averages= .false.
+    !   endif
+    !endif
 
     if(mod(Nx,av_div(1)) /= 0) call pariserror("Number of nodes in X not divisible by requested average units in X")
     if(mod(Ny,av_div(2)) /= 0) call pariserror("Number of nodes in Y not divisible by requested average units in Y")
@@ -390,7 +436,7 @@ module module_averages
     enddo
 
     ! Test
-    if( rank==0 )then
+    if( rank==0 .and. debug )then
       write(*,*) 'Written parameters in averages'
       write(*,*) averages_to_do
       write(*,*) averages_on_nodes
@@ -409,11 +455,11 @@ module module_averages
   integer :: x_div, iout, bounds(3)
   integer :: l, m, n
   real(8), dimension(:,:,:), allocatable :: vector
-  integer, save :: unit_num = 88
+  integer, save :: unit_num = 89
   logical :: nodes
   
 
-    OPEN(UNIT=unit_num,FILE=TRIM(out_path)//'/'//trim(file_name)//'-'//TRIM(int2text(iout,5))//'.dat',ACCESS='APPEND') 
+    OPEN(UNIT=unit_num,FILE=TRIM(out_path)//'/'//trim(file_name)//'-'//TRIM(int2text(iout,5))//'.dat') 
 
       do n=1,bounds(3); do m=1,bounds(2); do l=1,bounds(1);  
         write(unit_num,11) vector(l, m, n)
@@ -438,7 +484,7 @@ subroutine printVTK(filename,iout,bounds,vector)
   character(len=13) :: rootname,filename
   rootname=TRIM(out_path)//'/VTK/'//TRIM(filename)//'-'//TRIM(int2text(iout,5))//'.vtk'
 
-  write(*,*) rootname
+  !write(*,*) rootname
   if(bounds(1)==av_div(1)) then
     origin(1) = XLength / (2 * REAL(av_div(1)))
   else
@@ -481,7 +527,7 @@ subroutine printVTK(filename,iout,bounds,vector)
 17  format('SCALARS ',A20,' float 1')
 18  format('LOOKUP_TABLE default')
 
-    do n=1,bounds(3); do m=1,bounds(2); do l=1,bounds(3); 
+    do n=1,bounds(3); do m=1,bounds(2); do l=1,bounds(1); 
       write(89,210) vector(l,m,n)
     enddo; enddo; enddo
 210 format(e14.5)
@@ -491,6 +537,18 @@ subroutine printVTK(filename,iout,bounds,vector)
 
 end subroutine printVTK
 !=========================================================================
+subroutine outputmessage(message) 
+  use module_IO
+  use module_grid
+  implicit none
+  include 'mpif.h'
+  integer ierr
+  character(*) :: message
 
+  OPEN(UNIT=89,FILE=TRIM(out_path)//'/message-rank-'//TRIM(int2text(rank,padding))//'.txt')
+  write(89,*) message
+  close(89)
+  
+end subroutine outputmessage
 
 end module module_averages
