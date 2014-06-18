@@ -857,10 +857,13 @@ subroutine get_momentum(c,us,d,mom)
           endif
         endif
 
-        rhoavg = work(i,j,k,2)*rho2 + (1.d0-work(i,j,k,2))*rho1 
-        mom(i,j,k) = 0.5d0*us(i,j,k)*rhoavg
-        rhoavg = work(i,j,k,1)*rho2 + (1.d0-work(i,j,k,1))*rho1 
-        mom(i,j,k) = mom(i,j,k) + 0.5d0*us(i-i0,j-j0,k-k0)*rhoavg
+!        rhoavg = work(i,j,k,2)*rho2 + (1.d0-work(i,j,k,2))*rho1 
+!        mom(i,j,k) = 0.5d0*us(i,j,k)*rhoavg
+!        rhoavg = work(i,j,k,1)*rho2 + (1.d0-work(i,j,k,1))*rho1 
+!        mom(i,j,k) = mom(i,j,k) + 0.5d0*us(i-i0,j-j0,k-k0)*rhoavg
+
+        rhoavg = cvof(i,j,k)*rho2 + (1.d0-cvof(i,j,k))*rho1
+        mom(i,j,k) =0.5d0*(us(i,j,k)+us(i-i0,j-j0,k-k0))*rhoavg
 
       enddo
     enddo
