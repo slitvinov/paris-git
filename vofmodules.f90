@@ -109,6 +109,7 @@ contains
     integer :: i,j,k,n
     field=cvof
     do n=1,nfilter
+       call do_all_ghost(field)
        do k=ks-1,ke+1; do j=js-1,je+1; do i=is-1,ie+1
           tmp(i,j,k) = b1*field(i,j,k) + & 
                b2*( field(i-1,j,k) + field(i,j-1,k) + field(i,j,k-1) + &
@@ -118,7 +119,6 @@ contains
                     field(i,j+1,k+1) + field(i,j+1,k-1) + field(i,j-1,k+1) + field(i,j-1,k-1) ) + &
                b4*( field(i+1,j+1,k+1) + field(i+1,j+1,k-1) + field(i+1,j-1,k+1) + field(i+1,j-1,k-1) +  &
                     field(i-1,j+1,k+1) + field(i-1,j+1,k-1) + field(i-1,j-1,k+1) + field(i-1,j-1,k-1) )
-! fixme: ghostx missing
        enddo; enddo; enddo
        field=tmp
     enddo
