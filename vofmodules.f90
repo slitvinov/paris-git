@@ -178,7 +178,7 @@ contains
     logical file_is_there
     logical ViscMeanIsArith, DensMeanIsArith
     namelist /vofparameters/ vofbdry_cond,test_type,VOF_advect,refinement, &
-       cylinder_dir, normal_up, DoLPP, jetradius, jetcenter_yc2yLength, jetcenter_zc2zLength, & 
+       cylinder_dir, normal_up, DoLPP, &
        FreeSurface, ViscMeanIsArith, DensMeanIsArith, MAXERROR_FS, MAXIT_FS, &
        output_filtered_VOF, DoMOF, use_vofi,nfilter
     
@@ -190,7 +190,6 @@ contains
     cylinder_dir=0 ! redundant
     normal_up=.true. ! redundant
     DoLPP=.false.
-    jetradius=01d0;jetcenter_yc2yLength=0.5d0;jetcenter_zc2zLength=0.5d0
     FreeSurface=.false. 
     ViscMeanIsArith=.true.; DensMeanIsArith=.true.
     output_filtered_VOF=.false. ! redundant
@@ -247,10 +246,6 @@ contains
      !if (ierr .ne. 0) call pariserror("ReadParameters: error opening output file")
      write(UNIT=out,NML=vofparameters)
     end if ! rank
-
-    ! Set parameters depending on input parameters
-    jetcenter_yc = jetcenter_yc2yLength*yLength
-    jetcenter_zc = jetcenter_zc2zLength*zLength
 
   end subroutine ReadVOFParameters
 !
@@ -386,6 +381,7 @@ or none at all")
     integer, parameter :: root_rank = 0
     integer :: i,j,k
     real(8) :: lnozzle = 4.d-3   ! need to be consistent with lnozzle in solids
+    real(8) :: ryz
     
     if( test_D2P .or. test_tag ) then 
        if ( rank == root_rank ) call random_bubbles
@@ -418,14 +414,24 @@ or none at all")
        vof_flag=0
     endif
 
-    ! hard code for 2d planar jet with finite length nozzle
-    if (test_jet .and. inject_type == 3 ) then
-      do i = is,ie; do j=js,je; do k = ks,ke
-         if ( x(i) < lnozzle .and. y(j) < jetradius ) then 
-            cvof(i,j,k) = 1.d0
-            vof_flag(i,j,k) = 1
-         end if ! 
-      end do; end do; end do
+    ! hard code for initialized a short jet inside the nozzle
+    if (test_jet ) then 
+      if ( inject_type == 3 ) then
+         do i = is,ie; do j=js,je; do k = ks,ke
+            if ( x(i) < lnozzle .and. (y(j)-jetcenter_yc) < radius_liq_inject ) then 
+               cvof(i,j,k) = 1.d0
+               vof_flag(i,j,k) = 1
+            end if ! 
+         end do; end do; end do
+      else if ( inject_type == 4 ) then
+         do i = is,ie; do j=js,je; do k = ks,ke
+            ryz = sqrt( (y(j) - jetcenter_yc)**2.d0 + (z(k) - jetcenter_zc)**2.d0 )
+            if ( x(i) < lnozzle .and. ryz < radius_liq_inject ) then 
+               cvof(i,j,k) = 1.d0
+               vof_flag(i,j,k) = 1
+            end if ! 
+         end do; end do; end do
+      end if ! inject_type
     end if ! test_jet
 
     if ( test_KHI2D ) then 
@@ -1175,9 +1181,9 @@ end subroutine get_velocity_from_momentum
     integer :: inject
     inject=0
     if ( inject_type == 2 .or. inject_type == 5 .or. inject_type == 4) then 
-      if ((y(j) - jetcenter_yc)**2 + (z(k) - jetcenter_zc)**2.lt.jetradius**2) inject=1
+      if ((y(j) - jetcenter_yc)**2 + (z(k) - jetcenter_zc)**2.lt.radius_liq_inject**2) inject=1
     else if ( inject_type == 3 ) then
-      if ( y(j) <= jetradius ) inject = 1 
+      if ((y(j) - jetcenter_yc) <= radius_liq_inject ) inject = 1 
     end if ! inject_type
   end function inject
 !

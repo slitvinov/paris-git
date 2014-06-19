@@ -100,6 +100,7 @@ contains
 !=================================================================================================
   SUBROUTINE initialize_solids()
     use module_timer
+    use module_2phase
     implicit none
     include 'mpif.h'
     integer :: i,j,k,index
@@ -109,14 +110,13 @@ contains
     real(8) :: x0,y0,z0,radius,x2,y2,z2
     ! for 2d nozzle
     real(8), parameter :: PI = 3.14159265359d0
-    real(8) :: hmin,lnozzle,beta,h,l1,jetradius
+    real(8) :: hmin,lnozzle,beta,h,l1,ryz
     hmin = xlength/dble(nx)    
     lnozzle = 4.d-3
     beta=1d0
     l1=0.d0
     !beta = 3.5d0/180.d0*PI 
     ! Note: small beta is only meaningful when resolution is very high
-    jetradius = 0.01d0  ! note: need to be consistent with inputvof 
 
     call ReadSolidParameters
     if(dosolids) then
@@ -154,8 +154,18 @@ contains
              !h = tan(beta)*(lnozzle+l1-x(i))
              h = hmin*1.d0 
              if ( x(i) < lnozzle .and. & 
-                  y(j) < jetradius+h .and. & 
-                  y(j) > jetradius-h ) then 
+                  y(j) < radius_liq_inject+h .and. & 
+                  y(j) > radius_liq_inject-h ) then 
+               s1 = 1.d0 
+             else
+               s1 =-1.d0
+             end if ! x(i),y(j)
+          else if (solid_type == '3D_nozzle') then
+             ryz = sqrt( (y(j) - jetcenter_yc)**2.d0 + (z(k) - jetcenter_zc)**2.d0 )
+             h = hmin*1.d0 
+             if ( x(i) < lnozzle .and. & 
+                  ryz < radius_liq_inject+h .and. & 
+                  ryz > radius_liq_inject-h ) then 
                s1 = 1.d0 
              else
                s1 =-1.d0
@@ -177,7 +187,7 @@ contains
        call ghost_x(solids,2,req(1:4));  call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
        call ghost_y(solids,2,req(1:4));  call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
        call ghost_z(solids,2,req(1:4));  call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
-       call output_solids(0,is-1,ie,js-1,je,ks-1,ke)
+       call output_solids(0,is,ie+1,js,je+1,ks,ke+1)
 
        ! For solid objects set mask according to placement of solids
        umask=1d0; vmask=1d0; wmask=1d0

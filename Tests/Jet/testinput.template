@@ -89,7 +89,10 @@ ZLENGTH  = 1.0
 WallVel(1,1)  = 1. ! can set inflow velocities here
 WallShear(4,1) = 0.0
 
-U_init =  1d0
+inject_type = 2
+uliq_inject = 1.0
+radius_liq_inject = 0.1
+
 GX      = 0.0
 GY      = 0.0
 GZ      = 0.0

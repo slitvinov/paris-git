@@ -427,7 +427,8 @@ Program paris
            call write_vec_gnuplot(u,v,cvof,p,itimestep,DoVOF)
            call output(nfile,is,ie+1,js,je+1,ks,ke+1)
            if(DoVOF) call output_VOF(nfile,is,ie+1,js,je+1,ks,ke+1)
-           if(DoLPP) call output_LPP(nfile)
+           if(DoLPP) call output_LPP(nfile,is,ie+1,js,je+1,ks,ke+1)
+           call ComputeAverages(itimestep)
            if(test_droplet) call output_droplet(w,time)
            if(rank==0)then
               end_time =  MPI_WTIME()
@@ -1294,11 +1295,13 @@ subroutine InitCondition
          end if ! test_KHI_2D 
         
         ! -------------------------------------------------------------------
-        ! Test: 2d planar jet with finite length nozzle
-         if (test_jet .and. inject_type == 3 ) then
-            do i = is,ie; do j=js,je; do k = ks,ke
-               if((cvof(i,j,k) + cvof(i+1,j,k)) > 0.0d0) u(i,j,k) = uliq_inject 
-            end do; end do; end do
+         if (test_jet ) then 
+            ! Test: planar or cylindrical jet with finite length nozzle
+            if ( inject_type == 3 .or. inject_type == 4 ) then
+               do i = is,ie; do j=js,je; do k = ks,ke
+                  if((cvof(i,j,k) + cvof(i+1,j,k)) > 0.0d0) u(i,j,k) = uliq_inject 
+               end do; end do; end do
+            end if ! inject_type
          end if ! test_jet
      
      endif
@@ -1443,6 +1446,8 @@ subroutine ReadParameters
                         BoundaryPressure,             ZeroReynolds,  restartAverages,termout,    &  
                         excentricity,  tout,          zip_data,      ugas_inject,   uliq_inject, &  
                         blayer_gas_inject,            tdelay_gas_inject,            padding,     &
+                        radius_gas_inject,            radius_liq_inject,                         &
+                        jetcenter_yc2yLength,         jetcenter_zc2zLength,                      & 
                         cflmax_allowed, out_P
  
   Nx = 0; Ny = 4; Nz = 4 ! cause absurd input file that lack nx value to fail. 
@@ -1467,6 +1472,8 @@ subroutine ReadParameters
   excentricity=0d0;   tout = -1.d0;          zip_data=.false.
   ugas_inject=0.d0;   uliq_inject=1.d0
   blayer_gas_inject=8.d-2; tdelay_gas_inject=1.d-2
+  radius_gas_inject=0.1d0; radius_liq_inject=0.1d0
+  jetcenter_yc2yLength=0.5d0;jetcenter_zc2zLength=0.5d0
   padding=5
   cflmax_allowed=0.5d0
 
@@ -1523,6 +1530,10 @@ subroutine ReadParameters
           write(*,*) "*** WARNING: Mesh is not cubic, and non-uniform VOF is not ready! ***"
   endif
 
+  ! For jet setup
+  jetcenter_yc = jetcenter_yc2yLength*yLength
+  jetcenter_zc = jetcenter_zc2zLength*zLength
+
 !--- output frequency
   if ( tout > 0.d0 .and. dtFlag == 1) then 
      nout = NINT(tout/dt)
@@ -1577,9 +1588,6 @@ subroutine pariserror(message)
   include 'mpif.h'
   integer ierr
   character(*) :: message
-#ifdef DEBUG
-  write(*,*) rank, padding, int2text(rank,padding)
-#endif
   OPEN(UNIT=89,FILE=TRIM(out_path)//'/error-rank-'//TRIM(int2text(rank,padding))//'.txt')
   write(89,*) message
   if(rank==0) print*,message

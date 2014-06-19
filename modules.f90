@@ -318,9 +318,13 @@ module module_2phase
   real(8), dimension( : ), allocatable :: rad, xc, yc, zc, vol
   real(8), dimension(:,:,:), allocatable :: u_c, v_c, w_c, u_cold, v_cold, w_cold
   real(8) :: excentricity(3)
-  real(8) :: jetradius = 1d100
+  
+  real(8) :: ugas_inject,uliq_inject
+  real(8) :: blayer_gas_inject, tdelay_gas_inject 
+  real(8) :: radius_gas_inject, radius_liq_inject 
   real(8) :: jetcenter_yc2yLength, jetcenter_zc2zLength 
   real(8) :: jetcenter_yc,         jetcenter_zc 
+  
   real(8) :: sigma, MAXERROR_FS
   integer :: NumBubble, MAXIT_FS
   logical :: FreeSurface
@@ -768,8 +772,6 @@ module module_BC
   ! Example: WallVel(4,3) represent the W velocity on +y side of the domain.
   ! LM: The same convention is used for BoundaryPressure
   ! SZ: alternately may contain the velocity of the flow for inflow boundary conditions on x+
-  real(8) :: ugas_inject,uliq_inject
-  real(8) :: blayer_gas_inject, tdelay_gas_inject 
   logical :: check_setup=.true.
   contains
 !=================================================================================================
@@ -1308,38 +1310,38 @@ module module_BC
          uinject = 1.d0
       elseif( inject_type==2 ) then ! pulsed round jet
          !tdelay_gas_inject = 0.01d0
-         if( (y(j) - jetcenter_yc)**2.d0 + (z(k) - jetcenter_zc)**2.d0 .lt. jetradius**2.d0 ) then 
+         if( (y(j) - jetcenter_yc)**2.d0 + (z(k) - jetcenter_zc)**2.d0 .lt. radius_liq_inject**2.d0 ) then 
             uinject=uliq_inject*(1.d0+0.05d0*SIN(10.d0*2.d0*PI*t))
          end if ! y(j)
       elseif( inject_type==5 ) then ! round jet 
-         if( (y(j) - jetcenter_yc)**2.d0 + (z(k) - jetcenter_zc)**2.d0 .lt. jetradius**2.d0 ) then 
+         if( (y(j) - jetcenter_yc)**2.d0 + (z(k) - jetcenter_zc)**2.d0 .lt. radius_liq_inject**2.d0 ) then 
             uinject=uliq_inject
          end if ! y(j)
       else if ( inject_type == 3 ) then ! 2d coaxial jet
          !tdelay_gas_inject = 1.d-2
-         if ( y(j) <= jetradius ) then 
+         if ( y(j) <= radius_liq_inject ) then 
             uinject = uliq_inject & 
-                     *erf( (jetradius - y(j))/blayer_gas_inject )  
-         else if ( y(j) > jetradius .and. y(j) <= 2.d0*jetradius ) then
+                     *erf( (radius_liq_inject - y(j))/blayer_gas_inject )  
+         else if ( y(j) > radius_liq_inject .and. y(j) <= radius_gas_inject ) then
             uinject = ugas_inject & 
-                     *erf( (y(j) -      jetradius)/blayer_gas_inject ) & 
-                     !*erf( (2.d0*jetradius - y(j))/blayer_gas_inject ) & 
+                     *erf( (y(j) -   radius_liq_inject)/blayer_gas_inject ) & 
+                     !*erf( (radius_gas_inject - y(j))/blayer_gas_inject ) & 
                      !*erf(max(time-tdelay_gas_inject,0.d0)/tdelay_gas_inject) 
                      *erf(time/tdelay_gas_inject) 
          else 
             uinject = 0.d0 
          end if  !
       else if ( inject_type == 4 ) then ! 3d coaxial jet
-         tdelay_gas_inject = 0.d-2
+         !tdelay_gas_inject = 0.d-2
          ryz = sqrt( (y(j) - jetcenter_yc)**2.d0 + (z(k) - jetcenter_zc)**2.d0 )
-         if ( ryz <= jetradius ) then 
-            uinject = 0.173d0 !& 
-                     !*erf( (jetradius - ryz)/blayer_gas_inject ) & 
-         else if ( ryz > jetradius .and. ryz <= 2.d0*jetradius ) then
-            uinject = 2.0d+0 & 
-                     *erf( (ryz -      jetradius)/blayer_gas_inject ) & 
-                     *erf( (2.d0*jetradius - ryz)/blayer_gas_inject ) & 
-                     *erf(max(time-tdelay_gas_inject,0.d0)/tdelay_gas_inject) 
+         if ( ryz <= radius_liq_inject ) then 
+            uinject = uliq_inject & 
+                     *erf( (radius_liq_inject - ryz)/blayer_gas_inject )  
+         else if ( ryz > radius_liq_inject .and. ryz <= radius_gas_inject ) then
+            uinject = ugas_inject & 
+                     *erf( (ryz - radius_liq_inject)/blayer_gas_inject ) & 
+                     *erf( (radius_gas_inject - ryz)/blayer_gas_inject ) & 
+                     *erf(time/tdelay_gas_inject) 
          else 
             uinject = 0.d0 
          end if  !
