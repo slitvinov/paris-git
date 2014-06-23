@@ -24,7 +24,6 @@
 !-------------------------------------------------------------------------------------------------
 subroutine setuppoisson_fs(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask,cvof,n1,n2,n3)
   use module_grid
-  
   use module_BC
   use module_2phase
   implicit none
@@ -57,49 +56,47 @@ subroutine setuppoisson_fs(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask,cvof
               if (n1(i,j,k) > 0d0) then 
                  x_int(i,j,k) = xh(i-1) + x_test*dx(i)
                  x_l = x(i+1) - x_int(i,j,k)
-                 A(i+1,j,k,1) = 2d0*dt*umask(i,j,k)/((dx(i+1)+x_l)/2d0*x_l*(rhot(i,j,k)+rhot(i+1,j,k)))
-                 A(i+1,j,k,2) = 2d0*dt*umask(i+1,j,k)/((dx(i+1)+x_l)/2d0*dxh(i+2)*(rhot(i+1,j,k)+rhot(i+2,j,k)))
+                 x_mod(i,j,k) = dxh(i) - x_l
+                 A(i+1,j,k,1) = 2d0*dt*umask(i,j,k)/(dx(i+1)*x_l*(rhot(i,j,k)+rhot(i+1,j,k)))
               else 
                  x_int(i,j,k) = xh(i) - x_test*dx(i)
                  x_r = x_int(i,j,k) - x(i-1) 
-                 A(i-1,j,k,1) = 2d0*dt*umask(i-2,j,k)/((dx(i-1)+x_r)/2d0*dxh(i-2)*(rhot(i-1,j,k)+rhot(i-2,j,k)))
-                 A(i-1,j,k,2) = 2d0*dt*umask(i-1,j,k)/((dx(i-1)+x_r)/2d0*x_r*(rhot(i,j,k)+rhot(i-1,j,k)))
+                 x_mod(i-1,j,k) = dxh(i-1) - x_r
+                 A(i-1,j,k,2) = 2d0*dt*umask(i-1,j,k)/(dx(i-1)*x_r*(rhot(i,j,k)+rhot(i-1,j,k)))
               endif
            endif
         endif
 
         if (n_y .ne. 0.d0) then
-           !write(*,*)'non-zero n2 normal'
            y_test = (alpha - (n_x+n_z)/2d0)/n_y
            if (y_test<1.d0 .and. y_test>0d0) then
               if (n2(i,j,k) > 0d0) then 
                  y_int(i,j,k) = yh(j-1) + y_test*dy(j)
                  y_b = y(j+1) - y_int(i,j,k)
-                 A(i,j+1,k,3) = 2d0*dt*vmask(i,j,k)/((dy(j+1)+y_b)/2d0*y_b*(rhot(i,j,k)+rhot(i,j+1,k)))
-                 A(i,j+1,k,4) = 2d0*dt*vmask(i,j+1,k)/((dy(j+1)+y_b)/2d0*dyh(j+2)*(rhot(i,j+1,k)+rhot(i,j+2,k)))
+                 y_mod(i,j,k) = dyh(j)-y_b
+                 A(i,j+1,k,3) = 2d0*dt*vmask(i,j,k)/(dy(j+1)*y_b*(rhot(i,j,k)+rhot(i,j+1,k)))
               else 
                  y_int(i,j,k) = yh(j) - y_test*dy(j)
-                 y_t = y_int(i,j,k) - y(j-1) 
-                 A(i,j-1,k,3) = 2d0*dt*vmask(i,j-2,k)/((dy(j-1)+y_t)/2d0*dyh(j-2)*(rhot(i,j-1,k)+rhot(i,j-2,k)))
-                 A(i,j-1,k,4) = 2d0*dt*vmask(i,j-1,k)/((dy(j-1)+y_t)/2d0*y_t*(rhot(i,j,k)+rhot(i,j-1,k)))
+                 y_t = y_int(i,j,k) - y(j-1)
+                 y_mod(i,j-1,k) = dyh(j-1)-y_t
+                 A(i,j-1,k,4) = 2d0*dt*vmask(i,j-1,k)/(dy(j-1)*y_t*(rhot(i,j,k)+rhot(i,j-1,k)))
               endif
            endif
         endif
 
         if (n_z .ne. 0.d0) then
-           !write(*,*)'non-zero n3 normal'
            z_test = (alpha - (n_x+n_y)/2d0)/n_z
            if (z_test<1.d0 .and. z_test>0d0) then
               if (n3(i,j,k) > 0d0) then 
                  z_int(i,j,k) = zh(k-1) + z_test*dz(k)
                  z_r = z(k+1) - z_int(i,j,k)
-                 A(i,j,k+1,5) = 2d0*dt*wmask(i,j,k)/((dz(k+1)+z_r)/2d0*z_r*(rhot(i,j,k)+rhot(i,j,k+1)))
-                 A(i,j,k+1,6) = 2d0*dt*wmask(i,j,k+1)/((dz(k+1)+z_r)/2d0*dzh(k+2)*(rhot(i,j,k+1)+rhot(i,j,k+2)))
+                 z_mod(i,j,k) = dzh(k)-z_r
+                 A(i,j,k+1,5) = 2d0*dt*wmask(i,j,k)/(dz(k+1)*z_r*(rhot(i,j,k)+rhot(i,j,k+1)))
               else 
                  z_int(i,j,k) = zh(k) - z_test*dz(k)
                  z_f = z_int(i,j,k) - z(k-1)
-                 A(i,j,k-1,5) = 2d0*dt*wmask(i,j,k-2)/((dz(k-1)+z_f)/2d0*dzh(k-2)*(rhot(i,j,k-1)+rhot(i,j,k-2)))
-                 A(i,j,k-1,6) = 2d0*dt*wmask(i,j,k-1)/((dz(k-1)+z_f)/2d0*z_f*(rhot(i,j,k)+rhot(i,j,k-1)))
+                 z_mod(i,j,k-1) = dzh(k-1)-z_f
+                 A(i,j,k-1,6) = 2d0*dt*wmask(i,j,k-1)/(dz(k-1)*z_f*(rhot(i,j,k)+rhot(i,j,k-1)))
               endif
            endif
         endif
@@ -172,7 +169,7 @@ subroutine setuppoisson_fs(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask,cvof
      do l=1,6
         A(i,j,k,l) = pmask(i,j,k)*A(i,j,k,l)
      enddo
-     A(i,j,k,7) = sum(A(i,j,k,1:6)) + 1d-49
+     A(i,j,k,7) = sum(A(i,j,k,1:6)) + (1d0-pmask(i,j,k)) + 1d-49
      A(i,j,k,8) = pmask(i,j,k)*A(i,j,k,8)
   enddo;enddo;enddo
 end subroutine setuppoisson_fs

@@ -25,7 +25,7 @@ hypre    = F       ! T: uses hyprepackage, F: uses SOR solver
 restart  = F       ! T: start the domain from a previous simulation
 restartFront = F   ! T: start the front from  a previous simulation
 restartAverages = F
-nBackup = 900   ! number of time steps between backups are kept.
+nBackup = 90000   ! number of time steps between backups are kept.
 
 NSTEP   = 1000    ! maximum number of time steps
 EndTime = 2000.0   ! When to stop simulation

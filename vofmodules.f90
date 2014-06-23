@@ -279,8 +279,10 @@ contains
             v_c(imin:imax,jmin:jmax,kmin:kmax), dv_c(imin:imax,jmin:jmax,kmin:kmax), &
             w_c(imin:imax,jmin:jmax,kmin:kmax), dw_c(imin:imax,jmin:jmax,kmin:kmax), &
             u_cold(imin:imax,jmin:jmax,kmin:kmax), v_cold(imin:imax,jmin:jmax,kmin:kmax), &
-            w_cold(imin:imax,jmin:jmax,kmin:kmax))
+            w_cold(imin:imax,jmin:jmax,kmin:kmax), x_mod(imin:imax,jmin:jmax,kmin:kmax), &
+            y_mod(imin:imax,jmin:jmax,kmin:kmax), z_mod(imin:imax,jmin:jmax,kmin:kmax))
        u_cold = 0d0; v_cold = 0d0; w_cold = 0d0
+       x_mod = 0d0; y_mod = 0d0; z_mod = 0d0
     endif
     if ( itime_scheme == 2 ) then  
       allocate(cvofold(imin:imax,jmin:jmax,kmin:kmax))

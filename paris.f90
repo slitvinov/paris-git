@@ -333,17 +333,31 @@ Program paris
                    &" maxerror: ",e7.1)') residual*dt,maxerror
               if(rank==0) write(*,'("              pressure iterations :",I9)')it
            endif
-           do k=ks,ke;  do j=js,je; do i=is,ieu    ! CORRECT THE u-velocity 
-              u(i,j,k)=u(i,j,k)-dt*(2.0*umask(i,j,k)/dxh(i))*(p(i+1,j,k)-p(i,j,k))/(rho(i+1,j,k)+rho(i,j,k))
-           enddo; enddo; enddo
-           
-           do k=ks,ke;  do j=js,jev; do i=is,ie    ! CORRECT THE v-velocity
-              v(i,j,k)=v(i,j,k)-dt*(2.0*vmask(i,j,k)/dyh(j))*(p(i,j+1,k)-p(i,j,k))/(rho(i,j+1,k)+rho(i,j,k))
-           enddo; enddo; enddo
-      
-           do k=ks,kew;  do j=js,je; do i=is,ie   ! CORRECT THE w-velocity
-              w(i,j,k)=w(i,j,k)-dt*(2.0*wmask(i,j,k)/dzh(k))*(p(i,j,k+1)-p(i,j,k))/(rho(i,j,k+1)+rho(i,j,k))
-           enddo; enddo; enddo
+           if (.not.FreeSurface) then
+              do k=ks,ke;  do j=js,je; do i=is,ieu    ! CORRECT THE u-velocity 
+                 u(i,j,k)=u(i,j,k)-dt*(2.0*umask(i,j,k)/dxh(i))*(p(i+1,j,k)-p(i,j,k))/(rho(i+1,j,k)+rho(i,j,k))
+              enddo; enddo; enddo
+
+              do k=ks,ke;  do j=js,jev; do i=is,ie    ! CORRECT THE v-velocity
+                 v(i,j,k)=v(i,j,k)-dt*(2.0*vmask(i,j,k)/dyh(j))*(p(i,j+1,k)-p(i,j,k))/(rho(i,j+1,k)+rho(i,j,k))
+              enddo; enddo; enddo
+
+              do k=ks,kew;  do j=js,je; do i=is,ie   ! CORRECT THE w-velocity
+                 w(i,j,k)=w(i,j,k)-dt*(2.0*wmask(i,j,k)/dzh(k))*(p(i,j,k+1)-p(i,j,k))/(rho(i,j,k+1)+rho(i,j,k))
+              enddo; enddo; enddo
+           else
+              do k=ks,ke;  do j=js,je; do i=is,ieu    ! CORRECT THE u-velocity 
+                 u(i,j,k)=u(i,j,k)-dt*(2.0*umask(i,j,k)/(dxh(i)-x_mod(i,j,k)))*(p(i+1,j,k)-p(i,j,k))/(rho(i+1,j,k)+rho(i,j,k))
+              enddo; enddo; enddo
+
+              do k=ks,ke;  do j=js,jev; do i=is,ie    ! CORRECT THE v-velocity
+                 v(i,j,k)=v(i,j,k)-dt*(2.0*vmask(i,j,k)/(dyh(j)-y_mod(i,j,k)))*(p(i,j+1,k)-p(i,j,k))/(rho(i,j+1,k)+rho(i,j,k))
+              enddo; enddo; enddo
+
+              do k=ks,kew;  do j=js,je; do i=is,ie   ! CORRECT THE w-velocity
+                 w(i,j,k)=w(i,j,k)-dt*(2.0*wmask(i,j,k)/(dzh(k)-z_mod(i,j,k)))*(p(i,j,k+1)-p(i,j,k))/(rho(i,j,k+1)+rho(i,j,k))
+              enddo; enddo; enddo
+           endif
            if(mod(itimestep,nout)==0) call check_corrected_vel(u,v,w,umask,vmask,wmask,itimestep)
            if( DoLPP ) call ComputeSubDerivativeVel()
            call my_timer(10)

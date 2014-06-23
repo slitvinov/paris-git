@@ -317,6 +317,7 @@ end module module_tmpvar
 module module_2phase
   real(8), dimension( : ), allocatable :: rad, xc, yc, zc, vol
   real(8), dimension(:,:,:), allocatable :: u_c, v_c, w_c, u_cold, v_cold, w_cold
+  real(8), dimension(:,:,:), allocatable :: x_mod, y_mod, z_mod
   real(8) :: excentricity(3)
   
   real(8) :: ugas_inject,uliq_inject
