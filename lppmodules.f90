@@ -775,20 +775,19 @@ contains
       integer :: maxnum_element, total_num_element
       integer :: irank, idrop, ielement, ielem_plot
       integer :: num_element_estimate(0:nPdomain-1)
-      type(element) :: element_NULL
 
       integer, parameter :: num_gaps = 1000
       real(8) :: gap,dmax,d
       integer :: igap,count_element(num_gaps)
-
-      num_element_estimate = num_drop+num_drop_merge+num_part
-      maxnum_element = maxval(num_element_estimate) 
-      allocate( element_stat(maxnum_element,0:nPdomain-1) )
-
+      type(element) :: element_NULL
       element_NULL%xc = 0.d0;element_NULL%yc = 0.d0;element_NULL%zc = 0.d0
       element_NULL%uc = 0.d0;element_NULL%vc = 0.d0;element_NULL%wc = 0.d0
       element_NULL%duc = 0.d0;element_NULL%dvc = 0.d0;element_NULL%dwc = 0.d0
       element_NULL%vol = 0.d0;element_NULL%id = CRAZY_INT
+
+      num_element_estimate = num_drop+num_drop_merge+num_part
+      maxnum_element = maxval(num_element_estimate) 
+      allocate( element_stat(maxnum_element,0:nPdomain-1) )
 
       !  Setup MPI derived type for element_type 
       offsets (0) = 0 
@@ -1780,12 +1779,12 @@ contains
       real(8), intent (in) :: xp,yp,zp
       integer, intent(out) :: ip,jp,kp
 
-      if ( xp < xh(is-1) .or. xp > xh(ie) .or. & 
-           yp < yh(js-1) .or. yp > yh(je) .or. & 
-           zp < zh(ks-1) .or. zp > zh(ke) )    & 
+      if ( xp < (xh(imin)-dx(imin)) .or. xp > xh(imax) .or. & 
+           yp < (yh(jmin)-dy(jmin)) .or. yp > yh(jmax) .or. & 
+           zp < (zh(kmin)-dz(kmin)) .or. zp > zh(kmax) )    & 
            call lpperror("Fail to find cell index for particle outside of domain!") 
 
-      do ip = is,ie+1
+      do ip = imin,imax
          if (xp <= xh(ip)) exit
       end do ! ip
 
@@ -2192,13 +2191,19 @@ contains
             end if ! taup 
 
             if ( partforce(1) /= partforce(1) ) then 
-               write(*,*) ipart,rank,UnsteadyPartForce,partforce(1:3),relvel(1:3),taup
+               write(*,*) ipart,rank,num_part(rank),UnsteadyPartForce,partforce(1:3),relvel(1:3),taup
+               write(*,*) parts(ipart,rank)%ic,parts(ipart,rank)%jc,parts(ipart,rank)%kc,parts(ipart,rank)%element%vol
+               write(*,*) xp,yp,zp,up,vp,wp
                call lpperror("particle force in x direction is NaN!")
             else if ( partforce(2) /= partforce(2) ) then 
-               write(*,*) ipart,rank,UnsteadyPartForce,partforce(1:3),relvel(1:3),taup
+               write(*,*) ipart,rank,num_part(rank),UnsteadyPartForce,partforce(1:3),relvel(1:3),taup
+               write(*,*) parts(ipart,rank)%ic,parts(ipart,rank)%jc,parts(ipart,rank)%kc,parts(ipart,rank)%element%vol
+               write(*,*) xp,yp,zp,up,vp,wp
                call lpperror("particle force in y direction is NaN!")
             else if ( partforce(3) /= partforce(3) ) then 
-               write(*,*) ipart,rank,UnsteadyPartForce,partforce(1:3),relvel(1:3),taup
+               write(*,*) ipart,rank,num_part(rank),UnsteadyPartForce,partforce(1:3),relvel(1:3),taup
+               write(*,*) parts(ipart,rank)%ic,parts(ipart,rank)%jc,parts(ipart,rank)%kc,parts(ipart,rank)%element%vol
+               write(*,*) xp,yp,zp,up,vp,wp
                call lpperror("particle force in z direction is NaN!")
             else 
                parts(ipart,rank)%element%duc = partforce(1) 
@@ -2289,6 +2294,21 @@ contains
       real(8) :: ConvertRegSize
       real(8) :: xh1,xh2,x1,x2,yh1,yh2,y1,y2,zh1,zh2,z1,z2
       integer :: i1,i2,j1,j2,k1,k2
+
+      ! Check particle location
+      if ( xp > xh(imax) .or. xp < (xh(imin)-dx(is)) ) then 
+         write(*,*) ip,jp,kp,xp,yp,zp,(xh(imin)-dx(is)),xh(imax)
+         write(*,*) rank,is,ie,js,je,ks,ke,volp
+         call lpperror("Failed to get fluid properties as particle out x range")
+      else if ( yp > yh(jmax) .or. yp < (yh(jmin)-dy(js)) ) then
+         write(*,*) ip,jp,kp,xp,yp,zp,(yh(jmin)-dy(js)),yh(jmax)
+         write(*,*) rank,is,ie,js,je,ks,ke,volp
+         call lpperror("Failed to get fluid properties as particle out y range")
+      else if ( zp > zh(kmax) .or. zp < (zh(kmin)-dz(ks)) ) then 
+         write(*,*) ip,jp,kp,xp,yp,zp,(zh(kmin)-dz(ks)),zh(kmax)
+         write(*,*) rank,is,ie,js,je,ks,ke,volp
+         call lpperror("Failed to get fluid properties as particle out z range")
+      end if ! ip,jp,kp
 
       dp = (6.d0*volp/PI)**OneThird
 
@@ -2743,6 +2763,12 @@ contains
       integer :: MPI_particle_type, oldtypes(0:3), blockcounts(0:3), & 
                  offsets(0:3), intextent,r8extent
       integer :: maxnum_part_cross, MPI_int_row
+      type(element) :: element_NULL
+   
+      element_NULL%xc = 0.d0;element_NULL%yc = 0.d0;element_NULL%zc = 0.d0
+      element_NULL%uc = 0.d0;element_NULL%vc = 0.d0;element_NULL%wc = 0.d0
+      element_NULL%duc = 0.d0;element_NULL%dvc = 0.d0;element_NULL%dwc = 0.d0
+      element_NULL%vol = 0.d0;element_NULL%id = CRAZY_INT
 
       call MPI_ALLGATHER(num_part_cross(rank), 1, MPI_INTEGER, &
                          num_part_cross,    1, MPI_INTEGER, MPI_Comm_World, ierr)
@@ -2778,6 +2804,7 @@ contains
                            MPI_particle_type, ierr) 
       call MPI_TYPE_COMMIT(MPI_particle_type, ierr)
 
+      ! Transfer particle to the destination block
       do irank = 0,nPdomain-1
          if ( num_part_cross(irank) > 0 ) then
             do ipart_cross = 1,num_part_cross(irank)
@@ -2787,10 +2814,6 @@ contains
                   call MPI_ISEND(parts(ipart,irank),1, MPI_particle_type, & 
                                  ranknew, 15, MPI_COMM_WORLD, req(1), ierr)
                   call MPI_WAIT(req(1),sta(:,1),ierr)
-                  do ipart1 = ipart,num_part(irank)-1
-                     parts(ipart1,irank) = parts(ipart1+1,irank)
-                  end do ! ipart1
-                  num_part(irank) = num_part(irank) - 1
                else if ( rank == ranknew ) then 
                   call MPI_IRECV(parts(num_part(ranknew)+1,ranknew),1,MPI_particle_type, & 
                                  irank, 15, MPI_COMM_WORLD, req(2), ierr)
@@ -2800,6 +2823,23 @@ contains
             end do ! ipart_cross 
          end if ! num_part_cross(irank)
       end do ! irank
+
+      ! Remove particle in the origin block
+      if ( num_part_cross(rank) > 0 ) then
+         do ipart_cross = 1,num_part_cross(rank)
+            ipart = parts_cross_id(ipart_cross,rank)
+            do ipart1 = ipart,num_part(rank)-1
+               parts(ipart1,rank) = parts(ipart1+1,rank)
+            end do ! ipart1
+            parts(num_part(rank),rank)%element = element_NULL
+            num_part(rank) = num_part(rank) - 1
+            if ( ipart_cross < num_part_cross(rank) ) & 
+               parts_cross_id(ipart_cross+1:num_part_cross(rank),rank) = &
+               parts_cross_id(ipart_cross+1:num_part_cross(rank),rank) - 1
+         end do ! ipart_cross 
+      end if ! num_part_cross(irank)
+
+      ! Allgather updated number of partilces in every block
       call MPI_ALLGATHER(num_part(rank), 1, MPI_INTEGER, &
                          num_part(:)   , 1, MPI_INTEGER, MPI_Comm_World, ierr)
       end if ! maxnum_part_cross
@@ -2813,7 +2853,14 @@ contains
 
    subroutine SetPartBC
       implicit none
-      integer :: ipart
+      include 'mpif.h'
+      integer :: ipart,ipart1,ierr
+      type(element) :: element_NULL
+   
+      element_NULL%xc = 0.d0;element_NULL%yc = 0.d0;element_NULL%zc = 0.d0
+      element_NULL%uc = 0.d0;element_NULL%vc = 0.d0;element_NULL%wc = 0.d0
+      element_NULL%duc = 0.d0;element_NULL%dvc = 0.d0;element_NULL%dwc = 0.d0
+      element_NULL%vol = 0.d0;element_NULL%id = CRAZY_INT
 
       if ( num_part(rank) > 0 ) then 
          do ipart = 1,num_part(rank)
@@ -2831,7 +2878,7 @@ contains
                else 
                   call ImposePartBC(ipart,rank,4)
                end if ! lppbdry_cond
-            end if ! ic 
+            end if ! ic
 
             if ( parts(ipart,rank)%jc <= Ng ) then 
                if ( lppbdry_cond(2) == 'exit') then 
@@ -2865,10 +2912,30 @@ contains
                end if ! lppbdry_cond
             end if ! kc
          
-            ! Note: num_part(rank) has been updated in PartBC_exit
+         end do ! ipart
+
+         ! Remove particles that exit the domain from the list (vol=-1)
+         ipart = 0 
+         do
+            ipart = ipart + 1
+            if ( parts(ipart,rank)%element%vol < 0.d0 ) then
+               if ( ipart < num_part(rank) ) then 
+                  do ipart1 = ipart+1,num_part(rank)
+                     parts(ipart1-1,rank) = parts(ipart1,rank)
+                  end do ! ipart1
+               end if ! ipart
+               parts(num_part(rank),rank)%element = element_NULL
+               num_part(rank) = num_part(rank) - 1
+               ipart          = ipart          - 1 ! Note: the index also needs to be shifted
+            end if ! parts(ipart,rank)%element%vol
             if ( ipart >= num_part(rank) ) exit
          end do ! ipart
+
       end if ! num_part(rank)
+
+      ! Allgather updated number of particles after imposing BC
+      call MPI_ALLGATHER(num_part(rank), 1, MPI_INTEGER, &
+                         num_part(:)   , 1, MPI_INTEGER, MPI_Comm_World, ierr)
 
    end subroutine SetPartBC
 
@@ -2914,13 +2981,8 @@ contains
       implicit none
       integer, intent (in) :: ipart,rank
       
-      integer :: ipart1
-
-      ! Remove the particle from the array  
-      do ipart1 = ipart+1,num_part(rank)
-         parts(ipart1-1,rank) = parts(ipart1,rank)
-      end do ! ipart1
-      num_part(rank) = num_part(rank) - 1
+      ! For particle that will exit the domain, mark volume=-1 
+      parts(ipart,rank)%element%vol = -1.d0
    end subroutine PartBC_exit
 
    subroutine PartBC_reflect(ipart,rank,d)
@@ -2940,7 +3002,7 @@ contains
          parts(ipart,rank)%element%yc = -parts(ipart,rank)%element%yc 
          parts(ipart,rank)%element%vc = -parts(ipart,rank)%element%vc 
       else if ( d == 5 ) then 
-         parts(ipart,rank)%jc = 2*(Ny+Ng)+1-parts(ipart,rank)%ic 
+         parts(ipart,rank)%jc = 2*(Ny+Ng)+1-parts(ipart,rank)%jc 
          parts(ipart,rank)%element%yc = 2.d0*yLength - parts(ipart,rank)%element%yc 
          parts(ipart,rank)%element%vc = -parts(ipart,rank)%element%vc 
       else if ( d == 3 ) then 
