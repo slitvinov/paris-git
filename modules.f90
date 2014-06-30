@@ -299,6 +299,8 @@ module module_flow
   integer :: maxit, it, itime_scheme, BuoyancyCase, drive
   integer :: sbx, sby, Nstep
   integer :: maxStep, itmax, iTimeStep, iTimeStepRestart
+  character(20) :: AdvectionScheme
+
 end module module_flow
 !=================================================================================================
 !=================================================================================================

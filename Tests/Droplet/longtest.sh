@@ -5,7 +5,7 @@
 moftrue=F
 nfilter=1
 
-if [ $# -gt 1 ]; then
+if [ $# -gt 0 ]; then
     if [ $1 == MoF ]; then
 	echo "using Mof"
 	moftrue=T

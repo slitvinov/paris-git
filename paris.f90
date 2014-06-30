@@ -248,7 +248,7 @@ Program paris
            end if ! DoLPP
 
            if( DoLPP ) call StoreBeforeConvectionTerms()
-           if(.not.ZeroReynolds) call momentumConvection(u,v,w,du,dv,dw,mom_flag)
+           if(.not.ZeroReynolds) call momentumConvection(u,v,w,du,dv,dw,mom_flag,AdvectionScheme)
            if( DoLPP ) call StoreAfterConvectionTerms()
            call my_timer(9)
 
@@ -656,12 +656,142 @@ subroutine calcStats
 
 end subroutine calcStats
 !=================================================================================================
+subroutine momentumConvection(u,v,w,du,dv,dw,flag,scheme)
+  use module_grid
+  use module_tmpvar
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: u, v, w
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: du, dv, dw
+  integer, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: flag
+  character(20) :: scheme
+
+  if (scheme=='QUICK') then
+    call momentumConvectionQUICK(u,v,w,du,dv,dw,flag)
+  elseif (scheme=='ENO') then
+    call momentumConvectionENO(u,v,w,du,dv,dw,flag)
+  elseif (scheme=='Verstappen') then
+    call momentumConvectionVerstappen(u,v,w,du,dv,dw,flag)
+  else
+     call pariserror("*** unknown vof scheme")
+  endif
+
+end subroutine momentumConvection
+!=================================================================================================
+! subroutine momentumConvectionENO
+! calculates the convection terms in mumentum equation using ENO scheme
+! and returns them in du, dv, dw
+!-------------------------------------------------------------------------------------------------
+subroutine momentumConvectionENO(u,v,w,du,dv,dw,flag)
+  use module_grid
+  use module_tmpvar
+  implicit none
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: u, v, w
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: du, dv, dw
+  integer, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: flag
+  real(8), external :: minabs
+  integer :: i,j,k
+!-------------------------------------ENO interpolation u-velocity--------------------------------
+  do k=ks,ke; do j=js,je; do i=is,ieu+1
+    if (u(i-1,j,k)+u(i,j,k)>0.0) then
+      work(i,j,k,1)=u(i-1,j,k)+0.5*minabs((u(i,j,k)-u(i-1,j,k)),(u(i-1,j,k)-u(i-2,j,k)))
+    else
+      work(i,j,k,1)=u(i,j,k)-0.5*minabs((u(i+1,j,k)-u(i,j,k)),(u(i,j,k)-u(i-1,j,k)))
+    endif
+  enddo; enddo; enddo
+  do k=ks,ke; do j=js-1,je; do i=is-1,ie
+    if(v(i,j,k)+v(i+1,j,k)>0.0) then
+      work(i,j,k,2)=u(i,j,k)+0.5*minabs((u(i,j+1,k)-u(i,j,k)),(u(i,j,k)-u(i,j-1,k)))
+    else
+      work(i,j,k,2)=u(i,j+1,k)-0.5*minabs((u(i,j+2,k)-u(i,j+1,k)),(u(i,j+1,k)-u(i,j,k)))
+    endif
+  enddo; enddo; enddo
+  do k=ks-1,ke; do j=js,je; do i=is-1,ie
+    if(w(i,j,k)+w(i+1,j,k)>0.0) then
+      work(i,j,k,3)=u(i,j,k)+0.5*minabs((u(i,j,k+1)-u(i,j,k)),(u(i,j,k)-u(i,j,k-1)))
+    else
+      work(i,j,k,3)=u(i,j,k+1)-0.5*minabs((u(i,j,k+2)-u(i,j,k+1)),(u(i,j,k+1)-u(i,j,k)))
+    endif
+  enddo; enddo; enddo
+  do k=ks,ke;  do j=js,je; do i=is,ieu
+    du(i,j,k)=du(i,j,k)+flag(i,j,k)*( &
+              -0.5*((u(i,j  ,k  )+u(i+1,j  ,k  ))*work(i+1,j  ,k  ,1)-&
+                    (u(i,j  ,k  )+u(i-1,j  ,k  ))*work(i  ,j  ,k  ,1))/dxh(i) &
+              -0.5*((v(i,j  ,k  )+v(i+1,j  ,k  ))*work(i  ,j  ,k  ,2)-&
+                    (v(i,j-1,k  )+v(i+1,j-1,k  ))*work(i  ,j-1,k  ,2))/dy(j)  &
+              -0.5*((w(i,j  ,k  )+w(i+1,j  ,k  ))*work(i  ,j  ,k  ,3)-&
+                    (w(i,j  ,k-1)+w(i+1,j  ,k-1))*work(i  ,j  ,k-1,3))/dz(k))
+  enddo; enddo; enddo
+
+!-------------------------------------ENO interpolation v-velocity--------------------------------
+  do k=ks,ke; do j=js,jev+1; do i=is,ie
+    if (v(i,j-1,k)+v(i,j,k)>0.0) then
+      work(i,j,k,2)=v(i,j-1,k)+0.5*minabs((v(i,j,k)-v(i,j-1,k)),(v(i,j-1,k)-v(i,j-2,k)))
+    else
+      work(i,j,k,2)=v(i,j,k)-0.5*minabs((v(i,j+1,k)-v(i,j,k)),(v(i,j,k)-v(i,j-1,k)))
+    endif
+  enddo; enddo; enddo
+  do k=ks,ke; do j=js-1,je; do i=is-1,ie
+    if(u(i,j,k)+u(i,j+1,k)>0.0) then
+      work(i,j,k,1)=v(i,j,k)+0.5*minabs((v(i+1,j,k)-v(i,j,k)),(v(i,j,k)-v(i-1,j,k)))
+    else
+      work(i,j,k,1)=v(i+1,j,k)-0.5*minabs((v(i+2,j,k)-v(i+1,j,k)),(v(i+1,j,k)-v(i,j,k)))
+    endif
+  enddo; enddo; enddo
+  do k=ks-1,ke; do j=js-1,je; do i=is,ie
+    if(w(i,j,k)+w(i,j+1,k)>0.0) then
+      work(i,j,k,3)=v(i,j,k)+0.5*minabs((v(i,j,k+1)-v(i,j,k)),(v(i,j,k)-v(i,j,k-1)))
+    else
+      work(i,j,k,3)=v(i,j,k+1)-0.5*minabs((v(i,j,k+2)-v(i,j,k+1)),(v(i,j,k+1)-v(i,j,k)))
+    endif
+  enddo; enddo; enddo
+  do k=ks,ke;  do j=js,jev; do i=is,ie
+    dv(i,j,k)=dv(i,j,k)+flag(i,j,k)*( &
+              -0.5*((u(i  ,j,k  )+u(i  ,j+1,k  ))*work(i  ,j  ,k  ,1)-&
+                    (u(i-1,j,k  )+u(i-1,j+1,k  ))*work(i-1,j  ,k  ,1))/dx(i)  &
+              -0.5*((v(i  ,j,k  )+v(i  ,j+1,k  ))*work(i  ,j+1,k  ,2)-&
+                    (v(i  ,j,k  )+v(i  ,j-1,k  ))*work(i  ,j  ,k  ,2))/dyh(j) &
+              -0.5*((w(i  ,j,k  )+w(i  ,j+1,k  ))*work(i  ,j  ,k  ,3)-&
+                    (w(i  ,j,k-1)+w(i  ,j+1,k-1))*work(i  ,j  ,k-1,3))/dz(k))
+  enddo; enddo; enddo
+!-------------------------------------ENO interpolation w-velocity--------------------------------
+  do k=ks,kew+1; do j=js,je; do i=is,ie
+    if (w(i,j,k-1)+w(i,j,k)>0.0) then
+      work(i,j,k,3)=w(i,j,k-1)+0.5*minabs((w(i,j,k)-w(i,j,k-1)),(w(i,j,k-1)-w(i,j,k-2)))
+    else
+      work(i,j,k,3)=w(i,j,k)-0.5*minabs((w(i,j,k+1)-w(i,j,k)),(w(i,j,k)-w(i,j,k-1)))
+    endif
+  enddo; enddo; enddo
+  do k=ks-1,ke; do j=js,je; do i=is-1,ie
+    if(u(i,j,k)+u(i,j,k+1)>0.0) then
+      work(i,j,k,1)=w(i,j,k)+0.5*minabs((w(i+1,j,k)-w(i,j,k)),(w(i,j,k)-w(i-1,j,k)))
+    else
+      work(i,j,k,1)=w(i+1,j,k)-0.5*minabs((w(i+2,j,k)-w(i+1,j,k)),(w(i+1,j,k)-w(i,j,k)))
+    endif
+  enddo; enddo; enddo
+  do k=ks-1,ke; do j=js-1,je; do i=is,ie
+    if(v(i,j,k)+v(i,j,k+1)>0.0) then
+      work(i,j,k,2)=w(i,j,k)+0.5*minabs((w(i,j+1,k)-w(i,j,k)),(w(i,j,k)-w(i,j-1,k)))
+    else
+      work(i,j,k,2)=w(i,j+1,k)-0.5*minabs((w(i,j+2,k)-w(i,j+1,k)),(w(i,j+1,k)-w(i,j,k)))
+    endif
+  enddo; enddo; enddo
+  do k=ks,kew;  do j=js,je; do i=is,ie
+    dw(i,j,k)=dw(i,j,k) +flag(i,j,k)*( & 
+              -0.5*((u(i  ,j  ,k)+u(i  ,j  ,k+1))*work(i  ,j  ,k  ,1)-&
+                    (u(i-1,j  ,k)+u(i-1,j  ,k+1))*work(i-1,j  ,k  ,1))/dx(i)  &
+              -0.5*((v(i  ,j  ,k)+v(i  ,j  ,k+1))*work(i  ,j  ,k  ,2)-&
+                    (v(i  ,j-1,k)+v(i  ,j-1,k+1))*work(i  ,j-1,k  ,2))/dy(j)  &
+              -0.5*((w(i  ,j  ,k)+w(i  ,j  ,k+1))*work(i  ,j  ,k+1,3)-&
+                    (w(i  ,j  ,k)+w(i  ,j  ,k-1))*work(i  ,j  ,k  ,3))/dzh(k) )
+  enddo; enddo; enddo
+
+end subroutine momentumConvectionENO
+
 !=================================================================================================
 ! subroutine momentumConvection
 ! calculates the convection terms in the momentum equations using a QUICK scheme
 ! and returns them in du, dv, dw
 !-------------------------------------------------------------------------------------------------
-subroutine momentumConvection(u,v,w,du,dv,dw,flag)
+subroutine momentumConvectionQUICK(u,v,w,du,dv,dw,flag)
   use module_grid
   use module_tmpvar
   implicit none
@@ -788,7 +918,69 @@ real(8) function inter(x0,x1,x2,x,y0,y1,y2)
   !  inter = y0 + 0.5*minabs(y1-y0,y0-y2)
 end function inter
 !-------------------------------------------------------------------------------------------------
-end subroutine momentumConvection
+end subroutine momentumConvectionQUICK
+
+!=================================================================================================
+! subroutine momentumConvectionVerstappen
+! calculates the convection terms in the momentum equations using the Verstappen
+! symmetric scheme
+!-------------------------------------------------------------------------------------------------
+subroutine momentumConvectionVerstappen (u,v,w,du,dv,dw,flag)
+  use module_grid
+  use module_tmpvar
+  implicit none
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: u, v, w
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: du, dv, dw
+  integer, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: flag
+  real(8), external :: minabs
+  integer :: i,j,k
+
+  !fixme: This only works for regular uniform grids
+  do k=ks,ke;  do j=js,je; do i=is,ieu
+      work(i,j,k,1) = (u(i,j,k) + u(i+1,j,k))*u(i+1,j,k) &
+                     -(u(i,j,k) + u(i-1,j,k))*u(i-1,j,k) &
+                     +(v(i,j,k) + v(i+1,j,k))*u(i,j+1,k) &
+                     -(v(i,j-1,k) + v(i+1,j-1,k))*u(i,j-1,k) &
+                     +(w(i,j,k) + w(i+1,j,k))*u(i,j,k+1) &
+                     -(w(i,j,k-1) + w(i+1,j,k-1))*u(i,j,k-1)
+      work(i,j,k,1) = work(i,j,k,1)*0.25d0
+  enddo; enddo; enddo
+
+  do k=ks,ke;  do j=js,je; do i=is,ieu
+      du(i,j,k)=du(i,j,k) - flag(i,j,k) * work(i,j,k,1)/dxh(i)
+  enddo; enddo; enddo
+
+  do k=ks,ke;  do j=js,jev; do i=is,ie
+       work(i,j,k,1) = (v(i,j,k) + v(i,j+1,k))*v(i,j+1,k) &
+                     -(v(i,j,k) + v(i,j-1,k))*v(i,j-1,k) &
+                     +(u(i,j,k) + u(i,j+1,k))*v(i+1,j,k) &
+                     -(u(i-1,j,k) + u(i-1,j+1,k))*v(i-1,j,k) &
+                     +(w(i,j,k) + w(i,j+1,k))*v(i,j,k+1) &
+                     -(w(i,j,k-1) + w(i,j+1,k-1))*v(i,j,k-1)
+      work(i,j,k,1) = work(i,j,k,1)*0.25d0
+  enddo; enddo; enddo
+
+  do k=ks,ke;  do j=js,jev; do i=is,ie
+     dv(i,j,k)=dv(i,j,k) - flag(i,j,k) * work(i,j,k,1)/dxh(i)
+  enddo; enddo; enddo
+
+  do k=ks,kew;  do j=js,je; do i=is,ie
+      work(i,j,k,1) = (w(i,j,k) + w(i,j,k+1))*w(i,j,k+1) &
+                     -(w(i,j,k) + w(i,j,k-1))*w(i,j,k-1) &
+                     +(u(i,j,k) + u(i,j,k+1))*w(i+1,j,k) &
+                     -(u(i-1,j,k) + u(i-1,j,k+1))*w(i-1,j,k) &
+                     +(v(i,j,k) + v(i,j+1,k))*w(i,j,k+1) &
+                     -(v(i,j,k-1) + v(i,j+1,k-1))*w(i,j,k-1)
+      work(i,j,k,1) = work(i,j,k,1)*0.25d0
+  enddo; enddo; enddo
+
+  do k=ks,kew;  do j=js,je; do i=is,ie
+      dw(i,j,k)=dw(i,j,k) - flag(i,j,k) * work(i,j,k,1)/dxh(i)
+  enddo; enddo; enddo
+
+end subroutine momentumConvectionVerstappen
+
+
 
 !=================================================================================================
 !=================================================================================================
@@ -1462,7 +1654,7 @@ subroutine ReadParameters
                         blayer_gas_inject,            tdelay_gas_inject,            padding,     &
                         radius_gas_inject,            radius_liq_inject,                         &
                         jetcenter_yc2yLength,         jetcenter_zc2zLength,                      & 
-                        cflmax_allowed, out_P
+                        cflmax_allowed,               out_P,         AdvectionScheme
  
   Nx = 0; Ny = 4; Nz = 4 ! cause absurd input file that lack nx value to fail. 
   Ng=2;xLength=1d0;yLength=1d0;zLength=1d0
@@ -1490,6 +1682,7 @@ subroutine ReadParameters
   jetcenter_yc2yLength=0.5d0;jetcenter_zc2zLength=0.5d0
   padding=5
   cflmax_allowed=0.5d0
+  AdvectionScheme = 'QUICK'
 
   in=1
   out=2
