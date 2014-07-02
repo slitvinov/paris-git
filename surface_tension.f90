@@ -772,6 +772,9 @@ contains
       kappa = 0.d0
       ! if all nine heights found 
       if ( nfound == 9 ) then
+#ifdef COUNT
+         method_count(1) = method_count(1) + 1
+#endif
 !
 !  h = a6  + a4 x + a5 y + a3 xy + a1 x**2 + a2 y**2
 !

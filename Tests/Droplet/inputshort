@@ -35,15 +35,15 @@ MaxDt   = 0.1d0    ! maximum size of time step
 dtFlag  = 1        ! 1: fixed dt;  2: fixed CFL
 dt      = 0.1d0    ! dt in case of dtFlag=1
 CFL     = 0.25
-MAXERROR= 1d-6     ! Residual for Poisson solver
+MAXERROR= 1d-9     ! Residual for Poisson solver
 MAXERRORVOL = 1d-6 ! Tolerance for Front Tracking
                    ! Numerical parameters
 
-ITIME_SCHEME = 1
+ITIME_SCHEME = 2
                    ! time scheme: 1:first order Euler, 2: second order quasi Crank-Nicolson
 
 MAXIT    = 2000
-BETA     = 1.0
+BETA     = 1.3
                     ! parameters for linear solver
 U_init   = 0.d0
 !=================================================================================================

@@ -9,7 +9,7 @@ VOF_ADVECT = 'Dick_Yue'
 REFINEMENT = REFINEMENTTEMP
 CYLINDER_DIR = CYLDIRTEMP
 NORMAL_UP = NORMUPTEMP
-USE_VOFI = F
+USE_VOFI = T
 
 !=================================================================================================
 

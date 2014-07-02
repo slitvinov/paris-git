@@ -16,12 +16,12 @@ fi
 
 sed s/MOFTEMP/$moftrue/g inputvof.template | sed s/NFILTERTEMP/$nfilter/g > inputvof 
 
-mv input input.bkp
-cp inputlong input
-rm -fR out
+
+rm -fR out input
+ln -s inputlong input
 mpirun -np 8 paris > tmpout
 echo `awk ' /Step:/ { cpu = $8 } END { print "cpu = " cpu } ' < tmpout`
-mv input.bkp input
+rm -f input
 
 gnuplot <<EOF
 set xlabel "time"

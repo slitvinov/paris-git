@@ -16,8 +16,10 @@ fi
 sed s/MOFTEMP/$moftrue/g inputvof.template | sed s/NFILTERTEMP/$nfilter/g > inputvof 
 
 
-rm -fR out
+rm -fR input out
+ln -s inputshort input
 mpirun -np 8 paris > tmpout
+rm -f input
 echo `awk ' /Step:/ { cpu = $8 } END { print "cpu = " cpu } ' < tmpout`
 
 gnuplot <<EOF

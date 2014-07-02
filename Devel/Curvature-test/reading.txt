@@ -44,6 +44,13 @@ calls
     	   
 ***** NEW:
 
+static void variable_tracer_vof_height_update 
+calls
+	height
+	calls half_height
+		
+then
+
 gdouble gfs_height_curvature_new (FttCell * cell, GfsVariableTracerVOFHeight * t, 
 calls
 	static gboolean curvature_along_direction_new (FttCell * cell,  ! Not 3D

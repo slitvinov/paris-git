@@ -36,7 +36,7 @@ MaxDt   = 0.1d0    ! maximum size of time step
 dtFlag  = 1        ! 1: fixed dt;  2: fixed CFL
 dt      = 0.1d0    ! dt in case of dtFlag=1
 CFL     = 0.25
-MAXERROR= 1d-6     ! Residual for Poisson solver
+MAXERROR= 1d-9     ! Residual for Poisson solver
 MAXERRORVOL = 1d-6 ! Tolerance for Front Tracking
                    ! Numerical parameters
 
