@@ -41,7 +41,7 @@ LIBS = $(HYPRE_LIBS) $(VOFI_LIBS)
 #------------------------No changes needed beyond this line----------------------------------------------
 
 
-OBJ = paris.o solids.o modules.o vofmodules.o front.o surface_tension.o lppmodules.o st_testing.o newsolver.o freesurface.o averages.o
+OBJ = paris.o solids.o modules.o vofmodules.o front.o surface_tension.o lppmodules.o st_testing.o newsolver.o freesurface.o averages.o vofnonmodule.o
 SRC = $(wildcard  *.f90) 
 
 install: $(OBJ)

@@ -788,7 +788,8 @@ contains
          kappa = sign(1.d0,mxyz(try(1)))*kappa
          return
       else 
-         nfound = - ind_pos(points,nposit) 
+         nfound = - 10   ! encode the fact that less than 9 heights in same direction were found. 
+         ! ind_pos(points,nposit) 
       endif ! nfound == 9
       ! *** determine the origin. 
       call FindCutAreaCentroid(i0,j0,k0,centroid)
@@ -799,7 +800,6 @@ contains
       ! Bypass the mixed height step as tests show it is less accurate
       ! Find all centroids in 3**3
       ! use direction closest to normal
-      nfound = -100 + nfound  ! encode number of independent positions into nfound for debugging or analysis purposes. 
       nposit=0
       do m=-1,1; do n=-1,1; do l=-1,1
          i=i0+m

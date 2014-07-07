@@ -12,7 +12,7 @@ nstats=$2
 d=$3
 dim=$3'D'
 
-list="3 4 5 6"
+list="3 4 5 6 7"
 echo $list
 
 ndepth=`head -50  ../../surface_tension.f90 |  awk -F '=' ' /NDEPTH/ {print $2}' | tr -d ' '`

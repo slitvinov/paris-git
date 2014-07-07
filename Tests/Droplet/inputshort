@@ -28,7 +28,7 @@ restartFront = F    ! T: start the front from  a previous simulation
 restartAverages = F
 nBackup  = 200000      ! number of time steps between  backups are kept.
 
-NSTEP   = 100000       ! maximum number of time steps
+NSTEP   = 20000 ! 100000       ! maximum number of time steps
 EndTime = 380   ! When to stop simulation
 
 MaxDt   = 0.1d0    ! maximum size of time step
