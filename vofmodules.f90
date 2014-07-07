@@ -63,6 +63,7 @@ module module_VOF
   logical :: linfunc_initialized = .false.
   logical :: DoMOF = .false.
   logical :: use_Vofi
+  logical :: oldvof
 
   real(8) :: b1,b2,b3,b4
   integer :: nfilter
@@ -219,7 +220,7 @@ contains
     namelist /vofparameters/ vofbdry_cond,test_type,VOF_advect,refinement, &
        cylinder_dir, normal_up, DoLPP, &
        FreeSurface, ViscMeanIsArith, DensMeanIsArith, MAXERROR_FS, MAXIT_FS, &
-       output_filtered_VOF, DoMOF, use_vofi,nfilter
+       output_filtered_VOF, DoMOF, use_vofi,nfilter,oldvof
     
 !     vofbdry_cond=['periodic','periodic','periodic','periodic','periodic','periodic']
     vofbdry_cond=['undefined','undefined','undefined','undefined','undefined','undefined']
@@ -235,6 +236,7 @@ contains
     DoMOF = .false.
     use_vofi = .false.
     nfilter = 1 
+    oldvof = .true.
     
     in=31
 
