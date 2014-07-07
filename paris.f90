@@ -671,7 +671,7 @@ subroutine momentumConvection(u,v,w,du,dv,dw,flag,scheme)
   elseif (scheme=='Verstappen') then
     call momentumConvectionVerstappen(u,v,w,du,dv,dw,flag)
   else
-     call pariserror("*** unknown vof scheme")
+     call pariserror("*** unknown convection scheme")
   endif
 
 end subroutine momentumConvection
