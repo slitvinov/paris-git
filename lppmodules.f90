@@ -184,9 +184,16 @@
    logical :: UnsteadyPartForce
 
    integer :: SeedParticlesFlag
+   logical :: SeedWithFluidVel
    integer, parameter :: SeedParticlesNone      = 0
-   integer, parameter :: SeedParticlesOneTime   = 0
-   integer, parameter :: SeedParticlesRegular   = 0
+   integer, parameter :: SeedParticlesOneTime   = 1
+   integer, parameter :: SeedParticlesRegular   = 2
+   real(8) :: xmin_part_seed, ymin_part_seed, zmin_part_seed, dmin_part_seed, & 
+              xmax_part_seed, ymax_part_seed, zmax_part_seed, dmax_part_seed, &
+              umin_part_seed, vmin_part_seed, wmin_part_seed, & 
+              umax_part_seed, vmax_part_seed, wmax_part_seed
+   integer :: num_part_seed
+   real(8) :: time_part_seed
 contains
 !=================================================================================================
    subroutine initialize_LPP()
@@ -238,8 +245,6 @@ contains
 
    subroutine ReadLPPParameters
 
-      use module_flow
-      use module_BC
       implicit none
       include 'mpif.h'
 
@@ -252,7 +257,12 @@ contains
          max_num_drop, maxnum_cell_drop, max_num_part, max_num_part_cross, &
          outputlpp_format,nStepConverion,AspRatioTol, &
          WallEffectSettling,output_lpp_evolution,lppbdry_cond,& 
-         TwoWayCouplingFlag,FilterLengthLPP2Lcut,UnsteadyPartForce 
+         TwoWayCouplingFlag,FilterLengthLPP2Lcut,UnsteadyPartForce,&  
+         SeedParticlesFlag, SeedWithFluidVel, num_part_seed, time_part_seed, & 
+         xmin_part_seed, ymin_part_seed, zmin_part_seed, dmin_part_seed, & 
+         xmax_part_seed, ymax_part_seed, zmax_part_seed, dmax_part_seed, &
+         umin_part_seed, vmin_part_seed, wmin_part_seed, & 
+         umax_part_seed, vmax_part_seed, wmax_part_seed
 
       in=32
 
@@ -282,6 +292,13 @@ contains
       TwoWayCouplingFlag = 0 
       FilterLengthLPP2Lcut = 8.d0
       UnsteadyPartForce = .false.
+      SeedParticlesFlag = 0
+      SeedWithFluidVel =.false. 
+      num_part_seed = 0; time_part_seed = 0.0;
+      xmin_part_seed=0.0; ymin_part_seed=0.0; zmin_part_seed=0.0; dmin_part_seed=0.0 
+      xmax_part_seed=0.0; ymax_part_seed=0.0; zmax_part_seed=0.0; dmax_part_seed=0.0
+      umin_part_seed=0.0; vmin_part_seed=0.0; wmin_part_seed=0.0
+      umax_part_seed=0.0; vmax_part_seed=0.0; wmax_part_seed=0.0; 
 
       call MPI_COMM_RANK(MPI_COMM_WORLD, rank, ierr)
       inquire(file='inputlpp',exist=file_is_there)
@@ -2412,6 +2429,8 @@ contains
                   s1 = FilterLengthLPP*0.25d0
                   Ncf   = NINT(FilterLengthLPP*0.5d0/xLength*dble(Nx))
                   
+                  ! Note: XXX don't apply force on boundary cells, add an error
+                  ! function? 
                   if ( i > ip-Ncf .and. i < ip+Ncf .and. & 
                        j > jp-Ncf .and. j < jp+Ncf .and. &
                        k > kp-Ncf .and. k < kp+Ncf ) then 
@@ -3227,44 +3246,96 @@ contains
 
    end subroutine ComputeSubDerivativeVel
 
-   subroutine seedparticles(x1,x2,y1,y2,z1,z2,u1,u2,v1,v2,w1,w2,d1,d2,npseed,tseed,t)
+   subroutine SeedParticles()
 
       implicit none
+      include 'mpif.h'
 #ifdef __INTEL_COMPILER
       use IFPORT
 #endif
-      real(8), intent(in) :: x1,x2,y1,y2,z1,z2,u1,u2,v1,v2,w1,w2,d1,d2,tseed,t
-      integer, intent(in) :: npseed
 
       logical :: SeedParticlesNow
-      integer :: ip,it,itseed
+      integer :: ipart_seed,itime,itime_part_seed
       real(8) :: xp,yp,zp,up,vp,wp,dp,volp
+      real(8) :: rand
+      integer :: ip,jp,kp
+!      integer :: c1,c2,c3,rankpart
+      integer :: ierr
 
       SeedParticlesNow = .false.
       if ( SeedParticlesFlag == SeedParticlesNone ) then 
          return 
       else if ( SeedParticlesFlag == SeedParticlesOneTime ) then
-         if ( abs(tseed-t) < dt*1.d-2 ) then
+         itime           = nint(time/dt)
+         itime_part_seed = nint(time_part_seed/dt)
+         if ( itime == itime_part_seed ) then 
             SeedParticlesNow = .true.
          end if ! t
       else if ( SeedParticlesFlag == SeedParticlesRegular ) then
-         it       = nint(t/dt)
-         itseed   = nint(tseed/dt)
-         if ( mod(it,itseed) == 0 ) then 
+         itime           = nint(time/dt)
+         itime_part_seed = nint(time_part_seed/dt)
+         if ( mod(itime,itime_part_seed) == 0 ) then 
             SeedParticlesNow = .true.
-         end if ! itseed
+         end if ! itime_part_seed
       else 
          call lpperror("Unknown seeding particle flag!")
       end if ! SeedParticlesFlag
 
-      if ( SeedParticlesNow ) then 
-         do ip=1,npseed
-            dp = d1 + rand()*(d2-d1)
-            xp = x1 + rand()*0.7
-            yp = y1 + rand()*0.7
-            zp = y2 + rand()*0.7
-         end do ! ip
+      if ( SeedParticlesNow ) then
+         write(*,*) num_part_seed,'particles seed at t=',time
+         call random_seed()
+         do ipart_seed=1,num_part_seed
+            call random_number(rand) 
+            dp = dmin_part_seed + rand*(dmax_part_seed-dmin_part_seed)
+            volp = PI*dp*dp*dp/6.d0
+            call random_number(rand) 
+            xp = xmin_part_seed + rand*(xmax_part_seed-xmin_part_seed)
+            call random_number(rand) 
+            yp = ymin_part_seed + rand*(ymax_part_seed-ymin_part_seed)
+            call random_number(rand) 
+            zp = zmin_part_seed + rand*(zmax_part_seed-zmin_part_seed)
+            call random_number(rand) 
+            up = umin_part_seed + rand*(umax_part_seed-umin_part_seed)
+            call random_number(rand) 
+            vp = vmin_part_seed + rand*(vmax_part_seed-vmin_part_seed)
+            call random_number(rand) 
+            wp = wmin_part_seed + rand*(wmax_part_seed-wmin_part_seed)
+
+!            call FindPartLocCell(xp,yp,zp,ip,jp,kp)
+!            c1 = (ip-Ng-1)/Mx  
+!            c2 = (jp-Ng-1)/My  
+!            c3 = (kp-Ng-1)/Mz  
+!            rankpart = c1*npy*npz + c2*npz + c3
+!            if ( rankpart > nPdomain-1 .or. rankpart < 0 ) then
+!               call lpperror("rank of seeding particle out of range!")
+!            else if ( rankpart == rank ) then 
+            if ( xp > xh(is)-dx(is) .and. xp <= xh(ie) .and. & 
+                 yp > yh(js)-dy(js) .and. yp <= yh(je) .and. & 
+                 zp > zh(ks)-dz(ks) .and. zp <= zh(ke) ) then   
+               num_part(rank) = num_part(rank) + 1
+               parts(num_part(rank),rank)%element%xc = xp
+               parts(num_part(rank),rank)%element%yc = yp
+               parts(num_part(rank),rank)%element%zc = zp
+               parts(num_part(rank),rank)%element%vol = volp
+               call FindPartLocCell(xp,yp,zp,ip,jp,kp)
+               parts(num_part(rank),rank)%ic = ip
+               parts(num_part(rank),rank)%jc = jp
+               parts(num_part(rank),rank)%kc = kp
+               if ( SeedWithFluidVel ) then 
+                  up = u(ip,jp,kp)
+                  vp = v(ip,jp,kp)
+                  wp = w(ip,jp,kp)
+               end if ! SeedWithFluidVel
+               parts(num_part(rank),rank)%element%uc = up
+               parts(num_part(rank),rank)%element%vc = vp
+               parts(num_part(rank),rank)%element%wc = wp
+            end if ! xp,yp,zp 
+         end do ! ipart_seed
       end if ! SeedParticlesNow
+      
+      ! Allgather updated number of partilces after seeding 
+      call MPI_ALLGATHER(num_part(rank), 1, MPI_INTEGER, &
+                         num_part(:)   , 1, MPI_INTEGER, MPI_Comm_World, ierr)
 
    end subroutine seedparticles
 

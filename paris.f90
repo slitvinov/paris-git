@@ -420,6 +420,7 @@ Program paris
         if (DoLPP) then
             call PartBCWrapper
             call lppvofsweeps(itimestep,time)  
+            call SeedParticles
             call my_timer(14)
         end if ! DoLPP
 !--------------------------------------------OUTPUT-----------------------------------------------
@@ -1417,12 +1418,13 @@ subroutine InitCondition
            call ighost_y(vof_flag,2,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
            call ighost_z(vof_flag,2,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
            call setVOFBC(cvof,vof_flag)
-           if ( DoLPP ) then 
-              call backup_LPP_read
-              call MPI_ALLGATHER(num_part(rank), 1, MPI_INTEGER, &
-                                 num_part(:)   , 1, MPI_INTEGER, MPI_Comm_World, ierr)
-           end if ! DoLPP
         end if ! DoFront, DoVOF
+        if ( DoLPP ) then 
+           call backup_LPP_read
+           call SeedParticles
+           call MPI_ALLGATHER(num_part(rank), 1, MPI_INTEGER, &
+                              num_part(:)   , 1, MPI_INTEGER, MPI_Comm_World, ierr)
+        end if ! DoLPP
         call SetVelocityBC(u,v,w,umask,vmask,wmask,time)
         call ghost_x(u,2,req( 1: 4)); call ghost_x(v,2,req( 5: 8)); call ghost_x(w,2,req( 9:12))
         call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
@@ -1438,6 +1440,9 @@ subroutine InitCondition
         color = 0.;  v = 0;  w = 0.
         u = U_init;
 
+        if(DoLPP) then 
+           call SeedParticles
+        end if ! DoLPP
         if(DoVOF) then
            call initconditions_VOF()
            call get_all_heights()
