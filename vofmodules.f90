@@ -236,7 +236,7 @@ contains
     DoMOF = .false.
     use_vofi = .false.
     nfilter = 1 
-    oldvof = .true.
+    oldvof = .false.  ! .true.
     
     in=31
 
