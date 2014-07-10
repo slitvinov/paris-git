@@ -91,7 +91,7 @@ ZLENGTH  = ZLTEMP
 WallVel(1,1)  = 0.011 ! can set inflow velocities here
 WallShear(4,1) = 0.0
 
-U_init = 1d0
+U_init =  0d0
 GX      = 0.0
 GY      = 0.0
 GZ      = 0.0

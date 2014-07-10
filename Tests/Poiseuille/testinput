@@ -41,7 +41,7 @@ MAXERRORVOL = 1d-4
 
 ITIME_SCHEME = 1   ! time scheme: 1:first order Euler, 2: second order quasi Crank-Nicolson
                    ! Should use first order Euler for Stokes flow ! ! ! 
-MAXIT    = 200
+MAXIT    = 2000
 BETA     = 1.2
                     ! parameters for linear solver
 U_init   = 1.d0

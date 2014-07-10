@@ -47,12 +47,11 @@ while [ $idt -lt $ndt ] ; do
     dt=`awk -v dt=$dt 'BEGIN {print dt/2}'`
     let idt=$idt+1
 done
- 
+
+awk '{print $1,  ($18 - $19)}' stats | tail -1 > pressure_gradient.txt 
 if [ -d out ]; then
-    cd out
-	compare ../reference.txt flowrate.txt $precision
-    cd ..
-else
+    compare reference.txt pressure_gradient.txt  $precision
+else 
     echo "FAIL: directory out not created"
 fi
 

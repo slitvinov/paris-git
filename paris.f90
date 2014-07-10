@@ -1,28 +1,22 @@
 !=================================================================================================
 !=================================================================================================
-! Paris-0.2
-! Extended from Code: FTC3D2011 (Front Tracking Code for 3D simulations)
-! and Surfer. 
+! PARIS  Parallel Robust Interface Simulator 
 ! 
-! Authors: Sadegh Dabiri, Gretar Tryggvason.
-! Author for VOF extensions Stephane Zaleski (zaleski@dalembert.upmc.fr).
-! Author for momentum conserving method: Daniel Fuster (fuster@dalembert.upmc.fr)
-! Contact: sdabiri@gmail.com .
-! A three dimensional Navier-Stokes flow solver with front tracking for modeling of multiphase 
-! flows. Flow can be driven by wall motion, density difference or pressure gradient.
-! Boundary conditions supported: wall and periodic
 !
-!  HISTORY
+! Authors 
+!         Gretar Tryggvason  gtryggva@nd.edu
+!         Stephane Zaleski   zaleski@dalembert.upmc.fr
+!         Sadegh Dabiri      sdabiri@gmail.com
+! 	  Yue (Stanley) Ling ling.stanley@gmail.com
 !
-! Version 1.0   1/21/2011   The 3D flow solver for variable density/viscosity is written. 
-!                           The density is advected by an ENO scheme.
-! Version 2.0   2/25/2011   Parallel implementation.
-!                           
-! FTC Version 52_4 Implicit momentum diffusion
-!                  The density is advected by a QUICK scheme.
+! Extended from or inspired by Codes: 
+!      - FTC3D2011 (Front Tracking Code for 3D simulations)
+!      - Surfer VOF code
+!      - Gerris Flow Solver
+! 
+! Contact: Stephane Zaleski
 !
-! Paris version 0.2 Implicit momentum diffusion, VOF and Front-Tracking independent of each other. 
-!                   The density is not advected but deduced from VOF or Front Tracking. 
+! GPL Licence
 !
 ! This program is free software; you can redistribute it and/or
 ! modify it under the terms of the GNU General Public License as
@@ -457,7 +451,7 @@ Program paris
               !        write(121,'("            Iterations:",I7," cpu(s):",f10.2)')it,end_time-start_time
               !        close(121)
            open(unit=121,file='stats',access='append')
-           write(121,'(22es14.6e2)')time,stats(1:15),dpdx,(stats(8)-stats(9))/dt,end_time-start_time
+           write(121,'(22es14.6e2)')time,stats(1:nstatarray),dpdx,(stats(8)-stats(9))/dt,end_time-start_time
            close(121)
         endif
         call my_timer(11)
@@ -584,7 +578,10 @@ subroutine calcStats
   real(8) :: vol,CC=0d0
   real(8) :: kenergy
   real(8), save :: W_int=-0.02066
-  mystats(1:16)=0d0
+
+  nstatarray=18
+  if(nstatarray > 100) call pariserror("nstatarray too large")
+  mystats(1:nstatarray)=0d0
   do k=ks,ke;  do j=js,je;  do i=is,ie
     vol = dx(i)*dy(j)*dz(k)
 ! Average u component
@@ -627,11 +624,21 @@ subroutine calcStats
       mystats(1)=mystats(1)+mu(i,je,k)*u(i,je,k)*dx(i)*dz(k)/(dy(je)/2.0)
     enddo; enddo
   endif
+! Get pressure at entry and exit
+  if (test_point_in(ng+1,ny/2+ng,nz/2+ng)) then 
+     mystats(17)=p(ng+1,ny/2+ng,nz/2+ng)
+  else
+     mystats(17)=0d0
+  endif
+  if (test_point_in(ng+nx,ny/2+ng,nz/2+ng)) then 
+     mystats(18)=p(ng+nx,ny/2+ng,nz/2+ng)
+  else
+     mystats(18)=0d0
+  endif
   mystats(2:16) = mystats(2:16)/(xLength*yLength*zLength)
   mystats(1) = mystats(1)/(xLength*zLength*2.0)
   mystats(11) = mystats(11) ! /mystats(10)
-  
-  call MPI_ALLREDUCE(mystats(1), stats(1), 16, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_Domain, ierr)
+  call MPI_ALLREDUCE(mystats(1), stats(1), nstatarray, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_Domain, ierr)
   rho_ave = stats(6)
   p_ave = stats(7)
 ! This stops the code in case the average velocity (stats(2)) becomes NaN.

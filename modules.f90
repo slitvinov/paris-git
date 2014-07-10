@@ -288,7 +288,7 @@ module module_flow
   logical, allocatable, dimension(:,:,:) :: mask
 
   real(8) :: gx, gy, gz, mu1, mu2, r_avg, dt, dtFlag, rho_ave, p_ave, vdt
-  real(8) :: max_velocity, maxTime, Time, EndTime, MaxDt, CFL, mystats(16), stats(16)
+  real(8) :: max_velocity, maxTime, Time, EndTime, MaxDt, CFL, mystats(100), stats(100)
   logical :: ZeroReynolds,DoVOF, DoFront, Implicit, hypre, GetPropertiesFromFront
   logical :: dosolids = .false.
   real(8) :: rho1, rho2, s
@@ -299,6 +299,7 @@ module module_flow
   integer :: maxit, it, itime_scheme, BuoyancyCase, drive
   integer :: sbx, sby, Nstep
   integer :: maxStep, itmax, iTimeStep, iTimeStepRestart
+  integer :: nstatarray
   character(20) :: AdvectionScheme
 
 end module module_flow
