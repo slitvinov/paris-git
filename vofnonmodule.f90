@@ -62,7 +62,6 @@ subroutine swpmom(us,c,f,d,mom1,mom2,mom3,mom)
      call pariserror("*** unknown vof scheme")
   endif
 
-  call get_flags_and_clip()
   call do_all_ghost(mom)
 
 end subroutine swpmom
@@ -209,7 +208,8 @@ subroutine swpzmom(us,c,f,d,mom1,mom2,mom3,mom)
   real(8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: mom1,mom2,mom3
   real(8) mm1,mm2,vof
   real(8) a1,a2,alpha,fl3d,uavg,rhoavg
-  real(8) mxyz(3), dm(3), stencil3x3(-1:1,-1:1,-1:1)
+  REAL(8) deltax(3),x0(3),fl3dnew
+  real(8) mxyz(3), dm(3), nr(3), stencil3x3(-1:1,-1:1,-1:1)
   intrinsic dmax1,dmin1
   !***
   call init_i0j0k0 (d,i0,j0,k0)
@@ -243,21 +243,42 @@ subroutine swpzmom(us,c,f,d,mom1,mom2,mom3,mom)
               do i1=-1,1; do j1=-1,1; do k1=-1,1
                 stencil3x3(i1,j1,k1) = c(i+i1,j+j1,k+k1)
               enddo;enddo;enddo
-              call fit_plane(c(i,j,k),d,a1,a2,stencil3x3,dm,alpha,error)
-              if (error) cycle
 
-              if (a1 .lt. 0.d0) then
-                     vof = fl3d(dm(1),dm(2),dm(3),alpha,a1  ,-a1)
-                     mom1(i,j,k) = (rho2*vof + rho1*(-a1 - vof))*uavg
+              if(oldvof) then
+                 call fit_plane(c(i,j,k),d,a1,a2,stencil3x3,dm,alpha,error)
+                 if (error) cycle
+                 if (a1 .lt. 0.d0) then
+                    vof = fl3d(dm(1),dm(2),dm(3),alpha,a1  ,-a1)
+                    mom1(i,j,k) = (rho2*vof + rho1*(-a1 - vof))*uavg
+                 endif
+                 if (a2 .gt. 0.d0) then
+                    vof = fl3d(dm(1),dm(2),dm(3),alpha,1.d0,a2)
+                    mom3(i,j,k) = (rho2*vof + rho1*(a2 - vof))*uavg
+                 endif
+                 vof = fl3d(dm(1),dm(2),dm(3),alpha,mm1,mm2)
+                 mom2(i,j,k) = (rho2*vof + rho1*(mm2 - vof))*uavg
+              else
+                 call fit_plane_new(c(i,j,k),d,a1,a2,stencil3x3,nr,alpha,error)
+                 if(error) cycle
+                 x0=0d0
+                 deltax=1d0
+                 if(a1.lt.0d0) then
+                    x0(d)=a1
+                    deltax(d)=-a1
+                    vof = fl3dnew(nr,alpha,x0,deltax)
+                    mom1(i,j,k) = (rho2*vof + rho1*(-a1 - vof))*uavg
+                 endif
+                 if(a2.gt.0d0) then
+                    x0(d)=1d0
+                    deltax(d)=a2
+                    vof = fl3dnew(nr,alpha,x0,deltax)
+                    mom3(i,j,k) = (rho2*vof + rho1*(a2 - vof))*uavg
+                 endif
+                 x0(d)=mm1
+                 deltax(d)=mm2
+                 vof = fl3dnew(nr,alpha,x0,deltax)
+                 mom2(i,j,k) = (rho2*vof + rho1*(mm2 - vof))*uavg
               endif
-              if (a2 .gt. 0.d0) then
-                     vof = fl3d(dm(1),dm(2),dm(3),alpha,1.d0,a2)
-                     mom3(i,j,k) = (rho2*vof + rho1*(a2 - vof))*uavg
-              endif
-              
-              vof = fl3d(dm(1),dm(2),dm(3),alpha,mm1,mm2)
-              mom2(i,j,k) = (rho2*vof + rho1*(mm2 - vof))*uavg
-
            endif
         enddo
      enddo
@@ -286,9 +307,11 @@ subroutine fit_plane(vof,d,a1,a2,stencil3x3,dm,alpha,error)
   integer i0,j0,k0
   integer inv(3)
   integer, intent(in) :: d
-  real(8) a1,a2,alpha,al3d,vof
-  real(8) mxyz(3), dm(3), stencil3x3(-1:1,-1:1,-1:1)
-  logical error
+  real(8), intent(in) :: a1,a2, vof, stencil3x3(-1:1,-1:1,-1:1)
+  real(8), intent(out) :: alpha, dm(3)
+  real(8) :: al3d
+  real(8) :: mxyz(3)
+  logical, intent(out) :: error
   intrinsic dmax1,dmin1
 
   error=.TRUE.

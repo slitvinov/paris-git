@@ -3,7 +3,7 @@
     <Field name="Version" type="string">2.5.0</Field>
     <Object name="GUI">
         <Object name="FileServerList">
-            <Field name="path" type="string">/Users/stephanezaleski/darcs/paris-devel/Tests/Droplet</Field>
+            <Field name="path" type="string">/Users/stephanezaleski/darcs/paris-devel/Tests/CylinderAdvection</Field>
             <Field name="filter" type="string">*</Field>
             <Field name="useCurrentDir" type="bool">true</Field>
             <Field name="automaticFileGrouping" type="bool">true</Field>
@@ -21,7 +21,7 @@
             <Field name="orientation" type="int">0</Field>
             <Field name="defaultForeground" type="string">#000000</Field>
             <Field name="defaultBackground" type="string">#e8e8e8</Field>
-            <Field name="defaultFontName" type="string">"Lucida Grande,13,-1,5,50,0,0,0,0,0"</Field>
+            <Field name="defaultFontName" type="string">".Lucida Grande UI,13,-1,5,50,0,0,0,0,0"</Field>
             <Field name="defaultStyle" type="string">macintosh</Field>
             <Field name="defaultOrientation" type="int">0</Field>
         </Object>
@@ -36,14 +36,14 @@
         <Field name="postWhenShown" type="bool">false</Field>
         <Object name="File open">
             <Field name="x" type="int">0</Field>
-            <Field name="y" type="int">214</Field>
-            <Field name="width" type="int">660</Field>
+            <Field name="y" type="int">212</Field>
+            <Field name="width" type="int">631</Field>
             <Field name="height" type="int">467</Field>
             <Field name="visible" type="bool">false</Field>
         </Object>
         <Object name="Information">
             <Field name="x" type="int">1</Field>
-            <Field name="y" type="int">46</Field>
+            <Field name="y" type="int">24</Field>
             <Field name="width" type="int">536</Field>
             <Field name="height" type="int">304</Field>
             <Field name="visible" type="bool">false</Field>
@@ -64,14 +64,14 @@
             <Field name="SPLITTER_VALUES_V2" type="floatVector">0 1 </Field>
         </Object>
         <Object name="Contour plot attributes">
-            <Field name="x" type="int">1</Field>
-            <Field name="y" type="int">24</Field>
-            <Field name="width" type="int">521</Field>
+            <Field name="x" type="int">0</Field>
+            <Field name="y" type="int">145</Field>
+            <Field name="width" type="int">474</Field>
             <Field name="height" type="int">600</Field>
             <Field name="visible" type="bool">false</Field>
             <Field name="posted" type="bool">false</Field>
         </Object>
-        <Field name="plotDatabases" type="stringVector">"localhost:/Users/stephanezaleski/darcs/paris-devel/Tests/Droplet/vof.visit" </Field>
+        <Field name="plotDatabases" type="stringVector">"localhost:/Users/stephanezaleski/darcs/paris-devel/Tests/CylinderAdvection/vof.visit" </Field>
         <Object name="TimeFormat">
             <Field name="displayMode" type="string">Cycles</Field>
             <Field name="precision" type="int">5</Field>
