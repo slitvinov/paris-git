@@ -82,37 +82,37 @@ tags:	$(SRC)
 # @SZ	ctags paris.f90 
 
 paris.o:  paris.f90 solids.o modules.o vofmodules.o front.o surface_tension.o lppmodules.o st_testing.o newsolver.o freesurface.o averages.o
-	$(FC) -c  $(FFLAGS) $<
+	$(FC) -c $(FFLAGS) $<
 
 vofmodules.o: vofmodules.f90 modules.o
 	$(FC) -c $(FFLAGS) $<
 
 lppmodules.o: lppmodules.f90 vofmodules.o modules.o
-	$(FC) -c  $(FFLAGS) $<
+	$(FC) -c $(FFLAGS) $<
 
 surface_tension.o: surface_tension.f90 vofmodules.o modules.o
-	$(FC) -c  $(FFLAGS) $<
+	$(FC) -c $(FFLAGS) $<
 
 st_testing.o: st_testing.f90 vofmodules.o modules.o surface_tension.o
-	$(FC) -c  $(FFLAGS) $<
+	$(FC) -c $(FFLAGS) $<
 
 solids.o:  solids.f90 modules.o
-	$(FC) -c   $(FFLAGS) $<
+	$(FC) -c $(FFLAGS) $<
 
 front.o:  front.f90 modules.o
-	$(FC) -c   $(FFLAGS) $<
+	$(FC) -c $(FFLAGS) $<
 
 newsolver.o:  newsolver.f90 modules.o
-	$(FC) -c   $(FFLAGS) $<
+	$(FC) -c $(FFLAGS) $<
 
 freesurface.o: freesurface.f90 modules.o
-	$(FC) -c   $(FFLAGS) $<
+	$(FC) -c $(FFLAGS) $<
 
 averages.o: averages.f90 modules.o solids.o vofmodules.o
-	$(FC) -c   $(FFLAGS) $<
+	$(FC) -c $(FFLAGS) $<
 
 %.o : %.f90
-	$(FC) -c  $(FFLAGS) $<
+	$(FC) -c $(FFLAGS) $<
 
 compare: compare.o
 	@$(CC) -o compare compare.o -lm
@@ -123,4 +123,4 @@ parisdeconv: parisdeconv.o
 	@mv parisdeconv ~/bin
 
 .c.o:   $< 
-	@cc -c $(CFLAGS)   $< 
+	@cc -c $(CFLAGS) $< 

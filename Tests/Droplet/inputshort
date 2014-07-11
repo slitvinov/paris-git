@@ -21,6 +21,8 @@ GetPropertiesFromFront = F ! T: uses Front-Tracking data to compute mu, rho and 
 		           ! F: uses VOF data to compute mu and rho. 
 
 ZeroReynolds = F
+AdvectionScheme = 'Verstappen' !QUICK, ENO, Verstappen
+
 Implicit  = T     
 hypre     = F      ! T: uses hyprepackage, F: uses SOR solver 
 restart   = F       ! T: start the domain from a previous simulation

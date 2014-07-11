@@ -759,7 +759,7 @@ or none at all")
           if(max_flag==0) then
              write(*,*) "ls2vof_refined: error: single phase flow ? Nothing to initialize !?"
           else
-            write(*,*) "ls2vof_refined: maximum vof_flag = ", max_flag, "but expecting maximum flag = 2"
+            write(*,*) "ls2vof_refined: maximum vof_flag = ",max_flag,"but expecting maximum flag = 2"
           endif
        endif
        call pariserror("bad flag")
