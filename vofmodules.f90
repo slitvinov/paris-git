@@ -868,7 +868,7 @@ or none at all")
   end subroutine do_all_ighost
   !=================================================================================================
 
-subroutine get_momentum(c,us,d,mom)
+  subroutine get_momentum(c,us,d,mom)
 
   use module_grid
   use module_flow
@@ -882,41 +882,45 @@ subroutine get_momentum(c,us,d,mom)
   real(8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), intent(in)  :: us
   real(8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), intent(out) :: mom
   real(8) rhoavg
-  real(8) alpha,fl3d,stencil3x3(-1:1,-1:1,-1:1)
-  real(8) dm(3)
+  real(8) alpha,fl3dnew,stencil3x3(-1:1,-1:1,-1:1)
+  real(8) dm(3),x0(3),deltax(3)
 
   call init_i0j0k0 (d,i0,j0,k0)
-
+  
   do k=ks-1,ke+1
-    do j=js-1,je+1
-      do i=is-1,ie+1
-        work(i,j,k,1) = cvof(i,j,k)
-        work(i,j,k,2) = cvof(i,j,k)
-        if ((cvof(i,j,k).gt.0.d0).and.(cvof(i,j,k).lt.1.d0)) then
-          do i1=-1,1; do j1=-1,1; do k1=-1,1
-            stencil3x3(i1,j1,k1) = cvof(i+i1,j+j1,k+k1)
-          enddo;enddo;enddo
-          call fit_plane(cvof(i,j,k),d,0.d0,0.d0,stencil3x3,dm,alpha,error)
-          if (error) then
-            work(i,j,k,1) = cvof(i,j,k)
-            work(i,j,k,2) = cvof(i,j,k)
-          else
-            work(i,j,k,1) = 2.0d0*fl3d(dm(1),dm(2),dm(3),alpha,0.0d0,0.5d0)
-            work(i,j,k,2) = 2.0d0*fl3d(dm(1),dm(2),dm(3),alpha,0.5d0,0.5d0)
-          endif
-        endif
+     do j=js-1,je+1
+        do i=is-1,ie+1
+           work(i,j,k,1) = cvof(i,j,k)
+           work(i,j,k,2) = cvof(i,j,k)
+           if ((cvof(i,j,k).gt.0.d0).and.(cvof(i,j,k).lt.1.d0)) then
+              do i1=-1,1; do j1=-1,1; do k1=-1,1
+                 stencil3x3(i1,j1,k1) = cvof(i+i1,j+j1,k+k1)
+              enddo;enddo;enddo
+              call fit_plane_new(cvof(i,j,k),d,0.d0,0.d0,stencil3x3,dm,alpha,error)
+              if (error) then
+                 work(i,j,k,1) = cvof(i,j,k)
+                 work(i,j,k,2) = cvof(i,j,k)
+              else
+                 x0=0d0
+                 deltax=1d0
+                 deltax(d)=0.5d0
+                 work(i,j,k,1) = 2.0d0*fl3dnew(dm,alpha,x0,deltax)
+                 x0(d)=0.5d0
+                 work(i,j,k,2) = 2.0d0*fl3dnew(dm,alpha,x0,deltax)
+              endif
+           endif
 
-!        rhoavg = work(i,j,k,2)*rho2 + (1.d0-work(i,j,k,2))*rho1 
-!        mom(i,j,k) = 0.5d0*us(i,j,k)*rhoavg
-!        rhoavg = work(i,j,k,1)*rho2 + (1.d0-work(i,j,k,1))*rho1 
-!        mom(i,j,k) = mom(i,j,k) + 0.5d0*us(i-i0,j-j0,k-k0)*rhoavg
+           !        rhoavg = work(i,j,k,2)*rho2 + (1.d0-work(i,j,k,2))*rho1 
+           !        mom(i,j,k) = 0.5d0*us(i,j,k)*rhoavg
+           !        rhoavg = work(i,j,k,1)*rho2 + (1.d0-work(i,j,k,1))*rho1 
+           !        mom(i,j,k) = mom(i,j,k) + 0.5d0*us(i-i0,j-j0,k-k0)*rhoavg
 
-        rhoavg = cvof(i,j,k)*rho2 + (1.d0-cvof(i,j,k))*rho1
-        mom(i,j,k) =0.5d0*(us(i,j,k)+us(i-i0,j-j0,k-k0))*rhoavg
-        mom_flag(i,j,k) = 0
+           rhoavg = cvof(i,j,k)*rho2 + (1.d0-cvof(i,j,k))*rho1
+           mom(i,j,k) = 0.5d0*(us(i,j,k)+us(i-i0,j-j0,k-k0))*rhoavg
+           mom_flag(i,j,k) = 0
 
-      enddo
-    enddo
+        enddo
+     enddo
   enddo
 
 end subroutine get_momentum
@@ -935,31 +939,35 @@ subroutine get_velocity_from_momentum (mom,d,us,der)
   real(8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: mom
   real(8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: us,der
   real(8) tmpreal, rhoavg1,rhoavg2,mom1,mom2, uavg, cflag
-  real(8) alpha,fl3d,stencil3x3(-1:1,-1:1,-1:1)
-  real(8) dm(3)
-
-  do k=ks-1,ke+1
-    do j=js-1,je+1
-      do i=is-1,ie+1
-        work(i,j,k,1) = cvof(i,j,k)
-        work(i,j,k,2) = cvof(i,j,k)
-        if ((cvof(i,j,k).gt.0.d0).and.(cvof(i,j,k).lt.1.d0)) then
-          do i1=-1,1; do j1=-1,1; do k1=-1,1
-            stencil3x3(i1,j1,k1) = cvof(i+i1,j+j1,k+k1)
-          enddo;enddo;enddo
-          call fit_plane(cvof(i,j,k),d,0.d0,0.d0,stencil3x3,dm,alpha,error)
-          if (error) then
-            work(i,j,k,1) = cvof(i,j,k)
-            work(i,j,k,2) = cvof(i,j,k)
-          else
-            work(i,j,k,1) = 2.0d0*fl3d(dm(1),dm(2),dm(3),alpha,0.0d0,0.5d0)
-            work(i,j,k,2) = 2.0d0*fl3d(dm(1),dm(2),dm(3),alpha,0.5d0,0.5d0)
-          endif
-        endif
-      enddo
-    enddo
-  enddo
+  real(8) alpha,fl3dnew,stencil3x3(-1:1,-1:1,-1:1)
+  real(8) dm(3),x0(3),deltax(3)
   
+  do k=ks-1,ke+1
+     do j=js-1,je+1
+        do i=is-1,ie+1
+           work(i,j,k,1) = cvof(i,j,k)
+           work(i,j,k,2) = cvof(i,j,k)
+           if ((cvof(i,j,k).gt.0.d0).and.(cvof(i,j,k).lt.1.d0)) then
+              do i1=-1,1; do j1=-1,1; do k1=-1,1
+                 stencil3x3(i1,j1,k1) = cvof(i+i1,j+j1,k+k1)
+              enddo;enddo;enddo
+              call fit_plane_new(cvof(i,j,k),d,0.d0,0.d0,stencil3x3,dm,alpha,error)
+              if (error) then
+                 work(i,j,k,1) = cvof(i,j,k)
+                 work(i,j,k,2) = cvof(i,j,k)
+              else
+                 x0=0d0
+                 deltax=1d0
+                 deltax(d)=0.5d0
+                 work(i,j,k,1) = 2.0d0*fl3dnew(dm,alpha,x0,deltax)
+                 x0(d)=0.5d0
+                 work(i,j,k,2) = 2.0d0*fl3dnew(dm,alpha,x0,deltax)
+              endif
+           endif
+        enddo
+     enddo
+  enddo
+
   call do_all_ghost(work(:,:,:,1))
   call do_all_ghost(work(:,:,:,2))
 
@@ -995,7 +1003,7 @@ subroutine get_velocity_from_momentum (mom,d,us,der)
         if ((cflag.gt.0.d0).and.(cflag.lt.1.d0)) then
           mom_flag(i,j,k) = 0
           der(i-i0,j-j0,k-k0) = der(i-i0,j-j0,k-k0) + &
-                                (tmpreal - us(i-i0,j-j0,k-k0))/dt
+               (tmpreal - us(i-i0,j-j0,k-k0))/dt
         endif
       enddo
     enddo

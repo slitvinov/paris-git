@@ -87,9 +87,8 @@ subroutine swpz(us,c,f,d,vof1,vof2,vof3)
   real (8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: us
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: c,vof1,vof2,vof3
   real(8) mm1,mm2
-  real(8) a1,a2,alpha,fl3d, stencil3x3(-1:1,-1:1,-1:1)
-  real(8) dm(3)
-  real(8) fl3dnew,nr(3),deltax(3),x0(3)
+  real(8) a1,a2,alpha,fl3dnew, stencil3x3(-1:1,-1:1,-1:1)
+  real(8) nr(3),deltax(3),x0(3)
   intrinsic dmax1,dmin1
   !***
   call init_i0j0k0 (d,i0,j0,k0)
@@ -115,53 +114,35 @@ subroutine swpz(us,c,f,d,vof1,vof2,vof3)
            vof2(i,j,k) = 0.0d0
            vof3(i,j,k) = 0.0d0
 
-           ! we need to introduce full/empty flags
+           ! @@@ we need to introduce full/empty flags
 
            if (c(i,j,k) .eq. 1.0d0) then
               vof1(i,j,k) = dmax1(-a1,0.d0)
               vof2(i,j,k) = 1.d0 - dmax1(a1,0.d0) + dmin1(a2,0.d0)
               vof3(i,j,k) = dmax1(a2,0.d0)
-
            else if (c(i,j,k) .gt. 0.d0) then
               do i1=-1,1; do j1=-1,1; do k1=-1,1
                 stencil3x3(i1,j1,k1) = c(i+i1,j+j1,k+k1)
               enddo;enddo;enddo
-
-              if(oldvof) then
-                 call fit_plane(c(i,j,k),d,a1,a2,stencil3x3,dm,alpha,error)
-                 if (error) cycle
-              else
-                 call fit_plane_new(c(i,j,k),d,a1,a2,stencil3x3,nr,alpha,error)
-                 if(error) cycle
-              endif
-
+              call fit_plane_new(c(i,j,k),d,a1,a2,stencil3x3,nr,alpha,error)
+              if(error) cycle
               mm1 = dmax1(a1,0.0d0)
               mm2 = 1.d0 - mm1 + dmin1(0.d0,a2)
-
-              if(oldvof) then
-                 if (a1 .lt. 0.d0) &
-                      vof1(i,j,k) = fl3d(dm(1),dm(2),dm(3),alpha,a1  ,-a1)
-                 if (a2 .gt. 0.d0) &
-                      vof3(i,j,k) = fl3d(dm(1),dm(2),dm(3),alpha,1.d0,a2)
-                 vof2(i,j,k) = fl3d(dm(1),dm(2),dm(3),alpha,mm1,mm2)
-              else
-                 x0=0d0
-                 deltax=1d0
-                 if(a1.lt.0d0) then
-                    x0(d)=a1
-                    deltax(d)=-a1
-                    vof1(i,j,k) = fl3dnew(nr,alpha,x0,deltax)
-                 endif
-                 if(a2.gt.0d0) then
-                    x0(d)=1d0
-                    deltax(d)=a2
-                    vof3(i,j,k) = fl3dnew(nr,alpha,x0,deltax)
-                 endif
-                 x0(d)=mm1
-                 deltax(d)=mm2
-                 vof2(i,j,k) = fl3dnew(nr,alpha,x0,deltax)
+              x0=0d0
+              deltax=1d0
+              if(a1.lt.0d0) then
+                 x0(d)=a1
+                 deltax(d)=-a1
+                 vof1(i,j,k) = fl3dnew(nr,alpha,x0,deltax)
               endif
-
+              if(a2.gt.0d0) then
+                 x0(d)=1d0
+                 deltax(d)=a2
+                 vof3(i,j,k) = fl3dnew(nr,alpha,x0,deltax)
+              endif
+              x0(d)=mm1
+              deltax(d)=mm2
+              vof2(i,j,k) = fl3dnew(nr,alpha,x0,deltax)
            endif
         enddo
      enddo
@@ -207,9 +188,9 @@ subroutine swpzmom(us,c,f,d,mom1,mom2,mom3,mom)
   real(8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: c
   real(8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: mom1,mom2,mom3
   real(8) mm1,mm2,vof
-  real(8) a1,a2,alpha,fl3d,uavg,rhoavg
+  real(8) a1,a2,alpha,uavg,rhoavg
   REAL(8) deltax(3),x0(3),fl3dnew
-  real(8) mxyz(3), dm(3), nr(3), stencil3x3(-1:1,-1:1,-1:1)
+  real(8) mxyz(3), nr(3), stencil3x3(-1:1,-1:1,-1:1)
   intrinsic dmax1,dmin1
   !***
   call init_i0j0k0 (d,i0,j0,k0)
@@ -239,46 +220,29 @@ subroutine swpzmom(us,c,f,d,mom1,mom2,mom3,mom)
            uavg = mom(i,j,k)/(rho2*c(i,j,k)+rho1*(1.d0-c(i,j,k)))
 
            if ((c(i,j,k) .gt. 0.d0).and.(c(i,j,k) .lt. 1.d0)) then
-
               do i1=-1,1; do j1=-1,1; do k1=-1,1
-                stencil3x3(i1,j1,k1) = c(i+i1,j+j1,k+k1)
+                 stencil3x3(i1,j1,k1) = c(i+i1,j+j1,k+k1)
               enddo;enddo;enddo
-
-              if(oldvof) then
-                 call fit_plane(c(i,j,k),d,a1,a2,stencil3x3,dm,alpha,error)
-                 if (error) cycle
-                 if (a1 .lt. 0.d0) then
-                    vof = fl3d(dm(1),dm(2),dm(3),alpha,a1  ,-a1)
-                    mom1(i,j,k) = (rho2*vof + rho1*(-a1 - vof))*uavg
-                 endif
-                 if (a2 .gt. 0.d0) then
-                    vof = fl3d(dm(1),dm(2),dm(3),alpha,1.d0,a2)
-                    mom3(i,j,k) = (rho2*vof + rho1*(a2 - vof))*uavg
-                 endif
-                 vof = fl3d(dm(1),dm(2),dm(3),alpha,mm1,mm2)
-                 mom2(i,j,k) = (rho2*vof + rho1*(mm2 - vof))*uavg
-              else
-                 call fit_plane_new(c(i,j,k),d,a1,a2,stencil3x3,nr,alpha,error)
-                 if(error) cycle
-                 x0=0d0
-                 deltax=1d0
-                 if(a1.lt.0d0) then
-                    x0(d)=a1
-                    deltax(d)=-a1
-                    vof = fl3dnew(nr,alpha,x0,deltax)
-                    mom1(i,j,k) = (rho2*vof + rho1*(-a1 - vof))*uavg
-                 endif
-                 if(a2.gt.0d0) then
-                    x0(d)=1d0
-                    deltax(d)=a2
-                    vof = fl3dnew(nr,alpha,x0,deltax)
-                    mom3(i,j,k) = (rho2*vof + rho1*(a2 - vof))*uavg
-                 endif
-                 x0(d)=mm1
-                 deltax(d)=mm2
+              call fit_plane_new(c(i,j,k),d,a1,a2,stencil3x3,nr,alpha,error)
+              if(error) cycle
+              x0=0d0
+              deltax=1d0
+              if(a1.lt.0d0) then
+                 x0(d)=a1
+                 deltax(d)=-a1
                  vof = fl3dnew(nr,alpha,x0,deltax)
-                 mom2(i,j,k) = (rho2*vof + rho1*(mm2 - vof))*uavg
+                 mom1(i,j,k) = (rho2*vof + rho1*(-a1 - vof))*uavg
               endif
+              if(a2.gt.0d0) then
+                 x0(d)=1d0
+                 deltax(d)=a2
+                 vof = fl3dnew(nr,alpha,x0,deltax)
+                 mom3(i,j,k) = (rho2*vof + rho1*(a2 - vof))*uavg
+              endif
+              x0(d)=mm1
+              deltax(d)=mm2
+              vof = fl3dnew(nr,alpha,x0,deltax)
+              mom2(i,j,k) = (rho2*vof + rho1*(mm2 - vof))*uavg
            endif
         enddo
      enddo
@@ -295,65 +259,6 @@ subroutine swpzmom(us,c,f,d,mom1,mom2,mom3,mom)
   call SetMomentumBC(us,c,mom,d,umask,rho1,rho2) 
   !***
 end subroutine swpzmom
-
-subroutine fit_plane(vof,d,a1,a2,stencil3x3,dm,alpha,error)
-  use module_grid
-  !***
-  !     (1) normal vector: dmx,dmy,dmz, and |dmx|+|dmy|+|dmz| = 1.
-  !     (2) dmx,dmy,dmz>0.
-  !     (3) get alpha;               (4) back to original plane;
-  !     (5) lagrangian advection;    (6) get fluxes
-  !*(1)*
-  integer i0,j0,k0
-  integer inv(3)
-  integer, intent(in) :: d
-  real(8), intent(in) :: a1,a2, vof, stencil3x3(-1:1,-1:1,-1:1)
-  real(8), intent(out) :: alpha, dm(3)
-  real(8) :: al3d
-  real(8) :: mxyz(3)
-  logical, intent(out) :: error
-  intrinsic dmax1,dmin1
-
-  error=.TRUE.
-  call mycs(stencil3x3,mxyz)
-  !*(2)*  
-  inv(:) = 1
-  do i0=1,3
-    if (mxyz(i0) .lt. 0.0d0) then
-      mxyz(i0) = -mxyz(i0)
-      inv(i0) = -1
-    endif
-  enddo
-  !*(3)*  
-! TEMPORARY - Note: avoid calculating alpha when mxyz is zero, which occurs when cvof is 
-!                   a very small non-zero number in an isolated cell  
-  if ( mxyz(1) == 0.d0 .and. mxyz(2) == 0.d0 .and. mxyz(3) == 0.d0 ) return
-! END TEMPORARY  
-
-  alpha = al3d(mxyz(1),mxyz(2),mxyz(3),vof)
-  !*(4)*  
-  mxyz(:) = inv*mxyz
-  alpha = alpha + dmin1(0.d0,mxyz(1)) + dmin1(0.d0,mxyz(2)) + &
-        dmin1(0.d0,mxyz(3))
-  !*(5)*  
-  mxyz(d) = mxyz(d)/(1.0d0 - a1 + a2)
-  alpha = alpha + mxyz(d)*a1
-
-  if (d.eq.1) then
-    dm = mxyz
-    elseif (d.eq.2) then
-    dm(1) = mxyz(2)
-    dm(2) = mxyz(3)
-    dm(3) = mxyz(1)
-    elseif (d.eq.3) then
-    dm(1) = mxyz(3)
-    dm(2) = mxyz(1)
-    dm(3) = mxyz(2)
-  endif
-  
-  error=.FALSE.
-
-end subroutine fit_plane
 
 subroutine fit_plane_new(vof,d,a1,a2,stencil3x3,mxyz,alpha,error)
   use module_grid
@@ -379,7 +284,6 @@ subroutine fit_plane_new(vof,d,a1,a2,stencil3x3,mxyz,alpha,error)
   error=.FALSE.
 
 end subroutine fit_plane_new
-
 !
 !=================================================================================================
 ! split 1D advection of the interface along the x,y,z (d=1,2,3) directions
@@ -405,7 +309,7 @@ SUBROUTINE swpr(us,c,f,dir,vof1,cg,vof3)
     integer, dimension(imin:imax,jmin:jmax,kmin:kmax),  intent(inout) :: f
     REAL(8), TARGET :: dmx,dmy,dmz,dxyz
     REAL(8), POINTER :: dm1,dm2,dm3
-    REAL(8) :: a1,a2,alpha,AL3D,FL3D
+    REAL(8) :: a1,a2,alpha
     REAL(8) :: AL3DNEW, FL3DNEW, x0(3), deltax(3)
     real(8) :: mxyz(3),stencil3x3(-1:1,-1:1,-1:1)
     INTRINSIC DMAX1,DMIN1
@@ -441,50 +345,19 @@ SUBROUTINE swpr(us,c,f,dir,vof1,cg,vof3)
                  stencil3x3(i0,j0,k0) = c(i+i0,j+j0,k+k0)
               enddo;enddo;enddo
               call mycs(stencil3x3,mxyz)
-              if(oldvof) then
-                 dmx = mxyz(1); dmy = mxyz(2); dmz = mxyz(3)
-                 ! positive dmx,dmy,dmz
-                 invx = 1; invy = 1; invz = 1
-                 if (dmx < 0.d0) then
-                    dmx = -dmx; invx = -1
-                 endif
-                 if (dmy < 0.d0) then
-                    dmy = -dmy; invy = -1
-                 endif
-                 if (dmz < 0.0d0) then
-                    dmz = -dmz; invz = -1
-                 endif
-                 ! get alpha
-                 alpha = AL3D(dmx,dmy,dmz,c(i,j,k))
-                 ! back to the original plane
-                 dmx = invx*dmx
-                 dmy = invy*dmy
-                 dmz = invz*dmz
-                 alpha = alpha + DMIN1(0.d0,dmx) + DMIN1(0.d0,dmy) + DMIN1(0.d0,dmz)
-              else
-                 alpha = AL3DNEW(mxyz,c(i,j,k))
-              endif
-
+              alpha = AL3DNEW(mxyz,c(i,j,k))
               ! Eulerian advection
-              if(oldvof) then
-                 if (a1 < 0.d0) &
-                      vof1(i,j,k) = FL3D(dm1,dm2,dm3,alpha,0.d0,-a1)
-                 if (a2 > 0.d0) &
-                      vof3(i,j,k) = FL3D(dm1,dm2,dm3,alpha,1.d0-a2,a2)
-              else
-                 x0=0d0
-                 deltax=1d0
-                 if(a1<0d0) then
-                    deltax(dir)=-a1
-                    vof1(i,j,k) = FL3DNEW(mxyz,alpha,x0,deltax)
-                 endif
-                 if(a2>0d0) then
-                    x0(dir)=1d0-a2
-                    deltax(dir)=a2
-                    vof3(i,j,k) = FL3DNEW(mxyz,alpha,x0,deltax)
-                 endif
+              x0=0d0
+              deltax=1d0
+              if(a1<0d0) then
+                 deltax(dir)=-a1
+                 vof1(i,j,k) = FL3DNEW(mxyz,alpha,x0,deltax)
               endif
-              
+              if(a2>0d0) then
+                 x0(dir)=1d0-a2
+                 deltax(dir)=a2
+                 vof3(i,j,k) = FL3DNEW(mxyz,alpha,x0,deltax)
+              endif
            endif
         enddo
      enddo
@@ -527,142 +400,6 @@ subroutine init_i0j0k0 (d,i0,j0,k0)
 
 end subroutine init_i0j0k0
 !=================================================================================================
-!=================================================================================================
-! ****** 1 ******* 2 ******* 3 ******* 4 ******* 5 ******* 6 ******* 7 *
-! PROGRAM TO FIND alpha IN: m1 x1 + m2 x2 + m3 x3 = alpha,
-! GIVEN m1+m2+m3=1 (all > 0) AND THE VOLUMETRIC FRACTION cc
-! ****** 1 ******* 2 ******* 3 ******* 4 ******* 5 ******* 6 ******* 7 *
-function al3d(b1,b2,b3,cc)
-  !***
-  implicit none
-  real(8) m1,m2,m3,cc,b1,b2,b3,tmp,pr,ch,mm,m12
-  real(8) p,p12,q,teta,cs,al3d
-  real(8) untier,v1,v2,v3
-  parameter (untier=1.d0/3.d0)
-  intrinsic dmax1,dmin1,dsqrt,dacos,dcos
-  !***  
-  !     (1) order coefficients: m1<m2<m3; (2) get ranges: v1<v2<v3;
-  !     (3) limit ch (0.d0 < ch < 0.5d0); (4) calculate alpha
-  !*(1)* 
-  m1 = dmin1(b1,b2)
-  m3 = dmax1(b1,b2)
-  m2 = b3
-  if (m2 .lt. m1) then
-     tmp = m1
-     m1 = m2
-     m2 = tmp
-  else if (m2 .gt. m3) then
-     tmp = m3
-     m3 = m2
-     m2 = tmp
-  endif
-  !*(2)*
-  m12 = m1 + m2 
-  pr  = DMAX1(6.d0*m1*m2*m3,1.d-50)
-  V1  = m1*m1*m1/pr
-  V2  = V1 + 0.5d0*(m2-m1)/m3
-  if (m3 .LT. m12) then
-     mm = m3
-     V3 = (m3*m3*(3.d0*m12-m3) + m1*m1*(m1-3.d0*m3) +&
-          m2*m2*(m2-3.d0*m3))/pr
-  else
-     mm = m12
-     V3 = 0.5d0*mm/m3
-  endif
-  !*(3)*
-  ch = DMIN1(cc,1.d0-cc)
-  !*(4)*      
-  if (ch .LT. V1) then
-     !***         AL3D = cbrt(pr*ch)
-     AL3D = (pr*ch)**UNTIER
-  else if (ch .LT. V2) then
-     AL3D = 0.5d0*(m1 + DSQRT(m1*m1 + 8.d0*m2*m3*(ch-V1)))
-  else if (ch .LT. V3) then
-     p = 2.d0*m1*m2
-     q = 1.5d0*m1*m2*(m12 - 2.d0*m3*ch)
-     p12 = DSQRT(p)
-     teta = DACOS(q/(p*p12))/3.d0
-     cs = DCOS(teta)
-     AL3D = p12*(DSQRT(3.d0*(1.d0-cs*cs)) - cs) + m12
-  else if (m12 .LT. m3) then
-     AL3D = m3*ch + 0.5d0*mm
-  else 
-     p = m1*(m2+m3) + m2*m3 - 0.25d0
-     q = 1.5d0*m1*m2*m3*(0.5d0-ch)
-     p12 = DSQRT(p)
-     teta = DACOS(q/(p*p12))/3.0
-     cs = DCOS(teta)
-     AL3D = p12*(DSQRT(3.d0*(1.d0-cs*cs)) - cs) + 0.5d0
-  endif
-
-  if (cc .GT. 0.5d0)  AL3D = 1.d0 - AL3D
-  !***
-  return
-end function al3d
-! ****** 1 ******* 2 ******* 3 ******* 4 ******* 5 ******* 6 ******* 7 *
-! PROGRAM TO FIND THE "CUT VOLUME" V0 GIVEN r0, dr0 AND
-! m1 x1 + m2 x2 + m3 x3 = alpha
-! ****** 1 ******* 2 ******* 3 ******* 4 ******* 5 ******* 6 ******* 7 *
-function fl3d(m1,m2,m3,alpha,r0,dr0)
-  !***
-  implicit none
-  real(8) m1,m2,m3,alpha,r0,dr0,fl3D
-  real(8) al,al0,n1,n2,n3,b1,b2,b3,b12,bm,tmp,pr
-  INTRINSIC DMAX1,DMIN1,DABS
-  !***
-  !     (1) move origin to r0 along r ;  (2) reflect parallelepiped;
-  !     (3) limit alpha (0<= al0 <=0.5); (4) order coefficients: b1<b2<b3;
-  !     (5) calculate volume (NOTE: it is assumed:s0=t0=0; ds0=dt0=1.)
-  !*(1)*
-  al = alpha - m1*r0
-  !*(2)*
-  al = al + DMAX1(0.d0,-m1*dr0)+DMAX1(0.d0,-m2)+DMAX1(0.d0,-m3)
-  tmp = DABS(m1)*dr0 + DABS(m2) + DABS(m3)
-  n1 = DABS(m1)/tmp
-  n2 = DABS(m2)/tmp
-  n3 = DABS(m3)/tmp
-  al = DMAX1(0.d0,DMIN1(1.d0,al/tmp))
-  !*(3)*
-  al0 = DMIN1(al,1.d0-al)
-  !*(4)*
-  b1 = DMIN1(n1*dr0,n2)
-  b3 = DMAX1(n1*dr0,n2)
-  b2 = n3
-  if (b2 .LT. b1) then
-     tmp = b1
-     b1 = b2
-     b2 = tmp
-  else if (b2 .GT. b3) then
-     tmp = b3
-     b3 = b2
-     b2 = tmp
-  endif
-  b12 = b1 + b2
-  bm = DMIN1(b12,b3)
-  pr = DMAX1(6.d0*b1*b2*b3,1.0d-50)
-  !*5*     
-  if (al0 .LT. b1) then
-     tmp = al0*al0*al0/pr
-  else if (al0 .LT. b2) then
-     tmp = 0.5d0*al0*(al0-b1)/(b2*b3) +  b1*b1*b1/pr
-  else if (al0 .LT. bm) then
-     tmp = (al0*al0*(3.d0*b12-al0) + b1*b1*(b1-3.d0*al0) +&
-          b2*b2*(b2-3.d0*al0))/pr
-  else if (b12 .LT. b3) then
-     tmp = (al0 - 0.5d0*bm)/b3
-  else
-     tmp = (al0*al0*(3.d0-2.d0*al0) + b1*b1*(b1-3.d0*al0) +&
-          b2*b2*(b2-3.d0*al0) + b3*b3*(b3-3.d0*al0))/pr
-  endif
-
-  if (al .LE. 0.5d0) then
-     FL3D = tmp*dr0
-  else
-     FL3D = (1.d0-tmp)*dr0
-  endif
-  !***  
-  return
-end function fl3d
 
 subroutine ls2vof_in_cell(stencil3x3,c,nflag)
   implicit none
