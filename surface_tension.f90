@@ -36,7 +36,7 @@ module module_surface_tension
   use module_VOF
   implicit none
   real(8), parameter :: kappamax = 2.d0
-  integer, parameter :: NDEPTH=3
+  integer, parameter :: NDEPTH=3 ! 10
   integer, parameter :: BIGINT=100
   real(8), parameter :: D_HALF_BIGINT = DBLE(BIGINT/2)
   integer, parameter :: MAX_EXT_H = 0
@@ -1069,7 +1069,7 @@ contains
       integer :: l,m,n
       real(8) :: dmx,dmy,dmz, mxyz(3),px,py,pz
       real(8) :: invx,invy,invz
-      real(8) :: alpha, al3d
+      real(8) :: alpha, al3d, nr(3)
       real(8) :: stencil3x3(-1:1,-1:1,-1:1)
 
       ! find cut area centroid 
@@ -1086,19 +1086,20 @@ contains
             stencil3x3(l,m,n) = cvof(i+l,j+m,k+n)
          enddo;enddo;enddo
          call youngs(stencil3x3,mxyz)
-         dmx = mxyz(1)
-         dmy = mxyz(2)
-         dmz = mxyz(3)      
+         nr = mxyz
       else
-         dmx = n1(i,j,k)      
-         dmy = n2(i,j,k)      
-         dmz = n3(i,j,k)
+         nr(1) = n1(i,j,k)      
+         nr(2) = n2(i,j,k)      
+         nr(3) = n3(i,j,k)
       endif
-      !*(2)*  
-      invx = 1.d0
-      invy = 1.d0
-      invz = 1.d0
-      if (dmx .lt. 0.0d0) then
+
+      if(oldvof) then
+         dmx = nr(1); dmy = nr(2); dmz = nr(3)
+         !*(2)*  
+         invx = 1.d0
+         invy = 1.d0
+         invz = 1.d0
+         if (dmx .lt. 0.0d0) then
          dmx = -dmx
          invx = -1.d0
       endif
@@ -1128,6 +1129,9 @@ contains
       centroid(1) = centroid(1) - invx*0.5d0
       centroid(2) = centroid(2) - invy*0.5d0
       centroid(3) = centroid(3) - invz*0.5d0
+      else
+         call cent3D(nr,cvof(i,j,k),centroid)
+      endif
    end subroutine FindCutAreaCentroid
 ! 
 !   Computes the centroid as in gerris

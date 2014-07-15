@@ -310,11 +310,11 @@ END FUNCTION AREA3D
 !        negative normal coefficients, the midpoint symmetry and the ordering 
 !        of the coefficients    
 !-------------------------------------------------------------------------------
-FUNCTION CENT3D(nr,cc)
+subroutine CENT3D(nr,cc,centroid)
 
   IMPLICIT NONE
   REAL(8), INTENT(IN):: nr(3),cc
-  REAL(8), DIMENSION(3) :: CENT3D,ctd0
+  REAL(8), DIMENSION(3) :: centroid(3),ctd0
   REAL(8) :: cch,al,c01,c02,c03,np1,np2,np3
   REAL(8) :: m1,m2,m3,m12,numer,denom,p,pst,q,arc,csarc,top,bot
   REAL(8), PARAMETER :: athird=1.d0/3.d0 
@@ -420,16 +420,16 @@ FUNCTION CENT3D(nr,cc)
   endif
 
 ! get correct indexing
-  CENT3D(index(1)) = ctd0(1)                              
-  CENT3D(index(2)) = ctd0(2)
-  CENT3D(index(3)) = ctd0(3)
+  CENTROID(index(1)) = ctd0(1)                              
+  CENTROID(index(2)) = ctd0(2)
+  CENTROID(index(3)) = ctd0(3)
 
 ! take care of negative coefficients
-  if (nr(1) < 0.d0) CENT3D(1) = 1.d0 - CENT3D(1) 
-  if (nr(2) < 0.d0) CENT3D(2) = 1.d0 - CENT3D(2)
-  if (nr(3) < 0.d0) CENT3D(3) = 1.d0 - CENT3D(3)
+  if (nr(1) < 0.d0) CENTROID(1) = 1.d0 - CENTROID(1) 
+  if (nr(2) < 0.d0) CENTROID(2) = 1.d0 - CENTROID(2)
+  if (nr(3) < 0.d0) CENTROID(3) = 1.d0 - CENTROID(3)
 
-END FUNCTION CENT3D
+END subroutine CENT3D
 !=================================================================================================
 ! ****** 1 ******* 2 ******* 3 ******* 4 ******* 5 ******* 6 ******* 7 *
 ! PROGRAM TO FIND alpha IN: m1 x1 + m2 x2 + m3 x3 = alpha,
