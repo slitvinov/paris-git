@@ -185,6 +185,7 @@
 
    integer :: SeedParticlesFlag
    logical :: SeedWithFluidVel
+   logical :: AvoidSeedAtBlockBdry
    integer, parameter :: SeedParticlesNone      = 0
    integer, parameter :: SeedParticlesOneTime   = 1
    integer, parameter :: SeedParticlesRegular   = 2
@@ -258,7 +259,8 @@ contains
          outputlpp_format,nStepConverion,AspRatioTol, &
          WallEffectSettling,output_lpp_evolution,lppbdry_cond,& 
          TwoWayCouplingFlag,FilterLengthLPP2Lcut,UnsteadyPartForce,&  
-         SeedParticlesFlag, SeedWithFluidVel, num_part_seed, time_part_seed, & 
+         SeedParticlesFlag, SeedWithFluidVel, AvoidSeedAtBlockBdry, & 
+         num_part_seed, time_part_seed, & 
          xmin_part_seed, ymin_part_seed, zmin_part_seed, dmin_part_seed, & 
          xmax_part_seed, ymax_part_seed, zmax_part_seed, dmax_part_seed, &
          umin_part_seed, vmin_part_seed, wmin_part_seed, & 
@@ -294,6 +296,7 @@ contains
       UnsteadyPartForce = .false.
       SeedParticlesFlag = 0
       SeedWithFluidVel =.false. 
+      AvoidSeedAtBlockBdry =.false. 
       num_part_seed = 0; time_part_seed = 0.0;
       xmin_part_seed=0.0; ymin_part_seed=0.0; zmin_part_seed=0.0; dmin_part_seed=0.0 
       xmax_part_seed=0.0; ymax_part_seed=0.0; zmax_part_seed=0.0; dmax_part_seed=0.0
@@ -372,8 +375,16 @@ contains
          if ( DoConvertVOF2LPP ) call ConvertVOF2LPP(tswap)
          if ( DoConvertLPP2VOF ) call ConvertLPP2VOF(tswap)   
          call ReleaseTag2DropTable
-         if ( (DoConvertVOF2LPP .or. DoConvertLPP2VOF) .and. nPdomain > 1 ) & 
-            call VOFCommGhost    ! Communicate vof field after conversion
+         if (DoConvertVOF2LPP .or. DoConvertLPP2VOF) then 
+            if ( nPdomain > 1 ) & 
+               call VOFCommGhost    ! Communicate vof field after conversion
+            call linfunc(rho,rho1,rho2,DensMean)
+            call linfunc(mu,mu1,mu2,ViscMean)
+         end if ! DoConvertVOF2LPP,DoConvertLPP2VOF 
+      end if ! tswap
+
+      if ( MOD(tswap,termout) == 0 ) then 
+         if ( rank == 0 ) write(*,*) 'Total numbers of drops and particles are: ',sum(num_drop),sum(num_part)
       end if ! tswap
 
    end subroutine lppvofsweeps
@@ -1920,12 +1931,12 @@ contains
          ! Check if LPP locates at block boundary 
          dp = (6.d0*parts(ipart,rank)%element%vol/PI)**(1.d0/3.d0)
          rp = dp*0.5d0
-         if ( parts(ipart,rank)%element%xc - rp > x(is) .and. & 
-              parts(ipart,rank)%element%xc + rp < x(ie) .and. &
-              parts(ipart,rank)%element%yc - rp > y(js) .and. &
-              parts(ipart,rank)%element%yc + rp < y(je) .and. &
-              parts(ipart,rank)%element%zc - rp > z(ks) .and. &
-              parts(ipart,rank)%element%zc + rp < z(ke) )     & 
+         if ( parts(ipart,rank)%element%xc - rp > xh(is)-dx(is) .and. & 
+              parts(ipart,rank)%element%xc + rp < xh(ie)        .and. &
+              parts(ipart,rank)%element%yc - rp > yh(js)-dy(js) .and. &
+              parts(ipart,rank)%element%yc + rp < yh(je)        .and. &
+              parts(ipart,rank)%element%zc - rp > zh(ks)-dz(ks) .and. &
+              parts(ipart,rank)%element%zc + rp < zh(ke)       )     & 
               PartAtBlockEdge = .false.
 
          volcell = dx(ic)*dy(jc)*dz(kc)
@@ -2266,7 +2277,7 @@ contains
 
       rootname=trim(out_path)//'/LPP-PARA'//TRIM(int2text(rank,padding))//'-'
       OPEN(UNIT=11,FILE=TRIM(rootname)//TRIM(int2text(ipart,padding))//'.dat',access='append')
-      write(11,'(13(E15.8,1X))') time,xp,yp,zp,up,vp,wp,uf,vf,wf,Re,We
+      write(11,'(13(E15.8,1X))') time,xp,yp,zp,up,vp,wp,uf,vf,wf,Re,We,dp
       CLOSE(11)
    
    end subroutine output_LPP_parameter
@@ -3282,7 +3293,7 @@ contains
       end if ! SeedParticlesFlag
 
       if ( SeedParticlesNow ) then
-         write(*,*) num_part_seed,'particles seed at t=',time
+         if ( rank == 0 ) write(*,*) num_part_seed,'particles seed at t=',time
          call random_seed()
          do ipart_seed=1,num_part_seed
             call random_number(rand) 
@@ -3313,6 +3324,14 @@ contains
                  yp > yh(js)-dy(js) .and. yp <= yh(je) .and. & 
                  zp > zh(ks)-dz(ks) .and. zp <= zh(ke) ) then   
                num_part(rank) = num_part(rank) + 1
+               if ( AvoidSeedAtBlockBdry ) then
+                  if ( xp - 0.5d0*dp < xh(is)-dx(is) ) xp = xp + 0.5d0*dp
+                  if ( xp + 0.5d0*dp > xh(ie)        ) xp = xp - 0.5d0*dp
+                  if ( yp - 0.5d0*dp < yh(js)-dy(js) ) yp = yp + 0.5d0*dp
+                  if ( yp + 0.5d0*dp > yh(je)        ) yp = yp - 0.5d0*dp
+                  if ( zp - 0.5d0*dp < zh(ks)-dz(ks) ) zp = zp + 0.5d0*dp
+                  if ( zp + 0.5d0*dp > zh(ke)        ) zp = zp - 0.5d0*dp
+               end if !AvoidSeedAtBlockBdry
                parts(num_part(rank),rank)%element%xc = xp
                parts(num_part(rank),rank)%element%yc = yp
                parts(num_part(rank),rank)%element%zc = zp

@@ -148,8 +148,9 @@ contains
          field = 1.d0/(cvof*(inva2-inva1)+inva1)
        end if ! MeanFlag
     else if (nfilter==1) then
-       do k=ks-1,ke+1; do j=js-1,je+1; do i=is-1,ie+1
-          cfiltered = b1*cvof(i,j,k) + & 
+       do k=kmin,kmax; do j=jmin,jmax; do i=imin,imax
+         if ( k>kmin.and.k<kmax.and.j>jmin.and.j<jmax.and.i>imin.and.i<imax) then 
+            cfiltered = b1*cvof(i,j,k) + & 
                b2*( cvof(i-1,j,k) + cvof(i,j-1,k) + cvof(i,j,k-1) + &
                     cvof(i+1,j,k) + cvof(i,j+1,k) + cvof(i,j,k+1) ) + &
                b3*( cvof(i+1,j+1,k) + cvof(i+1,j-1,k) + cvof(i-1,j+1,k) + cvof(i-1,j-1,k) + &
@@ -157,6 +158,10 @@ contains
                     cvof(i,j+1,k+1) + cvof(i,j+1,k-1) + cvof(i,j-1,k+1) + cvof(i,j-1,k-1) ) + &
                b4*( cvof(i+1,j+1,k+1) + cvof(i+1,j+1,k-1) + cvof(i+1,j-1,k+1) + cvof(i+1,j-1,k-1) +  &
                     cvof(i-1,j+1,k+1) + cvof(i-1,j+1,k-1) + cvof(i-1,j-1,k+1) + cvof(i-1,j-1,k-1) )
+         else 
+            cfiltered = cvof(i,j,k)
+         end if ! i,j,k
+
          if ( MeanFlag == ArithMean ) then  
             field(i,j,k) = cfiltered*(a2-a1)+a1
          else if ( MeanFlag == HarmMean ) then 
