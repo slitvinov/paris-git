@@ -21,10 +21,11 @@
 ! 02111-1307, USA.  
 !=================================================================================================
 !===============================================================================
-! DESCRIPTION OF FUNCTION AL3DNEW:
-! compute in the unit cube the coefficient alpha that satisfies
+! DESCRIPTION OF FUNCTION AL3D:
+! compute in the unit cube the plane constant alpha satisfying
 ! [nr]*[x] = nr1*x1 + nr2*x2 + nr3*x3 = alpha
-! INPUT: normal coefficients (nr1,nr2,nr3) and volume fraction cc 
+! where the normal is pointing outward from the reference phase
+! INPUT: normal coefficients in nr(3) and volume fraction cc 
 ! NOTE : the normal coefficients MUST satisfy the relation |nr1|+|nr2|+|nr3|=1
 !-------------------------------------------------------------------------------
 FUNCTION AL3DNEW(nr,cc)
@@ -51,7 +52,7 @@ FUNCTION AL3DNEW(nr,cc)
    else
      m2 = np3
   endif
-  cch = DMIN1(cc,1.d0-cc)                              ! symmetry: 0 < cch < 1/2
+  cch = DMIN1(cc,1.d0-cc)                              ! limit to: 0 < cch < 1/2
   denom = DMAX1(6.d0*m1*m2*m3,1.d-50)                           ! get cch ranges
   c01 = m1*m1*m1/denom
   c02  = c01 + 0.5d0*(m2-m1)/m3
@@ -98,7 +99,7 @@ END FUNCTION AL3DNEW
 ! compute in the unit cube the volume cut by the plane
 ! [nr]*[x] = nr1*x1 + nr2*x2 + nr3*x3 = alpha
 ! where the normal is pointing outward from the reference phase
-! INPUT: normal coefficients (nr1,nr2,nr3) and plane constant alpha 
+! INPUT: normal coefficients in nr(3) and plane constant alpha 
 ! NOTE : the normal coefficients MUST satisfy the relation |nr1|+|nr2|+|nr3|=1
 !-------------------------------------------------------------------------------
 FUNCTION CC3DNEW(nr,alpha)
@@ -125,7 +126,7 @@ FUNCTION CC3DNEW(nr,alpha)
   endif
   al = alpha + DMAX1(0.d0,-nr(1))+DMAX1(0.d0,-nr(2))+DMAX1(0.d0,-nr(3))
   al = DMAX1(0.d0,DMIN1(1.d0,al))                                  ! safe limits
-  alh = DMIN1(al,1.d0-al)                              ! symmetry: 0 < alh < 1/2
+  alh = DMIN1(al,1.d0-al)                              ! limit to: 0 < alh < 1/2
   m12 = m1 + m2
   mm = DMIN1(m12,m3)
   denom = DMAX1(6.d0*m1*m2*m3,1.0d-50)
@@ -154,8 +155,8 @@ END FUNCTION CC3DNEW
 ! compute in the right hexahedron starting at (x01,x02,x03) and of sides 
 ! (dx1,dx2,dx3) the volume cut by the plane
 ! [nr]*[x] = nr1*x1 + nr2*x2 + nr3*x3 = alpha
-! INPUT: normal coefficients (nr1,nr2,nr3), plane constant alpha, starting
-!        point (x01,x02,x03), sides (dx1,dx2,dx3)
+! INPUT: normal coefficients in nr(3), plane constant alpha, starting
+!        point x0(3), sides dx(3)
 ! NOTE : the normal coefficients MUST satisfy the relation |nr1|+|nr2|+|nr3|=1
 !-------------------------------------------------------------------------------
 FUNCTION FL3DNEW(nr,alpha,x0,dx)
@@ -176,7 +177,7 @@ FUNCTION FL3DNEW(nr,alpha,x0,dx)
   np3 = DABS(nr(3))
   almax = np1*dx(1) + np2*dx(2) + np3*dx(3)                       
   al = DMAX1(0.d0,DMIN1(1.d0,al/almax))           !get new al within safe limits
-  alh = DMIN1(al,1.d0-al)                              ! symmetry: 0 < alh < 1/2
+  alh = DMIN1(al,1.d0-al)                              ! limit to: 0 < alh < 1/2
 
 
 ! normalized equation: m1*y1 + m2*y2 + m3*y3 = alh, with m1 <= m2 <= m3
@@ -227,10 +228,10 @@ END FUNCTION FL3DNEW
 ! DESCRIPTION OF FUNCTION AREA3D:
 ! compute in the unit cube the area cut by the plane
 ! [nr]*[x] = nr1*x1 + nr2*x2 + nr3*x3 = alpha
-! INPUT: normal coefficients (nr1,nr2,nr3) and volume fraction cc 
+! INPUT: normal coefficients in nr(3) and volume fraction cc 
 ! NOTE : the normal coefficients MUST satisfy the relation |nr1|+|nr2|+|nr3|=1;
 !        the cut area A is invariant with respects to reflections, ordering  
-!        of the coefficients and midpoint (i.e. A(alpha) = A(1-alpha))
+!        of the coefficients and midpoint (i.e., A(cc) = A(1-cc))
 !-------------------------------------------------------------------------------
 FUNCTION AREA3D(nr,cc)
 
@@ -256,26 +257,26 @@ FUNCTION AREA3D(nr,cc)
    else
      m2 = np3
   endif
-  cch = DMIN1(cc,1.d0-cc)                              ! symmetry: 0 < cch < 1/2
-  denom = DMAX1(6.d0*m1*m2*m3,1.d-50)                           ! get cch ranges
-  c01 = m1*m1*m1/denom
+  cch = DMIN1(cc,1.d0-cc)                              ! limit to: 0 < cch < 1/2
+  denom = DMAX1(2.d0*m1*m2*m3,1.d-50)                           ! get cch ranges
+  c01 = m1*m1*m1/(3.d0*denom)
   c02  = c01 + 0.5d0*(m2-m1)/m3
   m12 = m1 + m2
   if (m12 <= m3) then
      c03 = 0.5d0*m12/m3
   else
      numer = m3*m3*(3.d0*m12-m3) + m1*m1*(m1-3.d0*m3) + m2*m2*(m2-3.d0*m3)
-     c03 = numer/denom
+     c03 = numer/(3.d0*denom)
   endif
-  c00 = 3.d0*DSQRT(m1*m1 + m2*m2 + m3*m3)/denom
+  c00 = DSQRT(m1*m1 + m2*m2 + m3*m3)
 
 ! 1: C<=C1; 2: C1<=C<=C2; 3: C2<=C<=C3; 4: C3<=C<=1/2 (a: m12<=m3; b: m3<m12)) 
   if (cch <= c01) then
-     al = (denom*cch)**athird                                         
-     AREA3D = c00*al*al                                               ! case (1)
+     al = (3.d0*denom*cch)**athird                                         
+     AREA3D = c00*al*al/denom                                         ! case (1)
   else if (cch <= c02) then 
     al = 0.5d0*(m1 + DSQRT(m1*m1 + 8.d0*m2*m3*(cch - c01)))           
-    AREA3D = c00*m1*(2.d0*al-m1)                                      ! case (2)
+    AREA3D = c00*(2.d0*al-m1)/(2.d0*m2*m3)                            ! case (2)
   else if (cch <= c03) then
      p = 2.d0*m1*m2                                                   
      q = 1.5d0*m1*m2*(m12 - 2.d0*m3*cch)
@@ -283,10 +284,10 @@ FUNCTION AREA3D(nr,cc)
      arc = athird*DACOS(q/(p*pst))
      csarc = DCOS(arc)
      al = pst*(DSQRT(3.d0*(1.d0-csarc*csarc)) - csarc) + m12
-     AREA3D = c00*(-al*al + m1*(2.d0*al-m1) + m2*(2.d0*al-m2))        ! case (3)
+     AREA3D = c00*(-al*al + m1*(2.d0*al-m1) + m2*(2.d0*al-m2))/denom  ! case (3)
   else if (m12 <= m3) then                                  
      al = m3*cch + 0.5d0*m12                                         
-     AREA3D = c00*2.d0*m1*m2                                         ! case (4a) 
+     AREA3D = c00/m3                                                 ! case (4a)
   else                                  
      p = m12*m3 + m1*m2 - 0.25d0                                     
      q = 1.5d0*m1*m2*m3*(0.5d0-cch)
@@ -294,64 +295,65 @@ FUNCTION AREA3D(nr,cc)
      arc = athird*DACOS(q/(p*pst))
      csarc = DCOS(arc)
      al = pst*(DSQRT(3.d0*(1.d0-csarc*csarc)) - csarc) + 0.5d0 
-     AREA3D = c00*(2.d0*al*(1.d0-al) - (m1*m1 + m2*m2 + m3*m3))      ! case (4b)
+     AREA3D = c00*(2.d0*al*(1.d0-al) - c00*c00)/denom                ! case (4b)
   endif
 
 END FUNCTION AREA3D
 
 !===============================================================================
-! DESCRIPTION OF FUNCTION CENT3D:
+! DESCRIPTION OF SUBROUTINE CENT3D:
 ! compute in the unit cube the coordinates of the centroid of the area 
 ! cut by the plane
 ! [nr]*[x] = nr1*x1 + nr2*x2 + nr3*x3 = alpha
-! INPUT: normal coefficients nr1, nr2, nr3 and volume fraction cc 
+! INPUT: normal coefficients in nr(3) and volume fraction cc 
+!OUTPUT: centroid coordinates in xc0(3)
 ! NOTE : the normal coefficients MUST satisfy the relation |nr1|+|nr2|+|nr3|=1;
-!        the centroid coordinates change with the reflections required for 
-!        negative normal coefficients, the midpoint symmetry and the ordering 
-!        of the coefficients    
+!        the centroid coordinates change with respect to reflections, ordering 
+!        of the coefficients and midpoint (i.e., xc0(cc) = 1 - xc0(1-cc))
 !-------------------------------------------------------------------------------
-subroutine CENT3D(nr,cc,centroid)
+SUBROUTINE CENT3D(nr,cc,xc0)
 
   IMPLICIT NONE
-  REAL(8), INTENT(IN):: nr(3),cc
-  REAL(8), DIMENSION(3) :: centroid(3),ctd0
+  REAL(8), INTENT(IN) :: nr(3),cc
+  REAL(8), INTENT(out) :: xc0(3)
+  REAL(8) :: ctd0(3)
   REAL(8) :: cch,al,c01,c02,c03,np1,np2,np3
   REAL(8) :: m1,m2,m3,m12,numer,denom,p,pst,q,arc,csarc,top,bot
+  INTEGER :: ind(3)
   REAL(8), PARAMETER :: athird=1.d0/3.d0 
-  INTEGER, DIMENSION(3) :: index
   INTRINSIC DMAX1,DMIN1,DSQRT,DACOS,DCOS
 
   np1 = DABS(nr(1))                                 ! need positive coefficients
   np2 = DABS(nr(2))
   np3 = DABS(nr(3))
-! order positive coefficients and get index ordering
+! coefficients in ascending order
   if (np1 <= np2) then                             
     m1 = np1
     m3 = np2
-    index(1) = 1                                            
-    index(3) = 2
+    ind(1) = 1                                            
+    ind(3) = 2
   else
     m1 = np2
     m3 = np1
-    index(1) = 2
-    index(3) = 1
+    ind(1) = 2
+    ind(3) = 1
   endif
   
   if (np3 < m1) then
     m2 = m1
     m1 = np3
-    index(2) = index(1)
-    index(1) = 3
+    ind(2) = ind(1)
+    ind(1) = 3
   else if (np3 >= m3) then
     m2 = m3
     m3 = np3
-    index(2) = index(3)
-    index(3) = 3
+    ind(2) = ind(3)
+    ind(3) = 3
   else
     m2 = np3
-    index(2) = 3
+    ind(2) = 3
   endif
-  cch = DMIN1(cc,1.d0-cc)                              ! symmetry: 0 < cch < 1/2
+  cch = DMIN1(cc,1.d0-cc)                              ! limit to: 0 < cch < 1/2
   denom = DMAX1(6.d0*m1*m2*m3,1.d-50)                           ! get cch ranges
   c01 = m1*m1*m1/denom
   c02  = c01 + 0.5d0*(m2-m1)/m3
@@ -412,7 +414,7 @@ subroutine CENT3D(nr,cc,centroid)
     ctd0(3) = (al - m1*ctd0(1) - m2*ctd0(2))/m3                      ! case (4b)
   endif
 
-! back from symmetry
+! back to actual cc value
   if (cc > 0.5d0) then
     ctd0(1) = 1.d0 - ctd0(1)
     ctd0(2) = 1.d0 - ctd0(2)
@@ -420,16 +422,16 @@ subroutine CENT3D(nr,cc,centroid)
   endif
 
 ! get correct indexing
-  CENTROID(index(1)) = ctd0(1)                              
-  CENTROID(index(2)) = ctd0(2)
-  CENTROID(index(3)) = ctd0(3)
+  xc0(ind(1)) = ctd0(1)                              
+  xc0(ind(2)) = ctd0(2)
+  xc0(ind(3)) = ctd0(3)
 
 ! take care of negative coefficients
-  if (nr(1) < 0.d0) CENTROID(1) = 1.d0 - CENTROID(1) 
-  if (nr(2) < 0.d0) CENTROID(2) = 1.d0 - CENTROID(2)
-  if (nr(3) < 0.d0) CENTROID(3) = 1.d0 - CENTROID(3)
+  if (nr(1) < 0.d0) xc0(1) = 1.d0 - xc0(1) 
+  if (nr(2) < 0.d0) xc0(2) = 1.d0 - xc0(2)
+  if (nr(3) < 0.d0) xc0(3) = 1.d0 - xc0(3)
 
-END subroutine CENT3D
+END SUBROUTINE CENT3D
 !=================================================================================================
 ! ****** 1 ******* 2 ******* 3 ******* 4 ******* 5 ******* 6 ******* 7 *
 ! PROGRAM TO FIND alpha IN: m1 x1 + m2 x2 + m3 x3 = alpha,

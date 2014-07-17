@@ -131,7 +131,7 @@ contains
     endif
   end subroutine catch_divergence
 end subroutine NewSolver
-!--------------------------------------ONE RELAXATION ITERATION (SMMOTHER)----------------------------------
+!--------------------------------------ONE RELAXATION ITERATION (SMOOTHER)----------------------------------
 subroutine RedBlackRelax(A,p,beta)
   use module_grid
   use module_BC
@@ -151,7 +151,7 @@ subroutine RedBlackRelax(A,p,beta)
         isw=jsw
         do j=js,je
            do i=isw+is-1,ie,2
-              p(i,j,k)=(1d0-beta)*p(i,j,k) + (beta/A(i,j,k,7))*(              &
+              p(i,j,k)=(1d0-beta)*p(i,j,k) + (beta/A(i,j,k,7))*(             &
                    A(i,j,k,1) * p(i-1,j,k) + A(i,j,k,2) * p(i+1,j,k) +       &
                    A(i,j,k,3) * p(i,j-1,k) + A(i,j,k,4) * p(i,j+1,k) +       &
                    A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8))
