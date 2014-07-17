@@ -161,8 +161,10 @@ subroutine RedBlackRelax(A,p,beta)
         jsw=3-jsw
      enddo
      ksw=3-ksw
-    call ghost_x(p,1,req( 1: 4)); call ghost_y(p,1,req( 5: 8)); call ghost_z(p,1,req( 9:12))
-    call MPI_WAITALL(12,req,sta,ierr)
+     if(ipass==1) then
+        call ghost_x(p,1,req( 1: 4)); call ghost_y(p,1,req( 5: 8)); call ghost_z(p,1,req( 9:12))
+        call MPI_WAITALL(12,req,sta,ierr)
+     endif
   enddo
 end subroutine RedBlackRelax
 !--------------------------------------ONE RELAXATION ITERATION (SMOOTHER)----------------------------------
