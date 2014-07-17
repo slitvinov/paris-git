@@ -36,7 +36,7 @@ module module_surface_tension
   use module_VOF
   implicit none
   real(8), parameter :: kappamax = 2.d0
-  integer, parameter :: NDEPTH=3 ! 10
+  integer, parameter :: NDEPTH=3
   integer, parameter :: BIGINT=100
   real(8), parameter :: D_HALF_BIGINT = DBLE(BIGINT/2)
   integer, parameter :: MAX_EXT_H = 0
