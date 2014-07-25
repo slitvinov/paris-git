@@ -922,7 +922,6 @@ or none at all")
 
            rhoavg = cvof(i,j,k)*rho2 + (1.d0-cvof(i,j,k))*rho1
            mom(i,j,k) = 0.5d0*(us(i,j,k)+us(i-i0,j-j0,k-k0))*rhoavg
-           mom_flag(i,j,k) = 0
 
         enddo
      enddo
@@ -1006,15 +1005,12 @@ subroutine get_velocity_from_momentum (mom,d,us,der)
         tmpreal   = 0.5d0*(uavg + mom(i-i0,j-j0,k-k0)/rhoavg2)
 
         if ((cflag.gt.0.d0).and.(cflag.lt.1.d0)) then
-          mom_flag(i,j,k) = 0
-          der(i-i0,j-j0,k-k0) = der(i-i0,j-j0,k-k0) + &
-               (tmpreal - us(i-i0,j-j0,k-k0))/dt
+          der(i-i0,j-j0,k-k0) = (tmpreal - us(i-i0,j-j0,k-k0))/dt
         endif
       enddo
     enddo
   enddo
 
-  call do_all_ighost(mom_flag)
   call do_all_ghost(der)
 
 end subroutine get_velocity_from_momentum
@@ -1050,7 +1046,6 @@ end subroutine get_velocity_from_momentum
     integer i
     integer, intent(in) :: tswap
 
-    mom_flag = 1
     call get_momentum(cvof,u,1,momentum(:,:,:,1))
     call get_momentum(cvof,v,2,momentum(:,:,:,2))
     call get_momentum(cvof,w,3,momentum(:,:,:,3))

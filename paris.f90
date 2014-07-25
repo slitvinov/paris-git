@@ -193,6 +193,7 @@ Program paris
            if ( DoLPP ) call StoreOldPartSol()
         endif
  !------------------------------------ADVECTION & DIFFUSION----------------------------------------
+        du = 0d0; dv = 0d0; dw = 0d0
         do ii=1, itime_scheme
            if(TwoPhase.and.(.not.GetPropertiesFromFront)) then
              call linfunc(rho,rho1,rho2,DensMean)
@@ -200,7 +201,28 @@ Program paris
            endif
            call my_timer(2)
 
-           du = 0d0; dv = 0d0; dw = 0d0
+           if( DoLPP ) call StoreBeforeConvectionTerms()
+           if(.not.ZeroReynolds) call momentumConvection()
+           if( DoLPP ) call StoreAfterConvectionTerms()
+           call my_timer(3)
+           if(DoVOF) then
+              if (DoMOF) then
+                 call vofandmomsweeps(itimestep)
+              else
+                 call vofsweeps(itimestep)
+              endif
+              if (FreeSurface) call get_normals()
+              call my_timer(4)
+              call get_all_heights()
+              call my_timer(5)
+              call linfunc(rho,rho1,rho2,DensMean)
+              call surfaceForce(du,dv,dw,rho)
+              call my_timer(8)
+           endif
+           if (DoLPP) then
+                call lppsweeps(itimestep,time,ii)  
+                call my_timer(12)
+           end if ! DoLPP
 !------------------------------------FRONT TRACKING  ---------------------------------------------
            ! Receive front from master of front
            if(DoFront) call GetFront('recv')
@@ -222,29 +244,6 @@ Program paris
               call extrapolate_velocities()
            endif !Extrapolation
 !-------------------------------------------------------------------------------------------------
-           if(DoVOF) then
-              if (DoMOF) then
-                 call vofandmomsweeps(itimestep)
-              else
-                 call vofsweeps(itimestep)
-              endif
-              if (FreeSurface) call get_normals()
-              call my_timer(4)
-              call get_all_heights()
-              call my_timer(5)
-              call linfunc(rho,rho1,rho2,DensMean)
-              call surfaceForce(du,dv,dw,rho)
-              call my_timer(8)
-           endif
-           if (DoLPP) then
-                call lppsweeps(itimestep,time,ii)  
-                call my_timer(12)
-           end if ! DoLPP
-
-           if( DoLPP ) call StoreBeforeConvectionTerms()
-           if(.not.ZeroReynolds) call momentumConvection(u,v,w,du,dv,dw,mom_flag,AdvectionScheme)
-           if( DoLPP ) call StoreAfterConvectionTerms()
-           call my_timer(9)
 
            ! reset the surface tension force on the fixed grid (when surface tension from front)
            fx = 0d0;    dIdx=0d0
@@ -664,20 +663,19 @@ subroutine calcStats
 
 end subroutine calcStats
 !=================================================================================================
-subroutine momentumConvection(u,v,w,du,dv,dw,flag,scheme)
+subroutine momentumConvection()
+  use module_flow
   use module_grid
   use module_tmpvar
-  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: u, v, w
-  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: du, dv, dw
-  integer, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: flag
-  character(20) :: scheme
 
-  if (scheme=='QUICK') then
-    call momentumConvectionQUICK(u,v,w,du,dv,dw,flag)
-  elseif (scheme=='ENO') then
-    call momentumConvectionENO(u,v,w,du,dv,dw,flag)
-  elseif (scheme=='Verstappen') then
-    call momentumConvectionVerstappen(u,v,w,du,dv,dw,flag)
+  if (AdvectionScheme=='QUICK') then
+    call momentumConvectionQUICK(u,v,w,du,dv,dw)
+  elseif (AdvectionScheme=='ENO') then
+    call momentumConvectionENO(u,v,w,du,dv,dw)
+  elseif (AdvectionScheme=='Verstappen') then
+    call momentumConvectionVerstappen(u,v,w,du,dv,dw)
+  elseif (AdvectionScheme=='BCG') then
+    call momentumConvectionBCG()
   else
      call pariserror("*** unknown convection scheme")
   endif
@@ -799,13 +797,12 @@ end subroutine momentumConvectionENO
 ! calculates the convection terms in the momentum equations using a QUICK scheme
 ! and returns them in du, dv, dw
 !-------------------------------------------------------------------------------------------------
-subroutine momentumConvectionQUICK(u,v,w,du,dv,dw,flag)
+subroutine momentumConvectionQUICK(u,v,w,du,dv,dw)
   use module_grid
   use module_tmpvar
   implicit none
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: u, v, w
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: du, dv, dw
-  integer, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: flag
   real(8), external :: minabs
   integer :: i,j,k
 !  real(8), external :: inter
@@ -833,11 +830,11 @@ subroutine momentumConvectionQUICK(u,v,w,du,dv,dw,flag)
     endif
   enddo; enddo; enddo
   do k=ks,ke;  do j=js,je; do i=is,ieu
-      du(i,j,k)=du(i,j,k) &
-      - flag(i,j,k)*( work(i+1,j  ,k  ,1)**2 - work(i  ,j  ,k  ,1)**2 )/dxh(i) &
-      -0.5*flag(i,j,k)*((v(i,j  ,k  )+v(i+1,j  ,k  ))*work(i  ,j  ,k  ,2)-        &
+      du(i,j,k)= &
+      - ( work(i+1,j  ,k  ,1)**2 - work(i  ,j  ,k  ,1)**2 )/dxh(i) &
+      -0.5*((v(i,j  ,k  )+v(i+1,j  ,k  ))*work(i  ,j  ,k  ,2)-        &
       (v(i,j-1,k  )+v(i+1,j-1,k  ))*work(i  ,j-1,k  ,2))/dy(j)  &
-      -0.5*flag(i,j,k)*((w(i,j  ,k  )+w(i+1,j  ,k  ))*work(i  ,j  ,k  ,3)-        &
+      -0.5*((w(i,j  ,k  )+w(i+1,j  ,k  ))*work(i  ,j  ,k  ,3)-        &
       (w(i,j  ,k-1)+w(i+1,j  ,k-1))*work(i  ,j  ,k-1,3))/dz(k)
   enddo; enddo; enddo
   !-----------------------------------QUICK interpolation v-velocity--------------------------------
@@ -863,11 +860,11 @@ subroutine momentumConvectionQUICK(u,v,w,du,dv,dw,flag)
     endif
   enddo; enddo; enddo
   do k=ks,ke;  do j=js,jev; do i=is,ie
-     dv(i,j,k)=dv(i,j,k) &
-      -0.5*flag(i,j,k)*((u(i  ,j,k  )+u(i  ,j+1,k  ))*work(i  ,j  ,k  ,1)-        &
+     dv(i,j,k)= &
+      -0.5*((u(i  ,j,k  )+u(i  ,j+1,k  ))*work(i  ,j  ,k  ,1)-        &
       (u(i-1,j,k  )+u(i-1,j+1,k  ))*work(i-1,j  ,k  ,1))/dx(i)  &
-      -   flag(i,j,k)*( work(i  ,j+1,k  ,2)**2 - work(i  ,j  ,k  ,2)**2 )/dyh(j) &
-      -0.5*flag(i,j,k)*((w(i  ,j,k  )+w(i  ,j+1,k  ))*work(i  ,j  ,k  ,3)-        &
+      -   ( work(i  ,j+1,k  ,2)**2 - work(i  ,j  ,k  ,2)**2 )/dyh(j) &
+      -0.5*((w(i  ,j,k  )+w(i  ,j+1,k  ))*work(i  ,j  ,k  ,3)-        &
       (w(i  ,j,k-1)+w(i  ,j+1,k-1))*work(i  ,j  ,k-1,3))/dz(k)
   enddo; enddo; enddo
   !-----------------------------------QUICK interpolation w-velocity--------------------------------
@@ -894,12 +891,12 @@ subroutine momentumConvectionQUICK(u,v,w,du,dv,dw,flag)
   enddo; enddo; enddo
 
   do k=ks,kew;  do j=js,je; do i=is,ie
-      dw(i,j,k)=dw(i,j,k) &
-      -0.5*flag(i,j,k)*((u(i  ,j  ,k)+u(i  ,j  ,k+1))*work(i  ,j  ,k  ,1)-        &
+      dw(i,j,k)= &
+      -0.5*((u(i  ,j  ,k)+u(i  ,j  ,k+1))*work(i  ,j  ,k  ,1)-        &
       (u(i-1,j  ,k)+u(i-1,j  ,k+1))*work(i-1,j  ,k  ,1))/dx(i)  &
-      -0.5*flag(i,j,k)*((v(i  ,j  ,k)+v(i  ,j  ,k+1))*work(i  ,j  ,k  ,2)-        &
+      -0.5*((v(i  ,j  ,k)+v(i  ,j  ,k+1))*work(i  ,j  ,k  ,2)-        &
       (v(i  ,j-1,k)+v(i  ,j-1,k+1))*work(i  ,j-1,k  ,2))/dy(j)  &
-      -flag(i,j,k)*( work(i  ,j  ,k+1,3)**2 - work(i  ,j  ,k  ,3)**2 )/dzh(k)
+      -( work(i  ,j  ,k+1,3)**2 - work(i  ,j  ,k  ,3)**2 )/dzh(k)
   enddo; enddo; enddo
 contains
 !-------------------------------------------------------------------------------------------------
@@ -933,13 +930,12 @@ end subroutine momentumConvectionQUICK
 ! calculates the convection terms in the momentum equations using the Verstappen
 ! symmetric scheme
 !-------------------------------------------------------------------------------------------------
-subroutine momentumConvectionVerstappen (u,v,w,du,dv,dw,flag)
+subroutine momentumConvectionVerstappen (u,v,w,du,dv,dw)
   use module_grid
   use module_tmpvar
   implicit none
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: u, v, w
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: du, dv, dw
-  integer, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: flag
   real(8), external :: minabs
   integer :: i,j,k
 
@@ -955,7 +951,7 @@ subroutine momentumConvectionVerstappen (u,v,w,du,dv,dw,flag)
   enddo; enddo; enddo
 
   do k=ks,ke;  do j=js,je; do i=is,ieu
-      du(i,j,k)=du(i,j,k) - flag(i,j,k) * work(i,j,k,1)/dxh(i)
+      du(i,j,k)= - work(i,j,k,1)/dxh(i)
   enddo; enddo; enddo
 
   do k=ks,ke;  do j=js,jev; do i=is,ie
@@ -969,7 +965,7 @@ subroutine momentumConvectionVerstappen (u,v,w,du,dv,dw,flag)
   enddo; enddo; enddo
 
   do k=ks,ke;  do j=js,jev; do i=is,ie
-     dv(i,j,k)=dv(i,j,k) - flag(i,j,k) * work(i,j,k,1)/dxh(i)
+     dv(i,j,k)= - work(i,j,k,1)/dxh(i)
   enddo; enddo; enddo
 
   do k=ks,kew;  do j=js,je; do i=is,ie
@@ -983,14 +979,240 @@ subroutine momentumConvectionVerstappen (u,v,w,du,dv,dw,flag)
   enddo; enddo; enddo
 
   do k=ks,kew;  do j=js,je; do i=is,ie
-      dw(i,j,k)=dw(i,j,k) - flag(i,j,k) * work(i,j,k,1)/dxh(i)
+      dw(i,j,k)= - work(i,j,k,1)/dxh(i)
   enddo; enddo; enddo
 
 end subroutine momentumConvectionVerstappen
+!=======================================================================================
+! subroutine momentumConvectionBCG
+! calculates the convection terms in the momentum equations using a QUICK scheme
+! and returns them in du, dv, dw
+!-------------------------------------------------------------------------------------------------
+subroutine momentumConvectionBCG()
+  use module_grid
+  use module_tmpvar
+  use module_BC
+  use module_poisson
+  use module_flow
+  use module_VOF
+  use module_2phase
+  use module_surface_tension
 
+  implicit none
+  include 'mpif.h'
+  real(8), external :: minabs
+  real(8) :: grad, unorm, uc, fxx, fyy, fzz,usign
+  integer :: i,j,k, iaux,ierr
+  integer :: req(48),sta(MPI_STATUS_SIZE,48)
+ 
+  !prediction stage
+  call predict_velocity(u,du,1,dt,u,v,w,work(:,:,:,1))
+  call predict_velocity(v,dv,2,dt,v,u,w,work(:,:,:,2))
+  call predict_velocity(w,dw,3,dt,w,u,v,work(:,:,:,3))
 
+  call SetVelocityBC(work(:,:,:,1),work(:,:,:,2),work(:,:,:,3),umask,vmask,wmask,time)
+  call do_ghost_vector(work(:,:,:,1),work(:,:,:,2),work(:,:,:,3))
+  !-----------------------------------------PROJECTION STEP-----------------------------------------
+  tmp = p
+  call SetPressureBC(umask,vmask,wmask,tmp)
+  call SetupPoisson(work(:,:,:,1),work(:,:,:,2),work(:,:,:,3), &
+  umask,vmask,wmask,rho,dt,A,tmp,cvof,n1,n2,n3,VolumeSource)
+  ! (div u)*dt < epsilon => div u < epsilon/dt => maxresidual : maxerror/dt 
+  if(HYPRE)then
+    call poi_solve(A,tmp(is:ie,js:je,ks:ke),maxError/dt,maxit,it)
+    call ghost_x(tmp,1,req(1:4 ))
+    call ghost_y(tmp,1,req(5:8 ))
+    call ghost_z(tmp,1,req(9:12)) 
+    call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
+  else
+    call NewSolver(A,tmp,maxError/dt,beta,maxit,it,ierr)
+  endif
+  if (.not.FreeSurface) then
+    do k=ks,ke;  do j=js,je; do i=is,ieu    ! CORRECT THE u-velocity 
+      work(i,j,k,1)=work(i,j,k,1)-dt*(2.0*umask(i,j,k)/dxh(i))*(tmp(i+1,j,k)-tmp(i,j,k))/ &
+                                     (rho(i+1,j,k)+rho(i,j,k))
+    enddo; enddo; enddo
 
-!=================================================================================================
+    do k=ks,ke;  do j=js,jev; do i=is,ie    ! CORRECT THE v-velocity
+      work(i,j,k,2)=work(i,j,k,2)-dt*(2.0*vmask(i,j,k)/dyh(j))*(tmp(i,j+1,k)-tmp(i,j,k))/ &
+                                      (rho(i,j+1,k)+rho(i,j,k))
+    enddo; enddo; enddo
+
+    do k=ks,kew;  do j=js,je; do i=is,ie   ! CORRECT THE w-velocity
+      work(i,j,k,3)=work(i,j,k,3)-dt*(2.0*wmask(i,j,k)/dzh(k))*(tmp(i,j,k+1)-tmp(i,j,k))/ &
+                                     (rho(i,j,k+1)+rho(i,j,k))
+    enddo; enddo; enddo
+  else
+    do k=ks,ke;  do j=js,je; do i=is,ieu    ! CORRECT THE u-velocity 
+      work(i,j,k,1)=work(i,j,k,1)-dt*(2.0*umask(i,j,k)/(dxh(i)-x_mod(i,j,k)))*(tmp(i+1,j,k)-tmp(i,j,k))/ &
+                                      (rho(i+1,j,k)+rho(i,j,k))
+    enddo; enddo; enddo
+
+    do k=ks,ke;  do j=js,jev; do i=is,ie    ! CORRECT THE v-velocity
+      work(i,j,k,2)=work(i,j,k,2)-dt*(2.0*vmask(i,j,k)/(dyh(j)-y_mod(i,j,k)))*(tmp(i,j+1,k)-tmp(i,j,k))/ &
+                                      (rho(i,j+1,k)+rho(i,j,k))
+    enddo; enddo; enddo
+
+    do k=ks,kew;  do j=js,je; do i=is,ie   ! CORRECT THE w-velocity
+      work(i,j,k,3)=work(i,j,k,3)-dt*(2.0*wmask(i,j,k)/(dzh(k)-z_mod(i,j,k)))*(tmp(i,j,k+1)-tmp(i,j,k))/ &
+                                      (rho(i,j,k+1)+rho(i,j,k))
+    enddo; enddo; enddo
+  endif 
+
+  call do_ghost_vector(work(:,:,:,1),work(:,:,:,2),work(:,:,:,3))
+
+  !advection step
+  call predict_velocity(u,du,1,dt,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3),tmp)
+  du = tmp
+  call predict_velocity(v,dv,2,dt,work(:,:,:,2),work(:,:,:,1),work(:,:,:,3),tmp)
+  dv = tmp
+  call predict_velocity(w,dw,3,dt,work(:,:,:,3),work(:,:,:,1),work(:,:,:,2),tmp)
+  dw = tmp
+
+  !check: required?
+  call do_ghost_vector(du,dv,dw)
+
+  work(:,:,:,1) = du
+  work(:,:,:,2) = dv
+  work(:,:,:,3) = dw
+
+  !cell centered fluxes
+  do k=ks-1,ke+1
+    do j=js-1,je+1
+      do i=is-1,ie+1
+        du(i,j,k) = -0.5d0*(work(i,j,k,1)*work(i,j,k,1) - &
+                    work(i-1,j,k,1)*work(i-1,j,k,1))/dxh(i) &
+                  - 0.5d0*(work(i,j,k,2)+work(i,j-1,k,2))*  &
+                    (work(i,j,k,1)-work(i,j-1,k,1))/dyh(j)  &
+                  - 0.5d0*(work(i,j,k,3)+work(i,j,k-1,3))*  &
+                    (work(i,j,k,1)-work(i,j,k-1,1))/dzh(j)  
+        dv(i,j,k) = -0.5d0*(work(i,j,k,2)*work(i,j,k,2) - &
+                    work(i-1,j,k,2)*work(i-1,j,k,2))/dyh(i) &
+                  - 0.5d0*(work(i,j,k,1)+work(i,j-1,k,1))*  &
+                    (work(i,j,k,2)-work(i,j-1,k,2))/dxh(j)  &
+                  - 0.5d0*(work(i,j,k,3)+work(i,j,k-1,3))*  &
+                    (work(i,j,k,2)-work(i,j,k-1,2))/dzh(j)  
+        dw(i,j,k) = -0.5d0*(work(i,j,k,3)*work(i,j,k,3) - &
+                    work(i-1,j,k,3)*work(i-1,j,k,3))/dzh(i) &
+                  - 0.5d0*(work(i,j,k,2)+work(i,j-1,k,2))*  &
+                    (work(i,j,k,3)-work(i,j-1,k,3))/dyh(j)  &
+                  - 0.5d0*(work(i,j,k,1)+work(i,j,k-1,1))*  &
+                    (work(i,j,k,3)-work(i,j,k-1,3))/dxh(j)  
+      enddo
+    enddo
+  enddo
+
+  call do_ghost_vector(du,dv,dw)
+
+  !reinterpolating at face centers
+  work(:,:,:,1) = du
+  work(:,:,:,2) = dv
+  work(:,:,:,3) = dw
+
+  do k=ks-1,ke+1
+    do j=js-1,je+1
+      do i=is-1,ie+1
+        du(i,j,k) = 0.5d0*(work(i,j,k,1) + work(i+1,j,k,1)) 
+        dv(i,j,k) = 0.5d0*(work(i,j,k,2) + work(i+1,j,k,2)) 
+        dw(i,j,k) = 0.5d0*(work(i,j,k,3) + work(i+1,j,k,3)) 
+      enddo
+    enddo
+  enddo
+
+  call do_ghost_vector(du,dv,dw)
+
+end subroutine momentumConvectionBCG
+
+subroutine predict_velocity(u,du,d,dt,upred,vpred,wpred,unew)
+
+  use module_grid
+  implicit none
+  
+  integer i,j,k,d,iaux,jaux,kaux
+  integer i0,j0,k0
+  integer onex, oney, onez
+
+  REAL (8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), INTENT(IN) :: u, du,upred, vpred, wpred
+  REAL (8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), INTENT(INOUT) :: unew
+  real(8) :: dt, uc, unorm, usign, grad, dxcell,dxcell2
+  real(8) :: fyy, fzz
+  
+  call init_i0j0k0 (d,i0,j0,k0)
+  iaux = 0; jaux = 0; kaux = 0
+  onex = 0; oney = 0; onez = 0
+
+  do k=ks-1,ke+1
+    do j=js-1,je+1
+      do i=is-1,ie+1
+
+        uc    = (u(i,j,k) + u(i-i0,j-j0,k-k0))*0.5d0
+        usign = sign(1.d0,uc)
+
+        if (d.eq.1) then
+          iaux  = -(usign + 1)/2
+          onex  = 1
+          dxcell = dxh(i)
+          dxcell2 = dxh(i+iaux)
+        elseif (d.eq.2) then
+          jaux  = -(usign + 1)/2
+          oney  = 1
+          dxcell = dyh(j)
+          dxcell2 = dyh(j+jaux)
+        else 
+          kaux  = -(usign + 1)/2
+          onez  = 1
+          dxcell = dzh(k)
+          dxcell2 = dzh(k+kaux)
+        endif
+        
+        unorm = uc*dt/dxcell
+
+        grad  = 0.5d0*(upred(i+iaux,j+jaux,k+kaux) &
+                      -upred(i+iaux-onex,j+jaux-oney,k+kaux-onez))/dxcell2
+
+        if (vpred(i+iaux,j+jaux,k+kaux).lt.0.d0) then 
+          fyy = upred(i+iaux+onex,j+jaux+oney,k+kaux+onez) &
+              - upred(i+iaux,j+jaux,k+kaux)
+        else
+          fyy = upred(i+iaux,j+jaux,k+kaux) &
+              - upred(i+iaux-onex,j+jaux-oney,k+kaux-onez)
+        endif
+
+        if (wpred(i+iaux,j+jaux,k+kaux).lt.0.d0) then 
+          fzz = upred(i+iaux+onex,j+jaux+oney,k+kaux+onez) &
+              - upred(i+iaux,j+jaux,k+kaux)
+        else
+          fzz = upred(i+iaux,j+jaux,k+kaux) &
+              - upred(i+iaux-onex,j+jaux-oney,k+kaux-onez)
+        endif
+!fixme: check the dxcell values in the traverse terms
+        unew(i,j,k) = (u(i+iaux,j+jaux,k+kaux) &
+                     + u(i+iaux-onex,j+jaux-oney,k+kaux-onez))*0.5d0 &
+        + du(i+iaux,j+jaux,k+kaux)*dt/2.d0 &
+        + usign*min(1.d0,1.d0-usign*unorm)*grad*dxcell/2.d0 &
+        - dt*vpred(i+iaux,j+jaux,k+kaux)*fyy/(2.d0*dxcell) &
+        - dt*wpred(i+iaux,j+kaux,k+kaux)*fzz/(2.d0*dxcell) 
+
+      enddo
+    enddo
+  enddo
+
+end subroutine predict_velocity
+
+subroutine init_i0j0k0 (d,i0,j0,k0)
+  integer d,i0,j0,k0
+
+  i0=0;j0=0;k0=0
+
+  if (d.eq.1) then
+    i0=1
+  elseif (d.eq.2) then
+    j0=1
+  elseif (d.eq.3) then
+    k0=1
+  endif
+
+end subroutine init_i0j0k0
 !=================================================================================================
 ! Calculates the diffusion terms in the momentum equation and adds them to du,dv,dw
 !-------------------------------------------------------------------------------------------------
@@ -1002,7 +1224,7 @@ subroutine momentumDiffusion(u,v,w,rho,mu,du,dv,dw)
   integer :: i,j,k
 !-------------------------------------PREDICTED u-velocity-DIFFUSION------------------------------
   do k=ks,ke; do j=js,je; do i=is,ieu
-    du(i,j,k)= ( & ! du(i,j,k)+(   &
+    du(i,j,k)= du(i,j,k)+(   &
      +(1./dy(j))*( 0.25*(mu(i,j,k)+mu(i+1,j,k)+mu(i+1,j+1,k)+mu(i,j+1,k))*               &
          ( (1./dxh(i))*(v(i+1,j,k)-v(i,j,k)) ) -    &
                    0.25*(mu(i,j,k)+mu(i+1,j,k)+mu(i+1,j-1,k)+mu(i,j-1,k))*               &
@@ -1015,7 +1237,7 @@ subroutine momentumDiffusion(u,v,w,rho,mu,du,dv,dw)
   enddo; enddo; enddo
 !-------------------------------------PREDICTED v-velocity-DIFFUSION------------------------------
   do k=ks,ke; do j=js,jev; do i=is,ie
-    dv(i,j,k)= ( & ! dv(i,j,k)+(   &
+    dv(i,j,k)= dv(i,j,k)+(   &
       (1./dx(i))*( 0.25*(mu(i,j,k)+mu(i+1,j,k)+mu(i+1,j+1,k)+mu(i,j+1,k))*               &
          ( (1./dyh(j))*(u(i,j+1,k)-u(i,j,k)) ) -      &
                    0.25*(mu(i,j,k)+mu(i,j+1,k)+mu(i-1,j+1,k)+mu(i-1,j,k))*               &
@@ -1028,7 +1250,7 @@ subroutine momentumDiffusion(u,v,w,rho,mu,du,dv,dw)
   enddo; enddo; enddo
 !-------------------------------------PREDICTED w-velocity-DIFFUSION------------------------------
   do k=ks,kew; do j=js,je; do i=is,ie
-    dw(i,j,k)= ( & ! dw(i,j,k)+(   &
+    dw(i,j,k)= dw(i,j,k)+(   &
       (1./dx(i))*( 0.25*(mu(i,j,k)+mu(i+1,j,k)+mu(i+1,j,k+1)+mu(i,j,k+1))*               &
          ((1./dzh(k))*(u(i,j,k+1)-u(i,j,k)) ) -      &
                    0.25*(mu(i,j,k)+mu(i-1,j,k)+mu(i-1,j,k+1)+mu(i,j,k+1))*               &
@@ -1052,7 +1274,7 @@ subroutine explicitMomDiff(u,v,w,rho,mu,du,dv,dw)
   integer :: i,j,k
 !-------------------------------------PREDICTED u-velocity-DIFFUSION------------------------------
   do k=ks,ke; do j=js,je; do i=is,ieu
-    du(i,j,k)= ( & ! du(i,j,k)+(   &
+    du(i,j,k)= du(i,j,k)+(   &
       (1./dxh(i))*2.*(   mu(i+1,j,k)*(1./dx(i+1))*(u(i+1,j,k)-u(i,j,k)) -                &
                          mu(i,j,k)  *(1./dx(i))  *(u(i,j,k)-u(i-1,j,k)) )                &
      +(1./dy(j))*( 0.25*(mu(i,j,k)+mu(i+1,j,k)+mu(i+1,j+1,k)+mu(i,j+1,k))*               &
@@ -1067,7 +1289,7 @@ subroutine explicitMomDiff(u,v,w,rho,mu,du,dv,dw)
   enddo; enddo; enddo
 !-------------------------------------PREDICTED v-velocity-DIFFUSION------------------------------
   do k=ks,ke; do j=js,jev; do i=is,ie
-    dv(i,j,k)= ( & ! dv(i,j,k)+(   &
+    dv(i,j,k)= dv(i,j,k)+(   &
       (1./dx(i))*( 0.25*(mu(i,j,k)+mu(i+1,j,k)+mu(i+1,j+1,k)+mu(i,j+1,k))*               &
          ((1./dyh(j))*(u(i,j+1,k)-u(i,j,k)) + (1./dxh(i))*(v(i+1,j,k)-v(i,j,k)) ) -      &
                    0.25*(mu(i,j,k)+mu(i,j+1,k)+mu(i-1,j+1,k)+mu(i-1,j,k))*               &
@@ -1082,7 +1304,7 @@ subroutine explicitMomDiff(u,v,w,rho,mu,du,dv,dw)
   enddo; enddo; enddo
 !-------------------------------------PREDICTED w-velocity-DIFFUSION------------------------------
   do k=ks,kew; do j=js,je; do i=is,ie
-    dw(i,j,k)= ( & ! dw(i,j,k)+(   &
+    dw(i,j,k)= dw(i,j,k)+(   &
       (1./dx(i))*( 0.25*(mu(i,j,k)+mu(i+1,j,k)+mu(i+1,j,k+1)+mu(i,j,k+1))*               &
          ((1./dzh(k))*(u(i,j,k+1)-u(i,j,k)) + (1./dxh(i))*(w(i+1,j,k)-w(i,j,k)) ) -      &
                    0.25*(mu(i,j,k)+mu(i-1,j,k)+mu(i-1,j,k+1)+mu(i,j,k+1))*               &
@@ -1311,8 +1533,6 @@ subroutine initialize
                A(is:ie,js:je,ks:ke,1:8), averages(10,Ng:Ny+Ng+1), oldaverages(10,Ng:Ny+Ng+1), &
                allaverages(10,Ng:Ny+Ng+1))  ! 39
 
-    allocate(mom_flag(imin:imax,jmin:jmax,kmin:kmax))
-
     allocate(mask(imin:imax,jmin:jmax,kmin:kmax)) ! 40
     call add_2_my_sizer(40,8)
 
@@ -1320,7 +1540,6 @@ subroutine initialize
     u=0.0;v=0.0;w=0.0;p=0.0;tmp=0.0;fx=0.0;fy=0.0;fz=0.0;drho=0.0;rho=0.0;mu=0.0;work=0.0;A=0.0
     averages=0.0; oldaverages=0.0; allaverages=0d0
     uold=0.d0;vold=0.d0;wold=0.d0
-    mom_flag = 1
     umask = 1d0; vmask = 1d0; wmask = 1d0
 
   else  !   if(rank<nPdomain)then

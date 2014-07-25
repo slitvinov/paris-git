@@ -385,20 +385,6 @@ SUBROUTINE swpr(us,c,f,dir,vof1,cg,vof3)
   call setvofbc(c,f)
 end subroutine swpr
 
-subroutine init_i0j0k0 (d,i0,j0,k0)
-  integer d,i0,j0,k0
-
-  i0=0;j0=0;k0=0
-
-  if (d.eq.1) then
-    i0=1
-  elseif (d.eq.2) then
-    j0=1
-  elseif (d.eq.3) then
-    k0=1
-  endif
-
-end subroutine init_i0j0k0
 !=================================================================================================
 
 subroutine ls2vof_in_cell(stencil3x3,c,nflag)

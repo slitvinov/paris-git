@@ -284,7 +284,6 @@ module module_flow
   real(8), dimension(:,:,:), allocatable :: umask,vmask,wmask
   real(8), dimension(:,:,:), allocatable :: du,dv,dw,drho,du_c,dv_c,dw_c
   real(8), dimension(:,:), allocatable :: averages,oldaverages, allaverages
-  integer, dimension(:,:,:), allocatable :: mom_flag 
   logical, allocatable, dimension(:,:,:) :: mask
 
   real(8) :: gx, gy, gz, mu1, mu2, r_avg, dt, dtFlag, rho_ave, p_ave, vdt
