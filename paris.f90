@@ -1167,8 +1167,8 @@ subroutine predict_velocity(u,du,d,dt,upred,vpred,wpred,unew)
         
         unorm = uc*dt/dxcell
 
-        grad  = 0.5d0*(upred(i+iaux,j+jaux,k+kaux) &
-                      -upred(i+iaux-onex,j+jaux-oney,k+kaux-onez))/dxcell2
+        grad  = (upred(i+iaux,j+jaux,k+kaux) &
+                 -upred(i+iaux-onex,j+jaux-oney,k+kaux-onez))/dxcell2
 
         if (vpred(i+iaux,j+jaux,k+kaux).lt.0.d0) then 
           fyy = upred(i+iaux+onex,j+jaux+oney,k+kaux+onez) &
