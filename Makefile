@@ -56,7 +56,7 @@ all: tags install compare parisdeconv
 clean:
 	@rm -fR *.o *.mod paris stats *~ track out* errftc tmp* *.tmp fort.* *.visit core.* *stats*
 	@cd Tests; sh ./clean.sh; cd ..
-	@cd Documentation; make clean; cd ..
+	@cd Documentation; sh ./cleandoc.sh; cd ..
 	@find . -type l -exec /bin/rm {} \;
 
 distclean: clean
