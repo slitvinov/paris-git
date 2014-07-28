@@ -686,13 +686,12 @@ end subroutine momentumConvection
 ! calculates the convection terms in mumentum equation using ENO scheme
 ! and returns them in du, dv, dw
 !-------------------------------------------------------------------------------------------------
-subroutine momentumConvectionENO(u,v,w,du,dv,dw,flag)
+subroutine momentumConvectionENO(u,v,w,du,dv,dw)
   use module_grid
   use module_tmpvar
   implicit none
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: u, v, w
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: du, dv, dw
-  integer, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: flag
   real(8), external :: minabs
   integer :: i,j,k
 !-------------------------------------ENO interpolation u-velocity--------------------------------
@@ -718,7 +717,7 @@ subroutine momentumConvectionENO(u,v,w,du,dv,dw,flag)
     endif
   enddo; enddo; enddo
   do k=ks,ke;  do j=js,je; do i=is,ieu
-    du(i,j,k)=du(i,j,k)+flag(i,j,k)*( &
+    du(i,j,k)=du(i,j,k)+( &
               -0.5*((u(i,j  ,k  )+u(i+1,j  ,k  ))*work(i+1,j  ,k  ,1)-&
                     (u(i,j  ,k  )+u(i-1,j  ,k  ))*work(i  ,j  ,k  ,1))/dxh(i) &
               -0.5*((v(i,j  ,k  )+v(i+1,j  ,k  ))*work(i  ,j  ,k  ,2)-&
@@ -750,7 +749,7 @@ subroutine momentumConvectionENO(u,v,w,du,dv,dw,flag)
     endif
   enddo; enddo; enddo
   do k=ks,ke;  do j=js,jev; do i=is,ie
-    dv(i,j,k)=dv(i,j,k)+flag(i,j,k)*( &
+    dv(i,j,k)=dv(i,j,k)+( &
               -0.5*((u(i  ,j,k  )+u(i  ,j+1,k  ))*work(i  ,j  ,k  ,1)-&
                     (u(i-1,j,k  )+u(i-1,j+1,k  ))*work(i-1,j  ,k  ,1))/dx(i)  &
               -0.5*((v(i  ,j,k  )+v(i  ,j+1,k  ))*work(i  ,j+1,k  ,2)-&
@@ -781,7 +780,7 @@ subroutine momentumConvectionENO(u,v,w,du,dv,dw,flag)
     endif
   enddo; enddo; enddo
   do k=ks,kew;  do j=js,je; do i=is,ie
-    dw(i,j,k)=dw(i,j,k) +flag(i,j,k)*( & 
+    dw(i,j,k)=dw(i,j,k) +( & 
               -0.5*((u(i  ,j  ,k)+u(i  ,j  ,k+1))*work(i  ,j  ,k  ,1)-&
                     (u(i-1,j  ,k)+u(i-1,j  ,k+1))*work(i-1,j  ,k  ,1))/dx(i)  &
               -0.5*((v(i  ,j  ,k)+v(i  ,j  ,k+1))*work(i  ,j  ,k  ,2)-&
