@@ -918,11 +918,11 @@ subroutine update_momentum (us,d,cold,cnew,mflux,der)
   !work(i,j,k,3) is unew
   work(:,:,:,3) = 0.d0
 
+  !fixme: I could obtain the flux in cells that contain the interface and that
+  !       are near (how near?)
   do k=ks-1,ke+1
     do j=js-1,je+1
       do i=is-1,ie+1
-        if (((work(i,j,k,1).gt.0.d0).and.(work(i,j,k,1).lt.1.d0)).or. &
-        ((work(i,j,k,2).gt.0.d0).and.(work(i,j,k,2).lt.1.d0))) then
         !first contribution
         rhoold = rho2*work(i,j,k,1) + rho1*(1.d0 - work(i,j,k,1))
         rhonew = rho2*work(i,j,k,2) + rho1*(1.d0 - work(i,j,k,2))
@@ -983,7 +983,6 @@ subroutine update_momentum (us,d,cold,cnew,mflux,der)
         + (faceflux(3)*utmp(3) + faceflux(4)*utmp(4)  &
         +  faceflux(5)*utmp(5) + faceflux(6)*utmp(6))*0.5d0/rhonew 
 
-      endif
     enddo
   enddo
   enddo
@@ -991,8 +990,8 @@ subroutine update_momentum (us,d,cold,cnew,mflux,der)
   do k=ks-1,ke+1
     do j=js-1,je+1
       do i=is-1,ie+1
-        if (((work(i,j,k,1).gt.0.d0).and.(work(i,j,k,1).lt.1.d0)).or. &
-        ((work(i,j,k,2).gt.0.d0).and.(work(i,j,k,2).lt.1.d0))) then
+       if (((work(i,j,k,1).gt.0.d0).and.(work(i,j,k,1).lt.1.d0)).or. &
+       ((work(i,j,k,2).gt.0.d0).and.(work(i,j,k,2).lt.1.d0))) then
         der(i,j,k) = (work(i,j,k,3) - us(i,j,k))/dt
       endif
     enddo
