@@ -8,6 +8,7 @@
 !         Stephane Zaleski   zaleski@dalembert.upmc.fr
 !         Sadegh Dabiri      sdabiri@gmail.com
 ! 	  Yue (Stanley) Ling ling.stanley@gmail.com
+!         Daniel Fuster      fuster@dalembert.upmc.fr
 !
 ! Extended from or inspired by Codes: 
 !      - FTC3D2011 (Front Tracking Code for 3D simulations)
@@ -717,13 +718,12 @@ subroutine momentumConvectionENO(u,v,w,du,dv,dw)
     endif
   enddo; enddo; enddo
   do k=ks,ke;  do j=js,je; do i=is,ieu
-    du(i,j,k)= &
-              -0.5*((u(i,j  ,k  )+u(i+1,j  ,k  ))*work(i+1,j  ,k  ,1)-&
+    du(i,j,k)= -0.5*((u(i,j  ,k  )+u(i+1,j  ,k  ))*work(i+1,j  ,k  ,1)- &
                     (u(i,j  ,k  )+u(i-1,j  ,k  ))*work(i  ,j  ,k  ,1))/dxh(i) &
               -0.5*((v(i,j  ,k  )+v(i+1,j  ,k  ))*work(i  ,j  ,k  ,2)-&
                     (v(i,j-1,k  )+v(i+1,j-1,k  ))*work(i  ,j-1,k  ,2))/dy(j)  &
               -0.5*((w(i,j  ,k  )+w(i+1,j  ,k  ))*work(i  ,j  ,k  ,3)-&
-                    (w(i,j  ,k-1)+w(i+1,j  ,k-1))*work(i  ,j  ,k-1,3))/dz(k))
+                    (w(i,j  ,k-1)+w(i+1,j  ,k-1))*work(i  ,j  ,k-1,3))/dz(k)
   enddo; enddo; enddo
 
 !-------------------------------------ENO interpolation v-velocity--------------------------------
@@ -755,7 +755,7 @@ subroutine momentumConvectionENO(u,v,w,du,dv,dw)
               -0.5*((v(i  ,j,k  )+v(i  ,j+1,k  ))*work(i  ,j+1,k  ,2)-&
                     (v(i  ,j,k  )+v(i  ,j-1,k  ))*work(i  ,j  ,k  ,2))/dyh(j) &
               -0.5*((w(i  ,j,k  )+w(i  ,j+1,k  ))*work(i  ,j  ,k  ,3)-&
-                    (w(i  ,j,k-1)+w(i  ,j+1,k-1))*work(i  ,j  ,k-1,3))/dz(k))
+                    (w(i  ,j,k-1)+w(i  ,j+1,k-1))*work(i  ,j  ,k-1,3))/dz(k)
   enddo; enddo; enddo
 !-------------------------------------ENO interpolation w-velocity--------------------------------
   do k=ks,kew+1; do j=js,je; do i=is,ie
@@ -786,7 +786,7 @@ subroutine momentumConvectionENO(u,v,w,du,dv,dw)
               -0.5*((v(i  ,j  ,k)+v(i  ,j  ,k+1))*work(i  ,j  ,k  ,2)-&
                     (v(i  ,j-1,k)+v(i  ,j-1,k+1))*work(i  ,j-1,k  ,2))/dy(j)  &
               -0.5*((w(i  ,j  ,k)+w(i  ,j  ,k+1))*work(i  ,j  ,k+1,3)-&
-                    (w(i  ,j  ,k)+w(i  ,j  ,k-1))*work(i  ,j  ,k  ,3))/dzh(k) )
+                    (w(i  ,j  ,k)+w(i  ,j  ,k-1))*work(i  ,j  ,k  ,3))/dzh(k) 
   enddo; enddo; enddo
 
 end subroutine momentumConvectionENO
