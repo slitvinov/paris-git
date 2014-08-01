@@ -2129,7 +2129,7 @@ subroutine LinearSolver(A,p,maxError,beta,maxit,it,ierr)
     enddo; enddo; enddo
     res = res/dble(Nx*Ny*Nz)
     if ( (res*npx*npy*npz>1.d16) .or. (res.ne.res) ) then
-      print*,'Pressure residule is too large or NaN, res= ',res 
+      print*,'Pressure residual is too large or NaN, res= ',res 
       print*,'Pressure solver diverged after',it,'iterations at rank ',rank
       stop  !return
     else 
@@ -2188,9 +2188,9 @@ subroutine LinearSolver1(A,u,umask,maxError,beta,maxit,it,ierr)
         A(i,j,k,3) * u(i,j-1,k) + A(i,j,k,4) * u(i,j+1,k) +            &
         A(i,j,k,5) * u(i,j,k-1) + A(i,j,k,6) * u(i,j,k+1) + A(i,j,k,8) )**2
     enddo; enddo; enddo
-    res = res/float(Nx*Ny*Nz)
+    res = res/dble(Nx*Ny*Nz)
     if ( (res*npx*npy*npz>1.d16) .or. (res.ne.res) ) then
-      print*,'Viscous term residule is too large or NaN, res= ',res 
+      print*,'Viscous term residual is too large or NaN, res= ',res 
       print*,'Viscous term solver diverged after',it,'iterations at rank ',rank
       stop  !return
     else 
@@ -2203,7 +2203,7 @@ subroutine LinearSolver1(A,u,umask,maxError,beta,maxit,it,ierr)
 end subroutine LinearSolver1
 !=================================================================================================
 !=================================================================================================
-! Returns the residual. L2 norm of the new divergence. 
+! Returns the residual. L1 norm of the new divergence. 
 !-------------------------------------------------------------------------------------------------
 subroutine calcResidual(A,p, residual)
   use module_grid

@@ -64,7 +64,8 @@ Program paris
   integer :: ierr, icolor
   integer :: req(48),sta(MPI_STATUS_SIZE,48)
   INTEGER :: irank, ii, i, j, k
-  real(8) :: residual,cflmax,get_cfl
+  real(8) :: residual,cflmax,get_cfl,residualu,residualv,residualw
+  integer :: itu,itv,itw
 
 !---------------------------------------INITIALIZATION--------------------------------------------
   ! Initialize MPI
@@ -274,31 +275,23 @@ Program paris
               if(hypre)then
                  call poi_solve(A,u(is:ie,js:je,ks:ke),maxError,maxit,it)
               else
-                 call LinearSolver1(A,u,umask,maxError,beta,maxit,it,ierr)
-!                 if(rank==0)write(*,'("U implicit momentum diffusion iterations:",I9)')it
+                 call LinearSolver1(A,u,umask,maxError,beta,maxit,itu,ierr)
              endif
-!             call calcresidual1(A,u,umask,residual)
-!             if(rank==0)write(*,'("U implicit momentum diffusion residual:",e8.2)') residual
-           
-              call SetupVvel(v,dv,rho,mu,rho1,mu1,dt,A)
-              if(hypre)then
-                 call poi_solve(A,v(is:ie,js:je,ks:ke),maxError,maxit,it)
-              else
-                 call LinearSolver1(A,v,vmask,maxError,beta,maxit,it,ierr)
-!                 if(rank==0)write(*  ,'("V implicit momentum diffusion  iterations:",I9)')it
+             if(mod(itimestep,termout)==0) call calcresidual1(A,u,umask,residualu)
+             call SetupVvel(v,dv,rho,mu,rho1,mu1,dt,A)
+             if(hypre)then
+                call poi_solve(A,v(is:ie,js:je,ks:ke),maxError,maxit,it)
+             else
+                call LinearSolver1(A,v,vmask,maxError,beta,maxit,itv,ierr)
+             endif
+             if(mod(itimestep,termout)==0) call calcresidual1(A,v,vmask,residualv)
+             call SetupWvel(w,dw,rho,mu,rho1,mu1,dt,A)
+             if(hypre)then
+                call poi_solve(A,w(is:ie,js:je,ks:ke),maxError,maxit,it)
+             else
+                call LinearSolver1(A,w,wmask,maxError,beta,maxit,itw,ierr)
               endif
-!             call calcresidual1(A,v,vmask,residual)
-!             if(rank==0)write(*,'("V implicit momentum diffusion residual:",e8.2)') residual
-
-              call SetupWvel(w,dw,rho,mu,rho1,mu1,dt,A)
-              if(hypre)then
-                 call poi_solve(A,w(is:ie,js:je,ks:ke),maxError,maxit,it)
-              else
-                 call LinearSolver1(A,w,wmask,maxError,beta,maxit,it,ierr)
-!                 if(rank==0)write(*  ,'("W implicit momentum diffusion  iterations:",I9)')it
-              endif
-!             call calcresidual1(A,w,wmask,residual)
-!             if(rank==0)write(*,'("W implicit momentum diffusion residual:",e8.2)') residual
+              if(mod(itimestep,termout)==0) call calcresidual1(A,w,wmask,residualw)
            else
               u = u + dt * du
               v = v + dt * dv
@@ -323,9 +316,11 @@ Program paris
            endif
            if(mod(itimestep,termout)==0) then
               call calcresidual(A,p,residual)
-              if(rank==0)          write(*  ,    '("              pressure residual*dt:   ",e7.1,&
+              if(rank==0) then
+                 write(*,'("              pressure residual*dt:   ",e7.1,&
                    &" maxerror: ",e7.1)') residual*dt,maxerror
-              if(rank==0) write(*,'("              pressure iterations :",I9)')it
+                 write(*,'("              pressure iterations :",I9)')it
+              end if
            endif
            if (.not.FreeSurface) then
               do k=ks,ke;  do j=js,je; do i=is,ieu    ! CORRECT THE u-velocity 
