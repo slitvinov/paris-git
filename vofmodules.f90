@@ -59,6 +59,7 @@ module module_VOF
   logical :: test_injectdrop = .false.
   logical :: test_jet = .false.
   logical :: test_cylinder_advection = .false.
+  logical :: test_shear_multiphase = .false.
   logical :: test_KHI2D = .false.
   logical :: linfunc_initialized = .false.
   logical :: DoMOF = .false.
@@ -354,6 +355,8 @@ contains
        test_jet = .true.
     else if(test_type=='cylinder_advection') then
        test_cylinder_advection = .true.
+    else if(test_type=='shear_multiphase') then
+       test_shear_multiphase = .true.
     else if(test_type=='KHI2D') then
        test_KHI2D = .true.
     else
@@ -493,6 +496,14 @@ or none at all")
          ! (when boundary layer thickness delta =0.1*yLength)
       end do; end do; end do
     end if ! test_KHI2D
+
+    if (test_shear_multiphase) then
+      do i = is,ie; do j=js,je; do k = ks,ke
+        if ( (y(j)-0.5d0)**2 < 0.01d0 ) then
+          cvof(i,j,k) = 1.d0
+        endif
+      end do; end do; end do
+    end if
 
     call do_all_ghost(cvof)
     call do_all_ighost(vof_flag)

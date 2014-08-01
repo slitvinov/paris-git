@@ -1,0 +1,13 @@
+&VOFPARAMETERS
+
+VOFBDRY_COND = 'periodic' 'periodic' 'periodic' 
+                   ! Type of VOF boundary condition in x,y,z direction: 'wet', '90deg','periodic'
+
+TEST_TYPE = 'shear_multiphase'
+VOF_ADVECT = 'CIAM'
+ViscMeanIsArith = T
+DoMOF = F
+!=================================================================================================
+
+&end
+! end of the namelist
