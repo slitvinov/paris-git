@@ -1700,11 +1700,9 @@ subroutine InitCondition
      
          if ( test_shear_multiphase ) then
             do i=imin,imax-1; do j=jmin,jmax-1; do k=kmin,kmax-1
-!            if((cvof(i,j,k) + cvof(i+1,j,k)) > 0.0d0) then
             u(i,j,k) = 1.d0*cvof(i,j,k)+15.d0*(1.-cvof(i,j,k))
-            v(i,j,k) = 1.d-2*sin(2.d0*PI*x(i))*exp(-(2.d0*y(i)/0.1d0)**2)
+            v(i,j,k) = 1.d-2*sin(2.d0*PI*x(i))*exp(-(2.d0*(y(i)-0.5d0)/0.1d0)**2)
             w(i,j,k) = 0.d0
-!           endif
             enddo; enddo; enddo
          endif
      
