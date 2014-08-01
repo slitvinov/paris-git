@@ -3551,7 +3551,7 @@ module module_output_lpp
 12    format('ASCII')
 13    format('DATASET STRUCTURED_GRID')
 14    format('DIMENSIONS ',I5,I5,I5)
-15    format('POINTS ',I17,' float' )
+15    format('POINTS ',I17,' double' )
 
       do k=kl,kr; do j=jl,jr; do i=il,ir;
          write(8,320) x(i),y(j),z(k)

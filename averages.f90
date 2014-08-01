@@ -524,7 +524,7 @@ subroutine printVTK(filename,iout,bounds,vector)
     write(89,18)
 
 19  format('POINT_DATA ',I17)
-17  format('SCALARS ',A20,' float 1')
+17  format('SCALARS ',A20,' double 1')
 18  format('LOOKUP_TABLE default')
 
     do n=1,bounds(3); do m=1,bounds(2); do l=1,bounds(1); 

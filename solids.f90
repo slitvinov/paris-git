@@ -438,7 +438,7 @@ contains
 12  format('ASCII')
 13  format('DATASET STRUCTURED_GRID')
 14  format('DIMENSIONS ',I5,I5,I5)
-15  format('POINTS ',I17,' float' )
+15  format('POINTS ',I17,' double' )
 
     do k=k1,k2; do j=j1,j2; do i=i1,i2;
       write(8,320) x(i),y(j),z(k)

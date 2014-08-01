@@ -638,7 +638,7 @@ subroutine output2(nf,i1,i2,j1,j2,k1,k2)
     else
       write(8,20)
     endif
-20  format('VECTORS uv float')
+20  format('VECTORS uv double')
     do k=k1,k2; do j=j1,j2; do i=i1,i2;
       if (itype .eq. 1)write(8,210)rho(i,j,k)
       if (itype .eq. 5)write(8,310)0.5*(u(i,j,k)+u(i-1,j,k)), &
@@ -686,10 +686,10 @@ subroutine output2(nf,i1,i2,j1,j2,k1,k2)
 12  format('ASCII')
 13  format('DATASET STRUCTURED_GRID')
 14  format('DIMENSIONS ',I5,I5,I5)
-15  format('POINTS ',I17,' float' )
+15  format('POINTS ',I17,' double' )
 !16  format('SPACING ',F16.8,F16.8,F16.8)
 19  format('POINT_DATA ',I17)
-17  format('SCALARS ',A20,' float 1')
+17  format('SCALARS ',A20,' double 1')
 18  format('LOOKUP_TABLE default')
 
 320 format(e14.5,e14.5,e14.5)
@@ -731,8 +731,8 @@ subroutine output3(nf,i1,i2,j1,j2,k1,k2)
       write(8,20)
     endif
 19  format('POINT_DATA ',I17)
-17  format('SCALARS ',A20,' float 1')
-20  format('VECTORS uv float')
+17  format('SCALARS ',A20,' double 1')
+20  format('VECTORS uv double')
 18  format('LOOKUP_TABLE default')
 
     do k=k1,k2; do j=j1,j2; do i=i1,i2;
