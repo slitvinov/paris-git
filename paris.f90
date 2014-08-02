@@ -1,42 +1,46 @@
 !=================================================================================================
 !=================================================================================================
-! PARIS  Parallel Robust Interface Simulator 
-! 
 !
-! Authors 
-!         Gretar Tryggvason  gtryggva@nd.edu
-!         Stephane Zaleski   zaleski@dalembert.upmc.fr
-!         Sadegh Dabiri      sdabiri@gmail.com
-! 	  Yue (Stanley) Ling ling.stanley@gmail.com
-!         Daniel Fuster      fuster@dalembert.upmc.fr
+! PARIS  Parallel Robust Interface Simulator 
+! Main program to solve the 3D NS equations for multiphase flows
+!
+! Contact: Stephane Zaleski zaleski@dalembert.upmc.fr
+! 
+! Authors (in alphabetical order):
+!         Sadegh Dabiri      
+!         Daniel Fuster      
+! 	  Yue "Stanley" Ling 
+!         Ruben Scardovelli  
+!         Gretar Tryggvason  
+!         Phil Yecko         
+!         Stephane Zaleski   
 !
 ! Extended from or inspired by Codes: 
-!      - FTC3D2011 (Front Tracking Code for 3D simulations)
-!      - Surfer VOF code
-!      - Gerris Flow Solver
-! 
-! Contact: Stephane Zaleski
+!      - FTC3D2011 (Front Tracking Code for 3D simulations) by Gretar Tryggvason and Sadegh Dabiri      
+!      - Surfer VOF code by Stephane Zaleski and Ruben Scardovelli and others
+!      - Gerris Flow Solver by Stephane Popinet
 !
 ! GPL Licence
 !
-! This program is free software; you can redistribute it and/or
-! modify it under the terms of the GNU General Public License as
-! published by the Free Software Foundation; either version 2 of the
-! License, or (at your option) any later version.
+!     This file is part of PARIS.
 !
-! This program is distributed in the hope that it will be useful,
-! but WITHOUT ANY WARRANTY; without even the implied warranty of
-! MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	See the GNU
-! General Public License for more details.
+!     PARIS is free software: you can redistribute it and/or modify
+!     it under the terms of the GNU General Public License as published by
+!     the Free Software Foundation, either version 3 of the License, or
+!     (at your option) any later version.
+
+!     PARIS is distributed in the hope that it will be useful,
+!     but WITHOUT ANY WARRANTY; without even the implied warranty of
+!     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+!     GNU General Public License for more details.
 !
-! You should have received a copy of the GNU General Public License
-! along with this program; if not, write to the Free Software
-! Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
-! 02111-1307, USA.  
+!     You should have received a copy of the GNU General Public License
+!     along with PARIS.  If not, see <http://www.gnu.org/licenses/>.
+!
+! 
 !=================================================================================================
 !=================================================================================================
 !=================================================================================================
-! Main program to solve the 3D NS equations for multiphase flows
 !-------------------------------------------------------------------------------------------------
 Program paris
   use module_flow

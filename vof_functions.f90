@@ -1,27 +1,32 @@
-!=================================================================================================
-!=================================================================================================
+!==============================================================================
+!==============================================================================
+!
+! Copyright (C) 2014
+!
 ! PARIS  Parallel Robust Interface Simulator 
 ! NEW VOF FUNCTIONS
+! 
+!   This file contains a few routines in FORTRAN 90 for standard
+!   calculations with the Volume-of-Fluid (VOF) method
 !
-! author:  Ruben Scardovelli ruben.scardovelli@unibo.it
+! Author:  Ruben Scardovelli, ruben.scardovelli@unibo.it
 !
-! This program is free software; you can redistribute it and/or
-! modify it under the terms of the GNU General Public License as
-! published by the Free Software Foundation; either version 2 of the
-! License, or (at your option) any later version.
+! GPL Licence
 !
-! This program is distributed in the hope that it will be useful,
-! but WITHOUT ANY WARRANTY; without even the implied warranty of
-! MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	See the GNU
-! General Public License for more details.
+!   This program is free software: you can redistribute it and/or modify
+!   it under the terms of the GNU General Public License as published by
+!   the Free Software Foundation, either version 3 of the License, or
+!   (at your option) any later version.
 !
-! You should have received a copy of the GNU General Public License
-! along with this program; if not, write to the Free Software
-! Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
-! 02111-1307, USA.  
-!=================================================================================================
+!   This program is distributed in the hope that it will be useful,
+!   but WITHOUT ANY WARRANTY; without even the implied warranty of
+!   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+!   GNU General Public License for more details.
+!
+!   You should have received a copy of the GNU General Public License
+!   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 !===============================================================================
-! DESCRIPTION OF FUNCTION AL3D:
+! DESCRIPTION OF FUNCTION AL3DNEW:
 ! compute in the unit cube the plane constant alpha satisfying
 ! [nr]*[x] = nr1*x1 + nr2*x2 + nr3*x3 = alpha
 ! where the normal is pointing outward from the reference phase
@@ -89,7 +94,7 @@ FUNCTION AL3DNEW(nr,cc)
 
   if (cc > 0.5d0)  AL3DNEW = 1.d0 - AL3DNEW
   
-! compute alpha for the real coefficients  
+! compute alpha for the incoming coefficients  
   AL3DNEW = AL3DNEW + DMIN1(0.d0,nr(1)) + DMIN1(0.d0,nr(2)) + DMIN1(0.d0,nr(3))
   
 END FUNCTION AL3DNEW
@@ -568,3 +573,18 @@ function fl3d(m1,m2,m3,alpha,r0,dr0)
   !***  
   return
 end function fl3d
+
+
+!===============================================================================
+! to make it a module add the following lines at the top
+
+!!$MODULE VOF_FUNCTIONS
+!!$
+!!$  IMPLICIT NONE
+!!$
+!!$CONTAINS
+
+! and the following one at the bottom
+
+!!$END MODULE VOF_FUNCTIONS
+!===============================================================================
