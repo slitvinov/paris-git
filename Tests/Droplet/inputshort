@@ -23,7 +23,7 @@ GetPropertiesFromFront = F ! T: uses Front-Tracking data to compute mu, rho and 
 ZeroReynolds = F
 AdvectionScheme = 'QUICK'  ! 'Verstappen' , 'ENO'
 
-Implicit  = T     
+Implicit  = F     
 hypre     = F      ! T: uses hyprepackage, F: uses SOR solver 
 restart   = F       ! T: start the domain from a previous simulation
 restartFront = F    ! T: start the front from  a previous simulation
@@ -37,11 +37,11 @@ MaxDt   = 0.1d0    ! maximum size of time step
 dtFlag  = 1        ! 1: fixed dt;  2: fixed CFL
 dt      = 0.1d0    ! dt in case of dtFlag=1
 CFL     = 0.25
-MAXERROR= 1d-9     ! Residual for Poisson solver
+MAXERROR= 1d-8     ! Residual for Poisson solver
 MAXERRORVOL = 1d-6 ! Tolerance for Front Tracking
                    ! Numerical parameters
 
-ITIME_SCHEME = 2
+ITIME_SCHEME = 1
                    ! time scheme: 1:first order Euler, 2: second order quasi Crank-Nicolson
 
 MAXIT    = 2000

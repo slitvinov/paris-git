@@ -2,18 +2,21 @@
 #set -x
 
 moftrue=F
+plotlabel=nonMOF
 nfilter=1
 
 if [ $# -gt 0 ]; then
     if [ $1 == MoF ]; then
 	echo "using Mof"
 	moftrue=T
+	plotlabel=MOF
 	nfilter=0
     fi
 fi
 
 
 sed s/MOFTEMP/$moftrue/g inputvof.template | sed s/NFILTERTEMP/$nfilter/g > inputvof 
+sed s/nonMOF/$plotlabel/g plot.gp.orig > plot.gp
 
 
 rm -fR input out
@@ -27,7 +30,7 @@ set xlabel "time"
 set ylabel "w(0,0,R)"
 set term pdf
 set out "tmp.pdf"
-plot "out/droplet-test-vel.txt" notitle w l, 0 notitle
+load "plot.gp"
 set term png
 set out "tmp.png"
 replot
