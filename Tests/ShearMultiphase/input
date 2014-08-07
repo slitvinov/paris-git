@@ -27,11 +27,12 @@ Implicit  = F
 hypre     = F      ! T: uses hyprepackage, F: uses SOR solver 
 restart   = F       ! T: start the domain from a previous simulation
 restartFront = F    ! T: start the front from  a previous simulation
+AdvectionScheme = 'ENO'
 restartAverages = F
 nBackup  = 200000      ! number of time steps between  backups are kept.
 
-NSTEP   = 5000      ! maximum number of time steps
-EndTime = 380   ! When to stop simulation
+NSTEP   = 30000       ! maximum number of time steps
+EndTime = 2   ! When to stop simulation
 
 MaxDt   = 0.0002d0    ! maximum size of time step
 dtFlag  = 1           ! 1: fixed dt;  2: fixed CFL
@@ -75,7 +76,7 @@ Ng      = 2
 
 XLENGTH = 1d0
 YLENGTH = 1d0
-ZLENGTH = 1d0
+ZLENGTH = 0.015625
                    ! domain size in x,y,z direction
 
 read_x   = F       ! read the grid file for x-grid; If true xLength and xform are neglected

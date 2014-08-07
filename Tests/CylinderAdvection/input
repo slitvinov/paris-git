@@ -73,7 +73,7 @@ Ng      = 2
 
 XLENGTH = 1d0
 YLENGTH = 1d0
-ZLENGTH = 1d0
+ZLENGTH = 0.125d0
                    ! domain size in x,y,z direction
 
 read_x   = F       ! read the grid file for x-grid; If true xLength and xform are neglected
@@ -104,11 +104,11 @@ dPdZ      = 0.0
                    ! Px = (P(xLength)-P(0))/xLength
 
 RHO1    = 1.
-MU1     = 1.d-3
+MU1     = 0.d-3
                    ! rho1, mu1 : density and viscosity of the matrix phase
 
-RHO2    = 10.
-MU2     = 1.d-3
+RHO2    = 1.e5
+MU2     = 0.d-3
                    ! rho2, mu2 : properties of the drop
 SIGMA    = 0.0
 NumBubble =  1
