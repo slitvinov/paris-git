@@ -21,6 +21,8 @@ GetPropertiesFromFront = F ! T: uses Front-Tracking data to compute mu, rho and 
 		           ! F: uses VOF data to compute mu and rho. 
 
 ZeroReynolds = F
+AdvectionScheme = 'ENO' ! 'QUICK'  ! 'Verstappen' , 'ENO'
+
 Implicit  = F     
 hypre     = F      ! T: uses hyprepackage, F: uses SOR solver 
 restart   = F       ! T: start the domain from a previous simulation
@@ -28,11 +30,11 @@ restartFront = F    ! T: start the front from  a previous simulation
 restartAverages = F
 nBackup  = 200000      ! number of time steps between  backups are kept.
 
-NSTEP   = 600      ! maximum number of time steps
+NSTEP   = 5000      ! maximum number of time steps
 EndTime = 380   ! When to stop simulation
 
 MaxDt   = 0.0002d0    ! maximum size of time step
-dtFlag  = 1        ! 1: fixed dt;  2: fixed CFL
+dtFlag  = 1           ! 1: fixed dt;  2: fixed CFL
 dt      = 0.0002d0    ! dt in case of dtFlag=1
 CFL     = 0.25
 MAXERROR= 1d-5     ! Residual for Poisson solver
@@ -42,20 +44,20 @@ MAXERRORVOL = 1d-6 ! Tolerance for Front Tracking
 ITIME_SCHEME = 1
                    ! time scheme: 1:first order Euler, 2: second order quasi Crank-Nicolson
 
-MAXIT    = 500
+MAXIT    = 2000
 BETA     = 1.0
                     ! parameters for linear solver
 U_init   = 0.
 !=================================================================================================
 ! Output parameters
 
-termout  = 1
+termout  = 100
 ICOut    = T        ! output initial condition
-NOUT     = 20        ! write the solution to file every nout time steps
+NOUT     = 100        ! write the solution to file every nout time steps
 output_format = 2   ! 1:tecplot 2:vtk
 out_path = 'out'    ! name of the output directory
 
-nstats   = 20      ! number of time steps between flow statistics output
+nstats   = 1      ! number of time steps between flow statistics output
 
 !=================================================================================================
 ! Grid parameters

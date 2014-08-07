@@ -343,7 +343,7 @@ SUBROUTINE swpr(us,c,f,dir,vof1,cg,vof3)
      kk=1; dm1 => dmz;  dm2 => dmx;  dm3 => dmy 
   endif
   dxyz = dxh(is)
-  call test_cell_size()
+  ! call test_cell_size()
 
   do k=ks-1,ke+1
      do j=js-1,je+1

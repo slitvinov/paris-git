@@ -68,7 +68,7 @@ Program paris
   integer :: ierr, icolor
   integer :: req(48),sta(MPI_STATUS_SIZE,48)
   INTEGER :: irank, ii, i, j, k
-  real(8) :: residual,cflmax,get_cfl,residualu,residualv,residualw
+  real(8) :: residual,cflmax,get_cfl_and_check,residualu,residualv,residualw
   integer :: itu,itv,itw
 
 !---------------------------------------INITIALIZATION--------------------------------------------
@@ -151,14 +151,17 @@ Program paris
         call write_vec_gnuplot(u,v,cvof,p,itimestep,DoVOF)
         call calcstats
 
+        if(dtFlag==2)call TimeStepSize(dt)
+        cflmax = get_cfl_and_check(dt)
+
         if(rank==0) then
            end_time =  MPI_WTIME()
            open(unit=121,file='stats',access='append')
            write(121,'(22es14.6e2)')time,stats(1:15),dpdx,(stats(8)-stats(9))/dt,end_time-start_time
            close(121)
            write(out,'("Step:",I9," Iterations:",I9," cpu(s):",f10.2)')-1,0,end_time-start_time
-           write(*,'("Step:",I6," dt=",es16.5e2," time=",es16.5e2," cpu(s):",f11.3)')   &
-                itimestep,dt,time,end_time-start_time
+           write(*,  '("START:", I6," dt=",es16.5e2," time=",es16.5e2," cpu(s):",f11.3   ," cfl=",es16.5e2)') &
+                itimestep,dt,time,end_time-start_time,cflmax
 !           itimestep=0; ii=0
         endif
      endif
@@ -179,14 +182,13 @@ Program paris
         itimestep=itimestep+1
         if(mod(itimestep,termout)==0) then
            end_time =  MPI_WTIME()
-           cflmax = get_cfl(dt)
+           cflmax = get_cfl_and_check(dt)
            if(rank==0) &
                 write(out,'("Step: ",I10," dt=",es16.5e2," time=",es16.5e2," cfl="   ,es16.5e2)                 ') &
                 itimestep,dt,time                    ,cflmax
            if(rank==0) &
                 write(*,  '("Step: ", I6," dt=",es16.5e2," time=",es16.5e2," cpu(s):",f11.3   ," cfl=",es16.5e2)') &
                 itimestep,dt,time,end_time-start_time,cflmax
-           if(cflmax.gt.cflmax_allowed) call pariserror("CFL too large")
         endif
 
         if(itime_scheme==2) then
@@ -551,18 +553,20 @@ subroutine TimeStepSize(deltaT)
 
 end subroutine TimeStepSize
 !=================================================================================================
-function get_cfl(deltaT)
+function get_cfl_and_check(deltaT)
   use module_grid
   use module_flow
   implicit none
   include 'mpif.h'
   integer :: ierr
-  real(8) :: get_cfl,vmax,inbox_cfl,deltaT,h
+  real(8) :: get_cfl_and_check,vmax,inbox_cfl,deltaT,h,glogcfl
   vmax = maxval(sqrt(u(is:ie,js:je,ks:ke)**2 + v(is:ie,js:je,ks:ke)**2 + w(is:ie,js:je,ks:ke)**2))
   h  = minval(dx)
   inbox_cfl=vmax*deltaT/h
-  call MPI_ALLREDUCE(inbox_cfl, get_cfl, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_Cart, ierr)  
-end function get_cfl
+  call MPI_ALLREDUCE(inbox_cfl, glogcfl, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_Cart,ierr) 
+  get_cfl_and_check=glogcfl
+  if(get_cfl_and_check.gt.cflmax_allowed) call pariserror("CFL too large")
+end function get_cfl_and_check
 
 !=================================================================================================
 ! subroutine calcStats
