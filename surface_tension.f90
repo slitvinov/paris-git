@@ -559,7 +559,7 @@ contains
       deltax=dx(nx/2)
       do while (l.lt.3.and.dirnotfound)
          l = l+1
-         d = try(l)    ! on entry, try(l) sorts the directions , closest to normal first. 
+         d = try(l)    ! on entry, try(l) should sort the directions , closest to normal first. 
          if(d.eq.1) then
             si=1; sj=0; sk=0
          else if (d.eq.2) then
@@ -802,21 +802,22 @@ contains
       enddo
       ! *** determine curvature from centroids
       if ( (-nfound) > nfound_min )  then  ! more than 6 points to avoid special 2D degeneracy. 
-      !       if(1==0)  then ! Bypass the mixed height step as tests show it is less accurate
          xfit=points(:,try(2)) - origin(try(2))
          yfit=points(:,try(3)) - origin(try(3))
          hfit=points(:,try(1)) - origin(try(1))
          ! fit over all positions, not only independent ones. 
          call parabola_fit(xfit,yfit,hfit,nposit,a,fit_success) 
-         if(.not.fit_success) call pariserror("no fit success after mixed heights")
-         kappa = 2.d0*(a(1)*(1.d0+a(5)*a(5)) + a(2)*(1.d0+a(4)*a(4)) - a(3)*a(4)*a(5)) &
-              /(1.d0+a(4)*a(4)+a(5)*a(5))**(1.5d0)
-         kappa = sign(1.d0,mxyz(try(1)))*kappa
-         return
+         if(fit_success) then
+#ifdef COUNT
+            method_count(2) = method_count(2) + 1
+#endif
+            kappa = 2.d0*(a(1)*(1.d0+a(5)*a(5)) + a(2)*(1.d0+a(4)*a(4)) - a(3)*a(4)*a(5)) &
+                 /(1.d0+a(4)*a(4)+a(5)*a(5))**(1.5d0)
+            kappa = sign(1.d0,mxyz(try(1)))*kappa
+            return
+         endif
       endif
-      !       endif ! 1==0 ! ind_pos <= nfound_min
 
-      ! DO NOT Bypass the mixed height step as tests show it is less accurate
       ! Find all centroids in 3**3
       ! use direction closest to normal
       nposit=0

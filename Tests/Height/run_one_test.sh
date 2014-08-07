@@ -67,7 +67,7 @@ ln -s testinput-$dim-$nx-$radius input
 sed s/REFINEMENTTEMP/$refinement/g inputvof.template | sed s/TYPETEMP/$type/g  | sed s/CYLDIRTEMP/$cyldir/g | sed s/NORMUPTEMP/$normup/g > inputvof
 
 mpirun -np $npstart paris > tmpout 2>&1
-echo `awk ' /Step:/ { cpu = $8 } END { print "cpu = " cpu } ' < tmpout`
+echo `awk ' /START:/ { cpu = $8 } END { print "cpu = " cpu } ' < tmpout`
 
 if [ -d out ]; then
     cd out
