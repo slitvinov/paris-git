@@ -241,7 +241,7 @@ contains
     output_filtered_VOF=.false. ! redundant
     DoMOF = .false.
     use_vofi = .false.
-    nfilter = 1 
+    nfilter = 0 
     oldvof = .false.  ! .true.
     
     in=31
@@ -316,6 +316,7 @@ contains
     endif
     allocate(cvof(imin:imax,jmin:jmax,kmin:kmax),vof_flag(imin:imax,jmin:jmax,kmin:kmax))
     if (DoMOF) then
+      allocate(momentum(imin:imax,jmin:jmax,kmin:kmax,3))
       allocate(massflux(imin:imax,jmin:jmax,kmin:kmax,3,2))
     endif
     cvof = 0.d0
@@ -1098,6 +1099,221 @@ end subroutine get_half_fractions
    call update_momentum(w,3,cvof,tmp,massflux,dw)
     
   end subroutine vofandmomsweeps
+
+  subroutine get_momentum(c,us,d,mom)
+
+  use module_grid
+  use module_flow
+  use module_tmpvar
+
+  logical error
+  integer i,j,k,d
+  integer i0,j0,k0
+  integer i1,j1,k1
+  real(8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), intent(in)  :: c
+  real(8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), intent(in)  :: us
+  real(8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), intent(out) :: mom
+  real(8) rhoavg
+  real(8) alpha,fl3dnew,stencil3x3(-1:1,-1:1,-1:1)
+  real(8) dm(3),x0(3),deltax(3)
+
+  call init_i0j0k0 (d,i0,j0,k0)
+  
+  do k=ks-1,ke+1
+     do j=js-1,je+1
+        do i=is-1,ie+1
+           work(i,j,k,1) = cvof(i,j,k)
+           work(i,j,k,2) = cvof(i,j,k)
+           if ((cvof(i,j,k).gt.0.d0).and.(cvof(i,j,k).lt.1.d0)) then
+              do i1=-1,1; do j1=-1,1; do k1=-1,1
+                 stencil3x3(i1,j1,k1) = cvof(i+i1,j+j1,k+k1)
+              enddo;enddo;enddo
+              call fit_plane_new(cvof(i,j,k),d,0.d0,0.d0,stencil3x3,dm,alpha,error)
+              if (error) then
+                 work(i,j,k,1) = cvof(i,j,k)
+                 work(i,j,k,2) = cvof(i,j,k)
+              else
+                 x0=0d0
+                 deltax=1d0
+                 deltax(d)=0.5d0
+                 work(i,j,k,1) = 2.0d0*fl3dnew(dm,alpha,x0,deltax)
+                 x0(d)=0.5d0
+                 work(i,j,k,2) = 2.0d0*fl3dnew(dm,alpha,x0,deltax)
+              endif
+           endif
+
+           !        rhoavg = work(i,j,k,2)*rho2 + (1.d0-work(i,j,k,2))*rho1 
+           !        mom(i,j,k) = 0.5d0*us(i,j,k)*rhoavg
+           !        rhoavg = work(i,j,k,1)*rho2 + (1.d0-work(i,j,k,1))*rho1 
+           !        mom(i,j,k) = mom(i,j,k) + 0.5d0*us(i-i0,j-j0,k-k0)*rhoavg
+
+           rhoavg = cvof(i,j,k)*rho2 + (1.d0-cvof(i,j,k))*rho1
+           mom(i,j,k) = 0.5d0*(us(i,j,k)+us(i-i0,j-j0,k-k0))*rhoavg
+
+        enddo
+     enddo
+  enddo
+
+end subroutine get_momentum
+
+subroutine get_velocity_from_momentum (mom,d,us,der)
+  use module_grid
+  use module_flow
+  use module_BC
+  use module_tmpvar
+  implicit none
+  logical error
+  integer :: i,j,k
+  integer :: i0,j0,k0
+  integer :: i1,j1,k1
+  integer, intent(in) :: d
+  real(8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: mom
+  real(8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: us,der
+  real(8) tmpreal, rhoavg1,rhoavg2,mom1,mom2, uavg, cflag
+  real(8) alpha,fl3dnew,stencil3x3(-1:1,-1:1,-1:1)
+  real(8) dm(3),x0(3),deltax(3)
+  
+  do k=ks-1,ke+1
+     do j=js-1,je+1
+        do i=is-1,ie+1
+            call get_half_fractions(cvof,d,i,j,k,work(i,j,k,1),work(i,j,k,2))
+        enddo
+     enddo
+  enddo
+
+  call do_all_ghost(work(:,:,:,1))
+  call do_all_ghost(work(:,:,:,2))
+
+  call init_i0j0k0 (d,i0,j0,k0)
+
+  do k=ks-1,ke+1
+    do j=js-1,je+1
+      do i=is-1,ie+1
+        ! if interface rewrite interface velocity
+        cflag =  (cvof(i-1,j,k)+ cvof(i,j,k) + cvof(i-2,j,k) &
+        +cvof(i,j-1,k)+ cvof(i,j,k) + cvof(i,j-2,k) &
+        +cvof(i,j,k-1)+ cvof(i,j,k) + cvof(i,j,k-2))/9.d0
+        cflag = cvof(i-i0,j-j0,k-k0)
+        rhoavg1   = rho2*cvof(i,j,k) + rho1*(1.d0 - cvof(i,j,k))
+        uavg      = mom(i,j,k)/rhoavg1
+
+        rhoavg1   = rho2*work(i,j,k,1) + rho1*(1.d0 - work(i,j,k,1))
+        if (us(i,j,k).gt.0.d0) then
+            uavg      = us(i,j,k)
+        else
+            uavg      = us(i+i0,j+j0,k+k0)
+        endif
+        mom1      = rhoavg1*uavg
+
+        rhoavg2   = rho2*work(i-i0,j-j0,k-k0,2) + rho1*(1.d0 - work(i-i0,j-j0,k-k0,2))
+        tmpreal   = rho2*cvof(i-i0,j-j0,k-k0) + rho1*(1.d0 - cvof(i-i0,j-j0,k-k0))
+        uavg      = mom(i-i0,j-j0,k-k0)/tmpreal
+        if (us(i,j,k).gt.0.d0) then
+            uavg      = us(i-i0,j-j0,k-k0)
+        else
+            uavg      = us(i,j,k)
+        endif
+        mom2      = rhoavg2*uavg
+
+        tmpreal = (mom1+mom2)/(rhoavg1+rhoavg2)
+
+!        rhoavg1   = rho2*cvof(i,j,k) + rho1*(1.d0 - cvof(i,j,k))
+!        uavg      = mom(i,j,k)/rhoavg1
+!        mom1      = rhoavg1*uavg
+!        rhoavg2   = rho2*cvof(i-i0,j-j0,k-k0) + rho1*(1.d0 - cvof(i-i0,j-j0,k-k0))
+!        tmpreal   = 0.5d0*(uavg + mom(i-i0,j-j0,k-k0)/rhoavg2)
+
+        if ((cflag.gt.0.d0).and.(cflag.lt.1.d0)) then
+          der(i-i0,j-j0,k-k0) = (tmpreal - us(i-i0,j-j0,k-k0))/dt
+        endif
+      enddo
+    enddo
+  enddo
+
+  call do_all_ghost(der)
+
+end subroutine get_velocity_from_momentum
+
+  subroutine vofandmomsweepsold(tswap)
+    use module_BC
+    use module_flow
+    use module_tmpvar
+    implicit none
+    integer i
+    integer, intent(in) :: tswap
+
+    call get_momentum(cvof,u,1,momentum(:,:,:,1))
+    call get_momentum(cvof,v,2,momentum(:,:,:,2))
+    call get_momentum(cvof,w,3,momentum(:,:,:,3))
+    
+    if (VOF_advect=='Dick_Yue') call c_mask(work(:,:,:,2))
+    if (MOD(tswap,3).eq.0) then  ! do z then x then y 
+       do i=1,3
+         call swpmom(w,cvof,vof_flag,3,work(:,:,:,1),work(:,:,:,2), &
+                    work(:,:,:,3),momentum(:,:,:,i))
+       enddo
+       call swp(w,cvof,vof_flag,3,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3))
+
+       do i=1,3
+         call swpmom(u,cvof,vof_flag,1,work(:,:,:,1),work(:,:,:,2), &
+                    work(:,:,:,3),momentum(:,:,:,i))
+       enddo
+       call swp(u,cvof,vof_flag,1,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3))
+
+       do i=1,3
+         call swpmom(v,cvof,vof_flag,2,work(:,:,:,1),work(:,:,:,2), &
+                    work(:,:,:,3),momentum(:,:,:,i))
+       enddo
+       call swp(v,cvof,vof_flag,2,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3))
+
+    elseif (MOD(tswap,3).eq.1) then ! do y z x
+
+       do i=1,3
+         call swpmom(v,cvof,vof_flag,2,work(:,:,:,1),work(:,:,:,2), &
+                    work(:,:,:,3),momentum(:,:,:,i))
+       enddo
+       call swp(v,cvof,vof_flag,2,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3))
+
+       do i=1,3
+         call swpmom(w,cvof,vof_flag,3,work(:,:,:,1),work(:,:,:,2), &
+                    work(:,:,:,3),momentum(:,:,:,i))
+       enddo
+       call swp(w,cvof,vof_flag,3,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3))
+
+       do i=1,3
+         call swpmom(u,cvof,vof_flag,1,work(:,:,:,1),work(:,:,:,2), &
+                    work(:,:,:,3),momentum(:,:,:,i))
+       enddo
+       call swp(u,cvof,vof_flag,1,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3))
+
+    else ! do x y z
+
+       do i=1,3
+         call swpmom(u,cvof,vof_flag,1,work(:,:,:,1),work(:,:,:,2), &
+                    work(:,:,:,3),momentum(:,:,:,i))
+       enddo
+       call swp(u,cvof,vof_flag,1,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3))
+
+       do i=1,3
+         call swpmom(v,cvof,vof_flag,2,work(:,:,:,1),work(:,:,:,2), &
+                    work(:,:,:,3),momentum(:,:,:,i))
+       enddo
+       call swp(v,cvof,vof_flag,2,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3))
+
+       do i=1,3
+         call swpmom(w,cvof,vof_flag,3,work(:,:,:,1),work(:,:,:,2), &
+                    work(:,:,:,3),momentum(:,:,:,i))
+       enddo
+       call swp(w,cvof,vof_flag,3,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3))
+
+   endif
+    
+   call get_velocity_from_momentum (momentum(:,:,:,1),1,u,du)
+   call get_velocity_from_momentum (momentum(:,:,:,2),2,v,dv)
+   call get_velocity_from_momentum (momentum(:,:,:,3),3,w,dw)
+
+  end subroutine vofandmomsweepsold
+
 !-------------------------------------------------------------------------------------------------
 !-------------------------------------------------------------------------------------------------
 ! subroutine SetVOFBC: Sets the VOF fraction boundary condition

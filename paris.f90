@@ -215,7 +215,7 @@ Program paris
            call my_timer(3)
            if(DoVOF) then
               if (DoMOF) then
-                 call vofandmomsweeps(itimestep)
+                 call vofandmomsweepsold(itimestep)
               else
                  call vofsweeps(itimestep)
               endif
