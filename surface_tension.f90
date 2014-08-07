@@ -36,6 +36,8 @@ module module_surface_tension
   use module_VOF
   implicit none
   real(8), parameter :: kappamax = 2.d0
+  integer, parameter :: nfound_min= 6 ! DO NOT Bypass the mixed height step as tests show it is less accurate
+
   integer, parameter :: NDEPTH=3
   integer, parameter :: BIGINT=100
   real(8), parameter :: D_HALF_BIGINT = DBLE(BIGINT/2)
@@ -788,8 +790,10 @@ contains
          kappa = sign(1.d0,mxyz(try(1)))*kappa
          return
       else 
-         nfound = - 10   ! encode the fact that less than 9 heights in same direction were found. 
-         ! ind_pos(points,nposit) 
+!          nfound = - 10   ! encode the fact that less than 9 heights in same direction were found. 
+!          ! ind_pos(points,nposit) 
+!       endif ! nfound == 9
+         nfound = - ind_pos(points,nposit) 
       endif ! nfound == 9
       ! *** determine the origin. 
       call FindCutAreaCentroid(i0,j0,k0,centroid)
@@ -797,7 +801,22 @@ contains
          origin(n) = centroid(n)
       enddo
       ! *** determine curvature from centroids
-      ! Bypass the mixed height step as tests show it is less accurate
+      if ( (-nfound) > nfound_min )  then  ! more than 6 points to avoid special 2D degeneracy. 
+      !       if(1==0)  then ! Bypass the mixed height step as tests show it is less accurate
+         xfit=points(:,try(2)) - origin(try(2))
+         yfit=points(:,try(3)) - origin(try(3))
+         hfit=points(:,try(1)) - origin(try(1))
+         ! fit over all positions, not only independent ones. 
+         call parabola_fit(xfit,yfit,hfit,nposit,a,fit_success) 
+         if(.not.fit_success) call pariserror("no fit success after mixed heights")
+         kappa = 2.d0*(a(1)*(1.d0+a(5)*a(5)) + a(2)*(1.d0+a(4)*a(4)) - a(3)*a(4)*a(5)) &
+              /(1.d0+a(4)*a(4)+a(5)*a(5))**(1.5d0)
+         kappa = sign(1.d0,mxyz(try(1)))*kappa
+         return
+      endif
+      !       endif ! 1==0 ! ind_pos <= nfound_min
+
+      ! DO NOT Bypass the mixed height step as tests show it is less accurate
       ! Find all centroids in 3**3
       ! use direction closest to normal
       nposit=0
