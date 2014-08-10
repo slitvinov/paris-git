@@ -10,7 +10,6 @@ refinement = 8
 DoMOF = MOFTEMP
 use_vofi = T
 nfilter = NFILTERTEMP
-OLDVOF = T	
 !=================================================================================================
 
 &end
