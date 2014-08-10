@@ -442,11 +442,11 @@ END SUBROUTINE CENT3D
 ! PROGRAM TO FIND alpha IN: m1 x1 + m2 x2 + m3 x3 = alpha,
 ! GIVEN m1+m2+m3=1 (all > 0) AND THE VOLUMETRIC FRACTION cc
 ! ****** 1 ******* 2 ******* 3 ******* 4 ******* 5 ******* 6 ******* 7 *
-function al3d(b1,b2,b3,cc)
+function al3dOLD(b1,b2,b3,cc)
   !***
   implicit none
   real(8) m1,m2,m3,cc,b1,b2,b3,tmp,pr,ch,mm,m12
-  real(8) p,p12,q,teta,cs,al3d
+  real(8) p,p12,q,teta,cs,al3dOLD
   real(8) untier,v1,v2,v3
   parameter (untier=1.d0/3.d0)
   intrinsic dmax1,dmin1,dsqrt,dacos,dcos
@@ -483,40 +483,40 @@ function al3d(b1,b2,b3,cc)
   ch = DMIN1(cc,1.d0-cc)
   !*(4)*      
   if (ch .LT. V1) then
-     !***         AL3D = cbrt(pr*ch)
-     AL3D = (pr*ch)**UNTIER
+     !***         AL3DOLD = cbrt(pr*ch)
+     AL3DOLD = (pr*ch)**UNTIER
   else if (ch .LT. V2) then
-     AL3D = 0.5d0*(m1 + DSQRT(m1*m1 + 8.d0*m2*m3*(ch-V1)))
+     AL3DOLD = 0.5d0*(m1 + DSQRT(m1*m1 + 8.d0*m2*m3*(ch-V1)))
   else if (ch .LT. V3) then
      p = 2.d0*m1*m2
      q = 1.5d0*m1*m2*(m12 - 2.d0*m3*ch)
      p12 = DSQRT(p)
      teta = DACOS(q/(p*p12))/3.d0
      cs = DCOS(teta)
-     AL3D = p12*(DSQRT(3.d0*(1.d0-cs*cs)) - cs) + m12
+     AL3DOLD = p12*(DSQRT(3.d0*(1.d0-cs*cs)) - cs) + m12
   else if (m12 .LT. m3) then
-     AL3D = m3*ch + 0.5d0*mm
+     AL3DOLD = m3*ch + 0.5d0*mm
   else 
      p = m1*(m2+m3) + m2*m3 - 0.25d0
      q = 1.5d0*m1*m2*m3*(0.5d0-ch)
      p12 = DSQRT(p)
      teta = DACOS(q/(p*p12))/3.0
      cs = DCOS(teta)
-     AL3D = p12*(DSQRT(3.d0*(1.d0-cs*cs)) - cs) + 0.5d0
+     AL3DOLD = p12*(DSQRT(3.d0*(1.d0-cs*cs)) - cs) + 0.5d0
   endif
 
-  if (cc .GT. 0.5d0)  AL3D = 1.d0 - AL3D
+  if (cc .GT. 0.5d0)  AL3DOLD = 1.d0 - AL3DOLD
   !***
   return
-end function al3d
+end function al3dOLD
 ! ****** 1 ******* 2 ******* 3 ******* 4 ******* 5 ******* 6 ******* 7 *
 ! PROGRAM TO FIND THE "CUT VOLUME" V0 GIVEN r0, dr0 AND
 ! m1 x1 + m2 x2 + m3 x3 = alpha
 ! ****** 1 ******* 2 ******* 3 ******* 4 ******* 5 ******* 6 ******* 7 *
-function fl3d(m1,m2,m3,alpha,r0,dr0)
+function fl3dOLD(m1,m2,m3,alpha,r0,dr0)
   !***
   implicit none
-  real(8) m1,m2,m3,alpha,r0,dr0,fl3D
+  real(8) m1,m2,m3,alpha,r0,dr0,fl3DOLD
   real(8) al,al0,n1,n2,n3,b1,b2,b3,b12,bm,tmp,pr
   INTRINSIC DMAX1,DMIN1,DABS
   !***
@@ -566,13 +566,13 @@ function fl3d(m1,m2,m3,alpha,r0,dr0)
   endif
 
   if (al .LE. 0.5d0) then
-     FL3D = tmp*dr0
+     FL3DOLD = tmp*dr0
   else
-     FL3D = (1.d0-tmp)*dr0
+     FL3DOLD = (1.d0-tmp)*dr0
   endif
   !***  
   return
-end function fl3d
+end function fl3dOLD
 
 
 !===============================================================================

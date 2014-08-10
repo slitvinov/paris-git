@@ -35,7 +35,7 @@ subroutine setuppoisson_fs(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask,cvof
   real(8), dimension(is:ie,js:je,ks:ke) :: x_int, y_int, z_int
   real(8) :: alpha, x_test, y_test, z_test, n_x, n_y, n_z
   real(8) :: x_l, x_r, y_b, y_t, z_r, z_f
-  real(8) :: al3d
+  real(8) :: nr(3),al3dnew
   real(8) :: dt, limit
   integer :: i,j,k,l
 
@@ -47,8 +47,8 @@ subroutine setuppoisson_fs(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask,cvof
      if(cvof(i,j,k) >= 0.5d0) then ! pressure 0 in the cvof=1 phase. 
         pmask(i,j,k) = 0d0
 
-        n_x = ABS(n1(i,j,k)); n_y = ABS(n2(i,j,k)); n_z = ABS(n3(i,j,k))
-        alpha = al3d(n_x,n_y,n_z,cvof(i,j,k))
+        nr(1) = n1(i,j,k);         nr(2) = n2(i,j,k);         nr(3) = n3(i,j,k)
+        alpha = al3dnew(nr,cvof(i,j,k))
 
         if (n_x .ne. 0.d0) then
            x_test = (alpha - (n_y+n_z)/2d0)/n_x
@@ -103,8 +103,9 @@ subroutine setuppoisson_fs(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask,cvof
      endif
 
      if (cvof(i,j,k)>0d0 .and. cvof(i,j,k)<0.5d0) then
-        n_x = ABS(n1(i,j,k)); n_y = ABS(n2(i,j,k)); n_z = ABS(n3(i,j,k))
-        alpha = al3d(n_x,n_y,n_z,cvof(i,j,k))
+
+        nr(1) = n1(i,j,k);         nr(2) = n2(i,j,k);         nr(3) = n3(i,j,k)
+        alpha = al3dnew(nr,cvof(i,j,k))
 
         if (n_x .ne. 0.d0) then
            x_test = (alpha - (n_y+n_z)/2d0)/n_x

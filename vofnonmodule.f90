@@ -617,13 +617,13 @@ subroutine ls2vof_in_cell(stencil3x3,c,nflag)
   implicit none
   real(8), intent(out):: c
   integer, intent(out):: nflag
-  real(8) :: zero, one, norml1
+  real(8) :: zero(3), one(3), norml1
   real(8) :: mx,my,mz,alpha
-  real(8) :: fl3d
+  real(8) :: fl3dnew
   real(8) :: mxyz(3),stencil3x3(-1:1,-1:1,-1:1)
 
-  zero=0.d0
-  one=1.d0
+  zero=0d0
+  one=1d0
   !***
   !     (1) gradient*32: mx,my,mz; (2) mx,my,mz>0. and mx+my+mz = 1.;
   !     (3) normalize alpha = level set at center. Cell units. 
@@ -635,9 +635,9 @@ subroutine ls2vof_in_cell(stencil3x3,c,nflag)
   !***
   !     *(2)*  
   !***
-  mx = dabs(mxyz(1)); my = dabs(mxyz(2)); mz = dabs(mxyz(3))
-  norml1 = mx+my+mz
-  mx = mx/norml1;     my = my/norml1;     mz = mz/norml1
+  mxyz = dabs(mxyz)
+  norml1 = sum(mxyz)
+  mxyz = mxyz/norml1
   !***
   !     *(3)*  
   !***
@@ -657,7 +657,7 @@ subroutine ls2vof_in_cell(stencil3x3,c,nflag)
      c = 0.d0
      nflag = 0 
   else 
-     c = fl3d(mx,my,mz,alpha,zero,one)
+     c = fl3dnew(mxyz,alpha,zero,one)
      nflag = 2
   end if
   return
@@ -875,7 +875,6 @@ subroutine fd32(c,mm)
 ! Therefore an isolated droplet will have
 ! a normal with all components to zero. 
 !
-!
 subroutine youngs(c,mm)
   !***
   implicit none
@@ -885,10 +884,9 @@ subroutine youngs(c,mm)
   real(8) :: norm
 
   call fd32(c,mm)
-  norm = abs(mm(0))+abs(mm(1))+abs(mm(2)) ! + TINY
-  do i=0,2
-     mm(i) = mm(i)/norm
-  enddo
+  norm = sum(abs(mm)) ! + TINY
+  mm = mm/norm
+
   return 
 end subroutine youngs
 

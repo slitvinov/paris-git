@@ -16,7 +16,7 @@ fi
 
 
 sed s/MOFTEMP/$moftrue/g inputvof.template | sed s/NFILTERTEMP/$nfilter/g > inputvof 
-sed s/nonMOF/$plotlabel/g plot.gp.orig > plot.gp
+sed s/nonMOF/$plotlabel/g plot.gp.template > plot.gp
 
 
 rm -fR input out

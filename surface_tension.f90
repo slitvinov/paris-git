@@ -168,9 +168,8 @@ contains
      implicit none
      include 'mpif.h'
      integer :: i,j,k, iter_FS, q, r
-     real(8) :: n_x, n_y, n_z
      real(8) :: n_1, n_2, n_3, x_cut, y_cut, xz_cut
-     real(8) :: alpha, al3d, P_a, Src
+     real(8) :: alpha, al3dnew, nr(3), P_a, Src
      real(8) :: dtau, SS_error
      real(8) :: du_x, du_y, du_z, dv_x, dv_y, dv_z, dw_x, dw_y, dw_z
      real(8) :: a_l, a_rt, a_t, a_b, a_f, a_rr
@@ -182,8 +181,8 @@ contains
      !this loop masks extrapolated velocity locations 
      do k=ks,ke; do j=js,je; do i=is,ie
         if (vof_flag(i,j,k) == 2) then
-           n_1 = ABS(n1(i,j,k)); n_2 = ABS(n2(i,j,k)); n_3 = ABS(n3(i,j,k))
-           alpha = al3d(n_1,n_2,n_3,cvof(i,j,k))
+           nr(1) = n1(i,j,k);         nr(2) = n2(i,j,k);         nr(3) = n3(i,j,k)
+           alpha = al3dnew(nr,cvof(i,j,k))
            !=========Set mask for u-velocity in cut-cells          
            if (n_1 < 1d-49) n_1 = 1d-49
            x_cut = (alpha - n_3/2d0)/n_1
@@ -347,11 +346,11 @@ contains
               c0 = c(d) ! start of stack
               c1 = c0 + sign*ndepth ! middle of stack starting at c0 in direction sign
               limit_not_found=.true.
-              call verify_indices(c(1),c(2),c(3),index,0)
+              !call verify_indices(c(1),c(2),c(3),index,0)
               height_found  = height(c(1),c(2),c(3),index)<D_HALF_BIGINT
               do while (limit_not_found) 
-                 call verify_indices(c(1),c(2),c(3),index,1)
-                 call verify_indices(i,j,k,1,2)
+                 !call verify_indices(c(1),c(2),c(3),index,1)
+                 !call verify_indices(i,j,k,1,2)
                  same_flag = s>0.and.vof_flag(c(1),c(2),c(3))==vof_flag(i,j,k)
                  height_p = height_p + (cvof(c(1),c(2),c(3)) - 0.5d0)*normalsign
                  limit_not_found = .not.(vof_flag(c(1),c(2),c(3))==flag_other_end &
@@ -371,7 +370,7 @@ contains
                        ! necessarily reached. Add these terms. Here s = c(d) - c0
                        height_p = height_p + (2*ndepth-s)*(cvof(c(1),c(2),c(3))-0.5d0)*normalsign
                        do while (c(d)/=(c0-sign))
-                          call verify_indices(c(1),c(2),c(3),index,3)
+                          !call verify_indices(c(1),c(2),c(3),index,3)
                           height(c(1),c(2),c(3),index) = height_p + c1 - c(d)
                           !                    call check_all(c(1),c(2),c(3),index)
                           c(d) = c(d) - sign ! go back down
@@ -381,7 +380,7 @@ contains
                        height_p = height_p + (- cvof(c(1),c(2),c(3)) + 0.5d0)*normalsign ! remove last addition
                        c(d) = c(d) - sign ! go back one step to climit
                        ! (**) here s = c(d) - c0 + 1 and s=1 for c(d)=c0=climit
-                       call verify_indices(c(1),c(2),c(3),index,4)
+                       !call verify_indices(c(1),c(2),c(3),index,4)
                        height(c(1),c(2),c(3),index) = height_p + BIGINT*s 
                        !                call check_all(c(1),c(2),c(3),index)
                     endif        ! last possible case: reached ndepth and no proper height : do nothing
@@ -390,28 +389,28 @@ contains
            enddo ! sign
         endif ! vof_flag
      enddo; enddo; enddo;  ! i,j,k
-     contains
-       subroutine verify_indices(i,j,k,index,pass)
-         implicit none
-         include 'mpif.h'
-         integer, intent(in) :: i,j,k
-         integer, intent(in) :: index,pass
-         integer :: ierr
-         if(i.lt.imin.or.i.gt.imax.or.   &
-              j.lt.jmin.or.j.gt.jmax.or. &
-              k.lt.kmin.or.k.gt.kmax.or. &
-              index.lt.1.or.index.gt.6) then 
-            OPEN(UNIT=88,FILE=TRIM(out_path)//'/error-rank-'//TRIM(int2text(rank,padding))//'.txt')
-            write(88,*) "imin,imax,jmin,jmax,kmin,kmax",imin,imax,jmin,jmax,kmin,kmax
-            write(88,*) "i,j,k,index,pass",i,j,k,index,pass
-            close(88)
-            close(out)
-            if(rank==0) print *, "index error in get_heights"
-            call MPI_abort(MPI_COMM_WORLD, ierr)
-            call MPI_finalize(ierr)
-            stop 
-         end if
-       end subroutine verify_indices
+!      contains
+!        subroutine verify_indices(i,j,k,index,pass)
+!          implicit none
+!          include 'mpif.h'
+!          integer, intent(in) :: i,j,k
+!          integer, intent(in) :: index,pass
+!          integer :: ierr
+!          if(i.lt.imin.or.i.gt.imax.or.   &
+!               j.lt.jmin.or.j.gt.jmax.or. &
+!               k.lt.kmin.or.k.gt.kmax.or. &
+!               index.lt.1.or.index.gt.6) then 
+!             OPEN(UNIT=88,FILE=TRIM(out_path)//'/error-rank-'//TRIM(int2text(rank,padding))//'.txt')
+!             write(88,*) "imin,imax,jmin,jmax,kmin,kmax",imin,imax,jmin,jmax,kmin,kmax
+!             write(88,*) "i,j,k,index,pass",i,j,k,index,pass
+!             close(88)
+!             close(out)
+!             if(rank==0) print *, "index error in get_heights"
+!             call MPI_abort(MPI_COMM_WORLD, ierr)
+!             call MPI_finalize(ierr)
+!             stop 
+!          end if
+!        end subroutine verify_indices
    end subroutine get_heights_pass1  
 !
 !  Enable parallel computation: exchange information accross boundaries. 
@@ -1089,7 +1088,7 @@ contains
       integer :: l,m,n
       real(8) :: dmx,dmy,dmz, mxyz(3),px,py,pz
       real(8) :: invx,invy,invz
-      real(8) :: alpha, al3d, nr(3)
+      real(8) :: alpha, al3dold, nr(3)
       real(8) :: stencil3x3(-1:1,-1:1,-1:1)
 
       ! find cut area centroid 
@@ -1113,7 +1112,7 @@ contains
          nr(3) = n3(i,j,k)
       endif
 
-      if(oldvof) then
+     if(oldvof) then
          dmx = nr(1); dmy = nr(2); dmz = nr(3)
          !*(2)*  
          invx = 1.d0
@@ -1132,7 +1131,7 @@ contains
          invz = -1.d0
       endif
       !*(3)*  
-      alpha = al3d(dmx,dmy,dmz,cvof(i,j,k))
+      alpha = al3dold(dmx,dmy,dmz,cvof(i,j,k))
       !*(4)*  
       call PlaneAreaCenter(dmx,dmy,dmz,alpha,px,py,pz)
       !*(5)*
@@ -1149,9 +1148,9 @@ contains
       centroid(1) = centroid(1) - invx*0.5d0
       centroid(2) = centroid(2) - invy*0.5d0
       centroid(3) = centroid(3) - invz*0.5d0
-      else
+     else
          call cent3D(nr,cvof(i,j,k),centroid)
-      endif
+     endif
    end subroutine FindCutAreaCentroid
 ! 
 !   Computes the centroid as in gerris

@@ -318,9 +318,9 @@ subroutine PlotCutAreaCentroid(i,j,k,centroid,x1,y1,xvec,yvec)
       integer, intent(in)  :: i,j,k
       real(8), intent(out) :: centroid(3),x1,y1,xvec,yvec
       integer :: l,m,n
-      real(8) :: dmx,dmy,dmz, mxyz(3),px,py,pz
+      real(8) :: nr(3),mxyz(3),px,py,pz,dmx,dmy
       real(8) :: invx,invy
-      real(8) :: alpha, al3d
+      real(8) :: alpha, al3dnew
       real(8) :: stencil3x3(-1:1,-1:1,-1:1)
       logical :: inv, swap
       real(8) :: deltax, tmp
@@ -329,10 +329,6 @@ subroutine PlotCutAreaCentroid(i,j,k,centroid,x1,y1,xvec,yvec)
       ! plot cut area centroid 
       !***
       !     (1) normal vector: dmx,dmy,dmz, and |dmx|+|dmy|+|dmz| = 1.
-      !     (2) dmx,dmy,dmz>0 and record sign
-      !     (3) get alpha;               
-      !     (4) compute centroid with dmx,dmy,dmz and alpha;
-      !     (5) transfer to local coordinate;
       !*(1)*
 
       if(recomputenormals) then
@@ -340,36 +336,37 @@ subroutine PlotCutAreaCentroid(i,j,k,centroid,x1,y1,xvec,yvec)
             stencil3x3(l,m,n) = cvof(i+l,j+m,k+n)
          enddo;enddo;enddo
          call youngs(stencil3x3,mxyz)
-         dmx = mxyz(1)
-         dmy = mxyz(2)
-         dmz = mxyz(3)      
+         nr = mxyz
       else
-         dmx = n1(i,j,k)      
-         dmy = n2(i,j,k)      
-         dmz = n3(i,j,k)
+         nr(1) = n1(i,j,k)      
+         nr(2) = n2(i,j,k)      
+         nr(3) = n3(i,j,k)
       endif
-      if(abs(dmz).gt.EPS_GEOM) call pariserror("PCAC: invalid dmz.")
+      dmx = nr(1)
+      dmy = nr(2)
+      if(abs(nr(3)).gt.EPS_GEOM) call pariserror("PCAC: invalid dmz.")
       !*(2)*  
-      invx = 1.d0
-      invy = 1.d0
-      if (dmx .lt. 0.0d0) then
-         dmx = -dmx
-         invx = -1.d0
-      endif
-      if (dmy .lt. 0.0d0) then
-         dmy = -dmy
-         invy = -1.d0
-      endif
-      alpha = al3d(dmx,dmy,dmz,cvof(i,j,k))
+!       invx = 1.d0
+!       invy = 1.d0
+!       if (dmx .lt. 0.0d0) then
+!          dmx = -dmx
+!          invx = -1.d0
+!       endif
+!       if (dmy .lt. 0.0d0) then
+!          dmy = -dmy
+!          invy = -1.d0
+!       endif
+!       alpha = al3d(nr,cvof(i,j,k))
       !*(4)*  
-      call PlaneAreaCenter(dmx,dmy,dmz,alpha,px,py,pz)
+      call cent3D(nr,cvof(i,j,k),centroid)
+!      call PlaneAreaCenter(dmx,dmy,dmz,alpha,px,py,pz)
       !*(5)*
       ! rotate
-      centroid(1) = px*invx
-      centroid(2) = py*invy
+!      centroid(1) = px*invx
+!      centroid(2) = py*invy
       ! shift to cell-center coordinates
-      centroid(1) = centroid(1) - invx*0.5d0
-      centroid(2) = centroid(2) - invy*0.5d0
+      centroid(1) = centroid(1) - 0.5d0
+      centroid(2) = centroid(2) - 0.5d0
       ! rescale
 !      do n=1,2; centroid(n) = deltax*centroid(n); enddo
       !*(6) 
@@ -418,9 +415,9 @@ subroutine PlotCutAreaCentroid(i,j,k,centroid,x1,y1,xvec,yvec)
       yvec = yvec*invy*deltax
       ! shift
       x1 = x1 + x(i)
-      centroid(1) = centroid(1)
+      ! centroid(1) = centroid(1)
       y1 = y1 + y(j)
-      centroid(2) = centroid(2)
+      ! centroid(2) = centroid(2)
    end subroutine PlotCutAreaCentroid
 
   end module module_st_testing
