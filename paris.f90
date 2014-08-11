@@ -10,6 +10,7 @@
 !         Sadegh Dabiri      
 !         Daniel Fuster      
 ! 	  Yue "Stanley" Ling 
+!         Leon Malan
 !         Ruben Scardovelli  
 !         Gretar Tryggvason  
 !         Phil Yecko         
@@ -17,7 +18,7 @@
 !
 ! Extended from or inspired by Codes: 
 !      - FTC3D2011 (Front Tracking Code for 3D simulations) by Gretar Tryggvason and Sadegh Dabiri      
-!      - Surfer VOF code by Stephane Zaleski and Ruben Scardovelli and others
+!      - Surfer VOF code by Stephane Zaleski, Ruben Scardovelli and others
 !      - Gerris Flow Solver by Stephane Popinet
 !
 ! GPL Licence
