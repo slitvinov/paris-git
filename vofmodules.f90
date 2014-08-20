@@ -37,6 +37,9 @@ module module_VOF
   !   1 full
   !   2 fractional
   !   3 unknown
+  integer, dimension(:,:,:), allocatable :: vof_phase
+  !   0 cvof <= 0.5 liquid phase in free surface
+  !   1 cvof > 0.5 gas phase in free surface
 
   real(8), parameter  :: A_h = 2d0  ! For initialisation of height test
   real(8), parameter  :: TINY = 1d-50
@@ -314,13 +317,15 @@ contains
           stop
        endif
     endif
-    allocate(cvof(imin:imax,jmin:jmax,kmin:kmax),vof_flag(imin:imax,jmin:jmax,kmin:kmax))
+    allocate(cvof(imin:imax,jmin:jmax,kmin:kmax),vof_flag(imin:imax,jmin:jmax,kmin:kmax),&
+         vof_phase(imin:imax,jmin:jmax,kmin:kmax))
     if (DoMOF) then
       allocate(momentum(imin:imax,jmin:jmax,kmin:kmax,3))
       allocate(massflux(imin:imax,jmin:jmax,kmin:kmax,3,2))
     endif
     cvof = 0.d0
     vof_flag = 3
+    vof_phase = 2
     !allocate matrices for Free Surface
     if(FreeSurface) then
        allocate(u_c(imin:imax,jmin:jmax,kmin:kmax), du_c(imin:imax,jmin:jmax,kmin:kmax), &
@@ -410,6 +415,11 @@ or none at all")
                 cvof(i,j,k) = 1.d0
              else
                 vof_flag(i,j,k) = 2
+             endif
+             if (cvof(i,j,k)<0.5d0) then
+                vof_phase(i,j,k) = 0
+             else
+                vof_phase(i,j,k) = 1
              endif
           enddo
        enddo
