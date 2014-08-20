@@ -228,7 +228,7 @@ contains
     logical ViscMeanIsArith, DensMeanIsArith
     namelist /vofparameters/ vofbdry_cond,test_type,VOF_advect,refinement, &
        cylinder_dir, normal_up, DoLPP, &
-       FreeSurface, ViscMeanIsArith, DensMeanIsArith, MAXERROR_FS, MAXIT_FS, &
+       FreeSurface, ViscMeanIsArith, DensMeanIsArith, &
        output_filtered_VOF, DoMOF, use_vofi,nfilter ! ,oldvof
     
 !     vofbdry_cond=['periodic','periodic','periodic','periodic','periodic','periodic']
@@ -328,13 +328,8 @@ contains
     vof_phase = 2
     !allocate matrices for Free Surface
     if(FreeSurface) then
-       allocate(u_c(imin:imax,jmin:jmax,kmin:kmax), du_c(imin:imax,jmin:jmax,kmin:kmax), &
-            v_c(imin:imax,jmin:jmax,kmin:kmax), dv_c(imin:imax,jmin:jmax,kmin:kmax), &
-            w_c(imin:imax,jmin:jmax,kmin:kmax), dw_c(imin:imax,jmin:jmax,kmin:kmax), &
-            u_cold(imin:imax,jmin:jmax,kmin:kmax), v_cold(imin:imax,jmin:jmax,kmin:kmax), &
-            w_cold(imin:imax,jmin:jmax,kmin:kmax), x_mod(imin:imax,jmin:jmax,kmin:kmax), &
-            y_mod(imin:imax,jmin:jmax,kmin:kmax), z_mod(imin:imax,jmin:jmax,kmin:kmax))
-       u_cold = 0d0; v_cold = 0d0; w_cold = 0d0
+       allocate(x_mod(imin:imax,jmin:jmax,kmin:kmax), y_mod(imin:imax,jmin:jmax,kmin:kmax),&
+            z_mod(imin:imax,jmin:jmax,kmin:kmax))
        x_mod = 0d0; y_mod = 0d0; z_mod = 0d0
     endif
     if ( itime_scheme == 2 ) then  

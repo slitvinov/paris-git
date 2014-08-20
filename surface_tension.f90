@@ -167,11 +167,9 @@ contains
      use module_2phase
      implicit none
      include 'mpif.h'
-     integer :: i,j,k, iter_FS, q, r
+     integer :: i,j,k
      real(8) :: n_1, n_2, n_3, x_cut, y_cut, xz_cut
      real(8) :: alpha, al3dnew, nr(3), P_a, Src
-     real(8) :: dtau, SS_error
-     real(8) :: du_x, du_y, du_z, dv_x, dv_y, dv_z, dw_x, dw_y, dw_z
      real(8) :: a_l, a_rt, a_t, a_b, a_f, a_rr
      real(8) :: n_avg, count
      real(8), dimension(imin:imax,jmin:jmax,kmin:kmax) :: u_cmask,v_cmask,w_cmask

@@ -246,9 +246,6 @@ Program paris
            call my_timer(3)
 !----------------------------------EXTRAPOLATION FOR FREE SURFACE---------------------------------
            if (DoVOF .and. FreeSurface) then
-              u_cold = u !initialize cavity velocities to that of calculated field
-              v_cold = v
-              w_cold = w
               call get_normals()
               call extrapolate_velocities()
            endif !Extrapolation
