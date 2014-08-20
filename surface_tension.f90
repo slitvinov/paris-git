@@ -33,6 +33,7 @@ module module_surface_tension
   use module_IO
 !  use module_tmpvar
   use module_2phase
+  use module_freesurface
   use module_VOF
   implicit none
   real(8), parameter :: kappamax = 2.d0
@@ -165,6 +166,7 @@ contains
      use module_grid
      use module_flow
      use module_2phase
+     !use module_freesurface
      implicit none
      include 'mpif.h'
      integer :: i,j,k

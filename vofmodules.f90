@@ -220,6 +220,7 @@ contains
     use module_flow
     use module_BC
     use module_2phase
+    use module_freesurface
     use module_IO
     implicit none
     include 'mpif.h'
@@ -304,6 +305,7 @@ contains
     use module_BC
     use module_flow
     use module_2phase
+    use module_freesurface
     implicit none
     include 'mpif.h'
     integer :: ierr,dir,orientation

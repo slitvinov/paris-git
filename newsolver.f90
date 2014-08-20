@@ -190,6 +190,7 @@ subroutine check_poisson_setup(A,tmp,umask,vmask,wmask)
   use module_grid
   use module_BC
   use module_IO
+  use module_freesurface
   implicit none
   include 'mpif.h'
   real(8), dimension(is:ie,js:je,ks:ke,8), intent(in) :: A

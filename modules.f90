@@ -319,19 +319,24 @@ end module module_tmpvar
 !-------------------------------------------------------------------------------------------------
 module module_2phase
   real(8), dimension( : ), allocatable :: rad, xc, yc, zc, vol
-  real(8), dimension(:,:,:), allocatable :: x_mod, y_mod, z_mod
   real(8) :: excentricity(3)
-  
   real(8) :: ugas_inject,uliq_inject
   real(8) :: blayer_gas_inject, tdelay_gas_inject 
   real(8) :: radius_gas_inject, radius_liq_inject 
   real(8) :: jetcenter_yc2yLength, jetcenter_zc2zLength 
-  real(8) :: jetcenter_yc,         jetcenter_zc 
-  
+  real(8) :: jetcenter_yc,         jetcenter_zc
   real(8) :: sigma
   integer :: NumBubble
-  logical :: FreeSurface
 end module module_2phase
+!=================================================================================================
+!=================================================================================================
+! module_freesurface: Contains variables for the free surface interface condition
+!-------------------------------------------------------------------------------------------------
+module module_freesurface
+  real(8), dimension(:,:,:), allocatable :: x_mod, y_mod, z_mod
+  !real(8), dimension(:,:,:), allocatable :: pmask 
+  logical :: FreeSurface
+end module module_freesurface
 !=================================================================================================
 !=================================================================================================
 ! module_IO: Contains input/output variables and procedures
@@ -1974,6 +1979,7 @@ subroutine SetupPoisson(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask,cvof,n1
   use module_grid
   use module_BC
   use module_2phase
+  use module_freesurface
   use module_IO
   implicit none
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: utmp,vtmp,wtmp,rhot
