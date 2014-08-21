@@ -140,8 +140,8 @@ contains
      integer :: i,j,k
      integer :: i0,j0,k0
      real(8) :: mxyz(3)
-     if(recomputenormals) call pariserror("recomputenormals is true, normals not allocated")
      if(.not.st_initialized) call initialize_surface_tension()
+     if(recomputenormals) call pariserror("recomputenormals is true, normals not allocated")
 
      if(ng.lt.2) call pariserror("wrong ng")
       do k=ks-1,ke+1
@@ -167,108 +167,112 @@ contains
      use module_grid
      use module_flow
      use module_2phase
-     !use module_freesurface
+     use module_freesurface
      implicit none
      include 'mpif.h'
-     integer :: i,j,k
+     integer :: i,j,k,level
      real(8) :: n_1, n_2, n_3, x_cut, y_cut, xz_cut
      real(8) :: alpha, al3dnew, nr(3), P_a, Src
      real(8) :: a_l, a_rt, a_t, a_b, a_f, a_rr
      real(8) :: n_avg, count
-     real(8), dimension(imin:imax,jmin:jmax,kmin:kmax) :: ucmask,vcmask,wcmask
+     !real(8), dimension(imin:imax,jmin:jmax,kmin:kmax) :: ucmask,vcmask,wcmask
 
-     ucmask = 0d0; vcmask = 0d0; wcmask =0d0
+     !ucmask = 0d0; vcmask = 0d0; wcmask =0d0
 
      !this loop masks extrapolated velocity locations 
-     do k=ks,ke; do j=js,je; do i=is,ie
-        if (vof_flag(i,j,k) == 2) then
-           nr(1) = n1(i,j,k);         nr(2) = n2(i,j,k);         nr(3) = n3(i,j,k)
-           alpha = al3dnew(nr,cvof(i,j,k))
-           !=========Set mask for u-velocity in cut-cells          
-           if (n_1 < 1d-49) n_1 = 1d-49
-           x_cut = (alpha - n_3/2d0)/n_1
-           if (x_cut>0.5d0) then
-              if (n2(i,j,k)>0d0) then
-                 vcmask(i,j-1,k) = 1d0
-              else
-                 vcmask(i,j,k) = 1d0
-              endif
-           endif
-           x_cut = (alpha - n_2 - n_3/2d0)/n_1
-           if (x_cut>0.5d0) then
-              if (n2(i,j,k)>0d0) then
-                 vcmask(i,j,k) = 1d0
-              else
-                 vcmask(i,j-1,k) = 1d0
-              endif
-           endif
-           !=========Set mask for v-velocity in cut-cells
-           if (n_2 < 1d-49) n_2 = 1d-49
-           y_cut = (alpha - n_3/2d0)/n_2
-           if (y_cut>0.5d0) then
-              if (n1(i,j,k)>0d0) then
-                 ucmask(i-1,j,k) = 1d0
-              else
-                 ucmask(i,j,k) = 1d0
-              endif
-           endif
-           y_cut = (alpha - n_1 - n_3/2d0)/n_2
-           if (y_cut>0.5d0) then
-              if (n1(i,j,k)>0d0) then
-                 ucmask(i,j,k) = 1d0
-              else
-                 ucmask(i-1,j,k) = 1d0
-              endif
-           endif
-           !=========Set mask for w-velocity in cut-cells
-           if (n_1 < 1d-49) n_1 = 1d-49
-           xz_cut = (alpha - n_2/2d0)/n_1
-           if (xz_cut>0.5d0) then
-              if (n3(i,j,k)>0d0) then
-                 wcmask(i,j,k-1) = 1d0
-              else
-                 wcmask(i,j,k) = 1d0
-              endif
-           endif
-           xz_cut = (alpha - n_3 - n_2/2d0)/n_1
-           if (xz_cut>0.5d0) then
-              if (n3(i,j,k)>0d0) then
-                 wcmask(i,j,k) = 1d0
-              else
-                 wcmask(i,j,k-1) = 1d0
-              endif
-           endif
-        endif
-        !=========Set mask for all velocities in cavity cells neighbouring cut cells
-        if ((vof_flag(i,j,k) == 1) .and. ((vof_flag(i-1,j,k) == 2) .or. (vof_flag(i+1,j,k) == 2) .or. &
-             (vof_flag(i,j-1,k) == 2) .or. (vof_flag(i,j+1,k) == 2) .or. &
-             (vof_flag(i,j,k-1) == 2) .or. (vof_flag(i,j,k+1) == 2))) then
-           ucmask(i,j,k) = 1d0; ucmask(i-1,j,k) = 1d0
-           vcmask(i,j,k) = 1d0; vcmask(i,j-1,k) = 1d0
-           wcmask(i,j,k) = 1d0; wcmask(i,j,k-1) = 1d0
-        endif
-     enddo; enddo; enddo
-
+!!$     do k=ks,ke; do j=js,je; do i=is,ie
+!!$        if (vof_flag(i,j,k) == 2) then
+!!$           nr(1) = n1(i,j,k);         nr(2) = n2(i,j,k);         nr(3) = n3(i,j,k)
+!!$           alpha = al3dnew(nr,cvof(i,j,k))
+!!$           !=========Set mask for u-velocity in cut-cells          
+!!$           if (n_1 < 1d-49) n_1 = 1d-49
+!!$           x_cut = (alpha - n_3/2d0)/n_1
+!!$           if (x_cut>0.5d0) then
+!!$              if (n2(i,j,k)>0d0) then
+!!$                 vcmask(i,j-1,k) = 1d0
+!!$              else
+!!$                 vcmask(i,j,k) = 1d0
+!!$              endif
+!!$           endif
+!!$           x_cut = (alpha - n_2 - n_3/2d0)/n_1
+!!$           if (x_cut>0.5d0) then
+!!$              if (n2(i,j,k)>0d0) then
+!!$                 vcmask(i,j,k) = 1d0
+!!$              else
+!!$                 vcmask(i,j-1,k) = 1d0
+!!$              endif
+!!$           endif
+!!$           !=========Set mask for v-velocity in cut-cells
+!!$           if (n_2 < 1d-49) n_2 = 1d-49
+!!$           y_cut = (alpha - n_3/2d0)/n_2
+!!$           if (y_cut>0.5d0) then
+!!$              if (n1(i,j,k)>0d0) then
+!!$                 ucmask(i-1,j,k) = 1d0
+!!$              else
+!!$                 ucmask(i,j,k) = 1d0
+!!$              endif
+!!$           endif
+!!$           y_cut = (alpha - n_1 - n_3/2d0)/n_2
+!!$           if (y_cut>0.5d0) then
+!!$              if (n1(i,j,k)>0d0) then
+!!$                 ucmask(i,j,k) = 1d0
+!!$              else
+!!$                 ucmask(i-1,j,k) = 1d0
+!!$              endif
+!!$           endif
+!!$           !=========Set mask for w-velocity in cut-cells
+!!$           if (n_1 < 1d-49) n_1 = 1d-49
+!!$           xz_cut = (alpha - n_2/2d0)/n_1
+!!$           if (xz_cut>0.5d0) then
+!!$              if (n3(i,j,k)>0d0) then
+!!$                 wcmask(i,j,k-1) = 1d0
+!!$              else
+!!$                 wcmask(i,j,k) = 1d0
+!!$              endif
+!!$           endif
+!!$           xz_cut = (alpha - n_3 - n_2/2d0)/n_1
+!!$           if (xz_cut>0.5d0) then
+!!$              if (n3(i,j,k)>0d0) then
+!!$                 wcmask(i,j,k) = 1d0
+!!$              else
+!!$                 wcmask(i,j,k-1) = 1d0
+!!$              endif
+!!$           endif
+!!$        endif
+!!$        !=========Set mask for all velocities in cavity cells neighbouring cut cells
+!!$        if ((vof_flag(i,j,k) == 1) .and. ((vof_flag(i-1,j,k) == 2) .or. (vof_flag(i+1,j,k) == 2) .or. &
+!!$             (vof_flag(i,j-1,k) == 2) .or. (vof_flag(i,j+1,k) == 2) .or. &
+!!$             (vof_flag(i,j,k-1) == 2) .or. (vof_flag(i,j,k+1) == 2))) then
+!!$           ucmask(i,j,k) = 1d0; ucmask(i-1,j,k) = 1d0
+!!$           vcmask(i,j,k) = 1d0; vcmask(i,j-1,k) = 1d0
+!!$           wcmask(i,j,k) = 1d0; wcmask(i,j,k-1) = 1d0
+!!$        endif
+!!$     enddo; enddo; enddo
+! Simple volume conservation step after velocities have been extrapolated.
      Src = 0d0
-     do k=ks,ke; do j=js,je; do i=is,ie
-        a_l = 0d0; a_rt = 0d0; a_t = 0d0; a_b = 0d0; a_f = 0d0; a_rr = 0d0    
-        Src = (u(i-1,j,k)-u(i,j,k))*dz(k)*dy(j) + (v(i,j-1,k)-v(i,j,k))*dx(i)*dz(k) + (w(i,j,k-1)-w(i,j,k))*dx(i)*dy(j)
-        if (n1(i,j,k) > 0d0) a_l = ucmask(i-1,j,k); if (n1(i,j,k) < 0d0) a_rt = ucmask(i,j,k)
-        if (n2(i,j,k) > 0d0) a_b = vcmask(i,j-1,k); if (n2(i,j,k) < 0d0) a_t = vcmask(i,j,k)
-        if (n3(i,j,k) > 0d0) a_rr = wcmask(i,j,k-1); if (n3(i,j,k) < 0d0) a_f = wcmask(i,j,k)
-        P_a = (a_l+a_rt)*abs(n1(i,j,k))*dy(j)*dz(k) + &
-             (a_t + a_b)*abs(n2(i,j,k))*dx(i)*dz(k) + &
-             (a_f + a_rr)*abs(n3(i,j,k))*dx(i)*dy(j)
-        if (P_a .ne. 0) then
-           u(i,j,k) = u(i,j,k) + a_rt*Src/P_a*abs(n1(i,j,k)) 
-           v(i,j,k) = v(i,j,k) + a_t*Src/P_a*abs(n2(i,j,k))  
-           w(i,j,k) = w(i,j,k) + a_f*Src/P_a*abs(n3(i,j,k))
-           u(i-1,j,k) = u(i-1,j,k) - a_l*Src/P_a*abs(n1(i,j,k)) 
-           v(i,j-1,k) = v(i,j-1,k) - a_b*Src/P_a*abs(n2(i,j,k))  
-           w(i,j,k-1) = w(i,j,k-1) - a_rr*Src/P_a*abs(n3(i,j,k))
-        endif
-     enddo; enddo; enddo
-
+     do level = 1, X_level
+        do k=ks,ke; do j=js,je; do i=is,ie
+           a_l = 0d0; a_rt = 0d0; a_t = 0d0; a_b = 0d0; a_f = 0d0; a_rr = 0d0    
+           Src = (u(i-1,j,k)-u(i,j,k))*dz(k)*dy(j) + (v(i,j-1,k)-v(i,j,k))*dx(i)*dz(k) + (w(i,j,k-1)-w(i,j,k))*dx(i)*dy(j)
+           if ((n1(i,j,k) > 0d0) .and. (u_cmask(i-1,j,k,level)==1)) a_l = 1d0
+           if ((n1(i,j,k) < 0d0) .and. (u_cmask(i,j,k,level)==1)) a_rt = 1d0
+           if ((n2(i,j,k) > 0d0) .and. (v_cmask(i,j-1,k,level)==1)) a_b = 1d0
+           if ((n2(i,j,k) < 0d0) .and. (v_cmask(i,j,k,level)==1)) a_t = 1d0
+           if ((n3(i,j,k) > 0d0) .and. (w_cmask(i,j,k-1,level)==1)) a_rr = 1d0
+           if ((n3(i,j,k) < 0d0) .and. (w_cmask(i,j,k,level)==1)) a_f = 1d0
+           P_a = (a_l+a_rt)*abs(n1(i,j,k))*dy(j)*dz(k) + &
+                (a_t + a_b)*abs(n2(i,j,k))*dx(i)*dz(k) + &
+                (a_f + a_rr)*abs(n3(i,j,k))*dx(i)*dy(j)
+           if (P_a .ne. 0) then
+              u(i,j,k) = u(i,j,k) + a_rt*Src/P_a*abs(n1(i,j,k)) 
+              v(i,j,k) = v(i,j,k) + a_t*Src/P_a*abs(n2(i,j,k))  
+              w(i,j,k) = w(i,j,k) + a_f*Src/P_a*abs(n3(i,j,k))
+              u(i-1,j,k) = u(i-1,j,k) - a_l*Src/P_a*abs(n1(i,j,k)) 
+              v(i,j-1,k) = v(i,j-1,k) - a_b*Src/P_a*abs(n2(i,j,k))  
+              w(i,j,k-1) = w(i,j,k-1) - a_rr*Src/P_a*abs(n3(i,j,k))
+           endif
+        enddo; enddo; enddo
+     enddo
    end subroutine extrapolate_velocities
 !=================================================================================================
 !

@@ -1680,6 +1680,7 @@ subroutine InitCondition
            if (FreeSurface) then
               call set_topology(vof_phase)
               call get_normals()
+              call get_all_curvatures(kappa_fs)
            endif
            call get_all_heights()
         endif

@@ -163,8 +163,10 @@ subroutine setuppoisson_fs(umask,vmask,wmask,vof_phase,rhot,dt,A,pmask,cvof,n1,n
   real(8) :: alpha, x_test, y_test, z_test, n_x, n_y, n_z
   real(8) :: x_l, x_r, y_b, y_t, z_r, z_f
   real(8) :: nr(3),al3dnew
-  real(8) :: dt, limit
+  real(8) :: dt
   integer :: i,j,k,l
+  !new variables
+  real(8) :: mod0, mod1, count
 
   x_int = 0d0; y_int = 0d0; z_int = 0d0
   x_mod(imin:imax,:,:)=dxh((is+ie)/2); y_mod(:,jmin:jmax,:)=dyh((js+je)/2); z_mod(:,:,kmin:kmax)=dzh((ks+ke)/2) !assumes an unstretched grid
@@ -172,6 +174,47 @@ subroutine setuppoisson_fs(umask,vmask,wmask,vof_phase,rhot,dt,A,pmask,cvof,n1,n
   pmask = 1d0
 
   do k=ks,ke; do j=js,je; do i=is,ie
+!----------------------------------------------------------------------------------------------
+! New setup: use topology criteria. Pressure neighbours are in different phases, A branch is modified
+     ! Check pairs
+!!$     if(vof_phase(i,j,k)==1) then ! pressure 0 in the cvof=1 phase
+!!$        pmask(i,j,k) = 0d0 !pmask local, have to set 
+!!$        if (vof_phase(i+1,j,k) == 0) then
+!!$           count = 0d0; mod0 = 0d0; mod1 = 0d0
+!!$           !get_intersection liq cell
+!!$           nr(1) = n1(i+1,j,k); nr(2) = n2(i+1,j,k); nr(3) = n3(i+1,j,k)
+!!$           alpha = al3dnew(nr,cvof(i+1,j,k))
+!!$           n_x = ABS(nr(1)); n_y = ABS(nr(2)); n_z = ABS(nr(3))
+!!$           if (n_x > 1d-14) then
+!!$              x_test = (alpha - (n_y+n_z)/2d0)/n_x
+!!$              if (x_test<0.5d0 .and. n1(i+1,j,k)>0d0) then
+!!$                 count = count + 1d0
+!!$                 mod0 = (0.5d0-x_test)*dxh(i)
+!!$              endif
+!!$           endif
+!!$           !get_intersection gas cell
+!!$           nr(1) = n1(i,j,k); nr(2) = n2(i,j,k); nr(3) = n3(i,j,k)
+!!$           alpha = al3dnew(nr,cvof(i,j,k))
+!!$           n_x = ABS(n1(i,j,k)); n_y = ABS(n2(i,j,k)); n_z = ABS(n3(i,j,k))
+!!$           if (n_x > 1d-14) then
+!!$              x_test = (alpha - (n_y+n_z)/2d0)/n_x
+!!$              if (x_test<1.5d0 .and. n1(i+1,j,k)>0d0) then
+!!$                 count = count + 1d0
+!!$                 mod1 = (1.5d0-x_test)*dxh(i)
+!!$              endif
+!!$           endif
+!!$           !average if interfaces in both cells intersect in between nodes
+!!$           !adapt A coeff
+!!$           if (count > 0d0) then
+!!$              x_mod(i,j,k) = (mod0 + mod1)/count
+!!$           else
+!!$              x_mod(i,j,k) = dxh(i)/2d0
+!!$              write(*,'("WARNING: gas-liq pair has no interface intercepts between nodes",3I8)')i,j,k
+!!$           endif
+!!$           A(i+1,j,k,1) = 2d0*dt*umask(i,j,k)/(dx(i+1)*x_mod(i,j,k)*(rhot(i,j,k)+rhot(i+1,j,k)))
+!!$           P_g(i,j,k,1) = sigma*kappa(i,j,k)/dx(i) !check, fix
+!!$        endif
+!----------------------------------------------------------------------------------------------------
      if(vof_phase(i,j,k)==1) then ! pressure 0 in the cvof=1 phase. 
         pmask(i,j,k) = 0d0
 
