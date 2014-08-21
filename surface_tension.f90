@@ -171,7 +171,7 @@ contains
      implicit none
      include 'mpif.h'
      integer :: i,j,k,level,ii,jj,kk
-     real(8) :: n_1, n_2, n_3, x_cut, y_cut, xz_cut
+     real(8) :: x_cut, y_cut, xz_cut
      real(8) :: alpha, al3dnew, nr(3), P_a, Src
      real(8) :: a_l, a_rt, a_t, a_b, a_f, a_rr
      real(8) :: x_vel, xcount
@@ -250,7 +250,6 @@ contains
 !!$     enddo; enddo; enddo
      do level = 1, X_level
         do k=ks,ke; do j=js,je; do i=is,ie
-           !find level, look for neighbours
            if (u_cmask(i,j,k,level) == 1) then
               xcount = 0d0; x_vel = 0d0
               do kk=-1,1; do jj=-1,1; do ii=-1,1
@@ -289,7 +288,7 @@ contains
            endif
         enddo; enddo; enddo
      enddo
-! Sqimple volume conservation step after velocities have been extrapolated.
+! Simple volume conservation step after velocities have been extrapolated.
      Src = 0d0
      do level = 1, X_level
         do k=ks,ke; do j=js,je; do i=is,ie

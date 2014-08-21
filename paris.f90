@@ -354,7 +354,7 @@ Program paris
            endif
 !----------------------------------EXTRAPOLATION FOR FREE SURFACE---------------------------------
            if (DoVOF .and. FreeSurface) then
-              call extrapolate_velocities() !only volume conservation, extrapol to be added
+              call extrapolate_velocities()
            endif !Extrapolation
 !------------------------------------------------------------------------------------------------           
            if(mod(itimestep,nout)==0) call check_corrected_vel(u,v,w,umask,vmask,wmask,itimestep)
