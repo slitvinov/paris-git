@@ -713,6 +713,7 @@ contains
 
      !*** Initialize
      kapparray=2d6
+     kappa = 0d0
 
      do k=ks,ke; do j=js,je; do i=is,ie
         is_bulk_cell=.false. 
@@ -844,7 +845,7 @@ contains
       do n=1,3
          origin(n) = centroid(n)
       enddo
-      ! *** determine curvature from centroids
+      ! *** determine curvature from mixed heights 
       if ( (-nfound) > nfound_min )  then  ! more than 6 points to avoid special 2D degeneracy. 
          xfit=points(:,try(2)) - origin(try(2))
          yfit=points(:,try(3)) - origin(try(3))
@@ -860,8 +861,9 @@ contains
             kappa = sign(1.d0,mxyz(try(1)))*kappa
             return
          endif
-      endif
+      endif !  (-nfound) > nfound_min  
 
+      ! *** determine curvature from centroids
       ! Find all centroids in 3**3
       ! use direction closest to normal
       nposit=0
@@ -894,7 +896,7 @@ contains
                geom_case_count(1) = geom_case_count(1) + 1
             endif
             geom_case_count(2) = geom_case_count(2) + 1
-         else !  pure non-bulk cell
+         else !  pure non-bulk cell with less than 6 control points found. 
             if(central/2/=0) call pariserror("unexpected central flag")
             n_pure_faces = 0
             c(1)=i0
