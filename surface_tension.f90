@@ -170,15 +170,15 @@ contains
      use module_freesurface
      implicit none
      include 'mpif.h'
-     integer :: i,j,k,level
+     integer :: i,j,k,level,ii,jj,kk
      real(8) :: n_1, n_2, n_3, x_cut, y_cut, xz_cut
      real(8) :: alpha, al3dnew, nr(3), P_a, Src
      real(8) :: a_l, a_rt, a_t, a_b, a_f, a_rr
-     real(8) :: n_avg, count
+     real(8) :: x_vel, xcount
      !real(8), dimension(imin:imax,jmin:jmax,kmin:kmax) :: ucmask,vcmask,wcmask
 
+!----OLD MASKS, REMOVE
      !ucmask = 0d0; vcmask = 0d0; wcmask =0d0
-
      !this loop masks extrapolated velocity locations 
 !!$     do k=ks,ke; do j=js,je; do i=is,ie
 !!$        if (vof_flag(i,j,k) == 2) then
@@ -248,7 +248,48 @@ contains
 !!$           wcmask(i,j,k) = 1d0; wcmask(i,j,k-1) = 1d0
 !!$        endif
 !!$     enddo; enddo; enddo
-! Simple volume conservation step after velocities have been extrapolated.
+     do level = 1, X_level
+        do k=ks,ke; do j=js,je; do i=is,ie
+           !find level, look for neighbours
+           if (u_cmask(i,j,k,level) == 1) then
+              xcount = 0d0; x_vel = 0d0
+              do kk=-1,1; do jj=-1,1; do ii=-1,1
+                 if (u_cmask(i+ii,j+jj,k+kk,level-1)==1) then
+                    xcount = xcount+1d0
+                    x_vel = x_vel + u(i+ii,j+jj,k+kk)
+                 endif
+              enddo; enddo; enddo
+              if (xcount>0d0) then
+                 u(i,j,k) = x_vel/xcount
+              endif
+           endif
+           if (v_cmask(i,j,k,level) == 1) then
+              xcount = 0d0; x_vel = 0d0
+              do kk=-1,1; do jj=-1,1; do ii=-1,1
+                 if (v_cmask(i+ii,j+jj,k+kk,level-1)==1) then
+                    xcount = xcount+1d0
+                    x_vel = x_vel + v(i+ii,j+jj,k+kk)
+                 endif
+              enddo; enddo; enddo
+              if (xcount>0d0) then
+                 v(i,j,k) = x_vel/xcount
+              endif
+           endif
+           if (w_cmask(i,j,k,level) == 1) then
+              xcount = 0d0; x_vel = 0d0
+              do kk=-1,1; do jj=-1,1; do ii=-1,1
+                 if (w_cmask(i+ii,j+jj,k+kk,level-1)==1) then
+                    xcount = xcount+1d0
+                    x_vel = x_vel + w(i+ii,j+jj,k+kk)
+                 endif
+              enddo; enddo; enddo
+              if (xcount>0d0) then
+                 w(i,j,k) = x_vel/xcount
+              endif
+           endif
+        enddo; enddo; enddo
+     enddo
+! Sqimple volume conservation step after velocities have been extrapolated.
      Src = 0d0
      do level = 1, X_level
         do k=ks,ke; do j=js,je; do i=is,ie
