@@ -335,9 +335,10 @@ contains
             v_cmask(imin:imax,jmin:jmax,kmin:kmax,0:X_level), &
             w_cmask(imin:imax,jmin:jmax,kmin:kmax,0:X_level), &
             x_mod(imin:imax,jmin:jmax,kmin:kmax), y_mod(imin:imax,jmin:jmax,kmin:kmax),&
-            z_mod(imin:imax,jmin:jmax,kmin:kmax))
+            z_mod(imin:imax,jmin:jmax,kmin:kmax), P_g(imin:imax,jmin:jmax,kmin:kmax,3))
        u_cmask = 0; v_cmask = 0; w_cmask = 0
        x_mod = 0d0; y_mod = 0d0; z_mod = 0d0
+       P_g = 0d0
     endif
     if ( itime_scheme == 2 ) then  
       allocate(cvofold(imin:imax,jmin:jmax,kmin:kmax))

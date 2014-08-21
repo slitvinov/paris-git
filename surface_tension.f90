@@ -47,6 +47,7 @@ module module_surface_tension
   integer, parameter :: NPOS=NOR*27
   real(8), parameter :: EPS_GEOM = 1d-4
   real(8), dimension(:,:,:), allocatable :: n1,n2,n3 ! normals
+  real(8), dimension(:,:,:), allocatable :: kappa_fs ! for surface tension on free surface
   real(8), dimension(:,:,:,:), allocatable :: height ! 
 
   ! 4th index: 1 for normal vector pointing towards positive x "positive height", 
@@ -74,7 +75,7 @@ contains
     implicit none
     if(.not.recomputenormals .or. FreeSurface) then
        allocate(n1(imin:imax,jmin:jmax,kmin:kmax), n2(imin:imax,jmin:jmax,kmin:kmax),  &
-               n3(imin:imax,jmin:jmax,kmin:kmax))
+               n3(imin:imax,jmin:jmax,kmin:kmax), kappa_fs(imin:imax,jmin:jmax,kmin:kmax))
        recomputenormals = .false.
     endif
     allocate(height(imin:imax,jmin:jmax,kmin:kmax,6))
@@ -174,9 +175,9 @@ contains
      real(8) :: alpha, al3dnew, nr(3), P_a, Src
      real(8) :: a_l, a_rt, a_t, a_b, a_f, a_rr
      real(8) :: n_avg, count
-     real(8), dimension(imin:imax,jmin:jmax,kmin:kmax) :: u_cmask,v_cmask,w_cmask
+     real(8), dimension(imin:imax,jmin:jmax,kmin:kmax) :: ucmask,vcmask,wcmask
 
-     u_cmask = 0d0; v_cmask = 0d0; w_cmask =0d0
+     ucmask = 0d0; vcmask = 0d0; wcmask =0d0
 
      !this loop masks extrapolated velocity locations 
      do k=ks,ke; do j=js,je; do i=is,ie
@@ -188,17 +189,17 @@ contains
            x_cut = (alpha - n_3/2d0)/n_1
            if (x_cut>0.5d0) then
               if (n2(i,j,k)>0d0) then
-                 v_cmask(i,j-1,k) = 1d0
+                 vcmask(i,j-1,k) = 1d0
               else
-                 v_cmask(i,j,k) = 1d0
+                 vcmask(i,j,k) = 1d0
               endif
            endif
            x_cut = (alpha - n_2 - n_3/2d0)/n_1
            if (x_cut>0.5d0) then
               if (n2(i,j,k)>0d0) then
-                 v_cmask(i,j,k) = 1d0
+                 vcmask(i,j,k) = 1d0
               else
-                 v_cmask(i,j-1,k) = 1d0
+                 vcmask(i,j-1,k) = 1d0
               endif
            endif
            !=========Set mask for v-velocity in cut-cells
@@ -206,17 +207,17 @@ contains
            y_cut = (alpha - n_3/2d0)/n_2
            if (y_cut>0.5d0) then
               if (n1(i,j,k)>0d0) then
-                 u_cmask(i-1,j,k) = 1d0
+                 ucmask(i-1,j,k) = 1d0
               else
-                 u_cmask(i,j,k) = 1d0
+                 ucmask(i,j,k) = 1d0
               endif
            endif
            y_cut = (alpha - n_1 - n_3/2d0)/n_2
            if (y_cut>0.5d0) then
               if (n1(i,j,k)>0d0) then
-                 u_cmask(i,j,k) = 1d0
+                 ucmask(i,j,k) = 1d0
               else
-                 u_cmask(i-1,j,k) = 1d0
+                 ucmask(i-1,j,k) = 1d0
               endif
            endif
            !=========Set mask for w-velocity in cut-cells
@@ -224,17 +225,17 @@ contains
            xz_cut = (alpha - n_2/2d0)/n_1
            if (xz_cut>0.5d0) then
               if (n3(i,j,k)>0d0) then
-                 w_cmask(i,j,k-1) = 1d0
+                 wcmask(i,j,k-1) = 1d0
               else
-                 w_cmask(i,j,k) = 1d0
+                 wcmask(i,j,k) = 1d0
               endif
            endif
            xz_cut = (alpha - n_3 - n_2/2d0)/n_1
            if (xz_cut>0.5d0) then
               if (n3(i,j,k)>0d0) then
-                 w_cmask(i,j,k) = 1d0
+                 wcmask(i,j,k) = 1d0
               else
-                 w_cmask(i,j,k-1) = 1d0
+                 wcmask(i,j,k-1) = 1d0
               endif
            endif
         endif
@@ -242,9 +243,9 @@ contains
         if ((vof_flag(i,j,k) == 1) .and. ((vof_flag(i-1,j,k) == 2) .or. (vof_flag(i+1,j,k) == 2) .or. &
              (vof_flag(i,j-1,k) == 2) .or. (vof_flag(i,j+1,k) == 2) .or. &
              (vof_flag(i,j,k-1) == 2) .or. (vof_flag(i,j,k+1) == 2))) then
-           u_cmask(i,j,k) = 1d0; u_cmask(i-1,j,k) = 1d0
-           v_cmask(i,j,k) = 1d0; v_cmask(i,j-1,k) = 1d0
-           w_cmask(i,j,k) = 1d0; w_cmask(i,j,k-1) = 1d0
+           ucmask(i,j,k) = 1d0; ucmask(i-1,j,k) = 1d0
+           vcmask(i,j,k) = 1d0; vcmask(i,j-1,k) = 1d0
+           wcmask(i,j,k) = 1d0; wcmask(i,j,k-1) = 1d0
         endif
      enddo; enddo; enddo
 
@@ -252,9 +253,9 @@ contains
      do k=ks,ke; do j=js,je; do i=is,ie
         a_l = 0d0; a_rt = 0d0; a_t = 0d0; a_b = 0d0; a_f = 0d0; a_rr = 0d0    
         Src = (u(i-1,j,k)-u(i,j,k))*dz(k)*dy(j) + (v(i,j-1,k)-v(i,j,k))*dx(i)*dz(k) + (w(i,j,k-1)-w(i,j,k))*dx(i)*dy(j)
-        if (n1(i,j,k) > 0d0) a_l = u_cmask(i-1,j,k); if (n1(i,j,k) < 0d0) a_rt = u_cmask(i,j,k)
-        if (n2(i,j,k) > 0d0) a_b = v_cmask(i,j-1,k); if (n2(i,j,k) < 0d0) a_t = v_cmask(i,j,k)
-        if (n3(i,j,k) > 0d0) a_rr = w_cmask(i,j,k-1); if (n3(i,j,k) < 0d0) a_f = w_cmask(i,j,k)
+        if (n1(i,j,k) > 0d0) a_l = ucmask(i-1,j,k); if (n1(i,j,k) < 0d0) a_rt = ucmask(i,j,k)
+        if (n2(i,j,k) > 0d0) a_b = vcmask(i,j-1,k); if (n2(i,j,k) < 0d0) a_t = vcmask(i,j,k)
+        if (n3(i,j,k) > 0d0) a_rr = wcmask(i,j,k-1); if (n3(i,j,k) < 0d0) a_f = wcmask(i,j,k)
         P_a = (a_l+a_rt)*abs(n1(i,j,k))*dy(j)*dz(k) + &
              (a_t + a_b)*abs(n2(i,j,k))*dx(i)*dz(k) + &
              (a_f + a_rr)*abs(n3(i,j,k))*dx(i)*dy(j)

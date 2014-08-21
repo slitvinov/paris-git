@@ -146,7 +146,7 @@
   enddo
 end subroutine set_topology
 !-------------------------------------------------------------------------------------------------
-subroutine setuppoisson_fs(umask,vmask,wmask,vof_phase,rhot,dt,A,pmask,cvof,n1,n2,n3)
+subroutine setuppoisson_fs(umask,vmask,wmask,vof_phase,rhot,dt,A,pmask,cvof,n1,n2,n3,kappa)
   use module_grid
   use module_BC
   use module_2phase
@@ -154,6 +154,7 @@ subroutine setuppoisson_fs(umask,vmask,wmask,vof_phase,rhot,dt,A,pmask,cvof,n1,n
   implicit none
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: rhot
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: umask,vmask,wmask
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: kappa
   real(8), dimension(is:ie,js:je,ks:ke), intent(inout) :: pmask
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: cvof,n1,n2,n3
   real(8), dimension(is:ie,js:je,ks:ke,8), intent(out) :: A
@@ -166,6 +167,8 @@ subroutine setuppoisson_fs(umask,vmask,wmask,vof_phase,rhot,dt,A,pmask,cvof,n1,n
   integer :: i,j,k,l
 
   x_int = 0d0; y_int = 0d0; z_int = 0d0
+  x_mod(imin:imax,:,:)=dxh((is+ie)/2); y_mod(:,jmin:jmax,:)=dyh((js+je)/2); z_mod(:,:,kmin:kmax)=dzh((ks+ke)/2) !assumes an unstretched grid
+  P_g = 0d0
   pmask = 1d0
 
   do k=ks,ke; do j=js,je; do i=is,ie
@@ -181,13 +184,15 @@ subroutine setuppoisson_fs(umask,vmask,wmask,vof_phase,rhot,dt,A,pmask,cvof,n1,n
               if (n1(i,j,k) > 0d0) then 
                  x_int(i,j,k) = xh(i-1) + x_test*dx(i)
                  x_l = x(i+1) - x_int(i,j,k)
-                 x_mod(i,j,k) = dxh(i) - x_l
+                 x_mod(i,j,k) = x_l
                  A(i+1,j,k,1) = 2d0*dt*umask(i,j,k)/(dx(i+1)*x_l*(rhot(i,j,k)+rhot(i+1,j,k)))
+                 P_g(i,j,k,1) = sigma*kappa(i,j,k)/dx(i)
               else 
                  x_int(i,j,k) = xh(i) - x_test*dx(i)
                  x_r = x_int(i,j,k) - x(i-1) 
-                 x_mod(i-1,j,k) = dxh(i-1) - x_r
+                 x_mod(i-1,j,k) = x_r
                  A(i-1,j,k,2) = 2d0*dt*umask(i-1,j,k)/(dx(i-1)*x_r*(rhot(i,j,k)+rhot(i-1,j,k)))
+                 P_g(i,j,k,1) = sigma*kappa(i,j,k)/dx(i)
               endif
            endif
         endif
@@ -198,13 +203,15 @@ subroutine setuppoisson_fs(umask,vmask,wmask,vof_phase,rhot,dt,A,pmask,cvof,n1,n
               if (n2(i,j,k) > 0d0) then 
                  y_int(i,j,k) = yh(j-1) + y_test*dy(j)
                  y_b = y(j+1) - y_int(i,j,k)
-                 y_mod(i,j,k) = dyh(j)-y_b
+                 y_mod(i,j,k) = y_b
                  A(i,j+1,k,3) = 2d0*dt*vmask(i,j,k)/(dy(j+1)*y_b*(rhot(i,j,k)+rhot(i,j+1,k)))
+                 P_g(i,j,k,2) = sigma*kappa(i,j,k)/dy(j)
               else 
                  y_int(i,j,k) = yh(j) - y_test*dy(j)
                  y_t = y_int(i,j,k) - y(j-1)
-                 y_mod(i,j-1,k) = dyh(j-1)-y_t
+                 y_mod(i,j-1,k) = y_t
                  A(i,j-1,k,4) = 2d0*dt*vmask(i,j-1,k)/(dy(j-1)*y_t*(rhot(i,j,k)+rhot(i,j-1,k)))
+                 P_g(i,j,k,2) = sigma*kappa(i,j,k)/dy(j)
               endif
            endif
         endif
@@ -215,13 +222,15 @@ subroutine setuppoisson_fs(umask,vmask,wmask,vof_phase,rhot,dt,A,pmask,cvof,n1,n
               if (n3(i,j,k) > 0d0) then 
                  z_int(i,j,k) = zh(k-1) + z_test*dz(k)
                  z_r = z(k+1) - z_int(i,j,k)
-                 z_mod(i,j,k) = dzh(k)-z_r
+                 z_mod(i,j,k) = z_r
                  A(i,j,k+1,5) = 2d0*dt*wmask(i,j,k)/(dz(k+1)*z_r*(rhot(i,j,k)+rhot(i,j,k+1)))
+                 P_g(i,j,k,3) = sigma*kappa(i,j,k)/dz(k)
               else 
                  z_int(i,j,k) = zh(k) - z_test*dz(k)
                  z_f = z_int(i,j,k) - z(k-1)
-                 z_mod(i,j,k-1) = dzh(k-1)-z_f
+                 z_mod(i,j,k-1) = z_f
                  A(i,j,k-1,6) = 2d0*dt*wmask(i,j,k-1)/(dz(k-1)*z_f*(rhot(i,j,k)+rhot(i,j,k-1)))
+                 P_g(i,j,k,3) = sigma*kappa(i,j,k)/dz(k)
               endif
            endif
         endif
@@ -238,15 +247,15 @@ subroutine setuppoisson_fs(umask,vmask,wmask,vof_phase,rhot,dt,A,pmask,cvof,n1,n
               if (n1(i,j,k) > 0d0) then 
                  x_int(i,j,k) = xh(i-1) + x_test*dx(i)
                  x_l = x(i) - x_int(i,j,k)
-                 if (x_l < limit) x_l = limit !arbitrary small limit, to be evaluated
-                 A(i,j,k,1) = 2d0*dt*umask(i-1,j,k)/((dx(i)+x_l)/2d0*x_l*(rhot(i-1,j,k)+rhot(i,j,k)))
-                 A(i,j,k,2) = 2d0*dt*umask(i,j,k)/((dx(i)+x_l)/2d0*dxh(i+1)*(rhot(i,j,k)+rhot(i+1,j,k)))
+                 x_mod(i-1,j,k) = x_l
+                 A(i,j,k,1) = 2d0*dt*umask(i-1,j,k)/(dx(i)*x_l*(rhot(i-1,j,k)+rhot(i,j,k)))
+                 P_g(i-1,j,k,1) = sigma*kappa(i,j,k)/dx(i)
               else 
                  x_int(i,j,k) = xh(i) - x_test*dx(i)
                  x_r = x_int(i,j,k) - x(i)
-                 if (x_r < limit) x_r = limit !arbitrary small limit, to be evaluated
-                 A(i,j,k,1) = 2d0*dt*umask(i-1,j,k)/((dx(i)+x_r)/2d0*dxh(i-1)*(rhot(i,j,k)+rhot(i-1,j,k)))
-                 A(i,j,k,2) = 2d0*dt*umask(i,j,k)/((dx(i)+x_r)/2d0*x_r*(rhot(i+1,j,k)+rhot(i,j,k)))
+                 x_mod(i,j,k) = x_r
+                 A(i,j,k,2) = 2d0*dt*umask(i,j,k)/(dx(i)*x_r*(rhot(i+1,j,k)+rhot(i,j,k)))
+                 P_g(i+1,j,k,1) = sigma*kappa(i,j,k)/dx(i)
               endif
            endif
         endif
@@ -257,15 +266,15 @@ subroutine setuppoisson_fs(umask,vmask,wmask,vof_phase,rhot,dt,A,pmask,cvof,n1,n
               if (n2(i,j,k) > 0d0) then 
                  y_int(i,j,k) = yh(j-1) + y_test*dy(j)
                  y_b = y(j) - y_int(i,j,k)
-                 if (y_b < limit) y_b = limit !arbitrary small limit, to be evaluated
-                 A(i,j,k,3) = 2d0*dt*vmask(i,j-1,k)/((dy(j)+y_b)/2d0*y_b*(rhot(i,j-1,k)+rhot(i,j,k)))
-                 A(i,j,k,4) = 2d0*dt*vmask(i,j,k)/((dy(j)+y_b)/2d0*dyh(j+1)*(rhot(i,j,k)+rhot(i,j+1,k)))
+                 y_mod(i,j-1,k) = y_b
+                 A(i,j,k,3) = 2d0*dt*vmask(i,j-1,k)/(dy(j)*y_b*(rhot(i,j-1,k)+rhot(i,j,k)))
+                 P_g(i,j-1,k,2) = sigma*kappa(i,j,k)/dy(j)
               else 
                  y_int(i,j,k) = yh(j) - y_test*dy(j)
                  y_t = y_int(i,j,k) - y(j) 
-                 if (y_t < limit) y_t = limit !arbitrary small limit, to be evaluated
-                 A(i,j,k,3) = 2d0*dt*vmask(i,j-1,k)/((dy(j)+y_t)/2d0*dyh(j-1)*(rhot(i,j,k)+rhot(i,j-1,k)))
-                 A(i,j,k,4) = 2d0*dt*vmask(i,j,k)/((dy(j)+y_t)/2d0*y_t*(rhot(i,j+1,k)+rhot(i,j,k)))
+                 y_mod(i,j,k) = y_t
+                 A(i,j,k,4) = 2d0*dt*vmask(i,j,k)/(dy(j)*y_t*(rhot(i,j+1,k)+rhot(i,j,k)))                 
+                 P_g(i,j+1,k,2) = sigma*kappa(i,j,k)/dy(j)
               endif
            endif
         endif
@@ -276,15 +285,15 @@ subroutine setuppoisson_fs(umask,vmask,wmask,vof_phase,rhot,dt,A,pmask,cvof,n1,n
               if (n3(i,j,k) > 0d0) then 
                  z_int(i,j,k) = zh(k-1) + z_test*dz(k)
                  z_r = z(k) - z_int(i,j,k)
-                 if (z_r < limit) z_r = limit !arbitrary small limit, to be evaluated
-                 A(i,j,k,5) = 2d0*dt*wmask(i,j,k-1)/((dz(k)+z_r)/2d0*z_r*(rhot(i,j,k-1)+rhot(i,j,k)))
-                 A(i,j,k,6) = 2d0*dt*wmask(i,j,k)/((dz(k)+z_r)/2d0*dzh(k+1)*(rhot(i,j,k)+rhot(i,j,k+1)))
+                 z_mod(i,j,k-1) = z_r
+                 A(i,j,k,5) = 2d0*dt*wmask(i,j,k-1)/(dz(k)*z_r*(rhot(i,j,k-1)+rhot(i,j,k)))
+                 P_g(i,j,k-1,3) = sigma*kappa(i,j,k)/dz(k) 
               else 
                  z_int(i,j,k) = zh(k) - z_test*dz(k)
                  z_f = z_int(i,j,k) - z(k)
-                 if (z_f < limit) z_f = limit !arbitrary small limit, to be evaluated
-                 A(i,j,k,5) = 2d0*dt*wmask(i,j,k-1)/((dz(k)+z_f)/2d0*dzh(k-1)*(rhot(i,j,k)+rhot(i,j,k-1)))
-                 A(i,j,k,6) = 2d0*dt*wmask(i,j,k)/((dz(k)+z_f)/2d0*z_f*(rhot(i,j,k+1)+rhot(i,j,k)))
+                 z_mod(i,j,k) = z_f
+                 A(i,j,k,6) = 2d0*dt*wmask(i,j,k)/(dz(k)*z_f*(rhot(i,j,k+1)+rhot(i,j,k)))
+                 P_g(i,j,k+1,3) = sigma*kappa(i,j,k)/dz(k)
               endif
            endif
         endif
@@ -295,7 +304,10 @@ subroutine setuppoisson_fs(umask,vmask,wmask,vof_phase,rhot,dt,A,pmask,cvof,n1,n
      do l=1,6
         A(i,j,k,l) = pmask(i,j,k)*A(i,j,k,l)
      enddo
-     A(i,j,k,7) = sum(A(i,j,k,1:6)) + (1d0-pmask(i,j,k)) + 1d-49
-     A(i,j,k,8) = pmask(i,j,k)*A(i,j,k,8)
+     A(i,j,k,7) = sum(A(i,j,k,1:6)) + (1d0-pmask(i,j,k))
+     A(i,j,k,8) = pmask(i,j,k)*(A(i,j,k,8) + dt/(rhot(i,j,k))*&
+          (P_g(i+1,j,k,1)/(dx(i)*x_mod(i,j,k))+P_g(i-1,j,k,1)/(dx(i)*x_mod(i-1,j,k))&
+          +P_g(i,j+1,k,2)/(dy(j)*y_mod(i,j,k))+P_g(i,j-1,k,2)/(dy(j)*y_mod(i,j-1,k))&
+          +P_g(i,j,k+1,3)/(dz(k)*z_mod(i,j,k))+P_g(i,j,k-1,3)/(dz(k)*z_mod(i,j,k-1))))
   enddo;enddo;enddo
 end subroutine setuppoisson_fs
