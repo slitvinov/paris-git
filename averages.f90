@@ -1,28 +1,27 @@
 !=================================================================================================
-! Paris-0.1
-! Extended from Code: FTC3D2011 (Front Tracking Code for 3D simulations)
-! and Surfer. 
-! 
-! Authors: Sadegh Dabiri, Gretar Tryggvason
-! author for VOF extensions Stephane Zaleski (zaleski@dalembert.upmc.fr) 
-! !
-! This program is free software; you can redistribute it and/or
-! modify it under the terms of the GNU General Public License as
-! published by the Free Software Foundation; either version 2 of the
-! License, or (at your option) any later version.
-!
-! This program is distributed in the hope that it will be useful,
-! but WITHOUT ANY WARRANTY; without even the implied warranty of
-! MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	See the GNU
-! General Public License for more details.
-!
-! You should have received a copy of the GNU General Public License
-! along with this program; if not, write to the Free Software
-! Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
-! 02111-1307, USA.  
-!=================================================================================================
+! Paris Simulator
 ! module_averages: Contains subroutines to compute several averages of the flow
-! author: Tomas Arrufat
+! 
+! Author: Tomas Arrufat Jackson
+!
+! GPL Licence
+!
+!     This file is part of PARIS.
+!
+!     PARIS is free software: you can redistribute it and/or modify
+!     it under the terms of the GNU General Public License as published by
+!     the Free Software Foundation, either version 3 of the License, or
+!     (at your option) any later version.
+! 
+!     PARIS is distributed in the hope that it will be useful,
+!     but WITHOUT ANY WARRANTY; without even the implied warranty of
+!     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+!     GNU General Public License for more details.
+!
+!     You should have received a copy of the GNU General Public License
+!     along with PARIS.  If not, see <http://www.gnu.org/licenses/>.
+!
+!=================================================================================================
 !-------------------------------------------------------------------------------------------------
 module module_averages
   implicit none 

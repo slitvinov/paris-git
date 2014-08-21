@@ -7,6 +7,7 @@
 ! Contact: Stephane Zaleski zaleski@dalembert.upmc.fr
 ! 
 ! Authors (in alphabetical order):
+!         Tomas Arrufat Jackson
 !         Sadegh Dabiri      
 !         Daniel Fuster      
 ! 	  Yue "Stanley" Ling 
