@@ -230,7 +230,8 @@ contains
     namelist /vofparameters/ vofbdry_cond,test_type,VOF_advect,refinement, &
        cylinder_dir, normal_up, DoLPP, &
        FreeSurface, ViscMeanIsArith, DensMeanIsArith, &
-       output_filtered_VOF, DoMOF, use_vofi,nfilter ! ,oldvof
+       output_filtered_VOF, DoMOF, use_vofi,nfilter, &
+       X_level! ,oldvof
     
 !     vofbdry_cond=['periodic','periodic','periodic','periodic','periodic','periodic']
     vofbdry_cond=['undefined','undefined','undefined','undefined','undefined','undefined']
@@ -240,7 +241,7 @@ contains
     cylinder_dir=0 ! redundant
     normal_up=.true. ! redundant
     DoLPP=.false.
-    FreeSurface=.false. 
+    FreeSurface=.false.; X_level = 0 
     ViscMeanIsArith=.true.; DensMeanIsArith=.true.
     output_filtered_VOF=.false. ! redundant
     DoMOF = .false.
@@ -330,8 +331,12 @@ contains
     vof_phase = 2
     !allocate matrices for Free Surface
     if(FreeSurface) then
-       allocate(x_mod(imin:imax,jmin:jmax,kmin:kmax), y_mod(imin:imax,jmin:jmax,kmin:kmax),&
+       allocate(u_cmask(imin:imax,jmin:jmax,kmin:kmax,0:X_level), &
+            v_cmask(imin:imax,jmin:jmax,kmin:kmax,0:X_level), &
+            w_cmask(imin:imax,jmin:jmax,kmin:kmax,0:X_level), &
+            x_mod(imin:imax,jmin:jmax,kmin:kmax), y_mod(imin:imax,jmin:jmax,kmin:kmax),&
             z_mod(imin:imax,jmin:jmax,kmin:kmax))
+       u_cmask = 0; v_cmask = 0; w_cmask = 0
        x_mod = 0d0; y_mod = 0d0; z_mod = 0d0
     endif
     if ( itime_scheme == 2 ) then  
@@ -515,6 +520,7 @@ or none at all")
 
     call do_all_ghost(cvof)
     call do_all_ighost(vof_flag)
+    call do_all_ighost(vof_phase)
     call setVOFBC(cvof,vof_flag)
     return
   end subroutine initconditions_VOF

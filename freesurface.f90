@@ -22,18 +22,143 @@
 !=================================================================================================
 !=================================================================================================
 !-------------------------------------------------------------------------------------------------
-subroutine setuppoisson_fs(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask,cvof,n1,n2,n3)
+ subroutine set_topology(vof_phase)
+  use module_grid
+  use module_freesurface
+  use module_IO
+  implicit none
+  integer, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: vof_phase
+  integer :: i,j,k,level,iout
+  logical, dimension(is:ie,js:je,ks:ke) :: u_assigned, v_assigned, w_assigned
+  !initialize pmask to 1d0 and all masks to -1 and unassigned
+  !pmask = 1d0
+  u_cmask = -1; v_cmask = -1; w_cmask = -1
+  u_assigned = .false.; v_assigned=.false.; w_assigned=.false.
+
+  !First loop to set pmask and level 0 velocities in liq-liq and liq-gas cells
+  do k=ks,ke; do j=js,je; do i=is,ie
+     if (vof_phase(i,j,k) == 1) then
+        !pmask(i,j,k) = 0d0
+        if (vof_phase(i+1,j,k) == 0) then
+           u_cmask(i,j,k,0) = 1; u_assigned(i,j,k) = .true.
+        endif
+        if (vof_phase(i,j+1,k) == 0) then
+           v_cmask(i,j,k,0) = 1
+           v_assigned(i,j,k) = .true.
+        endif
+        if (vof_phase(i,j,k+1) == 0) then 
+           w_cmask(i,j,k,0) = 1
+           w_assigned(i,j,k) = .true.
+        endif
+     endif
+     if (vof_phase(i,j,k) == 0) then
+        if (vof_phase(i+1,j,k) == 1) then
+           u_cmask(i,j,k,0) = 1
+           u_assigned(i,j,k) = .true.
+        endif
+        if (vof_phase(i,j+1,k) == 1) then
+           v_cmask(i,j,k,0) = 1
+           v_assigned(i,j,k) = .true.
+        endif
+        if (vof_phase(i,j,k+1) == 1) then 
+           w_cmask(i,j,k,0) = 1
+           w_assigned(i,j,k) = .true.
+        endif
+        if (vof_phase(i+1,j,k) == 0) then
+           u_cmask(i,j,k,0) = 1; u_assigned(i,j,k)=.true.
+        endif
+        if (vof_phase(i,j+1,k) == 0) then
+           v_cmask(i,j,k,0) = 1; v_assigned(i,j,k)=.true.
+        endif
+        if (vof_phase(i,j,k+1) == 0) then 
+           w_cmask(i,j,k,0) = 1; w_assigned(i,j,k)=.true.
+        endif
+     endif
+  enddo; enddo; enddo
+  !Set levels 1 to X_level
+  do level=1,X_level
+  do k=ks,ke; do j=js,je; do i=is,ie
+     !Tests: in between gas nodes, neighbour level -1, unassigned
+     !u-neighbours
+     if (u_cmask(i,j,k,level-1)==1) then
+        if (.not.u_assigned(i,j+1,k) .and. vof_phase(i,j+1,k)==1 .and. vof_phase(i+1,j+1,k)==1) then
+           u_cmask(i,j+1,k,level) = 1; u_assigned(i,j+1,k)=.true.
+        endif
+        if (.not.u_assigned(i+1,j,k) .and. vof_phase(i+1,j,k)==1 .and. vof_phase(i+2,j,k)==1) then
+           u_cmask(i+1,j,k,level) = 1; u_assigned(i+1,j,k) = .true.
+        endif
+        if (.not.u_assigned(i,j-1,k) .and. vof_phase(i,j-1,k)==1 .and. vof_phase(i+1,j-1,k)==1) then
+           u_cmask(i,j-1,k,level) = 1; u_assigned(i,j-1,k)=.true.
+        endif
+        if (.not.u_assigned(i-1,j,k) .and. vof_phase(i-1,j,k)==1 .and. vof_phase(i,j,k)==1) then
+           u_cmask(i-1,j,k,level) = 1; u_assigned(i-1,j,k) = .true.
+        endif
+        if (.not.u_assigned(i,j,k+1) .and. vof_phase(i,j,k+1)==1 .and. vof_phase(i+1,j,k+1)==1) then
+           u_cmask(i,j,k+1,level) = 1; u_assigned(i,j,k+1)=.true.
+        endif
+        if (.not.u_assigned(i,j,k-1) .and. vof_phase(i,j,k-1)==1 .and. vof_phase(i+1,j,k-1)==1) then
+           u_cmask(i,j,k-1,level) = 1; u_assigned(i,j,k-1) = .true.
+        endif
+     endif
+     !v-neighbours
+     if (v_cmask(i,j,k,level-1)==1) then
+        if (.not.v_assigned(i,j+1,k) .and. vof_phase(i,j+1,k)==1 .and. vof_phase(i,j+2,k)==1) then
+           v_cmask(i,j+1,k,level) = 1; v_assigned(i,j+1,k)=.true.
+        endif
+        if (.not.v_assigned(i+1,j,k) .and. vof_phase(i+1,j,k)==1 .and. vof_phase(i+1,j+1,k)==1) then
+           v_cmask(i+1,j,k,level) = 1; v_assigned(i+1,j,k) = .true.
+        endif
+        if (.not.v_assigned(i,j-1,k) .and. vof_phase(i,j-1,k)==1 .and. vof_phase(i,j,k)==1) then
+           v_cmask(i,j-1,k,level) = 1; v_assigned(i,j-1,k)=.true.
+        endif
+        if (.not.v_assigned(i-1,j,k) .and. vof_phase(i-1,j,k)==1 .and. vof_phase(i-1,j+1,k)==1) then
+           v_cmask(i-1,j,k,level) = 1; v_assigned(i-1,j,k) = .true.
+        endif
+        if (.not.v_assigned(i,j,k+1) .and. vof_phase(i,j,k+1)==1 .and. vof_phase(i,j+1,k+1)==1) then
+           v_cmask(i,j,k+1,level) = 1; v_assigned(i,j,k+1)=.true.
+        endif
+        if (.not.v_assigned(i,j,k-1) .and. vof_phase(i,j,k-1)==1 .and. vof_phase(i,j+1,k-1)==1) then
+           v_cmask(i,j,k-1,level) = 1; v_assigned(i,j,k-1) = .true.
+        endif
+     endif
+     !w-neighbours
+     if (w_cmask(i,j,k,level-1)==1) then
+        if (.not.w_assigned(i,j+1,k) .and. vof_phase(i,j+1,k)==1 .and. vof_phase(i,j+1,k+1)==1) then
+           w_cmask(i,j+1,k,level) = 1; w_assigned(i,j+1,k)=.true.
+        endif
+        if (.not.w_assigned(i+1,j,k) .and. vof_phase(i+1,j,k)==1 .and. vof_phase(i+1,j,k+1)==1) then
+           w_cmask(i+1,j,k,level) = 1; w_assigned(i+1,j,k) = .true.
+        endif
+        if (.not.w_assigned(i,j-1,k) .and. vof_phase(i,j-1,k)==1 .and. vof_phase(i,j-1,k+1)==1) then
+           w_cmask(i,j-1,k,level) = 1; w_assigned(i,j-1,k)=.true.
+        endif
+        if (.not.w_assigned(i-1,j,k) .and. vof_phase(i-1,j,k)==1 .and. vof_phase(i-1,j,k+1)==1) then
+           w_cmask(i-1,j,k,level) = 1; w_assigned(i-1,j,k) = .true.
+        endif
+        if (.not.w_assigned(i,j,k+1) .and. vof_phase(i,j,k+1)==1 .and. vof_phase(i,j,k+2)==1) then
+           w_cmask(i,j,k+1,level) = 1; w_assigned(i,j,k+1)=.true.
+        endif
+        if (.not.w_assigned(i,j,k-1) .and. vof_phase(i,j,k-1)==1 .and. vof_phase(i,j,k)==1) then
+           w_cmask(i,j,k-1,level) = 1; w_assigned(i,j,k-1) = .true.
+        endif
+     endif
+  enddo; enddo; enddo
+  enddo
+end subroutine set_topology
+!-------------------------------------------------------------------------------------------------
+subroutine setuppoisson_fs(umask,vmask,wmask,vof_phase,rhot,dt,A,pmask,cvof,n1,n2,n3)
   use module_grid
   use module_BC
   use module_2phase
   use module_freesurface
   implicit none
-  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: utmp,vtmp,wtmp,rhot
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: rhot
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: umask,vmask,wmask
   real(8), dimension(is:ie,js:je,ks:ke), intent(inout) :: pmask
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: cvof,n1,n2,n3
   real(8), dimension(is:ie,js:je,ks:ke,8), intent(out) :: A
   real(8), dimension(is:ie,js:je,ks:ke) :: x_int, y_int, z_int
+  integer, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: vof_phase
   real(8) :: alpha, x_test, y_test, z_test, n_x, n_y, n_z
   real(8) :: x_l, x_r, y_b, y_t, z_r, z_f
   real(8) :: nr(3),al3dnew
@@ -44,8 +169,7 @@ subroutine setuppoisson_fs(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask,cvof
   pmask = 1d0
 
   do k=ks,ke; do j=js,je; do i=is,ie
-     limit = 0.10*min(dx(i),dy(j),dz(k))
-     if(cvof(i,j,k) >= 0.5d0) then ! pressure 0 in the cvof=1 phase. 
+     if(vof_phase(i,j,k)==1) then ! pressure 0 in the cvof=1 phase. 
         pmask(i,j,k) = 0d0
 
         nr(1) = n1(i,j,k);         nr(2) = n2(i,j,k);         nr(3) = n3(i,j,k)
@@ -103,7 +227,7 @@ subroutine setuppoisson_fs(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask,cvof
         endif
      endif
 
-     if (cvof(i,j,k)>0d0 .and. cvof(i,j,k)<0.5d0) then
+     if (vof_phase(i,j,k)==0) then
 
         nr(1) = n1(i,j,k);         nr(2) = n2(i,j,k);         nr(3) = n3(i,j,k)
         alpha = al3dnew(nr,cvof(i,j,k))

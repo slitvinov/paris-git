@@ -307,7 +307,7 @@ Program paris
            call my_timer(1)
 !-----------------------------------------PROJECTION STEP-----------------------------------------
            call SetPressureBC(umask,vmask,wmask,p)
-           call SetupPoisson(u,v,w,umask,vmask,wmask,rho,dt,A,tmp,cvof,n1,n2,n3,VolumeSource)
+           call SetupPoisson(u,v,w,umask,vmask,wmask,vof_phase,rho,dt,A,tmp,cvof,n1,n2,n3,VolumeSource)
            ! (div u)*dt < epsilon => div u < epsilon/dt => maxresidual : maxerror/dt 
            if(HYPRE)then
               call poi_solve(A,p(is:ie,js:je,ks:ke),maxError/dt,maxit,it)
