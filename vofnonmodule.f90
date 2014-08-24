@@ -40,6 +40,7 @@ subroutine swp(us,c,f,d,vof1,vof2,vof3)
   endif
 
   call get_flags_and_clip()
+  call get_vof_phase()   ! not sure it is needed here
   call do_all_ghost(c)
   call do_all_ighost(f)
 
@@ -85,6 +86,7 @@ subroutine swpflux(us,c,f,d,massflux,vof)
   endif
 
   call get_flags_and_clip()
+  call get_vof_phase()   ! not sure it is needed here
   call do_all_ghost(c)
   call do_all_ighost(f)
 

@@ -419,6 +419,18 @@ or none at all")
              else
                 vof_flag(i,j,k) = 2
              endif
+          enddo
+       enddo
+    enddo
+  end subroutine get_flags_and_clip
+!=================================================================================================
+!  get the majority phase flag
+!=================================================================================================
+  subroutine get_vof_phase()
+    integer :: i,j,k
+    do k=kmin,kmax
+       do j=jmin,jmax
+          do i=imin,imax
              if (cvof(i,j,k)<0.5d0) then
                 vof_phase(i,j,k) = 0
              else
@@ -427,7 +439,8 @@ or none at all")
           enddo
        enddo
     enddo
-  end subroutine get_flags_and_clip
+  end subroutine get_vof_phase
+  !=================================================================================================
   !=================================================================================================
   !  Initialize vof field and flags
   !=================================================================================================
@@ -521,8 +534,9 @@ or none at all")
 
     call do_all_ghost(cvof)
     call do_all_ighost(vof_flag)
-    call do_all_ighost(vof_phase)
     call setVOFBC(cvof,vof_flag)
+    call get_vof_phase()   
+    call do_all_ighost(vof_phase) ! not needed, and BC for VOF phase are not set. 
     return
   end subroutine initconditions_VOF
   !=================================================================================================

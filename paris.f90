@@ -414,7 +414,10 @@ Program paris
            rho = 0.5*(rho+rhoo)
            mu  = 0.5*(mu +muold)
            if(DoVOF) cvof  = 0.5*(cvof +cvofold)
-           if(DoVOF) call get_flags_and_clip()
+           if(DoVOF) then
+              call get_flags_and_clip()
+              call get_vof_phase()
+           endif
            if ( DoLPP ) call AveragePartSol()
         endif
         if (DoLPP) then
