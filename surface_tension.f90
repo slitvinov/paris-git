@@ -1,31 +1,36 @@
 !=================================================================================================
 !=================================================================================================
-! Paris-0.1
-! Extended from Code: FTC3D2011 (Front Tracking Code for 3D simulations)
-! and Surfer. 
-!
-! Authors:
-! 
-!   Sadegh Dabiri (sdabiri@gmail.com), Gretar Tryggvason
-!   Stephane Zaleski (zaleski@dalembert.upmc.fr) and Yue Ling (ling.stanley@gmail.com)
-! 
-! This program is free software; you can redistribute it and/or
-! modify it under the terms of the GNU General Public License as
-! published by the Free Software Foundation; either version 2 of the
-! License, or (at your option) any later version.
-!
-! This program is distributed in the hope that it will be useful,
-! but WITHOUT ANY WARRANTY; without even the implied warranty of
-! MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	See the GNU
-! General Public License for more details.
-!
-! You should have received a copy of the GNU General Public License
-! along with this program; if not, write to the Free Software
-! Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
-! 02111-1307, USA.  
+! PARIS  Parallel Robust Interface Simulator 
 !=================================================================================================
 ! module_surface_tension: Contains definition of variables for surface tension from
 !  Volume of Fluid interface tracking.
+!
+! Contact: Stephane Zaleski zaleski@dalembert.upmc.fr
+! 
+! Authors:
+! 	  Yue "Stanley" Ling 
+!         Leon Malan
+!         Ruben Scardovelli  
+!         Phil Yecko         
+!         Stephane Zaleski   
+!
+! GPL Licence
+!
+!     This file is part of PARIS.
+!
+!     PARIS is free software: you can redistribute it and/or modify
+!     it under the terms of the GNU General Public License as published by
+!     the Free Software Foundation, either version 3 of the License, or
+!     (at your option) any later version.
+! 
+!     PARIS is distributed in the hope that it will be useful,
+!     but WITHOUT ANY WARRANTY; without even the implied warranty of
+!     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+!     GNU General Public License for more details.
+!
+!     You should have received a copy of the GNU General Public License
+!     along with PARIS.  If not, see <http://www.gnu.org/licenses/>.
+!
 !-------------------------------------------------------------------------------------------------
 module module_surface_tension
   use module_grid
