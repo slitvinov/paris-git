@@ -1227,10 +1227,13 @@ subroutine get_velocity_from_momentum (mom,d,us,der)
   do k=ks-1,ke+1
     do j=js-1,je+1
       do i=is-1,ie+1
+
+! SZ following line makes array go out of bounds
+!        cflag =  (cvof(i-1,j,k)+ cvof(i,j,k) + cvof(i-2,j,k) &
+!        +cvof(i,j-1,k)+ cvof(i,j,k) + cvof(i,j-2,k) &
+!        +cvof(i,j,k-1)+ cvof(i,j,k) + cvof(i,j,k-2))/9.d0
+
         ! if interface rewrite interface velocity
-        cflag =  (cvof(i-1,j,k)+ cvof(i,j,k) + cvof(i-2,j,k) &
-        +cvof(i,j-1,k)+ cvof(i,j,k) + cvof(i,j-2,k) &
-        +cvof(i,j,k-1)+ cvof(i,j,k) + cvof(i,j,k-2))/9.d0
         cflag = cvof(i-i0,j-j0,k-k0)
         rhoavg1   = rho2*cvof(i,j,k) + rho1*(1.d0 - cvof(i,j,k))
         uavg      = mom(i,j,k)/rhoavg1
