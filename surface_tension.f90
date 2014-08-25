@@ -445,7 +445,7 @@ contains
 !          include 'mpif.h'
 !          integer, intent(in) :: i,j,k
 !          integer, intent(in) :: index,pass
-!          integer :: ierr
+!          integer :: ierr, MPI_errorcode=1
 !          if(i.lt.imin.or.i.gt.imax.or.   &
 !               j.lt.jmin.or.j.gt.jmax.or. &
 !               k.lt.kmin.or.k.gt.kmax.or. &
@@ -456,7 +456,7 @@ contains
 !             close(88)
 !             close(out)
 !             if(rank==0) print *, "index error in get_heights"
-!             call MPI_abort(MPI_COMM_WORLD, ierr)
+!             call MPI_ABORT(MPI_COMM_WORLD, MPI_errorcode, ierr)
 !             call MPI_finalize(ierr)
 !             stop 
 !          end if

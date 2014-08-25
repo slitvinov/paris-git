@@ -2028,7 +2028,7 @@ subroutine err_no_out_dir(message)
   use module_grid
   implicit none
   include 'mpif.h'
-  integer ierr
+  integer ierr, MPI_errorcode=1
   character(*) :: message
   OPEN(UNIT=89,FILE='error-rank-'//TRIM(int2text(rank,padding))//'.txt')
   write(89,*) message
@@ -2036,7 +2036,7 @@ subroutine err_no_out_dir(message)
   ! Exit MPI gracefully
   close(89)
   close(out)
-  call MPI_abort(MPI_COMM_WORLD, ierr)
+  call MPI_ABORT(MPI_COMM_WORLD, MPI_errorcode, ierr)
   call MPI_finalize(ierr)
   stop 
 end subroutine err_no_out_dir
@@ -2047,7 +2047,7 @@ subroutine pariserror(message)
   use module_grid
   implicit none
   include 'mpif.h'
-  integer ierr
+  integer ierr, MPI_errorcode=1
   character(*) :: message
   OPEN(UNIT=89,FILE=TRIM(out_path)//'/error-rank-'//TRIM(int2text(rank,padding))//'.txt')
   write(89,*) message
@@ -2055,7 +2055,7 @@ subroutine pariserror(message)
   ! Exit MPI gracefully
   close(89)
   close(out)
-  call MPI_abort(MPI_COMM_WORLD, ierr)
+  call MPI_ABORT(MPI_COMM_WORLD, MPI_errorcode, ierr)
   call MPI_finalize(ierr)
   stop 
 end subroutine pariserror
