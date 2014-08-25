@@ -29,7 +29,7 @@
   implicit none
   integer, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: vof_phase
   integer :: i,j,k,level,iout
-  logical, dimension(is:ie,js:je,ks:ke) :: u_assigned, v_assigned, w_assigned
+  logical, dimension(imin:imax,jmin:jmax,kmin:kmax) :: u_assigned, v_assigned, w_assigned
   !initialize pmask to 1d0 and all masks to -1 and unassigned
   !pmask = 1d0
   u_cmask = -1; v_cmask = -1; w_cmask = -1
@@ -173,7 +173,7 @@ subroutine setuppoisson_fs(umask,vmask,wmask,vof_phase,rhot,dt,A,pmask,cvof,n1,n
   P_g = 0d0
   pmask = 1d0
 
-  do k=ks,ke; do j=js,je; do i=is,ie
+  do k=ks,ke; do j=js,je; do i=is,ie !check bounds. Certain +1 or -1 branches may be modified at ends or starts of indexes
 !----------------------------------------------------------------------------------------------
 ! New setup: use topology criteria. Pressure neighbours are in different phases, A branch is modified
      ! Check pairs
