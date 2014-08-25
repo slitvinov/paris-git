@@ -35,6 +35,7 @@
 !     along with PARIS.  If not, see <http://www.gnu.org/licenses/>.
 !
 !=================================================================================================
+module module_VOF 
   use module_grid
   use module_IO
   use module_tmpvar
@@ -1387,8 +1388,8 @@ end subroutine get_velocity_from_momentum
     enddo
 ! 
     do orientation=1,6
-    ! orientation order:    
-    ! x- y- z- x+ y+ z+
+       ! orientation order:    
+       ! x- y- z- x+ y+ z+
        d = orientation
        sign=-1
        if(orientation>3) then
@@ -1433,23 +1434,23 @@ end subroutine get_velocity_from_momentum
                    fl(c(1),c(2),c(3))=flhere
                 elseif(flag==5) then !90deg 
                    if (d==1 .and. sign==-1) then 
-                     cv(c(1),c(2),c(3))=cv(c(1)+1,c(2),c(3))
-                     fl(c(1),c(2),c(3))=fl(c(1)+1,c(2),c(3))
+                      cv(c(1),c(2),c(3))=cv(c(1)+1,c(2),c(3))
+                      fl(c(1),c(2),c(3))=fl(c(1)+1,c(2),c(3))
                    else if (d==1 .and. sign==1) then
-                     cv(c(1),c(2),c(3))=cv(c(1)-1,c(2),c(3))
-                     fl(c(1),c(2),c(3))=fl(c(1)-1,c(2),c(3))
+                      cv(c(1),c(2),c(3))=cv(c(1)-1,c(2),c(3))
+                      fl(c(1),c(2),c(3))=fl(c(1)-1,c(2),c(3))
                    else if (d==2 .and. sign==-1) then 
-                     cv(c(1),c(2),c(3))=cv(c(1),c(2)+1,c(3))
-                     fl(c(1),c(2),c(3))=fl(c(1),c(2)+1,c(3))
+                      cv(c(1),c(2),c(3))=cv(c(1),c(2)+1,c(3))
+                      fl(c(1),c(2),c(3))=fl(c(1),c(2)+1,c(3))
                    else if (d==2 .and. sign==1) then
-                     cv(c(1),c(2),c(3))=cv(c(1),c(2)-1,c(3))
-                     fl(c(1),c(2),c(3))=fl(c(1),c(2)-1,c(3))
+                      cv(c(1),c(2),c(3))=cv(c(1),c(2)-1,c(3))
+                      fl(c(1),c(2),c(3))=fl(c(1),c(2)-1,c(3))
                    else if (d==3 .and. sign==-1) then 
-                     cv(c(1),c(2),c(3))=cv(c(1),c(2),c(3)+1)
-                     fl(c(1),c(2),c(3))=fl(c(1),c(2),c(3)+1)
+                      cv(c(1),c(2),c(3))=cv(c(1),c(2),c(3)+1)
+                      fl(c(1),c(2),c(3))=fl(c(1),c(2),c(3)+1)
                    else if (d==3 .and. sign==1) then
-                     cv(c(1),c(2),c(3))=cv(c(1),c(2),c(3)-1)
-                     fl(c(1),c(2),c(3))=fl(c(1),c(2),c(3)-1)
+                      cv(c(1),c(2),c(3))=cv(c(1),c(2),c(3)-1)
+                      fl(c(1),c(2),c(3))=fl(c(1),c(2),c(3)-1)
                    end if !d
                 endif
              enddo
@@ -1457,20 +1458,20 @@ end subroutine get_velocity_from_momentum
        endif
     enddo
   contains
-  function inject(j,k)
-    use module_grid
-    implicit none
-    integer :: j,k
-    integer :: inject
-    inject=0
-    if ( inject_type == 2 .or. inject_type == 5 .or. inject_type == 4) then 
-      if ((y(j) - jetcenter_yc)**2 + (z(k) - jetcenter_zc)**2.lt.radius_liq_inject**2) inject=1
-    else if ( inject_type == 3 ) then
-      if ((y(j) - jetcenter_yc) <= radius_liq_inject ) inject = 1 
-    end if ! inject_type
-  end function inject
-!
-   function xcoord(d,i)
+    function inject(j,k)
+      use module_grid
+      implicit none
+      integer :: j,k
+      integer :: inject
+      inject=0
+      if ( inject_type == 2 .or. inject_type == 5 .or. inject_type == 4) then 
+         if ((y(j) - jetcenter_yc)**2 + (z(k) - jetcenter_zc)**2.lt.radius_liq_inject**2) inject=1
+      else if ( inject_type == 3 ) then
+         if ((y(j) - jetcenter_yc) <= radius_liq_inject ) inject = 1 
+      end if ! inject_type
+    end function inject
+    !
+    function xcoord(d,i)
       implicit none
       real(8) :: xcoord
       integer, intent(in) :: d,i
