@@ -20,7 +20,11 @@ else
 fi
 
 mpirun -np $npstart paris > tmpout 2>&1
-echo `awk ' /Step:/ { cpu = $8 } END { print "cpu = " cpu } ' < tmpout`
+echo `awk ' /START:/ { cpu = $8 } END { print "cpu = " cpu } ' < tmpout`
+
+
+GREEN="\\033[1;32m"
+NORMAL="\\033[0m"
 
 echo -e "$GREEN" "Check results using Visit/Tecplot."  "$NORMAL"
 

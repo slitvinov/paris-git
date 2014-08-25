@@ -1,8 +1,3 @@
-! Test file for VOF test case
-! 
-! 4  grid points per dimension per domain
-! 8  mpi processes
-
 ! The input file for running the PARIS code
 ! Parameters are read using a namelist statement.
 ! Blank lines and commented lines are ignored.
@@ -26,7 +21,7 @@ hypre     = F      ! T: uses hyprepackage, F: uses SOR solver
 restart   = F       ! T: start the domain from a previous simulation
 restartFront = F    ! T: start the frontfrom  a previous simulation
 restartAverages = F
-nBackup  = 200      ! number of time steps between  backups are kept.
+nBackup  = 200      ! number of time steps between when backups are kept.
 
 NSTEP   = 100       ! maximum number of time steps
 EndTime = 1000.0     ! When to stop simulation

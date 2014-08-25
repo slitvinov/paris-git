@@ -445,7 +445,7 @@ contains
 !          include 'mpif.h'
 !          integer, intent(in) :: i,j,k
 !          integer, intent(in) :: index,pass
-!          integer :: ierr, MPI_errorcode=1
+!          integer :: ierr, MPI_errorcode
 !          if(i.lt.imin.or.i.gt.imax.or.   &
 !               j.lt.jmin.or.j.gt.jmax.or. &
 !               k.lt.kmin.or.k.gt.kmax.or. &

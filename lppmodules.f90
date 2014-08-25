@@ -3363,8 +3363,9 @@ contains
       use module_IO
       implicit none
       include 'mpif.h'
-      integer ierr, MPI_errorcode=1
+      integer ierr, MPI_errorcode
       character(*) :: message
+      MPI_errorcode=1
       write(*,*) "LPP ERROR *** ",message, " *** STOP at rank: ", rank
       ! Exit MPI gracefully
       close(out)
