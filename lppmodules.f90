@@ -62,6 +62,7 @@
    integer, dimension(:), allocatable :: tag_mergeflag
 
    integer, dimension(:), allocatable :: new_drop_id
+   integer :: tag_threshold=1d-9
 
    type element 
       real(8) :: xc,yc,zc,uc,vc,wc,duc,dvc,dwc,vol
@@ -425,7 +426,7 @@ contains
     num_drop_merge(:) = 0
     do i=imin,imax; do j=jmin,jmax; do k=kmin,kmax
     !do i=is,ie; do j=js,je; do k=ks,ke
-      if ( cvof(i,j,k) > 0.d0 .and. tag_flag(i,j,k) == 0 ) then 
+      if ( cvof(i,j,k) > tag_threshold .and. tag_flag(i,j,k) == 0 ) then 
         tag_id  (i,j,k) = current_id
         tag_flag(i,j,k) = 2 ! mark as S node
         num_drop(rank) = num_drop(rank) + 1
@@ -469,7 +470,7 @@ contains
                if ( isq+i0 >= imin .and. isq+i0 <= imax .and. & 
                     jsq+j0 >= jmin .and. jsq+j0 <= jmax .and. &
                     ksq+k0 >= kmin .and. ksq+k0 <= kmax ) then  
-                  if ( cvof(isq+i0,jsq+j0,ksq+k0)      > 0.d0 .and. & 
+                  if ( cvof(isq+i0,jsq+j0,ksq+k0)      > tag_threshold .and. & 
                       tag_flag(isq+i0,jsq+j0,ksq+k0) == 0 ) then 
                      tag_id  (isq+i0,jsq+j0,ksq+k0) = current_id  ! tag node with id
                      tag_flag(isq+i0,jsq+j0,ksq+k0) = 3  ! mark as C node
@@ -545,7 +546,7 @@ contains
           end if ! nc_queue
         end do ! ns_queue>0
 
-        if ( vol > 0.d0 ) then  
+        if ( vol > tag_threshold ) then  
           if ( merge_drop ) then
             drops_merge(num_drop_merge(rank),rank)%element%id  = current_id
             drops_merge(num_drop_merge(rank),rank)%element%vol = vol 
@@ -3362,7 +3363,7 @@ contains
       use module_IO
       implicit none
       include 'mpif.h'
-      integer ierr, MPI_errorcode
+      integer ierr, MPI_errorcode=1
       character(*) :: message
       write(*,*) "LPP ERROR *** ",message, " *** STOP at rank: ", rank
       ! Exit MPI gracefully
