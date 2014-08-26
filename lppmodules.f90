@@ -1195,7 +1195,10 @@ contains
       call tag_drop()
       if (nPdomain > 1 ) then 
          call tag_drop_all()
-         call merge_drop_pieces 
+         call hello_coucou  ! 12
+         call CreateTag2DropTable
+         call merge_drop_pieces
+         call ReleaseTag2DropTable
       end if ! nPdomain
       if ( DropStatisticsMethod > 0 ) call drop_statistics(0,0.d0)
       call output_tag()
