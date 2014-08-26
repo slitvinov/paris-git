@@ -224,7 +224,7 @@ Program paris
               if (FreeSurface) then
                  call get_normals()
                  call get_all_curvatures(kappa_fs)
-                 call set_topology(vof_phase)
+                 call set_topology(vof_phase) !vof_phase updated in vofsweeps
               endif
               call my_timer(4)
               call get_all_heights()
@@ -416,7 +416,7 @@ Program paris
            if(DoVOF) cvof  = 0.5*(cvof +cvofold)
            if(DoVOF) then
               call get_flags_and_clip()
-              call get_vof_phase()
+              call get_vof_phase() !cvof updated above from min to max
            endif
            if ( DoLPP ) call AveragePartSol()
         endif
@@ -1682,7 +1682,7 @@ subroutine InitCondition
         if(DoVOF) then
            call initconditions_VOF()
            if (FreeSurface) then
-              call set_topology(vof_phase)
+              call set_topology(vof_phase) !vof_phases are updated in initconditions_VOF called above
               call get_normals()
               call get_all_curvatures(kappa_fs)
            endif

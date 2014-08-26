@@ -546,7 +546,7 @@ or none at all")
     call do_all_ighost(vof_flag)
     call setVOFBC(cvof,vof_flag)
     call get_vof_phase()   
-    call do_all_ighost(vof_phase) ! not needed, and BC for VOF phase are not set. 
+    !call do_all_ighost(vof_phase) ! not needed, and BC for VOF phase are not set. 
     return
   end subroutine initconditions_VOF
   !=================================================================================================
