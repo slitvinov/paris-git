@@ -43,26 +43,21 @@
            u_cmask(i,j,k,0) = 1; u_assigned(i,j,k) = .true.
         endif
         if (vof_phase(i,j+1,k) == 0) then
-           v_cmask(i,j,k,0) = 1
-           v_assigned(i,j,k) = .true.
+           v_cmask(i,j,k,0) = 1; v_assigned(i,j,k) = .true.
         endif
         if (vof_phase(i,j,k+1) == 0) then 
-           w_cmask(i,j,k,0) = 1
-           w_assigned(i,j,k) = .true.
+           w_cmask(i,j,k,0) = 1; w_assigned(i,j,k) = .true.
         endif
      endif
      if (vof_phase(i,j,k) == 0) then
         if (vof_phase(i+1,j,k) == 1) then
-           u_cmask(i,j,k,0) = 1
-           u_assigned(i,j,k) = .true.
+           u_cmask(i,j,k,0) = 1; u_assigned(i,j,k) = .true.
         endif
         if (vof_phase(i,j+1,k) == 1) then
-           v_cmask(i,j,k,0) = 1
-           v_assigned(i,j,k) = .true.
+           v_cmask(i,j,k,0) = 1; v_assigned(i,j,k) = .true.
         endif
         if (vof_phase(i,j,k+1) == 1) then 
-           w_cmask(i,j,k,0) = 1
-           w_assigned(i,j,k) = .true.
+           w_cmask(i,j,k,0) = 1; w_assigned(i,j,k) = .true.
         endif
         if (vof_phase(i+1,j,k) == 0) then
            u_cmask(i,j,k,0) = 1; u_assigned(i,j,k)=.true.
