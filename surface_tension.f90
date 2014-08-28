@@ -82,6 +82,7 @@ contains
        allocate(n1(imin:imax,jmin:jmax,kmin:kmax), n2(imin:imax,jmin:jmax,kmin:kmax),  &
                n3(imin:imax,jmin:jmax,kmin:kmax), kappa_fs(imin:imax,jmin:jmax,kmin:kmax))
        recomputenormals = .false.
+       kappa_fs = 0d0
     endif
     allocate(height(imin:imax,jmin:jmax,kmin:kmax,6))
     if(nx.ge.500000.or.ny.gt.500000.or.nz.gt.500000) call pariserror("nx too large")
@@ -180,119 +181,48 @@ contains
      real(8) :: alpha, al3dnew, nr(3), P_a, Src
      real(8) :: a_l, a_rt, a_t, a_b, a_f, a_rr
      real(8) :: x_vel, xcount
-     !real(8), dimension(imin:imax,jmin:jmax,kmin:kmax) :: ucmask,vcmask,wcmask
 
-!----OLD MASKS, REMOVE
-     !ucmask = 0d0; vcmask = 0d0; wcmask =0d0
-     !this loop masks extrapolated velocity locations 
-!!$     do k=ks,ke; do j=js,je; do i=is,ie
-!!$        if (vof_flag(i,j,k) == 2) then
-!!$           nr(1) = n1(i,j,k);         nr(2) = n2(i,j,k);         nr(3) = n3(i,j,k)
-!!$           alpha = al3dnew(nr,cvof(i,j,k))
-!!$           !=========Set mask for u-velocity in cut-cells          
-!!$           if (n_1 < 1d-49) n_1 = 1d-49
-!!$           x_cut = (alpha - n_3/2d0)/n_1
-!!$           if (x_cut>0.5d0) then
-!!$              if (n2(i,j,k)>0d0) then
-!!$                 vcmask(i,j-1,k) = 1d0
-!!$              else
-!!$                 vcmask(i,j,k) = 1d0
+!New simple extrapolation: Velocities of neighbours at lower topological level averaged
+!!$     do level = 1, X_level
+!!$        do k=ks,ke; do j=js,je; do i=is,ie
+!!$           if (u_cmask(i,j,k,level) == 1) then
+!!$              xcount = 0d0; x_vel = 0d0
+!!$              do kk=-1,1; do jj=-1,1; do ii=-1,1
+!!$                 if (u_cmask(i+ii,j+jj,k+kk,level-1)==1) then
+!!$                    xcount = xcount+1d0
+!!$                    x_vel = x_vel + u(i+ii,j+jj,k+kk)
+!!$                 endif
+!!$              enddo; enddo; enddo
+!!$              if (xcount>0d0) then
+!!$                 u(i,j,k) = x_vel/xcount
 !!$              endif
 !!$           endif
-!!$           x_cut = (alpha - n_2 - n_3/2d0)/n_1
-!!$           if (x_cut>0.5d0) then
-!!$              if (n2(i,j,k)>0d0) then
-!!$                 vcmask(i,j,k) = 1d0
-!!$              else
-!!$                 vcmask(i,j-1,k) = 1d0
+!!$           if (v_cmask(i,j,k,level) == 1) then
+!!$              xcount = 0d0; x_vel = 0d0
+!!$              do kk=-1,1; do jj=-1,1; do ii=-1,1
+!!$                 if (v_cmask(i+ii,j+jj,k+kk,level-1)==1) then
+!!$                    xcount = xcount+1d0
+!!$                    x_vel = x_vel + v(i+ii,j+jj,k+kk)
+!!$                 endif
+!!$              enddo; enddo; enddo
+!!$              if (xcount>0d0) then
+!!$                 v(i,j,k) = x_vel/xcount
 !!$              endif
 !!$           endif
-!!$           !=========Set mask for v-velocity in cut-cells
-!!$           if (n_2 < 1d-49) n_2 = 1d-49
-!!$           y_cut = (alpha - n_3/2d0)/n_2
-!!$           if (y_cut>0.5d0) then
-!!$              if (n1(i,j,k)>0d0) then
-!!$                 ucmask(i-1,j,k) = 1d0
-!!$              else
-!!$                 ucmask(i,j,k) = 1d0
+!!$           if (w_cmask(i,j,k,level) == 1) then
+!!$              xcount = 0d0; x_vel = 0d0
+!!$              do kk=-1,1; do jj=-1,1; do ii=-1,1
+!!$                 if (w_cmask(i+ii,j+jj,k+kk,level-1)==1) then
+!!$                    xcount = xcount+1d0
+!!$                    x_vel = x_vel + w(i+ii,j+jj,k+kk)
+!!$                 endif
+!!$              enddo; enddo; enddo
+!!$              if (xcount>0d0) then
+!!$                 w(i,j,k) = x_vel/xcount
 !!$              endif
 !!$           endif
-!!$           y_cut = (alpha - n_1 - n_3/2d0)/n_2
-!!$           if (y_cut>0.5d0) then
-!!$              if (n1(i,j,k)>0d0) then
-!!$                 ucmask(i,j,k) = 1d0
-!!$              else
-!!$                 ucmask(i-1,j,k) = 1d0
-!!$              endif
-!!$           endif
-!!$           !=========Set mask for w-velocity in cut-cells
-!!$           if (n_1 < 1d-49) n_1 = 1d-49
-!!$           xz_cut = (alpha - n_2/2d0)/n_1
-!!$           if (xz_cut>0.5d0) then
-!!$              if (n3(i,j,k)>0d0) then
-!!$                 wcmask(i,j,k-1) = 1d0
-!!$              else
-!!$                 wcmask(i,j,k) = 1d0
-!!$              endif
-!!$           endif
-!!$           xz_cut = (alpha - n_3 - n_2/2d0)/n_1
-!!$           if (xz_cut>0.5d0) then
-!!$              if (n3(i,j,k)>0d0) then
-!!$                 wcmask(i,j,k) = 1d0
-!!$              else
-!!$                 wcmask(i,j,k-1) = 1d0
-!!$              endif
-!!$           endif
-!!$        endif
-!!$        !=========Set mask for all velocities in cavity cells neighbouring cut cells
-!!$        if ((vof_flag(i,j,k) == 1) .and. ((vof_flag(i-1,j,k) == 2) .or. (vof_flag(i+1,j,k) == 2) .or. &
-!!$             (vof_flag(i,j-1,k) == 2) .or. (vof_flag(i,j+1,k) == 2) .or. &
-!!$             (vof_flag(i,j,k-1) == 2) .or. (vof_flag(i,j,k+1) == 2))) then
-!!$           ucmask(i,j,k) = 1d0; ucmask(i-1,j,k) = 1d0
-!!$           vcmask(i,j,k) = 1d0; vcmask(i,j-1,k) = 1d0
-!!$           wcmask(i,j,k) = 1d0; wcmask(i,j,k-1) = 1d0
-!!$        endif
-!!$     enddo; enddo; enddo
-     do level = 1, X_level
-        do k=ks,ke; do j=js,je; do i=is,ie
-           if (u_cmask(i,j,k,level) == 1) then
-              xcount = 0d0; x_vel = 0d0
-              do kk=-1,1; do jj=-1,1; do ii=-1,1
-                 if (u_cmask(i+ii,j+jj,k+kk,level-1)==1) then
-                    xcount = xcount+1d0
-                    x_vel = x_vel + u(i+ii,j+jj,k+kk)
-                 endif
-              enddo; enddo; enddo
-              if (xcount>0d0) then
-                 u(i,j,k) = x_vel/xcount
-              endif
-           endif
-           if (v_cmask(i,j,k,level) == 1) then
-              xcount = 0d0; x_vel = 0d0
-              do kk=-1,1; do jj=-1,1; do ii=-1,1
-                 if (v_cmask(i+ii,j+jj,k+kk,level-1)==1) then
-                    xcount = xcount+1d0
-                    x_vel = x_vel + v(i+ii,j+jj,k+kk)
-                 endif
-              enddo; enddo; enddo
-              if (xcount>0d0) then
-                 v(i,j,k) = x_vel/xcount
-              endif
-           endif
-           if (w_cmask(i,j,k,level) == 1) then
-              xcount = 0d0; x_vel = 0d0
-              do kk=-1,1; do jj=-1,1; do ii=-1,1
-                 if (w_cmask(i+ii,j+jj,k+kk,level-1)==1) then
-                    xcount = xcount+1d0
-                    x_vel = x_vel + w(i+ii,j+jj,k+kk)
-                 endif
-              enddo; enddo; enddo
-              if (xcount>0d0) then
-                 w(i,j,k) = x_vel/xcount
-              endif
-           endif
-        enddo; enddo; enddo
-     enddo
+!!$        enddo; enddo; enddo
+!!$     enddo
 ! Simple volume conservation step after velocities have been extrapolated.
      Src = 0d0
      do level = 1, X_level
@@ -724,19 +654,22 @@ contains
         is_bulk_cell=.false. 
         if (vof_flag(i,j,k) == 2 ) then  ! mixed cell
            call get_curvature(i,j,k,kappa,nfound,nposit,afit,.false.)
+           !if (kappa /= kappa) write(*,'("Kappa from mixed cell NaN, Kappa: ",e14.5,3I8)')kappa, i,j,k !debugging
         else if (vof_flag(i,j,k) > 2 ) then
            call pariserror("inconsistent vof_flag > 3")
         else if(.not.bulk_cell(i,j,k)) then !  non-bulk pure cell
            call get_curvature(i,j,k,kappa,nfound,nposit,afit,.true.)
+           !if (kappa /= kappa) write(*,'("Kappa from non_bulk cell NaN, Kappa: ",e14.5,3I8)')kappa, i,j,k !debugging
         else
            is_bulk_cell=.true.
         endif
         if(abs(kappa)>kappamax) then
            geom_case_count(17) = geom_case_count(17) + 1
            kappa = sign(1d0,kappa)*kappamax
+           !if (kappa /= kappa) write(*,'("Kappa limit NaN, Kappa: ",e14.5,3I8)')kappa, i,j,k !debugging
         endif
         if(.not.is_bulk_cell) kapparray(i,j,k) = kappa
-        if (kappa /= kappa) then !debugging
+        if (kapparray(i,j,k) /= kapparray(i,j,k)) then !debugging
            write(*,'("Kappa read into array is NaN, Kapparay, Kappa: ",2e14.5,3I8)')kapparray(i,j,k), kappa, i,j,k !debugging
            call pariserror("Kappa read into array is NaN") !debugging
         endif

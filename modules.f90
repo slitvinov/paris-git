@@ -338,7 +338,7 @@ module module_freesurface
   integer, dimension(:,:,:,:), allocatable :: u_cmask, v_cmask, w_cmask
   !real(8), dimension(:,:,:), allocatable :: pmask 
   integer :: X_level
-  logical :: FreeSurface
+  logical :: FreeSurface, debug=.false.
 end module module_freesurface
 !=================================================================================================
 !=================================================================================================
@@ -1978,7 +1978,7 @@ end subroutine SetupDensity
 ! A7*Pijk = A1*Pi-1jk + A2*Pi+1jk + A3*Pij-1k + 
 !           A4*Pij+1k + A5*Pijk-1 + A6*Pijk+1 + A8
 !-------------------------------------------------------------------------------------------------
-subroutine SetupPoisson(utmp,vtmp,wtmp,umask,vmask,wmask,vof_phase,rhot,dt,A,pmask,cvof,n1,n2,n3,VolumeSource,kappa_fs)
+subroutine SetupPoisson(utmp,vtmp,wtmp,umask,vmask,wmask,vof_phase,rhot,dt,A,pmask,cvof,n1,n2,n3,VolumeSource,kappa_fs,istep) 
   use module_grid
   use module_BC
   use module_2phase
@@ -1993,7 +1993,7 @@ subroutine SetupPoisson(utmp,vtmp,wtmp,umask,vmask,wmask,vof_phase,rhot,dt,A,pma
   real(8), dimension(is:ie,js:je,ks:ke,8), intent(out) :: A
   real(8), intent(in) :: dt, VolumeSource
   real(8), dimension(4) :: P_bc
-  integer :: i,j,k
+  integer :: i,j,k,l
   do k=ks,ke; do j=js,je; do i=is,ie
 !    if(mask(i,j,k))then
       A(i,j,k,1) = 2d0*dt*umask(i-1,j,k)/(dx(i)*dxh(i-1)*(rhot(i-1,j,k)+rhot(i,j,k)))
@@ -2009,7 +2009,7 @@ subroutine SetupPoisson(utmp,vtmp,wtmp,umask,vmask,wmask,vof_phase,rhot,dt,A,pma
 !    endif
   enddo; enddo; enddo
   if(FreeSurface) then
-   call setuppoisson_fs(umask,vmask,wmask,vof_phase,rhot,dt,A,pmask,cvof,n1,n2,n3,kappa_fs)
+   call setuppoisson_fs(umask,vmask,wmask,vof_phase,rhot,dt,A,pmask,cvof,n1,n2,n3,kappa_fs,istep)
   endif
   P_bc = 0d0
   ! dp/dn = 0 for inflow bc on face 1 == x- : do not correct u(is-1)

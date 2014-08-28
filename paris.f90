@@ -219,8 +219,8 @@ Program paris
               endif
               if (FreeSurface) then
                  call get_normals()
-                 call get_all_curvatures(kappa_fs)
-                 call set_topology(vof_phase) !vof_phase updated in vofsweeps
+                 !call get_all_curvatures(kappa_fs)
+                 call set_topology(vof_phase,itimestep) !vof_phase updated in vofsweeps
               endif
               call my_timer(4)
               call get_all_heights()
@@ -302,7 +302,7 @@ Program paris
            call my_timer(1)
 !-----------------------------------------PROJECTION STEP-----------------------------------------
            call SetPressureBC(umask,vmask,wmask)
-           call SetupPoisson(u,v,w,umask,vmask,wmask,vof_phase,rho,dt,A,tmp,cvof,n1,n2,n3,VolumeSource,kappa_fs)
+           call SetupPoisson(u,v,w,umask,vmask,wmask,vof_phase,rho,dt,A,tmp,cvof,n1,n2,n3,VolumeSource,kappa_fs,itimestep)
            ! (div u)*dt < epsilon => div u < epsilon/dt => maxresidual : maxerror/dt 
            if(HYPRE)then
               call poi_solve(A,p(is:ie,js:je,ks:ke),maxError/dt,maxit,it)
@@ -337,16 +337,19 @@ Program paris
               do k=ks,ke;  do j=js,je; do i=is,ieu    ! CORRECT THE u-velocity 
                  u(i,j,k)=u(i,j,k)-dt*(2.0*umask(i,j,k)/x_mod(i,j,k))*(p(i+1,j,k)+P_g(i+1,j,k,1)-p(i,j,k)-P_g(i,j,k,1))&
                       /(rho(i+1,j,k)+rho(i,j,k))
+                 if (u(i,j,k) /= u(i,j,k)) write(*,'("WARNING u NaN :",2e14.5)')u(i,j,k), x_mod(i,j,k)
               enddo; enddo; enddo
 
               do k=ks,ke;  do j=js,jev; do i=is,ie    ! CORRECT THE v-velocity
                  v(i,j,k)=v(i,j,k)-dt*(2.0*vmask(i,j,k)/y_mod(i,j,k))*(p(i,j+1,k)+P_g(i,j+1,k,2)-p(i,j,k)-P_g(i,j,k,2))&
                       /(rho(i,j+1,k)+rho(i,j,k))
+                 if (v(i,j,k) /= v(i,j,k)) write(*,'("WARNING v NaN :",2e14.5)')v(i,j,k), y_mod(i,j,k)
               enddo; enddo; enddo
 
               do k=ks,kew;  do j=js,je; do i=is,ie   ! CORRECT THE w-velocity
                  w(i,j,k)=w(i,j,k)-dt*(2.0*wmask(i,j,k)/z_mod(i,j,k))*(p(i,j,k+1)+P_g(i,j,k+1,3)-p(i,j,k)-P_g(i,j,k,3))&
                       /(rho(i,j,k+1)+rho(i,j,k))
+                 if (w(i,j,k) /= w(i,j,k)) write(*,'("WARNING w NaN :",2e14.5)')w(i,j,k), z_mod(i,j,k)
               enddo; enddo; enddo
            endif
 !----------------------------------EXTRAPOLATION FOR FREE SURFACE---------------------------------
@@ -1676,9 +1679,9 @@ subroutine InitCondition
         if(DoVOF) then
            call initconditions_VOF()
            if (FreeSurface) then
-              call set_topology(vof_phase) !vof_phases are updated in initconditions_VOF called above
+              call set_topology(vof_phase,itimestep) !vof_phases are updated in initconditions_VOF called above
               call get_normals()
-              call get_all_curvatures(kappa_fs)
+              !call get_all_curvatures(kappa_fs)
            endif
            call get_all_heights()
         endif
