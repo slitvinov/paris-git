@@ -736,6 +736,10 @@ contains
            kappa = sign(1d0,kappa)*kappamax
         endif
         if(.not.is_bulk_cell) kapparray(i,j,k) = kappa
+        if (kapparray(i,j,k) /= kapparray(i,j,k)) then !debugging
+           write(*,'("Kappa read into array is NaN, Kapparay, Kappa: ",2e14.5,3I8)')kapparray(i,j,k), kappa, i,j,k !debugging
+           call pariserror("Kappa read into array is NaN") !debugging
+        endif
      enddo;enddo;enddo
 
      call ghost_x(kapparray(:,:,:),2,req(1:4))
