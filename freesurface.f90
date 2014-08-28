@@ -243,7 +243,7 @@ subroutine setuppoisson_fs(umask,vmask,wmask,vof_phase,rhot,dt,A,pmask,cvof,n1,n
               x_mod(i,j,k) = (mod0 + mod1)/count
            else
               x_mod(i,j,k) = dxh(i)/2d0
-              write(*,'("WARNING: gas-liq x-pair has no interface intercepts between nodes",3I8)')i,j,k
+              !write(*,'("WARNING: gas-liq x-pair has no interface intercepts between nodes",3I8)')i,j,k
            endif
            A(i+1,j,k,1) = 2d0*dt*umask(i,j,k)/(dx(i+1)*x_mod(i,j,k)*(rhot(i,j,k)+rhot(i+1,j,k)))
            if (debug) write(51,314)x(i+1),z(k),-x_mod(i,j,k),0d0
@@ -284,7 +284,7 @@ subroutine setuppoisson_fs(umask,vmask,wmask,vof_phase,rhot,dt,A,pmask,cvof,n1,n
               y_mod(i,j,k) = (mod0 + mod1)/count
            else
               y_mod(i,j,k) = dyh(j)/2d0
-              write(*,'("WARNING: gas-liq y-pair has no interface intercepts between nodes",3I8)')i,j,k
+              !write(*,'("WARNING: gas-liq y-pair has no interface intercepts between nodes",3I8)')i,j,k
            endif
            A(i,j+1,k,3) = 2d0*dt*vmask(i,j,k)/(dy(j+1)*y_mod(i,j,k)*(rhot(i,j,k)+rhot(i,j+1,k)))
            !if (debug) write(51,314)x(i),y(j+1),0d0,-y_mod(i,j,k)
@@ -325,7 +325,7 @@ subroutine setuppoisson_fs(umask,vmask,wmask,vof_phase,rhot,dt,A,pmask,cvof,n1,n
               z_mod(i,j,k) = (mod0 + mod1)/count
            else
               z_mod(i,j,k) = dzh(k)/2d0
-              write(*,'("WARNING: gas-liq z-pair has no interface intercepts between nodes",3I8)')i,j,k
+              !write(*,'("WARNING: gas-liq z-pair has no interface intercepts between nodes",3I8)')i,j,k
            endif
            A(i,j,k+1,5) = 2d0*dt*wmask(i,j,k)/(dz(k+1)*z_mod(i,j,k)*(rhot(i,j,k)+rhot(i,j,k+1)))
            if (debug) write(51,314)x(i),z(k+1),0d0,-z_mod(i,j,k)
@@ -371,7 +371,7 @@ subroutine setuppoisson_fs(umask,vmask,wmask,vof_phase,rhot,dt,A,pmask,cvof,n1,n
               x_mod(i,j,k) = (mod0 + mod1)/count
            else
               x_mod(i,j,k) = dxh(i)/2d0
-              write(*,'("WARNING: liq-gas x-pair has no interface intercepts between nodes",3I8)')i,j,k
+              !write(*,'("WARNING: liq-gas x-pair has no interface intercepts between nodes",3I8)')i,j,k
            endif
            A(i,j,k,2) = 2d0*dt*umask(i,j,k)/(dx(i)*x_mod(i,j,k)*(rhot(i,j,k)+rhot(i+1,j,k)))
            if (A(i,j,k,2) /= A(i,j,k,2)) write(*,'("A2 NaN? ",2e14.4)')A(i,j,k,2), x_mod(i,j,k) !debugging
@@ -413,7 +413,7 @@ subroutine setuppoisson_fs(umask,vmask,wmask,vof_phase,rhot,dt,A,pmask,cvof,n1,n
               y_mod(i,j,k) = (mod0 + mod1)/count
            else
               y_mod(i,j,k) = dyh(j)/2d0
-              write(*,'("WARNING: liq-gas y-pair has no interface intercepts between nodes",3I8)')i,j,k
+              !write(*,'("WARNING: liq-gas y-pair has no interface intercepts between nodes",3I8)')i,j,k
            endif
            A(i,j,k,4) = 2d0*dt*vmask(i,j,k)/(dy(j)*y_mod(i,j,k)*(rhot(i,j,k)+rhot(i,j+1,k)))
            !if (debug) write(51,314)x(i),y(j),0d0,y_mod(i,j,k)
@@ -456,7 +456,7 @@ subroutine setuppoisson_fs(umask,vmask,wmask,vof_phase,rhot,dt,A,pmask,cvof,n1,n
               z_mod(i,j,k) = (mod0 + mod1)/count
            else
               z_mod(i,j,k) = dzh(k)/2d0
-              write(*,'("WARNING: liq-gas z-pair has no interface intercepts between nodes",3I8)')i,j,k
+              !write(*,'("WARNING: liq-gas z-pair has no interface intercepts between nodes",3I8)')i,j,k
            endif
            A(i,j,k,6) = 2d0*dt*wmask(i,j,k)/(dz(k)*z_mod(i,j,k)*(rhot(i,j,k)+rhot(i,j,k+1)))
            if (debug) write(51,314)x(i),z(k),0d0,z_mod(i,j,k)
