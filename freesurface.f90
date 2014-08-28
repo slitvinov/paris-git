@@ -34,7 +34,7 @@
   !pmask = 1d0
   u_cmask = -1; v_cmask = -1; w_cmask = -1
   u_assigned = .false.; v_assigned=.false.; w_assigned=.false.
-  debug = .true.
+  debug = .false.
   if (debug) then
      Open(unit=20,FILE=TRIM(out_path)//'/Top_0-'//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout,padding))//'.txt')
      Open(unit=21,FILE=TRIM(out_path)//'/Top_1-'//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout,padding))//'.txt')
