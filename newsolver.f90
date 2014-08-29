@@ -42,8 +42,8 @@ subroutine NewSolver(A,p,maxError,beta,maxit,it,ierr)
   real(8), intent(in) :: beta, maxError
   integer, intent(in) :: maxit
   integer, intent(out) :: it, ierr
-  real(8) :: res1,res2,resinf,intvol,intsource,maxerrsrc
-  real(8) :: tres1,tres2,tresinf,tintvol,tintsource
+  real(8) :: res1,res2,resinf,intvol
+  real(8) :: tres2
   integer :: i,j,k
   integer :: req(12),sta(MPI_STATUS_SIZE,12)
   logical :: mask(imin:imax,jmin:jmax,kmin:kmax)
@@ -265,15 +265,15 @@ end subroutine check_poisson_setup
 !-------------------------------------------------------------------------------------------------
 !=================================================================================================
 !
-subroutine check_corrected_vel(u,v,w,umask,vmask,wmask,iout)
+subroutine check_corrected_vel(u,umask,iout)
   use module_grid
   
   use module_BC
   use module_IO
   implicit none
   include 'mpif.h'
-  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: u,v,w
-  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: umask,vmask,wmask
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: u
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: umask
   integer, intent(in) :: iout
   integer :: i,j,k,ierr,i1,i2
   real(8), dimension(:), allocatable, save :: flux,fullflux,fluxm,fullfluxm
@@ -283,10 +283,6 @@ subroutine check_corrected_vel(u,v,w,umask,vmask,wmask,iout)
      allocate(fluxm(nx+2*Ng),fullfluxm(nx+2*Ng))
      initialized = .true.
   endif
-
-!  print*,"xh(is-1),xh(ie)",xh(Ng),xh(Nx+Ng)
-
-
   flux = 0d0; fluxm = 0d0
   i1=is
   i2=ieu

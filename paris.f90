@@ -359,7 +359,7 @@ Program paris
            endif !Extrapolation
 !------------------------------------------------------------------------------------------------
 
-           if(mod(itimestep,nout)==0) call check_corrected_vel(u,v,w,umask,vmask,wmask,itimestep)
+           if(mod(itimestep,nout)==0) call check_corrected_vel(u,umask,itimestep)
            if( DoLPP ) call ComputeSubDerivativeVel()
            call my_timer(10)
            !--------------------------------------UPDATE COLOR---------------------------------------------
@@ -2011,7 +2011,6 @@ subroutine parismessage(message)
   use module_grid
   implicit none
   include 'mpif.h'
-  integer ierr
   character(*) :: message
   OPEN(UNIT=88,FILE=TRIM(out_path)//'/message-rank-'//TRIM(int2text(rank,padding))//'.txt')
   write(88,*) message
