@@ -789,11 +789,11 @@ module module_BC
 !=================================================================================================
 ! subroutine SetPressureBC: Sets the pressure boundary condition
 !-------------------------------------------------------------------------------------------------
-    subroutine SetPressureBC(umask,vmask,wmask,p)
+    subroutine SetPressureBC(umask,vmask,wmask)
     use module_grid
     implicit none
     include 'mpif.h'
-    real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: umask,vmask,wmask, p
+    real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: umask,vmask,wmask
 
 
   ! for walls set the mask to zero  ! @@@ Aijk coefficients should be changed too. 
@@ -1790,7 +1790,7 @@ module module_poisson
     use iso_c_binding, only: c_int,c_int8_t
     implicit none
     include 'mpif.h'
-    integer :: ierr, nvalues, ijk, i,j,k,one
+    integer :: ierr, nvalues, ijk, i,j,k
     real(8), dimension(:), allocatable :: values
     real(8), dimension(is:ie,js:je,ks:ke,8), intent(in) :: A
     real(8), dimension(is:ie,js:je,ks:ke), intent(inout) :: p
@@ -1798,7 +1798,7 @@ module module_poisson
     real(8), intent(in) :: maxError
     integer, intent(in) :: maxit
     integer, intent(out):: num_iterations
-    real(8) :: final_res_norm
+!     real(8) :: final_res_norm
 !----------------------------------------Fill in matrix Amat--------------------------------------
     num_iterations = 0
     nvalues = mx * my * mz * nstencil
@@ -1993,7 +1993,7 @@ subroutine SetupPoisson(utmp,vtmp,wtmp,umask,vmask,wmask,vof_phase,rhot,dt,A,pma
   real(8), dimension(is:ie,js:je,ks:ke,8), intent(out) :: A
   real(8), intent(in) :: dt, VolumeSource
   real(8), dimension(4) :: P_bc
-  integer :: i,j,k,l
+  integer :: i,j,k
   do k=ks,ke; do j=js,je; do i=is,ie
 !    if(mask(i,j,k))then
       A(i,j,k,1) = 2d0*dt*umask(i-1,j,k)/(dx(i)*dxh(i-1)*(rhot(i-1,j,k)+rhot(i,j,k)))
@@ -2494,7 +2494,7 @@ subroutine calcResidual(A,p, residual)
   include 'mpif.h'
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: p
   real(8), dimension(is:ie,js:je,ks:ke,8), intent(in) :: A
-  real(8) :: res, totalres, Residual,locres ! ,globmax,maxnorm
+  real(8) :: res, Residual,locres ! ,globmax,maxnorm
   integer :: i,j,k, ierr
   res = 0d0
 !  maxnorm = 0d0

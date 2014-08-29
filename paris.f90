@@ -305,7 +305,7 @@ Program paris
            call do_ghost_vector(u,v,w)
            call my_timer(1)
 !-----------------------------------------PROJECTION STEP-----------------------------------------
-           call SetPressureBC(umask,vmask,wmask,p)
+           call SetPressureBC(umask,vmask,wmask)
            call SetupPoisson(u,v,w,umask,vmask,wmask,vof_phase,rho,dt,A,tmp,cvof,n1,n2,n3,VolumeSource,kappa_fs)
            ! (div u)*dt < epsilon => div u < epsilon/dt => maxresidual : maxerror/dt 
            if(HYPRE)then
@@ -1024,7 +1024,7 @@ subroutine momentumConvectionBCG()
   call do_ghost_vector(work(:,:,:,1),work(:,:,:,2),work(:,:,:,3))
   !-----------------------------------------PROJECTION STEP-----------------------------------------
   tmp = p
-  call SetPressureBC(umask,vmask,wmask,tmp)
+  call SetPressureBC(umask,vmask,wmask)
   call SetupPoisson(work(:,:,:,1),work(:,:,:,2),work(:,:,:,3), &
   umask,vmask,wmask,rho,dt,A,tmp,cvof,n1,n2,n3,VolumeSource)
   ! (div u)*dt < epsilon => div u < epsilon/dt => maxresidual : maxerror/dt 

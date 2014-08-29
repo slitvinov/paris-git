@@ -1113,7 +1113,6 @@ end subroutine get_half_fractions
     use module_flow
     use module_tmpvar
     implicit none
-    integer i
     integer, intent(in) :: tswap
 
     tmp = cvof ! store old value
@@ -1138,7 +1137,7 @@ end subroutine get_half_fractions
     
   end subroutine vofandmomsweeps
 
-  subroutine get_momentum(c,us,d,mom)
+  subroutine get_momentum(us,d,mom)
 
   use module_grid
   use module_flow
@@ -1148,7 +1147,7 @@ end subroutine get_half_fractions
   integer i,j,k,d
   integer i0,j0,k0
   integer i1,j1,k1
-  real(8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), intent(in)  :: c
+!   real(8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), intent(in)  :: c
   real(8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), intent(in)  :: us
   real(8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), intent(out) :: mom
   real(8) rhoavg
@@ -1200,16 +1199,15 @@ subroutine get_velocity_from_momentum (mom,d,us,der)
   use module_BC
   use module_tmpvar
   implicit none
-  logical error
   integer :: i,j,k
   integer :: i0,j0,k0
-  integer :: i1,j1,k1
+!   integer :: i1,j1,k1
   integer, intent(in) :: d
   real(8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: mom
   real(8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: us,der
   real(8) tmpreal, rhoavg1,rhoavg2,mom1,mom2, uavg, cflag
-  real(8) alpha,fl3dnew,stencil3x3(-1:1,-1:1,-1:1)
-  real(8) dm(3),x0(3),deltax(3)
+!   real(8) stencil3x3(-1:1,-1:1,-1:1)
+!  real(8) x0(3)
   
   do k=ks-1,ke+1
      do j=js-1,je+1
@@ -1283,9 +1281,9 @@ end subroutine get_velocity_from_momentum
     integer i
     integer, intent(in) :: tswap
 
-    call get_momentum(cvof,u,1,momentum(:,:,:,1))
-    call get_momentum(cvof,v,2,momentum(:,:,:,2))
-    call get_momentum(cvof,w,3,momentum(:,:,:,3))
+    call get_momentum(u,1,momentum(:,:,:,1))
+    call get_momentum(v,2,momentum(:,:,:,2))
+    call get_momentum(w,3,momentum(:,:,:,3))
     
     if (VOF_advect=='Dick_Yue') call c_mask(work(:,:,:,2))
     if (MOD(tswap,3).eq.0) then  ! do z then x then y 
