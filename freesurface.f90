@@ -28,7 +28,7 @@
   use module_IO
   implicit none
   integer, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: vof_phase
-  integer :: i,j,k,level,iout
+  integer :: i,j,k,level,iout,nbr
   logical, dimension(imin:imax,jmin:jmax,kmin:kmax) :: u_assigned, v_assigned, w_assigned
   !initialize pmask to 1d0 and all masks to -1 and unassigned
   !pmask = 1d0
@@ -42,7 +42,7 @@
      Open(unit=19,FILE=TRIM(out_path)//'/Pmask-'//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout,padding))//'.txt')
   endif
   !First loop to set pmask and level 0 velocities in liq-liq and liq-gas cells
-  do k=ks,ke; do j=js,je; do i=is,ie
+  do k=kmin,kmax-1; do j=jmin,jmax-1; do i=imin,imax-1
      if (vof_phase(i,j,k) == 1) then
         !pmask(i,j,k) = 0d0
         if (debug) write(19,13)x(i),y(j),z(k)
@@ -57,92 +57,62 @@
         endif
      endif
      if (vof_phase(i,j,k) == 0) then
-        if (vof_phase(i+1,j,k) == 1) then
+        if ((vof_phase(i+1,j,k) == 1) .or. (vof_phase(i+1,j,k) == 0)) then
            u_cmask(i,j,k,0) = 1; u_assigned(i,j,k) = .true.
         endif
-        if (vof_phase(i,j+1,k) == 1) then
+        if ((vof_phase(i,j+1,k) == 1) .or. (vof_phase(i,j+1,k) == 0)) then
            v_cmask(i,j,k,0) = 1; v_assigned(i,j,k) = .true.
         endif
-        if (vof_phase(i,j,k+1) == 1) then 
+        if ((vof_phase(i,j,k+1) == 1) .or.(vof_phase(i,j,k+1) == 0)) then 
            w_cmask(i,j,k,0) = 1; w_assigned(i,j,k) = .true.
-        endif
-        if (vof_phase(i+1,j,k) == 0) then
-           u_cmask(i,j,k,0) = 1; u_assigned(i,j,k)=.true.
-        endif
-        if (vof_phase(i,j+1,k) == 0) then
-           v_cmask(i,j,k,0) = 1; v_assigned(i,j,k)=.true.
-        endif
-        if (vof_phase(i,j,k+1) == 0) then 
-           w_cmask(i,j,k,0) = 1; w_assigned(i,j,k)=.true.
         endif
      endif
   enddo; enddo; enddo
   !Set levels 1 to X_level
   do level=1,X_level
-  do k=ks,ke; do j=js,je; do i=is,ie
+  do k=kmin+1,kmax-1; do j=jmin+1,jmax-1; do i=imin+1,imax-1
      !Tests: in between gas nodes, neighbour level -1, unassigned
      !u-neighbours
      if (u_cmask(i,j,k,level-1)==1) then
-        if (.not.u_assigned(i,j+1,k) .and. vof_phase(i,j+1,k)==1 .and. vof_phase(i+1,j+1,k)==1) then
-           u_cmask(i,j+1,k,level) = 1; u_assigned(i,j+1,k)=.true.
-        endif
-        if (.not.u_assigned(i+1,j,k) .and. vof_phase(i+1,j,k)==1 .and. vof_phase(i+2,j,k)==1) then
-           u_cmask(i+1,j,k,level) = 1; u_assigned(i+1,j,k) = .true.
-        endif
-        if (.not.u_assigned(i,j-1,k) .and. vof_phase(i,j-1,k)==1 .and. vof_phase(i+1,j-1,k)==1) then
-           u_cmask(i,j-1,k,level) = 1; u_assigned(i,j-1,k)=.true.
-        endif
-        if (.not.u_assigned(i-1,j,k) .and. vof_phase(i-1,j,k)==1 .and. vof_phase(i,j,k)==1) then
-           u_cmask(i-1,j,k,level) = 1; u_assigned(i-1,j,k) = .true.
-        endif
-        if (.not.u_assigned(i,j,k+1) .and. vof_phase(i,j,k+1)==1 .and. vof_phase(i+1,j,k+1)==1) then
-           u_cmask(i,j,k+1,level) = 1; u_assigned(i,j,k+1)=.true.
-        endif
-        if (.not.u_assigned(i,j,k-1) .and. vof_phase(i,j,k-1)==1 .and. vof_phase(i+1,j,k-1)==1) then
-           u_cmask(i,j,k-1,level) = 1; u_assigned(i,j,k-1) = .true.
-        endif
+        do nbr=-1,1,2
+           if (.not.u_assigned(i,j+nbr,k) .and. vof_phase(i,j+nbr,k)==1 .and. vof_phase(i+1,j+nbr,k)==1) then
+              u_cmask(i,j+nbr,k,level) = 1; u_assigned(i,j+nbr,k)=.true.
+           endif
+           if (.not.u_assigned(i+nbr,j,k) .and. vof_phase(i+nbr,j,k)==1 .and. vof_phase(i+nbr+1,j,k)==1) then
+              u_cmask(i+nbr,j,k,level) = 1; u_assigned(i+nbr,j,k) = .true.
+           endif
+           if (.not.u_assigned(i,j,k+nbr) .and. vof_phase(i,j,k+nbr)==1 .and. vof_phase(i+1,j,k+nbr)==1) then
+              u_cmask(i,j,k+nbr,level) = 1; u_assigned(i,j,k+nbr)=.true.
+           endif
+        enddo
      endif
      !v-neighbours
      if (v_cmask(i,j,k,level-1)==1) then
-        if (.not.v_assigned(i,j+1,k) .and. vof_phase(i,j+1,k)==1 .and. vof_phase(i,j+2,k)==1) then
-           v_cmask(i,j+1,k,level) = 1; v_assigned(i,j+1,k)=.true.
-        endif
-        if (.not.v_assigned(i+1,j,k) .and. vof_phase(i+1,j,k)==1 .and. vof_phase(i+1,j+1,k)==1) then
-           v_cmask(i+1,j,k,level) = 1; v_assigned(i+1,j,k) = .true.
-        endif
-        if (.not.v_assigned(i,j-1,k) .and. vof_phase(i,j-1,k)==1 .and. vof_phase(i,j,k)==1) then
-           v_cmask(i,j-1,k,level) = 1; v_assigned(i,j-1,k)=.true.
-        endif
-        if (.not.v_assigned(i-1,j,k) .and. vof_phase(i-1,j,k)==1 .and. vof_phase(i-1,j+1,k)==1) then
-           v_cmask(i-1,j,k,level) = 1; v_assigned(i-1,j,k) = .true.
-        endif
-        if (.not.v_assigned(i,j,k+1) .and. vof_phase(i,j,k+1)==1 .and. vof_phase(i,j+1,k+1)==1) then
-           v_cmask(i,j,k+1,level) = 1; v_assigned(i,j,k+1)=.true.
-        endif
-        if (.not.v_assigned(i,j,k-1) .and. vof_phase(i,j,k-1)==1 .and. vof_phase(i,j+1,k-1)==1) then
-           v_cmask(i,j,k-1,level) = 1; v_assigned(i,j,k-1) = .true.
-        endif
+        do nbr=-1,1,2
+           if (.not.v_assigned(i,j+nbr,k) .and. vof_phase(i,j+nbr,k)==1 .and. vof_phase(i,j+nbr+1,k)==1) then
+              v_cmask(i,j+nbr,k,level) = 1; v_assigned(i,j+nbr,k)=.true.
+           endif
+           if (.not.v_assigned(i+nbr,j,k) .and. vof_phase(i+nbr,j,k)==1 .and. vof_phase(i+nbr,j+1,k)==1) then
+              v_cmask(i+nbr,j,k,level) = 1; v_assigned(i+nbr,j,k) = .true.
+           endif
+           if (.not.v_assigned(i,j,k+nbr) .and. vof_phase(i,j,k+nbr)==1 .and. vof_phase(i,j+1,k+nbr)==1) then
+              v_cmask(i,j,k+nbr,level) = 1; v_assigned(i,j,k+nbr)=.true.
+           endif
+        enddo
      endif
      !w-neighbours
      if (w_cmask(i,j,k,level-1)==1) then
-        if (.not.w_assigned(i,j+1,k) .and. vof_phase(i,j+1,k)==1 .and. vof_phase(i,j+1,k+1)==1) then
-           w_cmask(i,j+1,k,level) = 1; w_assigned(i,j+1,k)=.true.
-        endif
-        if (.not.w_assigned(i+1,j,k) .and. vof_phase(i+1,j,k)==1 .and. vof_phase(i+1,j,k+1)==1) then
-           w_cmask(i+1,j,k,level) = 1; w_assigned(i+1,j,k) = .true.
-        endif
-        if (.not.w_assigned(i,j-1,k) .and. vof_phase(i,j-1,k)==1 .and. vof_phase(i,j-1,k+1)==1) then
-           w_cmask(i,j-1,k,level) = 1; w_assigned(i,j-1,k)=.true.
-        endif
-        if (.not.w_assigned(i-1,j,k) .and. vof_phase(i-1,j,k)==1 .and. vof_phase(i-1,j,k+1)==1) then
-           w_cmask(i-1,j,k,level) = 1; w_assigned(i-1,j,k) = .true.
-        endif
-        if (.not.w_assigned(i,j,k+1) .and. vof_phase(i,j,k+1)==1 .and. vof_phase(i,j,k+2)==1) then
-           w_cmask(i,j,k+1,level) = 1; w_assigned(i,j,k+1)=.true.
-        endif
-        if (.not.w_assigned(i,j,k-1) .and. vof_phase(i,j,k-1)==1 .and. vof_phase(i,j,k)==1) then
-           w_cmask(i,j,k-1,level) = 1; w_assigned(i,j,k-1) = .true.
-        endif
+        do nbr=-1,1,2
+           if (.not.w_assigned(i,j+nbr,k) .and. vof_phase(i,j+nbr,k)==1 .and. vof_phase(i,j+nbr,k+1)==1) then
+              w_cmask(i,j+nbr,k,level) = 1; w_assigned(i,j+nbr,k)=.true.
+           endif
+           if (.not.w_assigned(i+nbr,j,k) .and. vof_phase(i+nbr,j,k)==1 .and. vof_phase(i+nbr,j,k+1)==1) then
+              w_cmask(i+nbr,j,k,level) = 1; w_assigned(i+nbr,j,k) = .true.
+           endif
+           if (.not.w_assigned(i,j,k+nbr) .and. vof_phase(i,j,k+nbr)==1 .and. vof_phase(i,j,k+nbr+1)==1) then
+              w_cmask(i,j,k+nbr,level) = 1; w_assigned(i,j,k+nbr)=.true.
+           endif
+        enddo
      endif
   enddo; enddo; enddo
   enddo

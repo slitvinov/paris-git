@@ -352,11 +352,13 @@ Program paris
                  if (w(i,j,k) /= w(i,j,k)) write(*,'("WARNING w NaN :",2e14.5)')w(i,j,k), z_mod(i,j,k)
               enddo; enddo; enddo
            endif
+   
 !----------------------------------EXTRAPOLATION FOR FREE SURFACE---------------------------------
            if (DoVOF .and. FreeSurface) then
               call extrapolate_velocities()
            endif !Extrapolation
-!------------------------------------------------------------------------------------------------           
+!------------------------------------------------------------------------------------------------
+
            if(mod(itimestep,nout)==0) call check_corrected_vel(u,v,w,umask,vmask,wmask,itimestep)
            if( DoLPP ) call ComputeSubDerivativeVel()
            call my_timer(10)
@@ -385,8 +387,7 @@ Program paris
            call ghost_y(color,1,req(13:16));  call MPI_WAITALL(16,req(1:16),sta(:,1:16),ierr)
            call ghost_z(u  ,2,req( 1: 4));  call ghost_z(v,2,req( 5: 8)); call ghost_z(w,2,req( 9:12)); 
            call ghost_z(color,1,req(13:16));  call MPI_WAITALL(16,req(1:16),sta(:,1:16),ierr)
-           call my_timer(1)
-
+           call my_timer(1)        
 
 !--------------------------------------UPDATE DENSITY/VISCOSITY------------------------------------
            if(TwoPhase) then

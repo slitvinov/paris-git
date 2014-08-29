@@ -1993,7 +1993,8 @@ subroutine SetupPoisson(utmp,vtmp,wtmp,umask,vmask,wmask,vof_phase,rhot,dt,A,pma
   real(8), dimension(is:ie,js:je,ks:ke,8), intent(out) :: A
   real(8), intent(in) :: dt, VolumeSource
   real(8), dimension(4) :: P_bc
-  integer :: i,j,k,l
+  integer :: i,j,k,l,istep
+
   do k=ks,ke; do j=js,je; do i=is,ie
 !    if(mask(i,j,k))then
       A(i,j,k,1) = 2d0*dt*umask(i-1,j,k)/(dx(i)*dxh(i-1)*(rhot(i-1,j,k)+rhot(i,j,k)))

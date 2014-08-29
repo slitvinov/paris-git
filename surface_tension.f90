@@ -176,7 +176,7 @@ contains
      use module_freesurface
      implicit none
      include 'mpif.h'
-     integer :: i,j,k,level,ii,jj,kk
+     integer :: i,j,k,level,nbr
      real(8) :: x_cut, y_cut, xz_cut
      real(8) :: alpha, al3dnew, nr(3), P_a, Src
      real(8) :: a_l, a_rt, a_t, a_b, a_f, a_rr
@@ -184,39 +184,75 @@ contains
 
 !New simple extrapolation: Velocities of neighbours at lower topological level averaged
      do level = 1, X_level
-        do k=ks,ke; do j=js,je; do i=is,ie
+        do k=ks-1,ke; do j=js-1,je; do i=is-1,ie
            if (u_cmask(i,j,k,level) == 1) then
               xcount = 0d0; x_vel = 0d0
-              do kk=-1,1; do jj=-1,1; do ii=-1,1
-                 if (u_cmask(i+ii,j+jj,k+kk,level-1)==1) then
+              do nbr=-1,1,2
+                 if (u_cmask(i+nbr,j,k,level-1)==1) then
                     xcount = xcount+1d0
-                    x_vel = x_vel + u(i+ii,j+jj,k+kk)
+                    x_vel = x_vel + u(i+nbr,j,k)
                  endif
-              enddo; enddo; enddo
+              enddo
+              do nbr=-1,1,2
+                 if (u_cmask(i,j+nbr,k,level-1)==1) then
+                    xcount = xcount+1d0
+                    x_vel = x_vel + u(i,j+nbr,k)
+                 endif
+              enddo
+              do nbr=-1,1,2
+                 if (u_cmask(i,j,k+nbr,level-1)==1) then
+                    xcount = xcount+1d0
+                    x_vel = x_vel + u(i,j,k+nbr)
+                 endif
+              enddo
               if (xcount>0d0) then
                  u(i,j,k) = x_vel/xcount
               endif
            endif
            if (v_cmask(i,j,k,level) == 1) then
               xcount = 0d0; x_vel = 0d0
-              do kk=-1,1; do jj=-1,1; do ii=-1,1
-                 if (v_cmask(i+ii,j+jj,k+kk,level-1)==1) then
+              do nbr = -1,1,2
+                 if (v_cmask(i+nbr,j,k,level-1)==1) then
                     xcount = xcount+1d0
-                    x_vel = x_vel + v(i+ii,j+jj,k+kk)
+                    x_vel = x_vel + v(i+nbr,j,k)
                  endif
-              enddo; enddo; enddo
+              enddo
+              do nbr = -1,1,2
+                 if (v_cmask(i,j+nbr,k,level-1)==1) then
+                    xcount = xcount+1d0
+                    x_vel = x_vel + v(i,j+nbr,k)
+                 endif
+              enddo
+              do nbr = -1,1,2
+                 if (v_cmask(i,j,k+nbr,level-1)==1) then
+                    xcount = xcount+1d0
+                    x_vel = x_vel + v(i,j,k+nbr)
+                 endif
+              enddo
               if (xcount>0d0) then
                  v(i,j,k) = x_vel/xcount
               endif
            endif
            if (w_cmask(i,j,k,level) == 1) then
               xcount = 0d0; x_vel = 0d0
-              do kk=-1,1; do jj=-1,1; do ii=-1,1
-                 if (w_cmask(i+ii,j+jj,k+kk,level-1)==1) then
+              do nbr = -1,1,2
+                 if (w_cmask(i+nbr,j,k,level-1)==1) then
                     xcount = xcount+1d0
-                    x_vel = x_vel + w(i+ii,j+jj,k+kk)
+                    x_vel = x_vel + w(i+nbr,j,k)
                  endif
-              enddo; enddo; enddo
+              enddo
+               do nbr = -1,1,2
+                 if (w_cmask(i,j+nbr,k,level-1)==1) then
+                    xcount = xcount+1d0
+                    x_vel = x_vel + w(i,j+nbr,k)
+                 endif
+              enddo
+               do nbr = -1,1,2
+                 if (w_cmask(i,j,k+nbr,level-1)==1) then
+                    xcount = xcount+1d0
+                    x_vel = x_vel + w(i,j,k+nbr)
+                 endif
+              enddo
               if (xcount>0d0) then
                  w(i,j,k) = x_vel/xcount
               endif
@@ -669,7 +705,7 @@ contains
            !if (kappa /= kappa) write(*,'("Kappa limit NaN, Kappa: ",e14.5,3I8)')kappa, i,j,k !debugging
         endif
         if(.not.is_bulk_cell) kapparray(i,j,k) = kappa
-        if (kapparray(i,j,k) /= kapparray(i,j,k)) then !debugging
+        if (kappa /= kappa) then !debugging
            write(*,'("Kappa read into array is NaN, Kapparay, Kappa: ",2e14.5,3I8)')kapparray(i,j,k), kappa, i,j,k !debugging
            call pariserror("Kappa read into array is NaN") !debugging
         endif
