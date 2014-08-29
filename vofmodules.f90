@@ -721,6 +721,9 @@ or none at all")
        ipar=-cylinder_dir
        if (test_cylinder_advection) ipar=-3
        vofi_lsfunction = shapes2ls(x,y,z,ipar)
+    else
+       call pariserror("unexpected case in vofi_ls")
+       vofi_lsfunction=0d0 ! to avoid warnings
     endif
     vofi_lsfunction = - vofi_lsfunction
   end function vofi_lsfunction
@@ -938,7 +941,7 @@ subroutine update_momentum (us,d,cold,cnew,mflux,der)
   real(8)  , dimension(imin:imax,jmin:jmax,kmin:kmax,3,2), intent(in) :: mflux
   real(8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: cold, cnew, us
   real(8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: der
-  real(8) tmpreal, vofh1old, vofh2old, vofh1new, vofh2new, rhoold,rhonew
+  real(8) vofh1old, vofh2old, vofh1new, vofh2new, rhoold,rhonew
   real(8) fluxtmp, rhohold,rhohnew,utmp(6)
   real(8) :: faceflux(6)
 

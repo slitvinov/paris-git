@@ -7,7 +7,6 @@
 ! Contact: Stephane Zaleski zaleski@dalembert.upmc.fr
 ! 
 ! Authors (in alphabetical order):
-!         Tomas Arrufat Jackson
 !         Sadegh Dabiri      
 !         Daniel Fuster      
 ! 	  Yue "Stanley" Ling 
@@ -54,7 +53,7 @@ Program paris
   use module_front
 
   use module_poisson
-  use module_averages
+!  use module_averages
   use module_IO
   use module_solid
   use module_vof
@@ -122,9 +121,6 @@ Program paris
   if(DoLPP) call initialize_LPP
 
   if(rank<nPdomain) call initialize_solids
-
-  call ReadAveParameters
-  if(rank==0) write(out,*)'Averaging Parameters read successfully'
 
   if(DoFront) call InitFront
   if(rank==0) write(out,*)'initialized'
@@ -428,7 +424,6 @@ Program paris
         end if ! DoLPP
 !--------------------------------------------OUTPUT-----------------------------------------------
         if(mod(itimestep,nstats)==0) call calcStats
-        !if(mod(itimestep,nbackup)==0) call ComputeAverages(itimestep)
         call my_timer(2)
         if(mod(itimestep,nbackup)==0) then 
            if ( DoFront ) then 
@@ -446,7 +441,6 @@ Program paris
            call output(nfile,is,ie+1,js,je+1,ks,ke+1)
            if(DoVOF) call output_VOF(nfile,is,ie+1,js,je+1,ks,ke+1)
            if(DoLPP) call output_LPP(nfile,is,ie+1,js,je+1,ks,ke+1)
-           call ComputeAverages(itimestep)
            if(test_droplet) call output_droplet(w,time)
            if(rank==0)then
               end_time =  MPI_WTIME()

@@ -17,6 +17,7 @@ max_num_drop = 30
 maxnum_cell_drop = 10000 
 max_num_part = 30 
 max_num_part_cross = 30 
+outputlpp_format = 2
 
 !=================================================================================================
 /
