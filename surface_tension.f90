@@ -1104,7 +1104,7 @@ contains
                 
    END SUBROUTINE FindInverseMatrix
 
-   subroutine FindCutAreaCentroid(i,j,k,centroid)
+   subroutine NewFindCutAreaCentroid(i,j,k,centroid)
       implicit none
 
       integer, intent(in)  :: i,j,k
@@ -1126,7 +1126,200 @@ contains
       endif
       call cent3D(nr,cvof(i,j,k),centroid)
       centroid = centroid - 0.5d0
+   end subroutine NewFindCutAreaCentroid
+!-------------------------------------------------------------------------------------------------------
+!-------------------------------------------------------------------------------------------------------
+   subroutine FindCutAreaCentroid(i,j,k,centroid)
+      implicit none
+
+      integer, intent(in)  :: i,j,k
+      real(8), intent(out) :: centroid(3)
+
+      integer :: l,m,n
+      real(8) :: dmx,dmy,dmz, mxyz(3),px,py,pz
+      real(8) :: invx,invy,invz
+      real(8) :: alpha, al3dold, nr(3)
+      real(8) :: stencil3x3(-1:1,-1:1,-1:1)
+
+      ! find cut area centroid 
+      !***
+      !     (1) normal vector: dmx,dmy,dmz, and |dmx|+|dmy|+|dmz| = 1.
+      !     (2) dmx,dmy,dmz>0 and record sign
+      !     (3) get alpha;               
+      !     (4) compute centroid with dmx,dmy,dmz and alpha;
+      !     (5) transfer to local coordinate;
+      !*(1)*
+
+      if(recomputenormals) then
+         do l=-1,1; do m=-1,1; do n=-1,1
+            stencil3x3(l,m,n) = cvof(i+l,j+m,k+n)
+         enddo;enddo;enddo
+         call youngs(stencil3x3,mxyz)
+         nr = mxyz
+      else
+         nr(1) = n1(i,j,k)      
+         nr(2) = n2(i,j,k)      
+         nr(3) = n3(i,j,k)
+      endif
+
+      dmx = nr(1); dmy = nr(2); dmz = nr(3)
+      !*(2)*  
+      invx = 1.d0
+      invy = 1.d0
+      invz = 1.d0
+      if (dmx .lt. 0.0d0) then
+         dmx = -dmx
+         invx = -1.d0
+      endif
+      if (dmy .lt. 0.0d0) then
+         dmy = -dmy
+         invy = -1.d0
+      endif
+      if (dmz .lt. 0.0d0) then
+         dmz = -dmz
+         invz = -1.d0
+      endif
+      !*(3)*  
+      alpha = al3dold(dmx,dmy,dmz,cvof(i,j,k))
+      !*(4)*  
+      call PlaneAreaCenter(dmx,dmy,dmz,alpha,px,py,pz)
+      !*(5)*
+      ! trap NaNs
+      !      if(px.ne.px) call pariserror("FCAC:invalid px")
+      !      if(py.ne.py) call pariserror("FCAC:invalid py")
+      !      if(pz.ne.pz) call pariserror("FCAC:invalid pz")
+
+      ! rotate
+      centroid(1) = px*invx
+      centroid(2) = py*invy
+      centroid(3) = pz*invz
+      ! shift to cell-center coordinates
+      centroid(1) = centroid(1) - invx*0.5d0
+      centroid(2) = centroid(2) - invy*0.5d0
+      centroid(3) = centroid(3) - invz*0.5d0
    end subroutine FindCutAreaCentroid
+!-------------------------------------------------------------------------------------------------------
+!-------------------------------------------------------------------------------------------------------
+! 
+!   Computes the centroid as in gerris
+! 
+! * Fills p with the position of the center of mass of the polygon
+! * obtained by interseectiing the plane  (m,alpha).
+! * with the reference cell.
+!
+!  assumptions: dmx,dmy,dmz > 0 and |dmx| + |dmy| + |dmz| = 1
+!
+   subroutine PlaneAreaCenter (dmx,dmy,dmz, alpha, px,py,pz)
+     implicit none
+     real(8), intent(in) :: dmx,dmy,dmz,alpha
+     real(8), intent(out) :: px,py,pz
+     real(8) :: nx,ny,qx,qy
+     real(8) :: area,b,amax
+
+     if(dmx<0.d0.or.dmy<0.d0.or.dmz<0.d0) call pariserror("invalid dmx dmy dmz")
+     if(abs(dmx+dmy+dmz-1d0)>EPS_GEOM) call pariserror("invalid dmx+dmy+dmz")
+
+     if (dmx < EPS_GEOM) then
+        nx = dmy
+        ny = dmz
+        call LineCenter (nx,ny, alpha, qx,qy)
+        px = 0.5d0
+        py = qx
+        pz = qy
+        return
+     endif
+     if (dmy < EPS_GEOM) then
+        nx = dmz
+        ny = dmx
+        call LineCenter (nx,ny, alpha, qx,qy)
+        px = qy
+        py = 0.5d0
+        pz = qx
+        return
+     endif
+     if (dmz < EPS_GEOM) then
+        call LineCenter (dmx,dmy, alpha, px,py)
+        pz = 0.5
+        return
+     endif
+
+     if (alpha < 0.d0 .or. alpha > 1.d0) then
+        print *, "alpha =", alpha
+        call pariserror("PAC: invalid alpha")
+     endif
+
+! Debris patch. Ideally, should not be looking for centroids of debris. 
+     if(alpha < EPS_GEOM) then
+        px=0d0; py=0d0; pz=0d0
+        return
+     endif
+
+     if(alpha > 1d0 - EPS_GEOM) then
+        px=1d0; py=1d0; pz=1d0
+        return
+     endif
+! end debris patch
+
+     area = alpha*alpha
+     px = area*alpha
+     py = area*alpha
+     pz = area*alpha
+     b = alpha - dmx
+     if (b > 0.) then
+        area = area - b*b
+        px = px - b*b*(2.*dmx + alpha)
+        py = py - b*b*b
+        pz = pz - b*b*b
+     endif
+     b = alpha - dmy
+     if (b > 0.) then
+        area = area - b*b
+        py = py - b*b*(2.*dmy + alpha)
+        px = px - b*b*b
+        pz = pz - b*b*b
+     endif
+     b = alpha - dmz
+     if (b > 0.) then
+        area = area - b*b
+        pz = pz - b*b*(2.*dmz + alpha)
+        px = px - b*b*b
+        py = py - b*b*b
+     endif
+
+     amax = alpha - 1.d0
+     b = amax + dmx
+     if (b > 0.) then
+        area = area + b*b
+        py = py + b*b*(2.*dmy + alpha - dmz)
+        pz = pz + b*b*(2.*dmz + alpha - dmy)
+        px = px + b*b*b
+     endif
+     b = amax + dmy
+     if (b > 0.) then
+        area = area + b*b
+        px = px + b*b*(2.*dmx + alpha - dmz)
+        pz = pz + b*b*(2.*dmz + alpha - dmx)
+        py = py + b*b*b
+     endif
+     b = amax + dmz
+     if (b > 0.) then
+        area = area + b*b
+        px = px + b*b*(2.*dmx + alpha - dmy)
+        py = py + b*b*(2.*dmy + alpha - dmx)
+        pz = pz + b*b*b
+     endif
+
+     area  = 3.d0*area
+     px = px/(area*dmx)
+     py = py/(area*dmy)
+     pz = pz/(area*dmz)
+
+     call THRESHOLD (px)
+     call THRESHOLD (py)
+     call THRESHOLD (pz)
+
+   end subroutine PlaneAreaCenter
+!-------------------------------------------------------------------------------------------------------
 !-------------------------------------------------------------------------------------------------------
    subroutine LineCenter (dmx,dmy, alpha, px,py)
      implicit none
@@ -1174,11 +1367,10 @@ contains
 
      call THRESHOLD (px)
      call THRESHOLD (py)
-
  !    if(px.ne.px) call pariserror("LAC:invalid px")
  !    if(py.ne.py) call pariserror("LAC:invalid px")
-
-   end subroutine
+   end subroutine LineCenter
+!------------------------------------------------------------------------
 
 !   direction closest to normal first
    subroutine orientation (m,c)
