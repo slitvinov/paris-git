@@ -58,6 +58,7 @@ module module_grid
   integer, dimension(:), allocatable :: dims, coords, periodic, reorder
   integer :: MPI_Comm_Cart, MPI_Comm_Domain, MPI_Comm_Active
   integer :: imin, imax, jmin, jmax, kmin, kmax
+  real(8), parameter :: TINY_DOUBLE=1d-300 
 ! added by SZ
 contains
 !

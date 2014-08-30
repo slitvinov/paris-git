@@ -128,7 +128,7 @@ contains
            glob_desc(19)="no surface tension force in y direction"
            glob_desc(20)="no surface tension force in z direction"
            do i=1,ngc
-              write(101,'(I10," ",A85)') geom_case_count(i), glob_desc(i)
+              write(101,'(I10," ",A85)') glob_count(i), glob_desc(i)
            enddo
            close(101)
         endif
@@ -838,6 +838,10 @@ contains
                  /(1.d0+a(4)*a(4)+a(5)*a(5))**(1.5d0)
             kappa = sign(1.d0,mxyz(try(1)))*kappa
             return
+         else
+            geom_case_count(16) = geom_case_count(16) + 1
+!            print *, "WARNING: no curvature"
+            return
          endif
       endif !  (-nfound) > nfound_min  
 
@@ -913,18 +917,21 @@ contains
             endif
          endif
       endif
-      call parabola_fit(xfit,yfit,hfit,nposit,a,fit_success)
-      if(.not.fit_success) then
-         if(nposit < 6) then
-            geom_case_count(nposit+10) = geom_case_count(nposit+10) + 1
-         else
-!            call print_cvof_3x3x3(i0,j0,k0)
-            geom_case_count(16) = geom_case_count(16) + 1
-         endif
+      if(nposit < 6) then
+         geom_case_count(nposit+10) = geom_case_count(nposit+10) + 1
+         return
       else
-         kappa = 2.d0*(a(1)*(1.d0+a(5)*a(5)) + a(2)*(1.d0+a(4)*a(4)) - a(3)*a(4)*a(5)) &
-             /sqrt(1.d0+a(4)*a(4)+a(5)*a(5))**3
-         kappa = sign(1.d0,mxyz(try(1)))*kappa
+         call parabola_fit(xfit,yfit,hfit,nposit,a,fit_success)
+         if(.not.fit_success) then
+            !            call print_cvof_3x3x3(i0,j0,k0)
+            geom_case_count(16) = geom_case_count(16) + 1
+!            print *, "WARNING: no curvature"
+            return
+         else
+            kappa = 2.d0*(a(1)*(1.d0+a(5)*a(5)) + a(2)*(1.d0+a(4)*a(4)) - a(3)*a(4)*a(5)) &
+                 /sqrt(1.d0+a(4)*a(4)+a(5)*a(5))**3
+            kappa = sign(1.d0,mxyz(try(1)))*kappa
+         endif
       endif
    end subroutine get_curvature
 
@@ -1004,6 +1011,8 @@ contains
             end do
          end do 
          fit_success = .true.
+      else
+!         print *, "WARNING: no fit success"
       end if ! inv_success
    end subroutine parabola_fit
 !
@@ -1041,9 +1050,9 @@ contains
         !Ensure diagonal elements are non-zero
         DO k = 1,n-1
           DO j = k+1,n
-            IF (augmatrix(k,k) == 0) THEN
+            IF (abs(augmatrix(k,k)) <  TINY_DOUBLE) THEN
                DO i = k+1, n
-                 IF (augmatrix(i,k) /= 0) THEN
+                 IF (abs(augmatrix(i,k)) > TINY_DOUBLE) THEN
                    DO  l = 1, 2*n
                      augmatrix(k,l) = augmatrix(k,l)+augmatrix(i,l)
                    END DO
@@ -1056,10 +1065,17 @@ contains
         !Reduce augmented matrix to upper triangular form
         DO k =1, n-1
           DO j = k+1, n
-            m = augmatrix(j,k)/augmatrix(k,k)
-            DO i = k, 2*n
-              augmatrix(j,i) = augmatrix(j,i) - m*augmatrix(k,i)
-            END DO
+             IF (abs(augmatrix(k,k)) >  TINY_DOUBLE) THEN 
+                m = augmatrix(j,k)/augmatrix(k,k)
+                DO i = k, 2*n
+                   augmatrix(j,i) = augmatrix(j,i) - m*augmatrix(k,i)
+                END DO
+             ELSE
+!                print *, "WARNING: matrix non invertible on row ",k
+                inverse = 0.d0
+                inverse_success = .false.
+                return
+             END IF
           END DO
         END DO
 
