@@ -382,7 +382,7 @@ contains
     endif
     if(vmax.ne.vmax) call pariserror("invalid vmax")
     call MPI_ALLREDUCE(vmax, norm, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_Cart, ierr)  
-    coeff = 0.8/norm
+    coeff = 0.8d0/(norm + TINY_DOUBLE)
     do i=is,ie; do j=js,je
        write(89,310) x(i),y(j),coeff*dx(i)*0.5d0*(u(i,j,k)+u(i-1,j,k)), &
                   coeff*dy(j)*0.5d0*(v(i,j,k)+v(i,j-1,k))
