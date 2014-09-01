@@ -682,6 +682,8 @@ subroutine momentumConvection()
     call momentumConvectionQUICK(u,v,w,du,dv,dw)
   elseif (AdvectionScheme=='ENO') then
     call momentumConvectionENO(u,v,w,du,dv,dw)
+  elseif (AdvectionScheme=='UpWind') then
+    call momentumConvectionUpWind(u,v,w,du,dv,dw)
   elseif (AdvectionScheme=='Verstappen') then
     call momentumConvectionVerstappen(u,v,w,du,dv,dw)
   elseif (AdvectionScheme=='BCG') then
@@ -799,7 +801,113 @@ subroutine momentumConvectionENO(u,v,w,du,dv,dw)
   enddo; enddo; enddo
 
 end subroutine momentumConvectionENO
+!=================================================================================================
+! subroutine momentumConvectionUpWind
+! calculates the convection terms in mumentum equation using UpWind scheme
+! and returns them in du, dv, dw
+!-------------------------------------------------------------------------------------------------
+subroutine momentumConvectionUpWind(u,v,w,du,dv,dw)
+  use module_grid
+  use module_tmpvar
+  implicit none
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: u, v, w
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: du, dv, dw
+  real(8), external :: minabs
+  integer :: i,j,k
+!-------------------------------------UpWind interpolation u-velocity--------------------------------
+  do k=ks,ke; do j=js,je; do i=is,ieu+1
+    if (u(i-1,j,k)+u(i,j,k)>0.0) then
+      work(i,j,k,1)=u(i-1,j,k)
+    else
+      work(i,j,k,1)=u(i,j,k)
+    endif
+  enddo; enddo; enddo
+  do k=ks,ke; do j=js-1,je; do i=is-1,ie
+    if(v(i,j,k)+v(i+1,j,k)>0.0) then
+      work(i,j,k,2)=u(i,j,k)
+    else
+      work(i,j,k,2)=u(i,j+1,k)
+    endif
+  enddo; enddo; enddo
+  do k=ks-1,ke; do j=js,je; do i=is-1,ie
+    if(w(i,j,k)+w(i+1,j,k)>0.0) then
+      work(i,j,k,3)=u(i,j,k)
+    else
+      work(i,j,k,3)=u(i,j,k+1)
+    endif
+  enddo; enddo; enddo
+  do k=ks,ke;  do j=js,je; do i=is,ieu
+    du(i,j,k)= -0.5*((u(i,j ,k  )+u(i+1,j  ,k  ))*work(i+1,j  ,k  ,1)- &
+                    (u(i,j  ,k  )+u(i-1,j  ,k  ))*work(i  ,j  ,k  ,1))/dxh(i) &
+              -0.5*((v(i,j  ,k  )+v(i+1,j  ,k  ))*work(i  ,j  ,k  ,2)-&
+                    (v(i,j-1,k  )+v(i+1,j-1,k  ))*work(i  ,j-1,k  ,2))/dy(j)  &
+              -0.5*((w(i,j  ,k  )+w(i+1,j  ,k  ))*work(i  ,j  ,k  ,3)-&
+                    (w(i,j  ,k-1)+w(i+1,j  ,k-1))*work(i  ,j  ,k-1,3))/dz(k)
+  enddo; enddo; enddo
 
+!-------------------------------------UpWind interpolation v-velocity--------------------------------
+  do k=ks,ke; do j=js,jev+1; do i=is,ie
+    if (v(i,j-1,k)+v(i,j,k)>0.0) then
+      work(i,j,k,2)=v(i,j-1,k)
+    else
+      work(i,j,k,2)=v(i,j,k)
+    endif
+  enddo; enddo; enddo
+  do k=ks,ke; do j=js-1,je; do i=is-1,ie
+    if(u(i,j,k)+u(i,j+1,k)>0.0) then
+      work(i,j,k,1)=v(i,j,k)
+    else
+      work(i,j,k,1)=v(i+1,j,k)
+    endif
+  enddo; enddo; enddo
+  do k=ks-1,ke; do j=js-1,je; do i=is,ie
+    if(w(i,j,k)+w(i,j+1,k)>0.0) then
+      work(i,j,k,3)=v(i,j,k)
+    else
+      work(i,j,k,3)=v(i,j,k+1)
+    endif
+  enddo; enddo; enddo
+  do k=ks,ke;  do j=js,jev; do i=is,ie
+    dv(i,j,k)= &
+              -0.5*((u(i  ,j,k  )+u(i  ,j+1,k  ))*work(i  ,j  ,k  ,1)-&
+                    (u(i-1,j,k  )+u(i-1,j+1,k  ))*work(i-1,j  ,k  ,1))/dx(i)  &
+              -0.5*((v(i  ,j,k  )+v(i  ,j+1,k  ))*work(i  ,j+1,k  ,2)-&
+                    (v(i  ,j,k  )+v(i  ,j-1,k  ))*work(i  ,j  ,k  ,2))/dyh(j) &
+              -0.5*((w(i  ,j,k  )+w(i  ,j+1,k  ))*work(i  ,j  ,k  ,3)-&
+                    (w(i  ,j,k-1)+w(i  ,j+1,k-1))*work(i  ,j  ,k-1,3))/dz(k)
+  enddo; enddo; enddo
+!-------------------------------------UpWind interpolation w-velocity--------------------------------
+  do k=ks,kew+1; do j=js,je; do i=is,ie
+    if (w(i,j,k-1)+w(i,j,k)>0.0) then
+      work(i,j,k,3)=w(i,j,k-1)
+    else
+      work(i,j,k,3)=w(i,j,k)
+    endif
+  enddo; enddo; enddo
+  do k=ks-1,ke; do j=js,je; do i=is-1,ie
+    if(u(i,j,k)+u(i,j,k+1)>0.0) then
+      work(i,j,k,1)=w(i,j,k)
+    else
+      work(i,j,k,1)=w(i+1,j,k)
+    endif
+  enddo; enddo; enddo
+  do k=ks-1,ke; do j=js-1,je; do i=is,ie
+    if(v(i,j,k)+v(i,j,k+1)>0.0) then
+      work(i,j,k,2)=w(i,j,k)
+    else
+      work(i,j,k,2)=w(i,j+1,k)
+    endif
+  enddo; enddo; enddo
+  do k=ks,kew;  do j=js,je; do i=is,ie
+    dw(i,j,k)= & 
+              -0.5*((u(i  ,j  ,k)+u(i  ,j  ,k+1))*work(i  ,j  ,k  ,1)-&
+                    (u(i-1,j  ,k)+u(i-1,j  ,k+1))*work(i-1,j  ,k  ,1))/dx(i)  &
+              -0.5*((v(i  ,j  ,k)+v(i  ,j  ,k+1))*work(i  ,j  ,k  ,2)-&
+                    (v(i  ,j-1,k)+v(i  ,j-1,k+1))*work(i  ,j-1,k  ,2))/dy(j)  &
+              -0.5*((w(i  ,j  ,k)+w(i  ,j  ,k+1))*work(i  ,j  ,k+1,3)-&
+                    (w(i  ,j  ,k)+w(i  ,j  ,k-1))*work(i  ,j  ,k  ,3))/dzh(k) 
+  enddo; enddo; enddo
+end subroutine momentumConvectionUpWind
 !=================================================================================================
 ! subroutine momentumConvection
 ! calculates the convection terms in the momentum equations using a QUICK scheme
