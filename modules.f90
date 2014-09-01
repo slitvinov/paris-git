@@ -353,7 +353,7 @@ module module_IO
   integer :: nout, out, output_format, nbackup, nstats, termout, nfile
   character(len=20) :: out_path, x_file, y_file, z_file
   logical :: read_x, read_y, read_z, restart, ICOut, restartFront, restartAverages, zip_data
-  logical :: out_P
+  logical :: out_P, out_mom
   real(8) :: tout
 contains
     !=================================================================================================
@@ -420,6 +420,24 @@ contains
     close(unit=89)
 310 format(4e14.5)
   end subroutine  write_vec_gnuplot
+  !=================================================================================================
+  subroutine write_mom_gnuplot(du,dv,dw,iout)
+    use module_grid
+    implicit none
+    include 'mpif.h'
+    real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: du, dv, dw
+    integer, intent(in) :: iout
+    integer :: i,j,k,ierr
+    
+    OPEN(UNIT=20,FILE=TRIM(out_path)//'/Mag_accel-'//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout,padding))//'.txt')
+    k=(ks+ke)/2
+    do i=is,ie; do j=js,je
+       write(20,13) x(i),y(j),sqrt(du(i,j,k)**2d0+dv(i,j,k)**2d0+dw(i,j,k)**2d0)
+    enddo; enddo
+    close(unit=20)
+  
+13 format(3e14.5)
+  end subroutine  write_mom_gnuplot
   !=================================================================================================
   subroutine output_droplet(w,time)
     use module_grid

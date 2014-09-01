@@ -70,7 +70,7 @@
   enddo; enddo; enddo
   !Set levels 1 to X_level
   do level=1,X_level
-  do k=kmin+1,kmax-1; do j=jmin+1,jmax-1; do i=imin+1,imax-1
+  do k=kmin+1,kmax-1; do j=jmin+1,jmax-1; do i=imin+1,imax-1 !fixme. bounds issue for i/j/k+nbr+1
      !Tests: in between gas nodes, neighbour level -1, unassigned
      !u-neighbours
      if (u_cmask(i,j,k,level-1)==1) then
@@ -451,15 +451,15 @@ close(unit=50); close(unit=51); close(unit=52); close(unit=53)
           (P_g(i+1,j,k,1)/(dx(i)*x_mod(i,j,k))+P_g(i-1,j,k,1)/(dx(i)*x_mod(i-1,j,k))&
           +P_g(i,j+1,k,2)/(dy(j)*y_mod(i,j,k))+P_g(i,j-1,k,2)/(dy(j)*y_mod(i,j-1,k))&
           +P_g(i,j,k+1,3)/(dz(k)*z_mod(i,j,k))+P_g(i,j,k-1,3)/(dz(k)*z_mod(i,j,k-1))))
-!!$     if (A(i,j,k,8) /= A(i,j,k,8)) then
-!!$        write(*,'("A8 NaN, error imminent. Neigbours mods :",6e14.5)')x_mod(i-1,j,k),x_mod(i,j,k),&
-!!$             y_mod(i,j-1,k),y_mod(i,j,k),z_mod(i,j,k-1),z_mod(i,j,k)
+     if (A(i,j,k,8) /= A(i,j,k,8)) then
+        write(*,'("A8 NaN, error imminent. Neigbours mods :",6e14.5)')x_mod(i-1,j,k),x_mod(i,j,k),&
+             y_mod(i,j-1,k),y_mod(i,j,k),z_mod(i,j,k-1),z_mod(i,j,k)
 !!$        write(*,'("A8 NaN, error imminent. P_g :",6e14.5)')P_g(i-1,j,k,1),P_g(i+1,j,k,1),&
 !!$             P_g(i,j-1,k,2),P_g(i,j+1,k,2),P_g(i,j,k-1,3),P_g(i,j,k+1,3)
 !!$        write(*,'("pmask :",e14.5)')pmask(i,j,k)
 !!$        write(*,'("sigma :",e14.5)')sigma
 !!$        write(*,'("A8 NaN, kap :",6e14.5)')kap(i-1,j,k),kap(i,j,k),&
 !!$             kap(i,j-1,k),kap(i,j,k),kap(i,j,k-1),kap(i,j,k)
-!!$     endif
+     endif
   enddo;enddo;enddo
 end subroutine setuppoisson_fs

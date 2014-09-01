@@ -260,30 +260,30 @@ contains
         enddo; enddo; enddo
      enddo
 ! Simple volume conservation step after velocities have been extrapolated.
-!!$     Src = 0d0
-!!$     do level = 1, X_level
-!!$        do k=ks,ke; do j=js,je; do i=is,ie
-!!$           a_l = 0d0; a_rt = 0d0; a_t = 0d0; a_b = 0d0; a_f = 0d0; a_rr = 0d0    
-!!$           Src = (u(i-1,j,k)-u(i,j,k))*dz(k)*dy(j) + (v(i,j-1,k)-v(i,j,k))*dx(i)*dz(k) + (w(i,j,k-1)-w(i,j,k))*dx(i)*dy(j)
-!!$           if ((n1(i,j,k) > 0d0) .and. (u_cmask(i-1,j,k,level)==1)) a_l = 1d0
-!!$           if ((n1(i,j,k) < 0d0) .and. (u_cmask(i,j,k,level)==1)) a_rt = 1d0
-!!$           if ((n2(i,j,k) > 0d0) .and. (v_cmask(i,j-1,k,level)==1)) a_b = 1d0
-!!$           if ((n2(i,j,k) < 0d0) .and. (v_cmask(i,j,k,level)==1)) a_t = 1d0
-!!$           if ((n3(i,j,k) > 0d0) .and. (w_cmask(i,j,k-1,level)==1)) a_rr = 1d0
-!!$           if ((n3(i,j,k) < 0d0) .and. (w_cmask(i,j,k,level)==1)) a_f = 1d0
-!!$           P_a = (a_l+a_rt)*abs(n1(i,j,k))*dy(j)*dz(k) + &
-!!$                (a_t + a_b)*abs(n2(i,j,k))*dx(i)*dz(k) + &
-!!$                (a_f + a_rr)*abs(n3(i,j,k))*dx(i)*dy(j)
-!!$           if (P_a .ne. 0) then
-!!$              u(i,j,k) = u(i,j,k) + a_rt*Src/P_a*abs(n1(i,j,k)) 
-!!$              v(i,j,k) = v(i,j,k) + a_t*Src/P_a*abs(n2(i,j,k))  
-!!$              w(i,j,k) = w(i,j,k) + a_f*Src/P_a*abs(n3(i,j,k))
-!!$              u(i-1,j,k) = u(i-1,j,k) - a_l*Src/P_a*abs(n1(i,j,k)) 
-!!$              v(i,j-1,k) = v(i,j-1,k) - a_b*Src/P_a*abs(n2(i,j,k))  
-!!$              w(i,j,k-1) = w(i,j,k-1) - a_rr*Src/P_a*abs(n3(i,j,k))
-!!$           endif
-!!$        enddo; enddo; enddo
-!!$     enddo
+     Src = 0d0
+     do level = 1, X_level
+        do k=ks,ke; do j=js,je; do i=is,ie
+           a_l = 0d0; a_rt = 0d0; a_t = 0d0; a_b = 0d0; a_f = 0d0; a_rr = 0d0    
+           Src = (u(i-1,j,k)-u(i,j,k))*dz(k)*dy(j) + (v(i,j-1,k)-v(i,j,k))*dx(i)*dz(k) + (w(i,j,k-1)-w(i,j,k))*dx(i)*dy(j)
+           if ((n1(i,j,k) > 0d0) .and. (u_cmask(i-1,j,k,level)==1)) a_l = 1d0
+           if ((n1(i,j,k) < 0d0) .and. (u_cmask(i,j,k,level)==1)) a_rt = 1d0
+           if ((n2(i,j,k) > 0d0) .and. (v_cmask(i,j-1,k,level)==1)) a_b = 1d0
+           if ((n2(i,j,k) < 0d0) .and. (v_cmask(i,j,k,level)==1)) a_t = 1d0
+           if ((n3(i,j,k) > 0d0) .and. (w_cmask(i,j,k-1,level)==1)) a_rr = 1d0
+           if ((n3(i,j,k) < 0d0) .and. (w_cmask(i,j,k,level)==1)) a_f = 1d0
+           P_a = (a_l+a_rt)*abs(n1(i,j,k))*dy(j)*dz(k) + &
+                (a_t + a_b)*abs(n2(i,j,k))*dx(i)*dz(k) + &
+                (a_f + a_rr)*abs(n3(i,j,k))*dx(i)*dy(j)
+           if (P_a .ne. 0) then
+              u(i,j,k) = u(i,j,k) + a_rt*Src/P_a*abs(n1(i,j,k)) 
+              v(i,j,k) = v(i,j,k) + a_t*Src/P_a*abs(n2(i,j,k))  
+              w(i,j,k) = w(i,j,k) + a_f*Src/P_a*abs(n3(i,j,k))
+              u(i-1,j,k) = u(i-1,j,k) - a_l*Src/P_a*abs(n1(i,j,k)) 
+              v(i,j-1,k) = v(i,j-1,k) - a_b*Src/P_a*abs(n2(i,j,k))  
+              w(i,j,k-1) = w(i,j,k-1) - a_rr*Src/P_a*abs(n3(i,j,k))
+           endif
+        enddo; enddo; enddo
+     enddo
    end subroutine extrapolate_velocities
 !=================================================================================================
 !

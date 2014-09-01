@@ -353,12 +353,6 @@ Program paris
               enddo; enddo; enddo
            endif
    
-!----------------------------------EXTRAPOLATION FOR FREE SURFACE---------------------------------
-           if (DoVOF .and. FreeSurface) then
-              call extrapolate_velocities()
-           endif !Extrapolation
-!------------------------------------------------------------------------------------------------
-
            if(mod(itimestep,nout)==0) call check_corrected_vel(u,umask,itimestep)
            if( DoLPP ) call ComputeSubDerivativeVel()
            call my_timer(10)
@@ -388,6 +382,13 @@ Program paris
            call ghost_z(u  ,2,req( 1: 4));  call ghost_z(v,2,req( 5: 8)); call ghost_z(w,2,req( 9:12)); 
            call ghost_z(color,1,req(13:16));  call MPI_WAITALL(16,req(1:16),sta(:,1:16),ierr)
            call my_timer(1)        
+
+!----------------------------------EXTRAPOLATION FOR FREE SURFACE---------------------------------
+           if (DoVOF .and. FreeSurface) then
+              call extrapolate_velocities()
+           endif !Extrapolation
+!------------------------------------------------------------------------------------------------
+
 
 !--------------------------------------UPDATE DENSITY/VISCOSITY------------------------------------
            if(TwoPhase) then
@@ -677,6 +678,7 @@ subroutine momentumConvection()
   use module_flow
   use module_grid
   use module_tmpvar
+  use module_IO
 
   if (AdvectionScheme=='QUICK') then
     call momentumConvectionQUICK(u,v,w,du,dv,dw)
@@ -691,6 +693,8 @@ subroutine momentumConvection()
   else
      call pariserror("*** unknown convection scheme")
   endif
+
+  if (out_mom .and. mod(itimestep-itimestepRestart,nout)==0) call write_mom_gnuplot(du,dv,dw,itimestep)
 
 end subroutine momentumConvection
 !=================================================================================================
@@ -2014,7 +2018,7 @@ subroutine ReadParameters
                         blayer_gas_inject,            tdelay_gas_inject,            padding,     &
                         radius_gas_inject,            radius_liq_inject,                         &
                         jetcenter_yc2yLength,         jetcenter_zc2zLength,                      & 
-                        cflmax_allowed,               out_P,         AdvectionScheme
+                        cflmax_allowed,               out_P,         AdvectionScheme, out_mom
  
   Nx = 0; Ny = 4; Nz = 4 ! cause absurd input file that lack nx value to fail. 
   Ng=2;xLength=1d0;yLength=1d0;zLength=1d0
@@ -2043,6 +2047,7 @@ subroutine ReadParameters
   padding=5
   cflmax_allowed=0.5d0
   AdvectionScheme = 'QUICK'
+  out_mom = .false.
 
   in=1
   out=2
