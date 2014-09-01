@@ -219,7 +219,7 @@ Program paris
               endif
               if (FreeSurface) then
                  call get_normals()
-                 !call get_all_curvatures(kappa_fs)
+                 call get_all_curvatures(kappa_fs)
                  call set_topology(vof_phase,itimestep) !vof_phase updated in vofsweeps
               endif
               call my_timer(4)
@@ -1794,7 +1794,7 @@ subroutine InitCondition
            if (FreeSurface) then
               call set_topology(vof_phase,itimestep) !vof_phases are updated in initconditions_VOF called above
               call get_normals()
-              !call get_all_curvatures(kappa_fs)
+              call get_all_curvatures(kappa_fs)
            endif
            call get_all_heights()
         endif

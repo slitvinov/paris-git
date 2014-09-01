@@ -60,6 +60,7 @@ module module_VOF
   integer :: parameters_read=0, refinement=-1 
   integer :: cylinder_dir = 0
   logical :: test_heights = .false.  
+  logical :: test_capwave = .false.
   logical :: test_droplet = .false.  
   logical :: normal_up = .true.    ! used for the h
   logical :: test_curvature = .false.  
@@ -362,6 +363,8 @@ contains
        test_curvature = .true.
     else if(test_type=='Curvature2D') then
        test_curvature_2D = .true.
+    else if(test_type=='Capillary_wave') then
+       test_capwave = .true.    
     else if(test_type=='tag_test') then
        test_tag = .true.
     else if(test_type=='D2P_test') then
@@ -483,7 +486,7 @@ or none at all")
                       root_rank, MPI_Comm_Cart, ierr)
     end if ! test_D2P
 
-    if(test_heights) then 
+    if(test_heights.or.test_capwave) then 
        if(cylinder_dir==0) then
           write(*,*) "IVOF: Warning: cylinder_dir=0 set to 2"
           cylinder_dir=2
