@@ -75,6 +75,7 @@ module module_VOF
   logical :: test_cylinder_advection = .false.
   logical :: test_shear_multiphase = .false.
   logical :: test_KHI2D = .false.
+  logical :: test_PhaseInversion = .false.
   logical :: linfunc_initialized = .false.
   logical :: DoMOMCONS = .false.
   logical :: use_Vofi
@@ -382,6 +383,8 @@ contains
        test_shear_multiphase = .true.
     else if(test_type=='KHI2D') then
        test_KHI2D = .true.
+    else if(test_type=='PhaseInversion') then
+       test_PhaseInversion = .true.
     else
        write(*,*) test_type, rank
        call pariserror("unknown initialization")
@@ -542,6 +545,15 @@ or none at all")
          ! (when boundary layer thickness delta =0.1*yLength)
       end do; end do; end do
     end if ! test_KHI2D
+
+    if ( test_PhaseInversion ) then 
+      do i = is,ie; do j=js,je; do k = ks,ke
+         if (x(i) < 0.5d0*xLength .and. y(j) < 0.5d0*yLength .and. z(k) < 0.5d0*zLength  ) then 
+            cvof(i,j,k) = 1.d0
+            vof_flag(i,j,k) = 1
+         end if 
+      end do; end do; end do
+    end if ! test_PhaseInversion
 
     if (test_shear_multiphase) then
       do i = is,ie; do j=js,je; do k = ks,ke
@@ -1464,7 +1476,7 @@ end subroutine output_VOF_VTKSP
 17  format('SCALARS ',A20,' float 1')
 18  format('LOOKUP_TABLE default')
 
-    do k=k1,k2; do j=j1,j2; do i=i1,i2;
+    do k=k1,k2; do j=j1,j2; do i=i1,i2
       if ( output_filtered_VOF ) then 
          cfiltered = b1*cvof(i,j,k) + & 
                b2*( cvof(i-1,j,k) + cvof(i,j-1,k) + cvof(i,j,k-1) + &

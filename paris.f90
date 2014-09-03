@@ -156,7 +156,7 @@ Program paris
         if(rank==0) then
            end_time =  MPI_WTIME()
            open(unit=121,file='stats',access='append')
-           write(121,'(22es14.6e2)')time,stats(1:15),dpdx,(stats(8)-stats(9))/dt,end_time-start_time
+           write(121,'(30es14.6e2)')time,stats(1:nstatarray),dpdx,(stats(8)-stats(9))/dt,end_time-start_time
            close(121)
            write(out,'("Step:",I9," Iterations:",I9," cpu(s):",f10.2)')-1,0,end_time-start_time
            write(*,  '("START:", I6," dt=",es16.5e2," time=",es16.5e2," cpu(s):",f11.3   ," cfl=",es16.5e2)') &
@@ -489,7 +489,7 @@ Program paris
               !        write(121,'("            Iterations:",I7," cpu(s):",f10.2)')it,end_time-start_time
               !        close(121)
            open(unit=121,file='stats',access='append')
-           write(121,'(22es14.6e2)')time,stats(1:nstatarray),dpdx,(stats(8)-stats(9))/dt,end_time-start_time
+           write(121,'(30es14.6e2)')time,stats(1:nstatarray),dpdx,(stats(8)-stats(9))/dt,end_time-start_time
            close(121)
         endif
         call my_timer(11)
@@ -616,10 +616,11 @@ subroutine calcStats
   include "mpif.h"
   integer :: i,j,k,ierr
   real(8) :: vol,CC=0d0
-  real(8) :: kenergy
+  real(8) :: kenergy,vort2,enstrophy
   real(8), save :: W_int=-0.02066
+  real(8), save :: height4Stats=0.875d0
 
-  nstatarray=18
+  nstatarray=24
   if(nstatarray > 100) call pariserror("nstatarray too large")
   mystats(1:nstatarray)=0d0
   do k=ks,ke;  do j=js,je;  do i=is,ie
@@ -639,18 +640,55 @@ subroutine calcStats
 ! Phase C=1 center of mass
     if(DoVOF) CC=cvof(i,j,k) ;  mystats(11)=mystats(11)+CC*vol*x(i)
 ! kinetic energy
-    kenergy = 0.5d0*(u(i,j,k)*u(i,j,k) + v(i,j,k)*v(i,j,k) + w(i,j,k)*w(i,j,k))
+    kenergy = 0.5d0*( (0.5d0*(u(i,j,k)+u(i+1,j,k)))**2.d0 & 
+                     +(0.5d0*(v(i,j,k)+v(i,j+1,k)))**2.d0 & 
+                     +(0.5d0*(w(i,j,k)+w(i,j,k+1)))**2.d0)
     if(DoVOF) then
-       mystats(12)=mystats(12)+0.5*(rho(i,j,k)+rho(i+1,j,k))*kenergy*vol*cvof(i,j,k)
-       mystats(13)=mystats(13)+0.5*(rho(i,j,k)+rho(i+1,j,k))*kenergy*vol*(1.d0-cvof(i,j,k))
+       mystats(12)=mystats(12)+rho(i,j,k)*kenergy*vol*      cvof(i,j,k)
+       mystats(13)=mystats(13)+rho(i,j,k)*kenergy*vol*(1.d0-cvof(i,j,k))
     else 
-       mystats(13)=mystats(13)+0.5*(rho(i,j,k)+rho(i+1,j,k))*kenergy*vol
+       mystats(13)=mystats(13)+rho(i,j,k)*kenergy*vol
     end if ! DoVOF
 ! y-momentum 
     if(DoVOF) then
       mystats(14)=mystats(14)+rho(i,j,k)*0.5d0*(v(i,j,k)+v(i,j+1,k))*vol*(     cvof(i,j,k))
       mystats(15)=mystats(15)+rho(i,j,k)*0.5d0*(v(i,j,k)+v(i,j+1,k))*vol*(1.d0-cvof(i,j,k))
     end if ! (DoVOF)
+! interfacial area
+   if (DoVOF .and. test_PhaseInversion) then
+      if (     max((cvof(i+1,j,k)-0.5d0)/abs(cvof(i+1,j,k)-0.5d0),0.d0) & 
+             - max((cvof(i-1,j,k)-0.5d0)/abs(cvof(i-1,j,k)-0.5d0),0.d0) /= 0.d0 &
+          .or. max((cvof(i,j+1,k)-0.5d0)/abs(cvof(i,j+1,k)-0.5d0),0.d0) & 
+             - max((cvof(i,j-1,k)-0.5d0)/abs(cvof(i,j-1,k)-0.5d0),0.d0) /= 0.d0 &
+          .or. max((cvof(i,j,k+1)-0.5d0)/abs(cvof(i,j,k+1)-0.5d0),0.d0) & 
+             - max((cvof(i,j,k-1)-0.5d0)/abs(cvof(i,j,k-1)-0.5d0),0.d0) /= 0.d0 & 
+         ) then
+         if ( vof_flag(i,j,k) == 2 ) & 
+            mystats(19) = mystats(19) + dx(i)*dy(j)
+      end if ! cvof
+   end if ! DoVOF
+! potential energy (considering gravity in y direction)  
+   if(DoVOF .and. test_PhaseInversion) then
+      mystats(20)=mystats(20)+rho(i,j,k)*Gy*y(j)*vol*      cvof(i,j,k)
+      mystats(21)=mystats(21)+rho(i,j,k)*Gy*y(j)*vol*(1.d0-cvof(i,j,k))
+   end if ! DoVOF
+! enstrophy
+   if(DoVOF .and. test_PhaseInversion) then
+      vort2 = (0.5d0*(w(i,j+1,k)+w(i,j+1,k+1)-w(i,j-1,k)-w(i,j-1,k+1))/(y(j+1)-y(j-1)) & 
+              -0.5d0*(v(i,j,k+1)+v(i,j+1,k+1)-v(i,j,k-1)-v(i,j+1,k-1))/(z(k+1)-z(k-1)))**2.d0 & 
+            + (0.5d0*(u(i,j,k+1)+u(i+1,j,k+1)-u(i,j,k-1)-u(i+1,j,k-1))/(z(k+1)-z(k-1)) & 
+              -0.5d0*(w(i+1,j,k)+w(i+1,j,k+1)-w(i-1,j,k)-w(i-1,j,k+1))/(x(i+1)-x(i-1)))**2.d0 & 
+            + (0.5d0*(v(i+1,j,k)+v(i+1,j+1,k)-v(i-1,j,k)-v(i-1,j+1,k))/(x(i+1)-x(i-1)) & 
+              -0.5d0*(u(i,j+1,k)+u(i+1,j+1,k)-u(i,j-1,k)-u(i+1,j-1,k))/(y(j+1)-y(j-1)))**2.d0 
+      enstrophy = 0.5*vort2
+      mystats(22)=mystats(22)+enstrophy*vol*      cvof(i,j,k)
+      mystats(23)=mystats(23)+enstrophy*vol*(1.d0-cvof(i,j,k))
+   end if ! DoVOF
+! volume fraction of top layer
+   if(DoVOF .and. test_PhaseInversion) then
+      if ( y(j) > height4Stats ) & 
+         mystats(24)=mystats(24)+vol*cvof(i,j,k)/(xLength*zLength*(yLength-height4Stats))
+   end if ! DoVOF
   enddo;  enddo;  enddo
 
 ! Shear stress on y=0,Ly
@@ -675,7 +713,7 @@ subroutine calcStats
   else
      mystats(18)=0d0
   endif
-  mystats(2:16) = mystats(2:16)/(xLength*yLength*zLength)
+  mystats(2:11) = mystats(2:11)/(xLength*yLength*zLength)
   mystats(1) = mystats(1)/(xLength*zLength*2.0)
   mystats(11) = mystats(11) ! /mystats(10)
   call MPI_ALLREDUCE(mystats(1), stats(1), nstatarray, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_Domain, ierr)
@@ -1798,8 +1836,7 @@ subroutine InitCondition
         if ( DoLPP ) then 
            call backup_LPP_read
            call SeedParticles
-           call MPI_ALLGATHER(num_part(rank), 1, MPI_INTEGER, &
-                              num_part(:)   , 1, MPI_INTEGER, MPI_Comm_World, ierr)
+           if ( DoLPP .and. test_injectdrop ) call backup_LPP_write 
         end if ! DoLPP
         call SetVelocityBC(u,v,w,umask,vmask,wmask,time)
         call ghost_x(u,2,req( 1: 4)); call ghost_x(v,2,req( 5: 8)); call ghost_x(w,2,req( 9:12))

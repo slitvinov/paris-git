@@ -117,9 +117,12 @@
       integer :: ic,jc,kc,dummyint  
    end type particle_collect 
    type (particle_collect), dimension(:,:), allocatable :: parts_collect
+   type (particle_collect), dimension(:), allocatable :: parts_collect_rank
 
    integer, dimension(:,:), allocatable :: parts_cross_id
+   integer, dimension(:), allocatable :: parts_cross_id_rank
    integer, dimension(:,:), allocatable :: parts_cross_newrank
+   integer, dimension(:), allocatable :: parts_cross_newrank_rank
    integer, dimension(:), allocatable :: num_part_cross
 
    ! substantial derivative of velocity
@@ -180,13 +183,13 @@
    integer, parameter :: TwoWayCouplingIgnore      = 0
    integer, parameter :: TwoWayCouplingFilterForce = 1
    integer, parameter :: TwoWayCouplingFilterVel   = 2
-   real(8) :: FilterLengthLPP2Lcut, FilterLengthLPP
+   real(8) :: LengthLPP2dp, LengthLPP,mfLPP_ref
 
    logical :: UnsteadyPartForce
 
    integer :: SeedParticlesFlag
    logical :: SeedWithFluidVel
-   logical :: AvoidSeedAtBlockBdry
+   logical :: AvoidSeedAtBlockBdry,AvoidSeedPartTooClose
    integer, parameter :: SeedParticlesNone      = 0
    integer, parameter :: SeedParticlesOneTime   = 1
    integer, parameter :: SeedParticlesRegular   = 2
@@ -228,8 +231,10 @@ contains
       if ( CriteriaConvertCase == CriteriaInterface ) & 
          allocate( RegAwayInterface(imin:imax,jmin:jmax,kmin:kmax) )
 
-      if ( TwoWayCouplingFlag == TwoWayCouplingFilterForce) & 
+      if ( TwoWayCouplingFlag == TwoWayCouplingFilterForce) then  
          allocate( parts_collect(max_num_part,0:nPdomain-1) )
+         allocate( parts_collect_rank(max_num_part) )
+      end if 
 
       ! set default values
       num_tag  = 0
@@ -259,8 +264,9 @@ contains
          max_num_drop, maxnum_cell_drop, max_num_part, max_num_part_cross, &
          outputlpp_format,nStepConverion,AspRatioTol, &
          WallEffectSettling,output_lpp_evolution,lppbdry_cond,& 
-         TwoWayCouplingFlag,FilterLengthLPP2Lcut,UnsteadyPartForce,&  
-         SeedParticlesFlag, SeedWithFluidVel, AvoidSeedAtBlockBdry, & 
+         TwoWayCouplingFlag,LengthLPP2dp,mfLPP_ref,UnsteadyPartForce,&  
+         SeedParticlesFlag, SeedWithFluidVel, & 
+         AvoidSeedAtBlockBdry,AvoidSeedPartTooClose, & 
          num_part_seed, time_part_seed, & 
          xmin_part_seed, ymin_part_seed, zmin_part_seed, dmin_part_seed, & 
          xmax_part_seed, ymax_part_seed, zmax_part_seed, dmax_part_seed, &
@@ -285,7 +291,7 @@ contains
       maxnum_cell_drop = 1000000
       max_num_part = 100
       max_num_part_cross = 10
-      outputlpp_format = 1
+      outputlpp_format = 3
       ConvertRegSizeToDiam = 2.d0 
       nStepConverion = 0
       AspRatioTol = 1.5d0
@@ -293,11 +299,13 @@ contains
       output_lpp_evolution = .false.
       lppbdry_cond=['undefined','undefined','undefined','undefined','undefined','undefined']
       TwoWayCouplingFlag = 0 
-      FilterLengthLPP2Lcut = 8.d0
+      LengthLPP2dp = 8.d0
+      mfLPP_ref = 0.5d0
       UnsteadyPartForce = .false.
       SeedParticlesFlag = 0
       SeedWithFluidVel =.false. 
       AvoidSeedAtBlockBdry =.false. 
+      AvoidSeedPartTooClose =.false. 
       num_part_seed = 0; time_part_seed = 0.0;
       xmin_part_seed=0.0; ymin_part_seed=0.0; zmin_part_seed=0.0; dmin_part_seed=0.0 
       xmax_part_seed=0.0; ymax_part_seed=0.0; zmax_part_seed=0.0; dmax_part_seed=0.0
@@ -382,11 +390,13 @@ contains
             call linfunc(rho,rho1,rho2,DensMean)
             call linfunc(mu,mu1,mu2,ViscMean)
          end if ! DoConvertVOF2LPP,DoConvertLPP2VOF 
+         
+         if ( rank == 0 ) write(*,*) 'Total num of particles/elements:',time,sum(num_part),sum(num_element)
       end if ! tswap
 
-      if ( MOD(tswap,termout) == 0 ) then 
-         if ( rank == 0 ) write(*,*) 'Total numbers of drops and particles are: ',sum(num_drop),sum(num_part)
-      end if ! tswap
+!      if ( MOD(tswap,termout) == 0 ) then 
+!         if ( rank == 0 ) write(*,*) 'Numbers of drops/particles:', time,sum(num_element)-sum(num_part),sum(num_part)
+!      end if ! tswap
 
    end subroutine lppvofsweeps
 
@@ -606,11 +616,14 @@ contains
       integer :: req(4),sta(MPI_STATUS_SIZE,4)
       integer , parameter :: ngh=2
       integer , parameter :: root=0
+      integer :: num_drop_rank, num_drop_merge_rank
 
       ! Broadcast num_drop(rank) to all processes
-      call MPI_ALLGATHER(num_drop      (rank), 1, MPI_INTEGER, &
+      num_drop_rank       = num_drop      (rank)
+      num_drop_merge_rank = num_drop_merge(rank)
+      call MPI_ALLGATHER(num_drop_rank       , 1, MPI_INTEGER, &
                          num_drop      (:)   , 1, MPI_INTEGER, MPI_Comm_World, ierr)
-      call MPI_ALLGATHER(num_drop_merge(rank), 1, MPI_INTEGER, &
+      call MPI_ALLGATHER(num_drop_merge_rank , 1, MPI_INTEGER, &
                          num_drop_merge(:)   , 1, MPI_INTEGER, MPI_Comm_World, ierr)
       num_tag(:) = num_drop(:) + num_drop_merge(:)
       total_num_tag =  sum(num_tag)
@@ -804,6 +817,7 @@ contains
       integer :: maxnum_element, total_num_element
       integer :: irank, idrop, ielement, ielem_plot
       integer :: num_element_estimate(0:nPdomain-1)
+      integer :: num_element_rank
 
       integer, parameter :: num_gaps = 1000
       real(8) :: gap,dmax,d
@@ -887,9 +901,10 @@ contains
          end do ! idrop
       end if ! num_drop(rank)
  
-      ! Collect all discrete elements to rank 0
-      call MPI_ALLGATHER(num_element(rank), 1, MPI_INTEGER, &
-                         num_element(:),    1, MPI_INTEGER, MPI_Comm_World, ierr)
+! Collect all discrete elements to rank 0
+      num_element_rank= num_element(rank)
+      call MPI_ALLGATHER(num_element_rank, 1, MPI_INTEGER, &
+                         num_element(:),   1, MPI_INTEGER, MPI_Comm_World, ierr)
       call MPI_TYPE_CONTIGUOUS (maxnum_element, MPI_element_type, MPI_element_row, ierr)
       call MPI_TYPE_COMMIT(MPI_element_row, ierr)
 
@@ -938,7 +953,7 @@ contains
                   if ( num_element(irank) > 0 ) then 
                      do ielement = 1, num_element(irank)
                         ! sum particles 
-                        d = (element_stat(ielement,irank)%vol*6.d0/PI)**(1.d0/3.d0)
+                        d =(element_stat(ielement,irank)%vol*6.d0/PI)**OneThird
                         if ( d < dmax ) then 
                            igap = int(d/gap)+1
                            count_element(igap) = count_element(igap) + 1
@@ -1407,6 +1422,7 @@ contains
       real(8) :: ufp,vfp,wfp,dist2,wt
       logical :: ConvertMergeDrop=.false.
       real(8) :: volcell
+      integer :: num_part_rank
 
       if ( num_drop(rank) > 0 ) then 
       do idrop = 1,num_drop(rank)
@@ -1579,9 +1595,10 @@ contains
       end if ! num_drop_merge(rank) 
 
       ! Update num_part to all ranks. Note: no need for num_drop &
-      ! num_drop_merge since they will be regenerated next step  
-      call MPI_ALLGATHER(num_part(rank), 1, MPI_INTEGER, &
-                         num_part(:)   , 1, MPI_INTEGER, MPI_Comm_World, ierr)
+      ! num_drop_merge since they will be regenerated next step
+      num_part_rank = num_part(rank)
+      call MPI_ALLGATHER(num_part_rank, 1, MPI_INTEGER, &
+                         num_part(:)  , 1, MPI_INTEGER, MPI_Comm_World, ierr)
 
    end subroutine ConvertVOF2LPP
 
@@ -1811,20 +1828,20 @@ contains
       real(8), intent (in) :: xp,yp,zp
       integer, intent(out) :: ip,jp,kp
 
-      if ( xp < (xh(imin)-dx(imin)) .or. xp > xh(imax) .or. & 
-           yp < (yh(jmin)-dy(jmin)) .or. yp > yh(jmax) .or. & 
-           zp < (zh(kmin)-dz(kmin)) .or. zp > zh(kmax) )    & 
+      if ( xp < xh(imin)-dx(imin) .or. xp > xh(imax) .or. & 
+           yp < yh(jmin)-dy(jmin) .or. yp > yh(jmax) .or. & 
+           zp < zh(kmin)-dz(kmin) .or. zp > zh(kmax) )    & 
            call lpperror("Fail to find cell index for particle outside of domain!") 
 
       do ip = imin,imax
          if (xp <= xh(ip)) exit
       end do ! ip
 
-      do jp = js,je+1
+      do jp = jmin,jmax
          if (yp <= yh(jp)) exit  
       end do ! jp
 
-      do kp = ks,ke+1
+      do kp = kmin,kmax
          if (zp <= zh(kp)) exit  
       end do ! kp
 
@@ -1915,6 +1932,7 @@ contains
       real(8) :: Re,vmf,vmp
       integer :: ierr
       real(8) :: volcell
+      integer :: num_part_rank
 
       if ( num_part(rank) > 0 ) then
       num_part_old = num_part(rank)
@@ -1996,8 +2014,9 @@ contains
       end if ! num_part(rank)
 
       ! Update num_part to all ranks
-      call MPI_ALLGATHER(num_part(rank), 1, MPI_INTEGER, &
-                         num_part(:)   , 1, MPI_INTEGER, MPI_Comm_World, ierr)
+      num_part_rank = num_part(rank)
+      call MPI_ALLGATHER(num_part_rank, 1, MPI_INTEGER, &
+                         num_part(:)  , 1, MPI_INTEGER, MPI_Comm_World, ierr)
    end subroutine ConvertLPP2VOF
 
    subroutine BuildFlowFieldVOF(i1,i2,j1,j2,k1,k2,dp,mu,xp,yp,zp,up,vp,wp,uf,vf,wf,Re)
@@ -2405,8 +2424,9 @@ contains
                  offsets(0:3), intextent,r8extent
 
       integer :: i,j,k,ipart,ip,jp,kp
-      real(8) :: xp,yp,zp,fx,fy,fz,x2,y2,z2,s0,s1
-      integer :: Ncf
+      real(8) :: xp,yp,zp,fx,fy,fz,x2,y2,z2,s0,s1,dp
+      real(8) :: massLPP, massVOF, mfLPP
+      real(8), parameter :: mfLPPsmall = 1.0d-40
 
       if (TwoWayCouplingFlag == TwoWayCouplingFilterForce) then
          
@@ -2427,28 +2447,41 @@ contains
          call MPI_TYPE_CONTIGUOUS (max_num_part, MPI_part_collect_type, MPI_part_collect_row, ierr)
          call MPI_TYPE_COMMIT(MPI_part_collect_row, ierr)
 
-         call MPI_ALLGATHER(parts_collect(1:max_num_part,rank), 1, MPI_part_collect_row, &
+         parts_collect_rank(1:max_num_part) = parts_collect(1:max_num_part,rank)
+         call MPI_ALLGATHER(parts_collect_rank(1:max_num_part), 1, MPI_part_collect_row, &
                             parts_collect(1:max_num_part,:),    1, MPI_part_collect_row, & 
                             MPI_Comm_World, ierr)
+
+         ! Compute LPP mass fraction
+         massLPP = 0.d0 
+         if ( num_part(rank) > 0 ) then 
+            do i = 1,num_part(rank)
+               massLPP = massLPP + parts(ipart,rank)%element%vol 
+            end do ! i
+            massLPP = massLPP*rho2
+         end if ! num_part(rank)
+         massVOF = 0.d0 
+         do k=ks,ke; do j=js,je; do i=is,ie
+            massVOF = massVOF + rho(i,j,k)*dx(i)*dy(j)*dz(k) 
+         end do; end do; end do
 
          do k=ks,ke; do j=js,je; do i=is,ie
             do irank = 0,nPdomain-1
                if ( num_part(irank) > 0 ) then
                do ipart = 1,num_part(irank) 
-                  ip = parts_collect(ipart,irank)%ic
-                  jp = parts_collect(ipart,irank)%jc
-                  kp = parts_collect(ipart,irank)%kc
+                  !ip = parts_collect(ipart,irank)%ic
+                  !jp = parts_collect(ipart,irank)%jc
+                  !kp = parts_collect(ipart,irank)%kc
 
-                  FilterLengthLPP = FilterLengthLPP2Lcut& 
-                                 *(6.d0*parts_collect(ipart,irank)%vol/PI)**OneThird 
-                  s1 = FilterLengthLPP*0.25d0
-                  Ncf   = NINT(FilterLengthLPP*0.5d0/xLength*dble(Nx))
+                  mfLPP = (massLPP-parts_collect(ipart,irank)%vol*rho2)/massVOF
+                  mfLPP = max(mfLPP,mfLPPsmall) 
+                  dp = (6.d0*parts_collect(ipart,irank)%vol/PI)**OneThird 
+                  LengthLPP = LengthLPP2dp*dp/erf(mfLPP/mfLPP_ref)
+                  s1 = LengthLPP
                   
-                  ! Note: XXX don't apply force on boundary cells, add an error
-                  ! function? 
-                  if ( i > ip-Ncf .and. i < ip+Ncf .and. & 
-                       j > jp-Ncf .and. j < jp+Ncf .and. &
-                       k > kp-Ncf .and. k < kp+Ncf ) then 
+                  if ( i > Ng .and. i < Ng+Nx .and. & 
+                       j > Ng .and. j < Ng+Ny .and. &
+                       k > Ng .and. k < Ng+Nz ) then 
                      xp = parts_collect(ipart,irank)%xc
                      yp = parts_collect(ipart,irank)%yc
                      zp = parts_collect(ipart,irank)%zc
@@ -2673,7 +2706,9 @@ contains
 
       allocate( num_part_cross(0:nPdomain-1) )
       allocate( parts_cross_id     (max_num_part_cross,0:nPdomain-1) )
-      allocate( parts_cross_newrank(max_num_part_cross,0:nPdomain-1) )
+      allocate( parts_cross_id_rank(max_num_part_cross) )
+      allocate( parts_cross_newrank     (max_num_part_cross,0:nPdomain-1) )
+      allocate( parts_cross_newrank_rank(max_num_part_cross) )
       num_part_cross(:) = 0
       parts_cross_id     (:,:) = CRAZY_INT 
       parts_cross_newrank(:,:) = CRAZY_INT 
@@ -2798,13 +2833,15 @@ contains
                  offsets(0:3), intextent,r8extent
       integer :: maxnum_part_cross, MPI_int_row
       type(element) :: element_NULL
+      integer :: num_part_cross_rank,num_part_rank
    
       element_NULL%xc = 0.d0;element_NULL%yc = 0.d0;element_NULL%zc = 0.d0
       element_NULL%uc = 0.d0;element_NULL%vc = 0.d0;element_NULL%wc = 0.d0
       element_NULL%duc = 0.d0;element_NULL%dvc = 0.d0;element_NULL%dwc = 0.d0
       element_NULL%vol = 0.d0;element_NULL%id = CRAZY_INT
 
-      call MPI_ALLGATHER(num_part_cross(rank), 1, MPI_INTEGER, &
+      num_part_cross_rank = num_part_cross(rank)
+      call MPI_ALLGATHER(num_part_cross_rank, 1, MPI_INTEGER, &
                          num_part_cross,    1, MPI_INTEGER, MPI_Comm_World, ierr)
       maxnum_part_cross = maxval(num_part_cross)
       if ( maxnum_part_cross  > 0 ) then 
@@ -2812,10 +2849,12 @@ contains
          call MPI_TYPE_CONTIGUOUS (maxnum_part_cross, MPI_INTEGER, MPI_int_row, ierr)
          call MPI_TYPE_COMMIT(MPI_int_row, ierr)
 
-         call MPI_ALLGATHER(parts_cross_id(1:maxnum_part_cross,rank), 1, MPI_int_row, &
+         parts_cross_id_rank(1:maxnum_part_cross)=parts_cross_id(1:maxnum_part_cross,rank)
+         call MPI_ALLGATHER(parts_cross_id_rank(1:maxnum_part_cross), 1, MPI_int_row, &
                             parts_cross_id(1:maxnum_part_cross,:),    1, MPI_int_row, & 
                             MPI_Comm_World, ierr)
-         call MPI_ALLGATHER(parts_cross_newrank(1:maxnum_part_cross,rank), 1, MPI_int_row, &
+         parts_cross_newrank_rank(1:maxnum_part_cross) = parts_cross_newrank(1:maxnum_part_cross,rank)
+         call MPI_ALLGATHER(parts_cross_newrank_rank(1:maxnum_part_cross), 1, MPI_int_row, &
                             parts_cross_newrank(1:maxnum_part_cross,:),    1, MPI_int_row, & 
                             MPI_Comm_World, ierr)
       !  Setup MPI derived type for particle 
@@ -2874,14 +2913,17 @@ contains
       end if ! num_part_cross(irank)
 
       ! Allgather updated number of partilces in every block
-      call MPI_ALLGATHER(num_part(rank), 1, MPI_INTEGER, &
+      num_part_rank = num_part(rank)
+      call MPI_ALLGATHER(num_part_rank, 1, MPI_INTEGER, &
                          num_part(:)   , 1, MPI_INTEGER, MPI_Comm_World, ierr)
       end if ! maxnum_part_cross
 
       ! final
       deallocate(num_part_cross)
       deallocate(parts_cross_id)
+      deallocate(parts_cross_id_rank)
       deallocate(parts_cross_newrank)
+      deallocate(parts_cross_newrank_rank)
 
    end subroutine TransferPartCrossBlocks
 
@@ -2890,6 +2932,7 @@ contains
       include 'mpif.h'
       integer :: ipart,ipart1,ierr
       type(element) :: element_NULL
+      integer :: num_part_rank
    
       element_NULL%xc = 0.d0;element_NULL%yc = 0.d0;element_NULL%zc = 0.d0
       element_NULL%uc = 0.d0;element_NULL%vc = 0.d0;element_NULL%wc = 0.d0
@@ -2968,7 +3011,8 @@ contains
       end if ! num_part(rank)
 
       ! Allgather updated number of particles after imposing BC
-      call MPI_ALLGATHER(num_part(rank), 1, MPI_INTEGER, &
+      num_part_rank = num_part(rank)
+      call MPI_ALLGATHER(num_part_rank, 1, MPI_INTEGER, &
                          num_part(:)   , 1, MPI_INTEGER, MPI_Comm_World, ierr)
 
    end subroutine SetPartBC
@@ -3266,7 +3310,7 @@ contains
       implicit none
       include 'mpif.h'
 #ifdef __INTEL_COMPILER
-      use IFPORT
+!      use IFPORT
 #endif
 
       logical :: SeedParticlesNow
@@ -3276,6 +3320,15 @@ contains
       integer :: ip,jp,kp
 !      integer :: c1,c2,c3,rankpart
       integer :: ierr
+      integer :: num_part_rank
+      real(8) :: dist,dp1
+      logical :: PartSeedTooClose
+      integer :: ipart,ipart1,iter,niters
+      real(8) :: xb1,xb2,yb1,yb2,zb1,zb2
+      real(8) :: Mxt,Myt,Mzt
+      integer :: num_part_seeded(0:nPdomain-1),rankseed,c1,c2,c3
+      real(8) :: dummyreal,uf,vf,wf
+      integer,parameter :: largeint = 1234567890
 
       SeedParticlesNow = .false.
       if ( SeedParticlesFlag == SeedParticlesNone ) then 
@@ -3296,10 +3349,180 @@ contains
          call lpperror("Unknown seeding particle flag!")
       end if ! SeedParticlesFlag
 
+      num_part_seeded = 0 
       if ( SeedParticlesNow ) then
-         if ( rank == 0 ) write(*,*) num_part_seed,'particles seed at t=',time
          call random_seed()
-         do ipart_seed=1,num_part_seed
+         if ( rank == 0 ) write(*,*) num_part_seed,'particles to seed at t=',time
+         ipart_seed = 0
+         do 
+            ipart_seed = ipart_seed + 1
+            call generate_random_particle(dmin_part_seed,dmax_part_seed,   & 
+               xmin_part_seed,xmax_part_seed,ymin_part_seed,ymax_part_seed,&
+               zmin_part_seed,zmax_part_seed,umin_part_seed,umax_part_seed,&
+               vmin_part_seed,vmax_part_seed,wmin_part_seed,wmax_part_seed,& 
+               dp,volp,xp,yp,zp,up,vp,wp)
+
+            if ( test_injectdrop ) then
+               Mxt = NINT((xmax_part_seed - xmin_part_seed)/dx(is))/npx
+               Myt = NINT((ymax_part_seed - ymin_part_seed)/dy(js))/npy
+               Mzt = NINT((zmax_part_seed - zmin_part_seed)/dz(ks))/npz
+               c1 = INT((xp-xmin_part_seed)/dx(is))/Mxt  
+               c2 = INT((yp-ymin_part_seed)/dy(js))/Myt 
+               c3 = INT((zp-zmin_part_seed)/dz(ks))/Mzt 
+               rankseed = c1*npy*npz + c2*npz + c3
+               niters = 200
+               do iter = 1,niters
+                  if ( num_part_seeded(rankseed) >= NINT(dble(num_part_seed)/dble(npx*npy*npz)*1.1d0) ) then   
+                     call generate_random_particle(dmin_part_seed,dmax_part_seed,   & 
+                        xmin_part_seed,xmax_part_seed,ymin_part_seed,ymax_part_seed,&
+                        zmin_part_seed,zmax_part_seed,umin_part_seed,umax_part_seed,&
+                        vmin_part_seed,vmax_part_seed,wmin_part_seed,wmax_part_seed,& 
+                        dp,volp,xp,yp,zp,up,vp,wp)
+                     c1 = INT((xp-xmin_part_seed)/dx(is))/Mxt  
+                     c2 = INT((yp-ymin_part_seed)/dy(js))/Myt 
+                     c3 = INT((zp-zmin_part_seed)/dz(ks))/Mzt 
+                     rankseed = c1*npy*npz + c2*npz + c3
+                  else 
+                     exit
+                  end if ! num_part_seeded(rankseed)
+               end do ! iter
+               num_part_seeded(rankseed) = num_part_seeded(rankseed) + 1
+            end if ! test_injectdrop
+
+            if ( xp > xh(is-1) .and. xp <= xh(ie) .and. & 
+                 yp > yh(js-1) .and. yp <= yh(je) .and. & 
+                 zp > zh(ks-1) .and. zp <= zh(ke) ) then   
+               num_part(rank) = num_part(rank) + 1
+               parts(num_part(rank),rank)%element%xc = xp
+               parts(num_part(rank),rank)%element%yc = yp
+               parts(num_part(rank),rank)%element%zc = zp
+               parts(num_part(rank),rank)%element%vol = volp
+               call FindPartLocCell(xp,yp,zp,ip,jp,kp)
+               parts(num_part(rank),rank)%ic = ip
+               parts(num_part(rank),rank)%jc = jp
+               parts(num_part(rank),rank)%kc = kp
+               if ( SeedWithFluidVel ) then 
+                  call GetFluidProp(ip,jp,kp,xp,yp,zp, & 
+                              uf,vf,wf,dummyreal,dummyreal,dummyreal,& 
+                              volp,largeint,TwoWayCouplingFlag)
+                  up = uf; vp = vf; wp = wf
+               end if ! SeedWithFluidVel
+               parts(num_part(rank),rank)%element%uc = up
+               parts(num_part(rank),rank)%element%vc = vp
+               parts(num_part(rank),rank)%element%wc = wp
+            end if ! xp,yp,zp 
+            if ( ipart_seed >= num_part_seed ) exit
+         end do ! ipart_seed
+      
+         ! Adjust particle positions to avoid locating at block bdry 
+         if ( AvoidSeedAtBlockBdry .and. num_part(rank) > 0 ) then
+            do ipart = 1,num_part(rank)
+               dp = (parts(ipart,rank)%element%vol*6.d0/PI)**OneThird
+               xp = parts(ipart,rank)%element%xc
+               yp = parts(ipart,rank)%element%yc
+               zp = parts(ipart,rank)%element%zc
+               if ( xp - 0.65d0*dp < xh(is-1) ) xp = xh(is-1) + 0.65d0*dp
+               if ( xp + 0.65d0*dp > xh(ie)   ) xp = xh(ie)   - 0.65d0*dp
+               if ( yp - 0.65d0*dp < yh(js-1) ) yp = yh(js-1) + 0.65d0*dp
+               if ( yp + 0.65d0*dp > yh(je)   ) yp = yh(je)   - 0.65d0*dp
+               if ( zp - 0.65d0*dp < zh(ks-1) ) zp = zh(ks-1) + 0.65d0*dp
+               if ( zp + 0.65d0*dp > zh(ke)   ) zp = zh(ke)   - 0.65d0*dp
+               parts(ipart,rank)%element%xc = xp 
+               parts(ipart,rank)%element%yc = yp
+               parts(ipart,rank)%element%zc = zp
+            end do !ipart
+         end if !AvoidSeedAtBlockBdry
+           
+         ! Adjust particle positions to avoid particle too close to each other 
+         if ( AvoidSeedPartTooClose .and. num_part(rank) > 1 ) then
+            niters = 5000 
+            do iter = 1,niters
+               do ipart = 1,num_part(rank)
+                  ! Check if a particle is too close with others
+                  PartSeedTooClose = .false.
+                  dp = (parts(ipart,rank)%element%vol*6.d0/PI)**OneThird
+                  do ipart1 = 1,num_part(rank)
+                     if ( ipart1 /= ipart ) then 
+                        dist = (parts(ipart ,rank)%element%xc - & 
+                                parts(ipart1,rank)%element%xc)**2.d0 & 
+                             + (parts(ipart ,rank)%element%yc - &
+                                parts(ipart1,rank)%element%yc)**2.d0 &
+                             + (parts(ipart ,rank)%element%zc - &
+                                parts(ipart1,rank)%element%zc)**2.d0
+                        dp1  = (parts(ipart1,rank)%element%vol*6.d0/PI)**OneThird
+                        if ( sqrt(dist) < (dp+dp1)*1.3d0 ) then 
+                           PartSeedTooClose = .true.
+                           exit
+                        end if ! sqrt(dist)
+                     end if ! ipart1 
+                  end do ! ipart1
+                  ! relocate the particle within the block
+                  if ( PartSeedTooClose ) then
+                     xb1 = max(xh(is-1)+0.65d0*dp,xmin_part_seed)
+                     xb2 = min(xh(ie  )-0.65d0*dp,xmax_part_seed)
+                     call random_number(rand) 
+                     parts(ipart,rank)%element%xc = xb1 + rand*(xb2-xb1)
+                                 
+                     yb1 = max(yh(js-1)+0.65d0*dp,ymin_part_seed) 
+                     yb2 = min(yh(je  )-0.65d0*dp,ymax_part_seed)
+                     call random_number(rand) 
+                     parts(ipart,rank)%element%yc = yb1 + rand*(yb2-yb1)
+
+                     zb1 = max(zh(ks-1)+0.65d0*dp,zmin_part_seed) 
+                     zb2 = min(zh(ke  )-0.65d0*dp,zmax_part_seed) 
+                     call random_number(rand) 
+                     parts(ipart,rank)%element%zc = zb1 + rand*(zb2-zb1)
+                     exit
+                  end if ! PartSeedTooClose
+               end do ! ipart
+               if ( .NOT.PartSeedTooClose ) exit
+            end do ! iter 
+            write(*,*) 'iteration on adjusting particle locations',rank,iter,num_part(rank)
+         end if !AvoidSeedPartTooClose
+
+         ! recompute particle velocity if seed with fluid vel and part positions
+         ! have been adjusted
+         if ( SeedWithFluidVel .and. (AvoidSeedAtBlockBdry .or. AvoidSeedPartTooClose) ) then
+            do ipart = 1, num_part(rank)
+               xp = parts(ipart,rank)%element%xc
+               yp = parts(ipart,rank)%element%yc
+               zp = parts(ipart,rank)%element%zc
+               call FindPartLocCell(xp,yp,zp,ip,jp,kp)
+               parts(ipart,rank)%ic = ip
+               parts(ipart,rank)%jc = jp
+               parts(ipart,rank)%kc = kp
+               call GetFluidProp(ip,jp,kp,xp,yp,zp, &
+                           uf,vf,wf,dummyreal,dummyreal,dummyreal,& 
+                           volp,largeint,TwoWayCouplingFlag)
+               up = uf; vp = vf; wp = wf
+               parts(ipart,rank)%element%uc = up
+               parts(ipart,rank)%element%vc = vp
+               parts(ipart,rank)%element%wc = wp
+            end do ! ipart 
+         end if ! SeedWithFluidVel
+
+         ! Allgather updated number of partilces after seeding
+         num_part_rank = num_part(rank)
+         call MPI_ALLGATHER(num_part_rank, 1, MPI_INTEGER, &
+                            num_part(:)   , 1, MPI_INTEGER, MPI_Comm_World, ierr)
+         if ( rank == 0 ) write(*,*) sum(num_part), "particles seeded!"
+      end if ! SeedParticlesNow
+   
+      contains
+         subroutine generate_random_particle(dmin_part_seed,dmax_part_seed,   & 
+               xmin_part_seed,xmax_part_seed,ymin_part_seed,ymax_part_seed,&
+               zmin_part_seed,zmax_part_seed,umin_part_seed,umax_part_seed,&
+               vmin_part_seed,vmax_part_seed,wmin_part_seed,wmax_part_seed,& 
+               dp,volp,xp,yp,zp,up,vp,wp)
+
+            implicit none
+
+            real(8),intent(in) :: dmin_part_seed,dmax_part_seed,   &
+                                 xmin_part_seed,xmax_part_seed,ymin_part_seed,ymax_part_seed,&
+                                 zmin_part_seed,zmax_part_seed,umin_part_seed,umax_part_seed,&
+                                 vmin_part_seed,vmax_part_seed,wmin_part_seed,wmax_part_seed
+            real(8),intent(out) :: dp,volp,xp,yp,zp,up,vp,wp
+
             call random_number(rand) 
             dp = dmin_part_seed + rand*(dmax_part_seed-dmin_part_seed)
             volp = PI*dp*dp*dp/6.d0
@@ -3315,51 +3538,7 @@ contains
             vp = vmin_part_seed + rand*(vmax_part_seed-vmin_part_seed)
             call random_number(rand) 
             wp = wmin_part_seed + rand*(wmax_part_seed-wmin_part_seed)
-
-!            call FindPartLocCell(xp,yp,zp,ip,jp,kp)
-!            c1 = (ip-Ng-1)/Mx  
-!            c2 = (jp-Ng-1)/My  
-!            c3 = (kp-Ng-1)/Mz  
-!            rankpart = c1*npy*npz + c2*npz + c3
-!            if ( rankpart > nPdomain-1 .or. rankpart < 0 ) then
-!               call lpperror("rank of seeding particle out of range!")
-!            else if ( rankpart == rank ) then 
-            if ( xp > xh(is)-dx(is) .and. xp <= xh(ie) .and. & 
-                 yp > yh(js)-dy(js) .and. yp <= yh(je) .and. & 
-                 zp > zh(ks)-dz(ks) .and. zp <= zh(ke) ) then   
-               num_part(rank) = num_part(rank) + 1
-               if ( AvoidSeedAtBlockBdry ) then
-                  if ( xp - 0.5d0*dp < xh(is)-dx(is) ) xp = xp + 0.5d0*dp
-                  if ( xp + 0.5d0*dp > xh(ie)        ) xp = xp - 0.5d0*dp
-                  if ( yp - 0.5d0*dp < yh(js)-dy(js) ) yp = yp + 0.5d0*dp
-                  if ( yp + 0.5d0*dp > yh(je)        ) yp = yp - 0.5d0*dp
-                  if ( zp - 0.5d0*dp < zh(ks)-dz(ks) ) zp = zp + 0.5d0*dp
-                  if ( zp + 0.5d0*dp > zh(ke)        ) zp = zp - 0.5d0*dp
-               end if !AvoidSeedAtBlockBdry
-               parts(num_part(rank),rank)%element%xc = xp
-               parts(num_part(rank),rank)%element%yc = yp
-               parts(num_part(rank),rank)%element%zc = zp
-               parts(num_part(rank),rank)%element%vol = volp
-               call FindPartLocCell(xp,yp,zp,ip,jp,kp)
-               parts(num_part(rank),rank)%ic = ip
-               parts(num_part(rank),rank)%jc = jp
-               parts(num_part(rank),rank)%kc = kp
-               if ( SeedWithFluidVel ) then 
-                  up = u(ip,jp,kp)
-                  vp = v(ip,jp,kp)
-                  wp = w(ip,jp,kp)
-               end if ! SeedWithFluidVel
-               parts(num_part(rank),rank)%element%uc = up
-               parts(num_part(rank),rank)%element%vc = vp
-               parts(num_part(rank),rank)%element%wc = wp
-            end if ! xp,yp,zp 
-         end do ! ipart_seed
-      end if ! SeedParticlesNow
-      
-      ! Allgather updated number of partilces after seeding 
-      call MPI_ALLGATHER(num_part(rank), 1, MPI_INTEGER, &
-                         num_part(:)   , 1, MPI_INTEGER, MPI_Comm_World, ierr)
-
+         end subroutine generate_random_particle
    end subroutine seedparticles
 
    subroutine lpperror(message) 
@@ -3397,6 +3576,7 @@ module module_output_lpp
       integer prank
       integer, parameter :: LPPformatPlot3D = 1
       integer, parameter :: LPPformatVOFVTK = 2
+      integer, parameter :: LPPformatVTK = 3
       if(rank.ne.0) call pariserror('rank.ne.0 in append_LPP')
       if(lpp_opened==0) then
          OPEN(UNIT=88,FILE='lpp.visit')
@@ -3409,7 +3589,8 @@ module module_output_lpp
       do prank=0,NpDomain-1
          if ( outputlpp_format == LPPformatPlot3D ) then 
             write(88,11) rootname//TRIM(int2text(prank,padding))//'.3D'
-         else if ( outputlpp_format == LPPformatVOFVTK ) then
+         else if ( outputlpp_format == LPPformatVOFVTK .or. & 
+                   outputlpp_format == LPPformatVTK ) then
             write(88,11) rootname//TRIM(int2text(prank,padding))//'.vtk'
          else 
             call pariserror("Unknow LPP output format!")
@@ -3425,11 +3606,14 @@ module module_output_lpp
       integer,intent(in)  :: nf,i1,i2,j1,j2,k1,k2
       integer, parameter :: LPPformatPlot3D = 1
       integer, parameter :: LPPformatVOFVTK = 2
+      integer, parameter :: LPPformatVTK = 3
 
       if ( outputlpp_format == LPPformatPlot3D ) then 
          call output_LPP_Plot3D(nf,i1,i2,j1,j2,k1,k2)
       else if ( outputlpp_format == LPPformatVOFVTK ) then
          call output_LPP_VOFVTK(nf,i1,i2,j1,j2,k1,k2)
+      else if ( outputlpp_format == LPPformatVTK ) then
+         call output_LPP_VTK(nf,i1,i2,j1,j2,k1,k2)
       else 
          call pariserror("Unknow LPP output format!")
       end if ! outputlpp_format
@@ -3603,6 +3787,118 @@ module module_output_lpp
       close(8)
 
    end subroutine output_LPP_VOFVTK
+
+   subroutine output_LPP_VTK(nf,i1,i2,j1,j2,k1,k2)
+      implicit none
+      integer,intent(in)  :: nf,i1,i2,j1,j2,k1,k2
+      character(len=30) :: rootname
+      integer :: ipart
+      real(8), parameter :: smallradius=1.0d-60
+
+      ! output lpp data in plot3d formate 
+      rootname=trim(out_path)//'/VTK/LPP'//TRIM(int2text(nf,padding))//'-'
+      if(rank==0) call append_LPP_visit_file(TRIM(rootname))
+
+      OPEN(UNIT=8,FILE=TRIM(rootname)//TRIM(int2text(rank,padding))//'.vtk')
+      write(8,10)
+      write(8,11)
+      write(8,12)
+      write(8,13)
+      write(8,14)
+      write(8,15) num_part(rank)+2
+10    format('# vtk DataFile Version 3.0')
+11    format('vtk output')
+12    format('ASCII')
+13    format('DATASET POLYDATA')
+14    format('')
+15    format('POINTS ',I17,' float' )
+
+      do ipart = 1,num_part(rank) 
+         write(8,320) parts(ipart,rank)%element%xc,& 
+         parts(ipart,rank)%element%yc, & 
+         parts(ipart,rank)%element%zc  
+      enddo
+      ! add virtual particles at the 8 corners of the block, so that
+      ! moledular plot in VisIt would work in the same scale of vof
+      write(8,320) x(i1),y(j1),z(k1) 
+      write(8,320) x(i2),y(j2),z(k2) 
+320   format(e14.5,e14.5,e14.5)
+
+      write(8,16) num_part(rank)+2
+      write(8,17)'radius'
+      write(8,18)
+16    format('POINT_DATA ',I17)
+17    format('SCALARS ',A20,' float')
+18    format('LOOKUP_TABLE default')
+
+      do ipart = 1,num_part(rank) 
+         write(8,330) (parts(ipart,rank)%element%vol*0.75d0/PI)**0.3333333333333333d0 
+      enddo
+      write(8,330) smallradius 
+      write(8,330) smallradius 
+330   format(e14.5)
+
+      write(8,17)'up'
+      write(8,18)
+      do ipart = 1,num_part(rank) 
+         write(8,330) parts(ipart,rank)%element%uc
+      enddo
+      write(8,330) smallradius 
+      write(8,330) smallradius
+
+      write(8,17)'vp'
+      write(8,18)
+      do ipart = 1,num_part(rank) 
+         write(8,330) parts(ipart,rank)%element%vc
+      enddo
+      write(8,330) smallradius 
+      write(8,330) smallradius
+
+      write(8,17)'wp'
+      write(8,18)
+      do ipart = 1,num_part(rank) 
+         write(8,330) parts(ipart,rank)%element%wc
+      enddo
+      write(8,330) smallradius 
+      write(8,330) smallradius
+
+      write(8,17)'uf'
+      write(8,18)
+      do ipart = 1,num_part(rank) 
+         write(8,330) parts(ipart,rank)%uf
+      enddo
+      write(8,330) smallradius 
+      write(8,330) smallradius
+
+      write(8,17)'vf'
+      write(8,18)
+      do ipart = 1,num_part(rank) 
+         write(8,330) parts(ipart,rank)%vf
+      enddo
+      write(8,330) smallradius 
+      write(8,330) smallradius
+
+      write(8,17)'wf'
+      write(8,18)
+      do ipart = 1,num_part(rank) 
+         write(8,330) parts(ipart,rank)%wf
+      enddo
+      write(8,330) smallradius 
+      write(8,330) smallradius
+
+!19    format('VECTORS ',A20,' float')
+!      write(8,19)'velf'
+!      write(8,18)
+!      do ipart = 1,num_part(rank) 
+!         write(8,320) parts(ipart,rank)%uf, &
+!            parts(ipart,rank)%vf, &
+!            parts(ipart,rank)%wf
+!      enddo
+!      write(8,320) smallradius,smallradius,smallradius 
+!      write(8,320) smallradius,smallradius,smallradius
+
+      close(8)
+   end subroutine output_LPP_VTK
 
 !-------------------------------------------------------------------------------------------------
    subroutine backup_LPP_write
