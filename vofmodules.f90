@@ -440,7 +440,12 @@ or none at all")
 !  get the majority phase flag
 !=================================================================================================
   subroutine get_vof_phase()
-    integer :: i,j,k
+    use module_IO
+    use module_flow
+    integer :: i,j,k!,iout
+    !character(2) :: flag
+    !iout = itimestep
+    !OPEN(UNIT=21,FILE='Phase_flags-'//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout,padding))//'.txt')
     do k=kmin,kmax
        do j=jmin,jmax
           do i=imin,imax
@@ -449,9 +454,13 @@ or none at all")
              else
                 vof_phase(i,j,k) = 1
              endif
+             !if (k==(ks+ke)/2) then
+              !write(21,'(2e14.5,I4)')x(i),y(j),vof_phase(i,j,k)
+             !endif
           enddo
        enddo
     enddo
+    !close(unit=21)
   end subroutine get_vof_phase
   !=================================================================================================
   !=================================================================================================
