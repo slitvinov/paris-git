@@ -977,14 +977,20 @@ subroutine update_momentum (us,d,cold,cnew,mflux,der)
   !fixme: I could obtain the flux in cells that contain the interface and that
   !       are near (how near?)
   do k=ks-1,ke+1
-    do j=js-1,je+1
-      do i=is-1,ie+1
-        !first contribution
-        rhoold = rho2*work(i,j,k,1) + rho1*(1.d0 - work(i,j,k,1))
-        rhonew = rho2*work(i,j,k,2) + rho1*(1.d0 - work(i,j,k,2))
+      do j=js-1,je+1
+          do i=is-1,ie+1
+              !first contribution
+              rhoold = rho2*work(i,j,k,1) + rho1*(1.d0 - work(i,j,k,1))
+              rhonew = rho2*work(i,j,k,2) + rho1*(1.d0 - work(i,j,k,2))
 
-        work(i,j,k,3) = work(i,j,k,3) + rhoold*us(i,j,k)/rhonew
+              work(i,j,k,3) = rhoold*us(i,j,k)/rhonew
+          enddo
+      enddo
+  enddo
 
+  do k=ks-1,ke+1
+      do j=js-1,je+1
+          do i=is-1,ie+1
         ! Recomputing fractions in the half cells 
         ! (is it better to store them from the previous loop?)
         call get_half_fractions(cnew,d,i,j,k,vofh1new,vofh2new)
@@ -1053,7 +1059,7 @@ subroutine update_momentum (us,d,cold,cnew,mflux,der)
     enddo
   enddo
   enddo
-  
+
   call do_all_ghost(der)
 
 end subroutine update_momentum
@@ -1143,22 +1149,56 @@ end subroutine get_half_fractions
     
   end subroutine vofandmomsweeps
 
+  subroutine get_momentum_staggered(us,d,mom)
+
+  use module_grid
+  use module_flow
+  use module_tmpvar
+
+  integer i,j,k,d
+  integer i0,j0,k0
+  real(8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), intent(in)  :: us
+  real(8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), intent(out) :: mom
+  real(8) :: rhoavg
+
+  tmp = 0.d0
+  call init_i0j0k0 (d,i0,j0,k0)
+  
+  do k=ks-1,ke+1
+     do j=js-1,je+1
+        do i=is-1,ie+1
+            call get_half_fractions(cvof,d,i,j,k,work(i,j,k,1),work(i,j,k,2))
+        enddo
+     enddo
+  enddo
+
+  do k=ks-1,ke+1
+     do j=js-1,je+1
+        do i=is-1,ie+1
+           tmp(i,j,k) = 0.5d0*(work(i,j,k,2)+work(i+i0,j+j0,k+k0,1))
+           rhoavg = tmp(i,j,k)*rho2 + (1.d0-tmp(i,j,k))*rho1
+           mom(i,j,k) = us(i,j,k)*rhoavg
+        enddo
+     enddo
+  enddo
+
+  call do_all_ghost(tmp)
+  call do_all_ghost(mom)
+
+  end subroutine get_momentum_staggered
+
   subroutine get_momentum(us,d,mom)
 
   use module_grid
   use module_flow
   use module_tmpvar
 
-  logical error
   integer i,j,k,d
   integer i0,j0,k0
-  integer i1,j1,k1
 !   real(8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), intent(in)  :: c
   real(8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), intent(in)  :: us
   real(8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), intent(out) :: mom
   real(8) rhoavg
-  real(8) alpha,fl3dnew,stencil3x3(-1:1,-1:1,-1:1)
-  real(8) dm(3),x0(3),deltax(3)
 
   tmp = 0.d0
   call init_i0j0k0 (d,i0,j0,k0)
@@ -1168,7 +1208,6 @@ end subroutine get_half_fractions
         do i=is-1,ie+1
            rhoavg = cvof(i,j,k)*rho2 + (1.d0-cvof(i,j,k))*rho1
            mom(i,j,k) = 0.5d0*(us(i,j,k)+us(i-i0,j-j0,k-k0))*rhoavg
-
         enddo
      enddo
   enddo
@@ -1236,7 +1275,36 @@ subroutine get_velocity_from_momentum (mom,d,us,der)
 
 end subroutine get_velocity_from_momentum
 
-  subroutine vofandmomsweepsold(tswap)
+subroutine get_velocity_from_momentum_staggered (mom,us,der)
+  use module_grid
+  use module_flow
+  use module_BC
+  use module_tmpvar
+  implicit none
+  integer :: i,j,k
+  real(8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: mom
+  real(8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: us,der
+  real(8) :: cflag,rhoavg
+
+  do k=ks-1,ke+1
+    do j=js-1,je+1
+      do i=is-1,ie+1
+        ! if interface rewrite interface velocity
+        cflag = tmp(i,j,k)
+
+        if (((cflag.gt.0.d0).and.(cflag.lt.1.d0))) then
+          rhoavg = rho2*cflag + (1.d0-cflag)*rho1
+          der(i,j,k) = (mom(i,j,k)/rhoavg - us(i,j,k))/dt
+        endif
+      enddo
+    enddo
+  enddo
+
+  call do_all_ghost(der)
+
+end subroutine get_velocity_from_momentum_staggered
+
+ subroutine vofandmomsweepsold(tswap)
     use module_BC
     use module_flow
     use module_tmpvar
@@ -1315,6 +1383,88 @@ end subroutine get_velocity_from_momentum
    call get_velocity_from_momentum (momentum(:,:,:,3),3,w,dw)
 
   end subroutine vofandmomsweepsold
+  
+ subroutine vofandmomsweepsstaggeredold(tswap)
+    use module_BC
+    use module_flow
+    use module_tmpvar
+    implicit none
+    integer dir
+    integer, intent(in) :: tswap
+
+    do dir=1,3
+        if (dir.eq.1) then
+            call get_momentum_staggered(u,1,momentum(:,:,:,1))
+        elseif (dir.eq.2) then
+            call get_momentum_staggered(v,2,momentum(:,:,:,2))
+        elseif (dir.eq.3) then
+            call get_momentum_staggered(w,3,momentum(:,:,:,3))
+        endif
+
+    if (VOF_advect=='Dick_Yue') call c_mask(work(:,:,:,2))
+    if (MOD(tswap,3).eq.0) then  ! do z then x then y 
+       call swpmom_stg(w,tmp,vof_flag,3,work(:,:,:,1),work(:,:,:,2), &
+                    work(:,:,:,3),momentum(:,:,:,dir),dir)
+       call swp_stg(w,tmp,vof_flag,3,work(:,:,:,1),work(:,:,:,2),&
+                    work(:,:,:,3),dir)
+
+       call swpmom_stg(u,tmp,vof_flag,1,work(:,:,:,1),work(:,:,:,2), &
+                    work(:,:,:,3),momentum(:,:,:,dir),dir)
+       call swp_stg(u,tmp,vof_flag,1,work(:,:,:,1),work(:,:,:,2),&
+                   work(:,:,:,3),dir)
+
+       call swpmom_stg(v,tmp,vof_flag,2,work(:,:,:,1),work(:,:,:,2), &
+                    work(:,:,:,3),momentum(:,:,:,dir),dir)
+       call swp_stg(v,tmp,vof_flag,2,work(:,:,:,1),work(:,:,:,2), &
+                    work(:,:,:,3),dir)
+
+    elseif (MOD(tswap,3).eq.1) then ! do y z x
+
+       call swpmom_stg(v,tmp,vof_flag,2,work(:,:,:,1),work(:,:,:,2), &
+                    work(:,:,:,3),momentum(:,:,:,dir),dir)
+       call swp_stg(v,tmp,vof_flag,2,work(:,:,:,1),work(:,:,:,2),&
+                    work(:,:,:,3),dir)
+
+       call swpmom_stg(w,tmp,vof_flag,3,work(:,:,:,1),work(:,:,:,2), &
+                    work(:,:,:,3),momentum(:,:,:,dir),dir)
+       call swp_stg(w,tmp,vof_flag,3,work(:,:,:,1),work(:,:,:,2),&
+                    work(:,:,:,3),dir)
+
+       call swpmom_stg(u,tmp,vof_flag,1,work(:,:,:,1),work(:,:,:,2), &
+                    work(:,:,:,3),momentum(:,:,:,dir),dir)
+       call swp_stg(u,tmp,vof_flag,1,work(:,:,:,1),work(:,:,:,2), &
+                    work(:,:,:,3),dir)
+
+    else ! do x y z
+
+       call swpmom_stg(u,tmp,vof_flag,1,work(:,:,:,1),work(:,:,:,2), &
+                    work(:,:,:,3),momentum(:,:,:,dir),dir)
+       call swp_stg(u,tmp,vof_flag,1,work(:,:,:,1),work(:,:,:,2),&
+                    work(:,:,:,3),dir)
+
+       call swpmom_stg(v,tmp,vof_flag,2,work(:,:,:,1),work(:,:,:,2), &
+                    work(:,:,:,3),momentum(:,:,:,dir),dir)
+       call swp_stg(v,tmp,vof_flag,2,work(:,:,:,1),work(:,:,:,2),&
+                    work(:,:,:,3),dir)
+
+       call swpmom_stg(w,tmp,vof_flag,3,work(:,:,:,1),work(:,:,:,2), &
+                    work(:,:,:,3),momentum(:,:,:,dir),dir)
+       call swp_stg(w,tmp,vof_flag,3,work(:,:,:,1),work(:,:,:,2),&
+                   work(:,:,:,3),dir)
+
+   endif
+   
+   if (dir.eq.1) then
+       call get_velocity_from_momentum_staggered (momentum(:,:,:,1),u,du)
+   elseif (dir.eq.2) then
+       call get_velocity_from_momentum_staggered (momentum(:,:,:,2),v,dv)
+   elseif (dir.eq.3) then
+       call get_velocity_from_momentum_staggered (momentum(:,:,:,3),w,dw)
+   endif
+
+   enddo
+
+  end subroutine vofandmomsweepsstaggeredold
 
 !-------------------------------------------------------------------------------------------------
 !-------------------------------------------------------------------------------------------------

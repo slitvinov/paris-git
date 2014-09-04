@@ -4,7 +4,7 @@ VOFBDRY_COND = 'periodic' 'periodic' 'periodic'
                    ! Type of VOF boundary condition in x,y,z direction: 'wet', '90deg','periodic'
 
 TEST_TYPE = 'cylinder_advection'
-VOF_ADVECT = 'Dick_Yue'
+VOF_ADVECT = 'CIAM'
 ViscMeanIsArith = T
 DoMOF = T
 !=================================================================================================
