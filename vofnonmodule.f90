@@ -274,7 +274,7 @@ subroutine swpz_stg(us,c,f,d,vof1,vof2,vof3,dir)
               a1 = 0.5d0*(us(i,j-1,k)+us(i+i2,j-1+j2,k+k2))*dt/dyh(j-1)
            elseif (d.eq.3) then
               a2 = 0.5d0*(us(i,j,k)+us(i+i2,j+j2,k+k2))*dt/dzh(k)
-              a1 = 0.5d0*(us(i,j,k-1)+us(i-1+i2,j+j2,k-1+k2))*dt/dzh(k-1)
+              a1 = 0.5d0*(us(i,j,k-1)+us(i+i2,j+j2,k-1+k2))*dt/dzh(k-1)
            endif
            !***
            !     3 cases: 1: default (c=0. and fluxes=0.); 2: c=1.; 3:c>0.
@@ -474,7 +474,7 @@ subroutine swpzmom_stg(us,c,f,d,mom1,mom2,mom3,mom,dir)
               a1 = 0.5d0*(us(i,j-1,k)+us(i+i2,j-1+j2,k+k2))*dt/dyh(j-1)
            elseif (d.eq.3) then
               a2 = 0.5d0*(us(i,j,k)+us(i+i2,j+j2,k+k2))*dt/dzh(k)
-              a1 = 0.5d0*(us(i,j,k-1)+us(i-1+i2,j+j2,k-1+k2))*dt/dzh(k-1)
+              a1 = 0.5d0*(us(i,j,k-1)+us(i+i2,j+j2,k+k2))*dt/dzh(k-1)
            endif
             
            !momentum for full cells
