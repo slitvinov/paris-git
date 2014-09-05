@@ -176,15 +176,15 @@ contains
      use module_freesurface
      implicit none
      include 'mpif.h'
-     integer :: i,j,k,level,nbr
-     real(8) :: x_cut, y_cut, xz_cut
+     integer :: i,j,k,level,nbr,ierr
+     integer :: req(12),sta(MPI_STATUS_SIZE,12)
      real(8) :: alpha, al3dnew, nr(3), P_a, Src
      real(8) :: a_l, a_rt, a_t, a_b, a_f, a_rr
      real(8) :: x_vel, xcount
 
 !New simple extrapolation: Velocities of neighbours at lower topological level averaged
      do level = 1, X_level
-        do k=ks-1,ke+1; do j=js-1,je+1; do i=is-1,ie+1
+        do k=ks,ke; do j=js,je; do i=is,ie
            if (u_cmask(i,j,k,level) == 1) then
               xcount = 0d0; x_vel = 0d0
               do nbr=-1,1,2
@@ -257,6 +257,12 @@ contains
                  w(i,j,k) = x_vel/xcount
               endif
            endif
+           call ghost_x(u  ,2,req( 1: 4));  call ghost_x(v,2,req( 5: 8)); call ghost_x(w,2,req( 9:12)); 
+           call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
+           call ghost_y(u  ,2,req( 1: 4));  call ghost_y(v,2,req( 5: 8)); call ghost_y(w,2,req( 9:12)); 
+           call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
+           call ghost_z(u  ,2,req( 1: 4));  call ghost_z(v,2,req( 5: 8)); call ghost_z(w,2,req( 9:12)); 
+           call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
         enddo; enddo; enddo
      enddo
 ! Simple volume conservation step after velocities have been extrapolated.
