@@ -39,10 +39,10 @@ subroutine swp(us,c,f,d,vof1,vof2,vof3)
      call pariserror("*** unknown vof scheme")
   endif
 
-  call get_flags_and_clip()
+  call get_flags_and_clip(c,f)
   call do_all_ghost(c)
   call do_all_ighost(f)
-  call get_vof_phase()
+  call get_vof_phase(c)
 
 end subroutine swp
 
@@ -61,27 +61,26 @@ subroutine swp_stg(us,c,f,d,vof1,vof2,vof3,dir)
      call pariserror("*** unknown vof scheme")
   endif
 
-  call get_flags_and_clip()
+  call get_flags_and_clip(c,f)
   call do_all_ghost(c)
   call do_all_ighost(f)
-  call get_vof_phase()
+  call get_vof_phase(c)
 
 end subroutine swp_stg
 
 
-subroutine swpmom(us,c,f,d,mom1,mom2,mom3,mom)
+subroutine swpmom(us,c,d,mom1,mom2,mom3,mom)
   use module_vof
   implicit none
   integer, intent(in) :: d
   real(8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: us,mom
   real(8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: c
   real(8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: mom1,mom2,mom3
-  integer, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: f
 
   if (VOF_advect=='Dick_Yue') then  ! Yue-Weymouth = Eulerian Implicit + central cell stuff
-     call swprmom(us,c,f,d,mom1,mom2,mom3,mom)
+     call swprmom(us,c,d,mom1,mom2,mom3,mom)
   elseif (VOF_advect=='CIAM') then  ! CIAM == Lagrangian Explicit
-     call swpzmom(us,c,f,d,mom1,mom2,mom3,mom)
+     call swpzmom(us,c,d,mom1,mom2,mom3,mom)
   else
      call pariserror("*** unknown vof scheme")
   endif
@@ -90,19 +89,18 @@ subroutine swpmom(us,c,f,d,mom1,mom2,mom3,mom)
 
 end subroutine swpmom
 
-subroutine swpmom_stg(us,c,f,d,mom1,mom2,mom3,mom,dir)
+subroutine swpmom_stg(us,c,d,mom1,mom2,mom3,mom,dir)
   use module_vof
   implicit none
   integer, intent(in) :: d,dir
   real(8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: us,mom
   real(8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: c
   real(8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: mom1,mom2,mom3
-  integer, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: f
 
   if (VOF_advect=='Dick_Yue') then  ! Yue-Weymouth = Eulerian Implicit + central cell stuff
      call pariserror("*** not implemented yet")
   elseif (VOF_advect=='CIAM') then  ! CIAM == Lagrangian Explicit
-     call swpzmom_stg(us,c,f,d,mom1,mom2,mom3,mom,dir)
+     call swpzmom_stg(us,c,d,mom1,mom2,mom3,mom,dir)
   else
      call pariserror("*** unknown vof scheme")
   endif
@@ -111,29 +109,6 @@ subroutine swpmom_stg(us,c,f,d,mom1,mom2,mom3,mom,dir)
 
 end subroutine swpmom_stg
 
-subroutine swpflux(us,c,f,d,massflux,vof)
-  use module_vof
-  implicit none
-  integer, intent(in) :: d
-  real (8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: us
-  real (8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: c
-  real (8)  , dimension(imin:imax,jmin:jmax,kmin:kmax,3,2), intent(inout) :: massflux
-  real (8)  , dimension(imin:imax,jmin:jmax,kmin:kmax,3), intent(inout) :: vof
-  integer, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: f
-  if (VOF_advect=='Dick_Yue') then  ! Yue-Weymouth = Eulerian Implicit + central cell stuff
-     call pariserror("*** Dick_Yue and Momentum Conserving are not compatible yet")
-  elseif (VOF_advect=='CIAM') then  ! CIAM == Lagrangian Explicit
-     call swpzflux(us,c,f,d,massflux,vof)
-  else
-     call pariserror("*** unknown vof scheme")
-  endif
-
-  call get_flags_and_clip()
-  call get_vof_phase()   ! not sure it is needed here
-  call do_all_ghost(c)
-  call do_all_ighost(f)
-
-end subroutine swpflux
 !
 !  Implements the CIAM (Lagrangian Explicit, onto square)
 !  advection method of Jie Li. 
@@ -338,7 +313,7 @@ subroutine swpz_stg(us,c,f,d,vof1,vof2,vof3,dir)
   !***
 end subroutine swpz_stg
 
-subroutine swpzmom(us,c,f,d,mom1,mom2,mom3,mom)
+subroutine swpzmom(us,c,d,mom1,mom2,mom3,mom)
 !  !***
   use module_grid
   use module_flow
@@ -350,7 +325,6 @@ subroutine swpzmom(us,c,f,d,mom1,mom2,mom3,mom)
   integer i0,j0,k0
   integer i1,j1,k1
   integer inv(3)
-  integer, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: f
   integer, intent(in) :: d
   real(8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: us
   real(8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: mom
@@ -434,7 +408,7 @@ subroutine swpzmom(us,c,f,d,mom1,mom2,mom3,mom)
   !***
 end subroutine swpzmom
 
-subroutine swpzmom_stg(us,c,f,d,mom1,mom2,mom3,mom,dir)
+subroutine swpzmom_stg(us,c,d,mom1,mom2,mom3,mom,dir)
 !  !***
   use module_grid
   use module_flow
@@ -447,7 +421,6 @@ subroutine swpzmom_stg(us,c,f,d,mom1,mom2,mom3,mom,dir)
   integer i1,j1,k1
   integer i2,j2,k2
   integer inv(3)
-  integer, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: f
   integer, intent(in) :: d
   real(8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: us
   real(8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: mom
@@ -531,113 +504,6 @@ subroutine swpzmom_stg(us,c,f,d,mom1,mom2,mom3,mom,dir)
   call SetMomentumBC(us,c,mom,d,umask,rho1,rho2) 
   !***
 end subroutine swpzmom_stg
-
-subroutine swpzflux(us,c,f,d,mflux,vof)
-  !***
-  use module_grid
-  use module_flow
-  use module_vof
-  implicit none
-  logical error
-  integer i,j,k
-  integer i0,j0,k0
-  integer i1,j1,k1
-  integer, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout)     :: f
-  integer, intent(in) :: d
-  real (8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in)     :: us
-  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout)     :: c
-  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax,3,2), intent(inout) :: mflux
-  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax,3), intent(inout)   :: vof
-  real(8) mm1,mm2
-  real(8) a1,a2,alpha,fl3dnew, stencil3x3(-1:1,-1:1,-1:1)
-  real(8) nr(3),deltax(3),x0(3)
-  intrinsic dmax1,dmin1
-
-  mflux(:,:,:,d,:) = 0.d0
-
-  call init_i0j0k0 (d,i0,j0,k0)
-
-  if(ng.lt.2) call pariserror("wrong ng")
-  do k=ks-1,ke+1
-     do j=js-1,je+1
-        do i=is-1,ie+1
-           if (d.eq.1) then
-              a2 = us(i,j,k)*dt/dxh(i)
-              a1 = us(i-1,j,k)*dt/dxh(i-1)
-           elseif (d.eq.2) then
-              a2 = us(i,j,k)*dt/dyh(j)
-              a1 = us(i,j-1,k)*dt/dyh(j-1)
-           elseif (d.eq.3) then
-              a2 = us(i,j,k)*dt/dzh(k)
-              a1 = us(i,j,k-1)*dt/dzh(k-1)
-           endif
-           !***
-           !     3 cases: 1: default (c=0. and fluxes=0.); 2: c=1.; 3:c>0.
-           !***
-           vof(i,j,k,:) = 0.0d0
-           mflux(i,j,k,d,1) = rho1*dmax1(-a1,0.d0)
-           mflux(i,j,k,d,2) = rho1*dmax1(a2,0.d0)
-
-           ! @@@ we need to introduce full/empty flags
-
-           if (c(i,j,k) .eq. 1.0d0) then
-              vof(i,j,k,1) = dmax1(-a1,0.d0)
-              vof(i,j,k,2) = 1.d0 - dmax1(a1,0.d0) + dmin1(a2,0.d0)
-              vof(i,j,k,3) = dmax1(a2,0.d0)
-              mflux(i,j,k,d,1) = rho2*dmax1(-a1,0.d0)
-              mflux(i,j,k,d,2) = rho2*dmax1(a2,0.d0)
-           else if (c(i,j,k) .gt. 0.d0) then
-              do i1=-1,1; do j1=-1,1; do k1=-1,1
-                stencil3x3(i1,j1,k1) = c(i+i1,j+j1,k+k1)
-              enddo;enddo;enddo
-              call fit_plane_new(c(i,j,k),d,a1,a2,stencil3x3,nr,alpha,error)
-              if(error) cycle
-              mm1 = dmax1(a1,0.0d0)
-              mm2 = 1.d0 - mm1 + dmin1(0.d0,a2)
-              x0=0d0
-              deltax=1d0
-              if(a1.lt.0d0) then
-                 x0(d)=a1
-                 deltax(d)=-a1
-                 vof(i,j,k,1) = fl3dnew(nr,alpha,x0,deltax)
-              endif
-              if(a2.gt.0d0) then
-                 x0(d)=1d0
-                 deltax(d)=a2
-                 vof(i,j,k,3) = fl3dnew(nr,alpha,x0,deltax)
-              endif
-              x0(d)=mm1
-              deltax(d)=mm2
-              vof(i,j,k,2) = fl3dnew(nr,alpha,x0,deltax)
-           endif
-           mflux(i,j,k,d,1) = vof(i,j,k,1)*(rho2-rho1) + rho1*dmax1(-a1,0.d0)
-           mflux(i,j,k,d,2) = vof(i,j,k,3)*(rho2-rho1) + rho1*dmax1(a2,0.d0)
-        enddo
-     enddo
-  enddo
-  !
-  ! assume that ghost layers take care of the boundary conditions. 
-  ! so i-1, i+1 needs to be computed. 
-  ! at least the ghost layers is-2, is-1, ie+1,ie+2  need to be there
-  ! at the beginning of the subroutine, so that fluxes vof1,vof3 are computed
-  ! for is-1, ie+1. 
-  !    (1) new values of c and  clip it: 0. <= c <= 1.
-  !    (2) apply proper boundary conditions to c
-  !*(1)* 
-  do k=ks,ke
-     do j=js,je
-        do i=is,ie
-           c(i,j,k) = vof(i-i0,j-j0,k-k0,3) + vof(i,j,k,2) + vof(i+i0,j+j0,k+k0,1)
-           c(i,j,k) = dmax1(0.0d0,dmin1(1.0d0,c(i,j,k)))
-        enddo
-     enddo
-  enddo
-
-  !*(2)*
-  call setvofbc(c,f)
-  !***
-
-end subroutine swpzflux
 
 subroutine fit_plane_new(vof,d,a1,a2,stencil3x3,mxyz,alpha,error)
   use module_grid
@@ -764,7 +630,7 @@ SUBROUTINE swpr(us,c,f,dir,vof1,cg,vof3)
   call setvofbc(c,f)
 end subroutine swpr
 
-SUBROUTINE swprmom(us,c,f,dir,mom1,cg,mom3,mom)
+SUBROUTINE swprmom(us,c,dir,mom1,cg,mom3,mom)
 !***
     USE module_grid
     USE module_flow
@@ -779,7 +645,6 @@ SUBROUTINE swprmom(us,c,f,dir,mom1,cg,mom3,mom)
     REAL (8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), INTENT(INOUT) :: us
     real(8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: mom
     REAL (8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), INTENT(INOUT) :: c,mom1,cg,mom3
-    integer, dimension(imin:imax,jmin:jmax,kmin:kmax),  intent(inout) :: f
     REAL(8), TARGET :: dmx,dmy,dmz,dxyz
     REAL(8), POINTER :: dm1,dm2,dm3
     REAL(8) :: a1,a2,alpha,vof,uavg

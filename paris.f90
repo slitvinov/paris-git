@@ -213,7 +213,7 @@ Program paris
            call my_timer(3)
            if(DoVOF) then
               if (DoMOF) then
-                 call vofandmomsweepsstaggeredold(itimestep)
+                 call vofandmomsweepsstaggered(itimestep)
                  call vofsweeps(itimestep)
 !                 call vofandmomsweepsold(itimestep)
               else
@@ -418,8 +418,8 @@ Program paris
            mu  = 0.5*(mu +muold)
            if(DoVOF) cvof  = 0.5*(cvof +cvofold)
            if(DoVOF) then
-              call get_flags_and_clip()
-              call get_vof_phase() !cvof updated above from min to max
+              call get_flags_and_clip(cvof,vof_flag)
+              call get_vof_phase(cvof) !cvof updated above from min to max
            endif
            if ( DoLPP ) call AveragePartSol()
         endif

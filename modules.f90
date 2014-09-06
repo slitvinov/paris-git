@@ -280,8 +280,7 @@ module module_flow
   implicit none
   save
   real(8), dimension(:,:,:), allocatable :: u, v, w, uold, vold, wold, fx, fy, fz, color
-  real(8), dimension(:,:,:,:), allocatable :: momentum
-  real(8), dimension(:,:,:,:,:), allocatable :: massflux
+  real(8), dimension(:,:,:), allocatable :: momentum
   real(8), dimension(:,:,:), allocatable :: p, rho, rhoo, muold, mu, dIdx, dIdy, dIdz
   real(8), dimension(:,:,:), allocatable :: umask,vmask,wmask
   real(8), dimension(:,:,:), allocatable :: du,dv,dw,drho,du_c,dv_c,dw_c

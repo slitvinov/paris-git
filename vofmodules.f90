@@ -42,7 +42,7 @@ module module_VOF
   implicit none
   real(8), dimension(:,:,:), allocatable, target :: cvof ! VOF tracer variable
   real(8), dimension(:,:,:), allocatable :: cvofold 
-  integer, dimension(:,:,:), allocatable :: vof_flag ! 
+  integer, dimension(:,:,:), allocatable :: vof_flag, tmp_flag ! 
   !   0 empty
   !   1 full
   !   2 fractional
@@ -334,8 +334,8 @@ contains
     allocate(cvof(imin:imax,jmin:jmax,kmin:kmax),vof_flag(imin:imax,jmin:jmax,kmin:kmax),&
          vof_phase(imin:imax,jmin:jmax,kmin:kmax))
     if (DoMOF) then
-      allocate(momentum(imin:imax,jmin:jmax,kmin:kmax,3))
-      allocate(massflux(imin:imax,jmin:jmax,kmin:kmax,3,2))
+      allocate(momentum(imin:imax,jmin:jmax,kmin:kmax))
+      allocate(tmp_flag(imin:imax,jmin:jmax,kmin:kmax))
     endif
     cvof = 0.d0
     vof_flag = 3
@@ -417,20 +417,22 @@ or none at all")
 !=================================================================================================
 !   a hack to get the flags quickly (temporary)
 !=================================================================================================
-  subroutine get_flags_and_clip()
+  subroutine get_flags_and_clip(c,cflag)
     integer :: i,j,k
+    real (8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: c
+    integer   , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: cflag
     if(ng.lt.2) call pariserror("wrong ng")
     do k=kmin,kmax
        do j=jmin,jmax
           do i=imin,imax
-             if(cvof(i,j,k).le.EPSC) then
-                vof_flag(i,j,k) = 0
-                cvof(i,j,k)=0.d0
-             else if(cvof(i,j,k).ge.1.d0-EPSC) then
-                vof_flag(i,j,k) = 1
-                cvof(i,j,k) = 1.d0
+             if(c(i,j,k).le.EPSC) then
+                cflag(i,j,k) = 0
+                c(i,j,k)=0.d0
+             else if(c(i,j,k).ge.1.d0-EPSC) then
+                cflag(i,j,k) = 1
+                c(i,j,k) = 1.d0
              else
-                vof_flag(i,j,k) = 2
+                cflag(i,j,k) = 2
              endif
           enddo
        enddo
@@ -439,17 +441,18 @@ or none at all")
 !=================================================================================================
 !  get the majority phase flag
 !=================================================================================================
-  subroutine get_vof_phase()
+  subroutine get_vof_phase(c)
     use module_IO
     use module_flow
     integer :: i,j,k!,iout
+    real (8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: c
     !character(2) :: flag
     !iout = itimestep
     !OPEN(UNIT=21,FILE='Phase_flags-'//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout,padding))//'.txt')
     do k=kmin,kmax
        do j=jmin,jmax
           do i=imin,imax
-             if (cvof(i,j,k)<0.5d0) then
+             if (c(i,j,k)<0.5d0) then
                 vof_phase(i,j,k) = 0
              else
                 vof_phase(i,j,k) = 1
@@ -557,7 +560,7 @@ or none at all")
     call do_all_ghost(cvof)
     call do_all_ighost(vof_flag)
     call setVOFBC(cvof,vof_flag)
-    call get_vof_phase()   
+    call get_vof_phase(cvof)   
     !call do_all_ighost(vof_phase) ! not needed, and BC for VOF phase are not set. 
     return
   end subroutine initconditions_VOF
@@ -938,141 +941,6 @@ or none at all")
   end subroutine do_all_ighost
   !=================================================================================================
 
-subroutine update_momentum (us,d,cold,cnew,mflux,der)
-
-  use module_grid
-  use module_flow
-  use module_BC
-  use module_tmpvar
-  implicit none
-  integer :: i,j,k
-  integer :: i0,j0,k0
-  integer :: d
-  integer :: od(3,2) = reshape((/2,1,1,3,3,2/), (/3,2/))!ortogonal directions
-  integer :: di(3)
-  real(8)  , dimension(imin:imax,jmin:jmax,kmin:kmax,3,2), intent(in) :: mflux
-  real(8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: cold, cnew, us
-  real(8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: der
-  real(8) vofh1old, vofh2old, vofh1new, vofh2new, rhoold,rhonew
-  real(8) fluxtmp, rhohold,rhohnew,utmp(6)
-  real(8) :: faceflux(6)
-
-  call init_i0j0k0 (d,i0,j0,k0)
-  work(:,:,:,1) = 0.d0 !staggered vof old
-  work(:,:,:,2) = 0.d0 !staggered vof new
-
-  do k=ks-1,ke+1
-    do j=js-1,je+1
-      do i=is-1,ie+1
-        !new density
-        call get_half_fractions(cnew,d,i,j,k,vofh1new,vofh2new)
-        work(i,j,k,2)          = work(i,j,k,2)          + vofh2new*0.5d0
-        work(i-i0,j-j0,k-k0,2) = work(i-i0,j-j0,k-k0,2) + vofh1new*0.5d0
-
-        !old density
-        call get_half_fractions(cold,d,i,j,k,vofh1old,vofh2old)
-        work(i,j,k,1)          = work(i,j,k,1)          + vofh2old*0.5d0
-        work(i-i0,j-j0,k-k0,1) = work(i-i0,j-j0,k-k0,1) + vofh1old*0.5d0
-      enddo
-    enddo
-  enddo
-
-  call do_all_ghost(work(:,:,:,1))
-  call do_all_ghost(work(:,:,:,2))
-
-  !work(i,j,k,3) is unew
-  work(:,:,:,3) = 0.d0
-
-  !fixme: I could obtain the flux in cells that contain the interface and that
-  !       are near (how near?)
-  do k=ks-1,ke+1
-      do j=js-1,je+1
-          do i=is-1,ie+1
-              !first contribution
-              rhoold = rho2*work(i,j,k,1) + rho1*(1.d0 - work(i,j,k,1))
-              rhonew = rho2*work(i,j,k,2) + rho1*(1.d0 - work(i,j,k,2))
-
-              work(i,j,k,3) = rhoold*us(i,j,k)/rhonew
-          enddo
-      enddo
-  enddo
-
-  do k=ks-1,ke+1
-      do j=js-1,je+1
-          do i=is-1,ie+1
-        ! Recomputing fractions in the half cells 
-        ! (is it better to store them from the previous loop?)
-        call get_half_fractions(cnew,d,i,j,k,vofh1new,vofh2new)
-        call get_half_fractions(cold,d,i,j,k,vofh1old,vofh2old)
-
-        !flux at the cell faces (normal component)
-        faceflux(1) = mflux(i-i0,j-j0,k-k0,d,2) - mflux(i,j,k,d,1)
-        faceflux(2) = mflux(i+i0,j+j0,k+k0,d,1) - mflux(i,j,k,d,2)
-
-        !flux at the cell faces (orthogonal component 1)
-        di = 0
-        di(od(d,1))=1
-        faceflux(3) = mflux(i-di(1),j-di(2),k-di(3),od(d,1),2) - mflux(i,j,k,od(d,1),1)
-        faceflux(4) = mflux(i+di(1),j+di(1),k+di(1),od(d,1),1) - mflux(i,j,k,od(d,1),2)
-        !advection velocity
-        utmp(3) = (us(i,j,k) + us(i-di(1),j-di(2),k-di(3)))*0.5d0 !orthogonal od=2 dir=1
-        utmp(4) = (us(i,j,k) + us(i+di(1),j+di(2),k+di(3)))*0.5d0 !orthogonal od=2 dir=2
-
-
-        !flux at the cell faces (orthogonal component 2)
-        di = 0
-        di(od(d,2))=1
-        faceflux(5) = mflux(i-di(1),j-di(2),k-di(3),od(d,2),2) - mflux(i,j,k,od(d,2),1)
-        faceflux(6) = mflux(i+di(1),j+di(1),k+di(1),od(d,2),1) - mflux(i,j,k,od(d,2),2)
-        !advection velocity
-        utmp(5) = (us(i,j,k) + us(i-di(1),j-di(2),k-di(3)))*0.5d0 !orthogonal od=2 dir=1
-        utmp(6) = (us(i,j,k) + us(i+di(1),j+di(2),k+di(3)))*0.5d0 !orthogonal od=2 dir=2
-
-        !flux at the half center plane(F_1)
-        !rho^{n+1} - rho^n = 2(F_1+F_2) + sum_{i=3}^6 F_i
-        rhohnew = rho2*vofh2new + rho1*(1.d0 - vofh2new)
-        rhohold = rho2*vofh2old + rho1*(1.d0 - vofh2old)
-        fluxtmp = (rhohnew - rhohold - faceflux(3) - faceflux(4) - faceflux(5) &
-        - faceflux(6) - 2.d0*faceflux(2))*0.5d0
-        !advection velocity
-        utmp(1) = (us(i,j,k) + us(i-i0,j-j0,k-k0))*0.5d0 !normal
-
-        work(i,j,k,3) = work(i,j,k,3) + fluxtmp/rhonew*utmp(1)      &
-        + (faceflux(3)*utmp(3) + faceflux(4)*utmp(4)  &
-        +  faceflux(5)*utmp(5) + faceflux(6)*utmp(6))*0.5d0/rhonew 
-
-        !second contribution
-        rhonew = rho2*work(i-i0,j-j0,k-k0,2) + rho1*(1.d0 - work(i-i0,j-j0,k-k0,2))
-
-        rhohnew = rho2*vofh1new + rho1*(1.d0 - vofh1new)
-        rhohold = rho2*vofh1old + rho1*(1.d0 - vofh1old)
-        fluxtmp = (rhohnew - rhohold - faceflux(3) - faceflux(4) - faceflux(5) &
-        - faceflux(6) - 2.d0*faceflux(1))*0.5d0
-
-        work(i-i0,j-j0,k-k0,3) = work(i-i0,j-j0,k-k0,3)  &
-        +  fluxtmp/rhonew*utmp(1)          &
-        + (faceflux(3)*utmp(3) + faceflux(4)*utmp(4)  &
-        +  faceflux(5)*utmp(5) + faceflux(6)*utmp(6))*0.5d0/rhonew 
-
-    enddo
-  enddo
-  enddo
-
-  do k=ks-1,ke+1
-    do j=js-1,je+1
-      do i=is-1,ie+1
-       if (((work(i,j,k,1).gt.0.d0).and.(work(i,j,k,1).lt.1.d0)).or. &
-       ((work(i,j,k,2).gt.0.d0).and.(work(i,j,k,2).lt.1.d0))) then
-        der(i,j,k) = (work(i,j,k,3) - us(i,j,k))/dt
-      endif
-    enddo
-  enddo
-  enddo
-
-  call do_all_ghost(der)
-
-end subroutine update_momentum
-
 subroutine get_half_fractions(c,d,i,j,k,vofh1,vofh2)
 
 implicit none
@@ -1129,35 +997,6 @@ end subroutine get_half_fractions
    endif
   end subroutine vofsweeps
 !=================================================================================================
-  subroutine vofandmomsweeps(tswap)
-    use module_BC
-    use module_flow
-    use module_tmpvar
-    implicit none
-    integer, intent(in) :: tswap
-
-    tmp = cvof ! store old value
-    if (VOF_advect=='Dick_Yue') call c_mask(work(:,:,:,2))
-    if (MOD(tswap,3).eq.0) then  ! do z then x then y 
-       call swpflux(w,cvof,vof_flag,3,massflux,work)
-       call swpflux(u,cvof,vof_flag,1,massflux,work)
-       call swpflux(v,cvof,vof_flag,2,massflux,work)
-    elseif (MOD(tswap,3).eq.1) then ! do y z x
-       call swpflux(v,cvof,vof_flag,2,massflux,work)
-       call swpflux(w,cvof,vof_flag,3,massflux,work)
-       call swpflux(u,cvof,vof_flag,1,massflux,work)
-    else ! do x y z
-       call swpflux(u,cvof,vof_flag,1,massflux,work)
-       call swpflux(v,cvof,vof_flag,2,massflux,work)
-       call swpflux(w,cvof,vof_flag,3,massflux,work)
-   endif
-
-   call update_momentum(u,1,cvof,tmp,massflux,du)
-   call update_momentum(v,2,cvof,tmp,massflux,dv)
-   call update_momentum(w,3,cvof,tmp,massflux,dw)
-    
-  end subroutine vofandmomsweeps
-
   subroutine get_momentum_staggered(us,d,mom)
 
   use module_grid
@@ -1170,7 +1009,9 @@ end subroutine get_half_fractions
   real(8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), intent(out) :: mom
   real(8) :: rhoavg
 
-  tmp = 0.d0
+  tmp = cvof
+  work(:,:,:,1) = 0.d0
+  work(:,:,:,2) = 0.d0
   call init_i0j0k0 (d,i0,j0,k0)
   
   do k=ks-1,ke+1
@@ -1180,6 +1021,10 @@ end subroutine get_half_fractions
         enddo
      enddo
   enddo
+
+  call do_all_ghost(work(:,:,:,1))
+  call do_all_ghost(work(:,:,:,2))
+  call do_all_ghost(us)
 
   do k=ks-1,ke+1
      do j=js-1,je+1
@@ -1195,94 +1040,6 @@ end subroutine get_half_fractions
   call do_all_ghost(mom)
 
   end subroutine get_momentum_staggered
-
-  subroutine get_momentum(us,d,mom)
-
-  use module_grid
-  use module_flow
-  use module_tmpvar
-
-  integer i,j,k,d
-  integer i0,j0,k0
-!   real(8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), intent(in)  :: c
-  real(8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), intent(in)  :: us
-  real(8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), intent(out) :: mom
-  real(8) rhoavg
-
-  tmp = 0.d0
-  call init_i0j0k0 (d,i0,j0,k0)
-  
-  do k=ks-1,ke+1
-     do j=js-1,je+1
-        do i=is-1,ie+1
-           rhoavg = cvof(i,j,k)*rho2 + (1.d0-cvof(i,j,k))*rho1
-           mom(i,j,k) = 0.5d0*(us(i,j,k)+us(i-i0,j-j0,k-k0))*rhoavg
-        enddo
-     enddo
-  enddo
-
-end subroutine get_momentum
-
-subroutine get_velocity_from_momentum (mom,d,us,der)
-  use module_grid
-  use module_flow
-  use module_BC
-  use module_tmpvar
-  implicit none
-  integer :: i,j,k
-  integer :: i0,j0,k0
-!   integer :: i1,j1,k1
-  integer, intent(in) :: d
-  real(8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: mom
-  real(8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: us,der
-  real(8) tmpreal, rhoavg1,rhoavg2,mom1,mom2, uavg, cflag
-!   real(8) stencil3x3(-1:1,-1:1,-1:1)
-!  real(8) x0(3)
-  
-  do k=ks-1,ke+1
-     do j=js-1,je+1
-        do i=is-1,ie+1
-            call get_half_fractions(cvof,d,i,j,k,work(i,j,k,1),work(i,j,k,2))
-        enddo
-     enddo
-  enddo
-
-  call do_all_ghost(work(:,:,:,1))
-  call do_all_ghost(work(:,:,:,2))
-
-  call init_i0j0k0 (d,i0,j0,k0)
-
-  do k=ks-1,ke+1
-    do j=js-1,je+1
-      do i=is-1,ie+1
-        ! if interface rewrite interface velocity
-        cflag = cvof(i-i0,j-j0,k-k0)
-
-        !option 1: 0.5(M(i)/rho(i)+M(i-1)/rho(i-1))
-        rhoavg1   = rho2*cvof(i,j,k) + rho1*(1.d0 - cvof(i,j,k))
-        uavg      = mom(i,j,k)/rhoavg1
-        rhoavg2   = rho2*cvof(i-i0,j-j0,k-k0) + rho1*(1.d0 - cvof(i-i0,j-j0,k-k0))
-        tmpreal   = 0.5d0*(uavg + mom(i-i0,j-j0,k-k0)/rhoavg2)
-
-        !option 2: (2 M_vc(i)/(rho(i)+rho(i-1))
-        !mom1 = mom(i,j,k)*work(i,j,k,1)/rhoavg1
-        !mom2 = mom(i-i0,j-j0,k-k0)*work(i-i0,j-j0,k-k0,2)/rhoavg2
-        !tmpreal = (mom1 + mom2)/(rhoavg1+rhoavg2)
-
-        !option 3: (M(i)+M(i-1))/(rho(i)+rho(i-1)) 
-        !tmpreal   = (mom(i,j,k) + mom(i-i0,j-j0,k-k0))/(rhoavg1+rhoavg2)
-
-        if (((cflag.gt.0.d0).and.(cflag.lt.1.d0)).or. &
-            (tmp(i,j,k).gt.0.d0)) then
-          der(i-i0,j-j0,k-k0) = (tmpreal - us(i-i0,j-j0,k-k0))/dt
-        endif
-      enddo
-    enddo
-  enddo
-
-  call do_all_ghost(der)
-
-end subroutine get_velocity_from_momentum
 
 subroutine get_velocity_from_momentum_staggered (mom,us,der)
   use module_grid
@@ -1313,167 +1070,134 @@ subroutine get_velocity_from_momentum_staggered (mom,us,der)
 
 end subroutine get_velocity_from_momentum_staggered
 
- subroutine vofandmomsweepsold(tswap)
+subroutine vofandmomsweepsstaggered(tswap)
     use module_BC
     use module_flow
     use module_tmpvar
     implicit none
-    integer i
-    integer, intent(in) :: tswap
-
-    call get_momentum(u,1,momentum(:,:,:,1))
-    call get_momentum(v,2,momentum(:,:,:,2))
-    call get_momentum(w,3,momentum(:,:,:,3))
-    
-    if (VOF_advect=='Dick_Yue') call c_mask(work(:,:,:,2))
-    if (MOD(tswap,3).eq.0) then  ! do z then x then y 
-       do i=1,3
-         call swpmom(w,cvof,vof_flag,3,work(:,:,:,1),work(:,:,:,2), &
-                    work(:,:,:,3),momentum(:,:,:,i))
-       enddo
-       call swp(w,cvof,vof_flag,3,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3))
-
-       do i=1,3
-         call swpmom(u,cvof,vof_flag,1,work(:,:,:,1),work(:,:,:,2), &
-                    work(:,:,:,3),momentum(:,:,:,i))
-       enddo
-       call swp(u,cvof,vof_flag,1,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3))
-
-       do i=1,3
-         call swpmom(v,cvof,vof_flag,2,work(:,:,:,1),work(:,:,:,2), &
-                    work(:,:,:,3),momentum(:,:,:,i))
-       enddo
-       call swp(v,cvof,vof_flag,2,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3))
-
-    elseif (MOD(tswap,3).eq.1) then ! do y z x
-
-       do i=1,3
-         call swpmom(v,cvof,vof_flag,2,work(:,:,:,1),work(:,:,:,2), &
-                    work(:,:,:,3),momentum(:,:,:,i))
-       enddo
-       call swp(v,cvof,vof_flag,2,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3))
-
-       do i=1,3
-         call swpmom(w,cvof,vof_flag,3,work(:,:,:,1),work(:,:,:,2), &
-                    work(:,:,:,3),momentum(:,:,:,i))
-       enddo
-       call swp(w,cvof,vof_flag,3,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3))
-
-       do i=1,3
-         call swpmom(u,cvof,vof_flag,1,work(:,:,:,1),work(:,:,:,2), &
-                    work(:,:,:,3),momentum(:,:,:,i))
-       enddo
-       call swp(u,cvof,vof_flag,1,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3))
-
-    else ! do x y z
-
-       do i=1,3
-         call swpmom(u,cvof,vof_flag,1,work(:,:,:,1),work(:,:,:,2), &
-                    work(:,:,:,3),momentum(:,:,:,i))
-       enddo
-       call swp(u,cvof,vof_flag,1,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3))
-
-       do i=1,3
-         call swpmom(v,cvof,vof_flag,2,work(:,:,:,1),work(:,:,:,2), &
-                    work(:,:,:,3),momentum(:,:,:,i))
-       enddo
-       call swp(v,cvof,vof_flag,2,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3))
-
-       do i=1,3
-         call swpmom(w,cvof,vof_flag,3,work(:,:,:,1),work(:,:,:,2), &
-                    work(:,:,:,3),momentum(:,:,:,i))
-       enddo
-       call swp(w,cvof,vof_flag,3,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3))
-
-   endif
-    
-   call get_velocity_from_momentum (momentum(:,:,:,1),1,u,du)
-   call get_velocity_from_momentum (momentum(:,:,:,2),2,v,dv)
-   call get_velocity_from_momentum (momentum(:,:,:,3),3,w,dw)
-
-  end subroutine vofandmomsweepsold
-  
- subroutine vofandmomsweepsstaggeredold(tswap)
-    use module_BC
-    use module_flow
-    use module_tmpvar
-    implicit none
-    integer dir
+    integer dir,i
     integer, intent(in) :: tswap
 
     do dir=1,3
         if (dir.eq.1) then
-            call get_momentum_staggered(u,1,momentum(:,:,:,1))
+            call get_momentum_staggered(u,1,momentum)
         elseif (dir.eq.2) then
-            call get_momentum_staggered(v,2,momentum(:,:,:,2))
+            call get_momentum_staggered(v,2,momentum)
         elseif (dir.eq.3) then
-            call get_momentum_staggered(w,3,momentum(:,:,:,3))
+            call get_momentum_staggered(w,3,momentum)
         endif
 
+        tmp_flag = vof_flag
+ 
     if (VOF_advect=='Dick_Yue') call c_mask(work(:,:,:,2))
     if (MOD(tswap,3).eq.0) then  ! do z then x then y 
-       call swpmom_stg(w,tmp,vof_flag,3,work(:,:,:,1),work(:,:,:,2), &
-                    work(:,:,:,3),momentum(:,:,:,dir),dir)
-       call swp_stg(w,tmp,vof_flag,3,work(:,:,:,1),work(:,:,:,2),&
+       call swpmom_stg(w,tmp,3,work(:,:,:,1),work(:,:,:,2), &
+                    work(:,:,:,3),momentum,dir)
+       call swp_stg(w,tmp,tmp_flag,3,work(:,:,:,1),work(:,:,:,2),&
                     work(:,:,:,3),dir)
 
-       call swpmom_stg(u,tmp,vof_flag,1,work(:,:,:,1),work(:,:,:,2), &
-                    work(:,:,:,3),momentum(:,:,:,dir),dir)
-       call swp_stg(u,tmp,vof_flag,1,work(:,:,:,1),work(:,:,:,2),&
-                   work(:,:,:,3),dir)
+       call swpmom_stg(u,tmp,1,work(:,:,:,1),work(:,:,:,2), &
+                    work(:,:,:,3),momentum,dir)
+       call swp_stg(u,tmp,tmp_flag,1,work(:,:,:,1),work(:,:,:,2),&
+                    work(:,:,:,3),dir)
 
-       call swpmom_stg(v,tmp,vof_flag,2,work(:,:,:,1),work(:,:,:,2), &
-                    work(:,:,:,3),momentum(:,:,:,dir),dir)
-       call swp_stg(v,tmp,vof_flag,2,work(:,:,:,1),work(:,:,:,2), &
+       call swpmom_stg(v,tmp,2,work(:,:,:,1),work(:,:,:,2), &
+                    work(:,:,:,3),momentum,dir)
+       call swp_stg(v,tmp,tmp_flag,2,work(:,:,:,1),work(:,:,:,2),&
                     work(:,:,:,3),dir)
 
     elseif (MOD(tswap,3).eq.1) then ! do y z x
 
-       call swpmom_stg(v,tmp,vof_flag,2,work(:,:,:,1),work(:,:,:,2), &
-                    work(:,:,:,3),momentum(:,:,:,dir),dir)
-       call swp_stg(v,tmp,vof_flag,2,work(:,:,:,1),work(:,:,:,2),&
+       call swpmom_stg(v,tmp,2,work(:,:,:,1),work(:,:,:,2), &
+                    work(:,:,:,3),momentum,dir)
+       call swp_stg(v,tmp,tmp_flag,2,work(:,:,:,1),work(:,:,:,2),&
                     work(:,:,:,3),dir)
 
-       call swpmom_stg(w,tmp,vof_flag,3,work(:,:,:,1),work(:,:,:,2), &
-                    work(:,:,:,3),momentum(:,:,:,dir),dir)
-       call swp_stg(w,tmp,vof_flag,3,work(:,:,:,1),work(:,:,:,2),&
+       call swpmom_stg(w,tmp,3,work(:,:,:,1),work(:,:,:,2), &
+                    work(:,:,:,3),momentum,dir)
+       call swp_stg(w,tmp,tmp_flag,3,work(:,:,:,1),work(:,:,:,2),&
                     work(:,:,:,3),dir)
 
-       call swpmom_stg(u,tmp,vof_flag,1,work(:,:,:,1),work(:,:,:,2), &
-                    work(:,:,:,3),momentum(:,:,:,dir),dir)
-       call swp_stg(u,tmp,vof_flag,1,work(:,:,:,1),work(:,:,:,2), &
+       call swpmom_stg(u,tmp,1,work(:,:,:,1),work(:,:,:,2), &
+                    work(:,:,:,3),momentum,dir)
+       call swp_stg(u,tmp,tmp_flag,1,work(:,:,:,1),work(:,:,:,2),&
                     work(:,:,:,3),dir)
 
     else ! do x y z
 
-       call swpmom_stg(u,tmp,vof_flag,1,work(:,:,:,1),work(:,:,:,2), &
-                    work(:,:,:,3),momentum(:,:,:,dir),dir)
-       call swp_stg(u,tmp,vof_flag,1,work(:,:,:,1),work(:,:,:,2),&
+       call swpmom_stg(u,tmp,1,work(:,:,:,1),work(:,:,:,2), &
+                    work(:,:,:,3),momentum,dir)
+       call swp_stg(u,tmp,tmp_flag,1,work(:,:,:,1),work(:,:,:,2),&
                     work(:,:,:,3),dir)
 
-       call swpmom_stg(v,tmp,vof_flag,2,work(:,:,:,1),work(:,:,:,2), &
-                    work(:,:,:,3),momentum(:,:,:,dir),dir)
-       call swp_stg(v,tmp,vof_flag,2,work(:,:,:,1),work(:,:,:,2),&
+       call swpmom_stg(v,tmp,2,work(:,:,:,1),work(:,:,:,2), &
+                    work(:,:,:,3),momentum,dir)
+       call swp_stg(v,tmp,tmp_flag,2,work(:,:,:,1),work(:,:,:,2),&
                     work(:,:,:,3),dir)
 
-       call swpmom_stg(w,tmp,vof_flag,3,work(:,:,:,1),work(:,:,:,2), &
-                    work(:,:,:,3),momentum(:,:,:,dir),dir)
-       call swp_stg(w,tmp,vof_flag,3,work(:,:,:,1),work(:,:,:,2),&
-                   work(:,:,:,3),dir)
+       call swpmom_stg(w,tmp,3,work(:,:,:,1),work(:,:,:,2), &
+                    work(:,:,:,3),momentum,dir)
+       call swp_stg(w,tmp,tmp_flag,3,work(:,:,:,1),work(:,:,:,2),&
+                    work(:,:,:,3),dir)
 
    endif
+
+!    if (VOF_advect=='Dick_Yue') call c_mask(work(:,:,:,2))
+!    if (MOD(tswap,3).eq.0) then  ! do z then x then y 
+!       call swpmom(w,tmp,3,work(:,:,:,1),work(:,:,:,2), &
+!                    work(:,:,:,3),momentum)
+!       call swp(w,tmp,tmp_flag,3,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3))
+!
+!       call swpmom(u,tmp,1,work(:,:,:,1),work(:,:,:,2), &
+!                    work(:,:,:,3),momentum)
+!       call swp(u,tmp,tmp_flag,1,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3))
+!
+!       call swpmom(v,tmp,2,work(:,:,:,1),work(:,:,:,2), &
+!                    work(:,:,:,3),momentum)
+!       call swp(v,tmp,tmp_flag,2,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3))
+!
+!    elseif (MOD(tswap,3).eq.1) then ! do y z x
+!
+!       call swpmom(v,tmp,2,work(:,:,:,1),work(:,:,:,2), &
+!                    work(:,:,:,3),momentum)
+!       call swp(v,tmp,tmp_flag,2,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3))
+!
+!       call swpmom(w,tmp,3,work(:,:,:,1),work(:,:,:,2), &
+!                    work(:,:,:,3),momentum)
+!       call swp(w,tmp,tmp_flag,3,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3))
+!
+!       call swpmom(u,tmp,1,work(:,:,:,1),work(:,:,:,2), &
+!                    work(:,:,:,3),momentum)
+!       call swp(u,tmp,tmp_flag,1,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3))
+!
+!    else ! do x y z
+!
+!       call swpmom(u,tmp,1,work(:,:,:,1),work(:,:,:,2),&
+!                   work(:,:,:,3),momentum)
+!       call swp(u,tmp,tmp_flag,1,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3))
+!
+!       call swpmom(v,tmp,2,work(:,:,:,1),work(:,:,:,2), &
+!                    work(:,:,:,3),momentum)
+!       call swp(v,tmp,tmp_flag,2,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3))
+!
+!       call swpmom(w,tmp,3,work(:,:,:,1),work(:,:,:,2), &
+!                    work(:,:,:,3),momentum)
+!       call swp(w,tmp,tmp_flag,3,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3))
+!
+!   endif
+
    
    if (dir.eq.1) then
-       call get_velocity_from_momentum_staggered (momentum(:,:,:,1),u,du)
+       call get_velocity_from_momentum_staggered (momentum,u,du)
    elseif (dir.eq.2) then
-       call get_velocity_from_momentum_staggered (momentum(:,:,:,2),v,dv)
+       call get_velocity_from_momentum_staggered (momentum,v,dv)
    elseif (dir.eq.3) then
-       call get_velocity_from_momentum_staggered (momentum(:,:,:,3),w,dw)
+       call get_velocity_from_momentum_staggered (momentum,w,dw)
    endif
 
    enddo
 
-  end subroutine vofandmomsweepsstaggeredold
+  end subroutine vofandmomsweepsstaggered
 
 !-------------------------------------------------------------------------------------------------
 !-------------------------------------------------------------------------------------------------
