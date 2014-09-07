@@ -1,22 +1,22 @@
 #!/bin/bash
 #set -x
 
-moftrue=F
-plotlabel=nonMOF
+momconstrue=F
+plotlabel=NonMomCons
 nfilter=1
 
 if [ $# -gt 0 ]; then
-    if [ $1 == MoF ]; then
-	echo "using Mof"
-	moftrue=T
-	plotlabel=MOF
+    if [ $1 == MomCons ]; then
+	echo "using MomCons"
+	momconstrue=T
+	plotlabel=MomCons
 	nfilter=0
     fi
 fi
 
 
-sed s/MOFTEMP/$moftrue/g inputvof.template | sed s/NFILTERTEMP/$nfilter/g > inputvof 
-sed s/nonMOF/$plotlabel/g plot.gp.template > plot.gp
+sed s/MOMCONSTEMP/$momconstrue/g inputvof.template | sed s/NFILTERTEMP/$nfilter/g > inputvof 
+sed s/nonMOMCONS/$plotlabel/g plot.gp.template > plot.gp
 
 
 rm -fR input out

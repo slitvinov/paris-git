@@ -6,7 +6,7 @@ VOFBDRY_COND = 'periodic' 'periodic' 'periodic'
 TEST_TYPE = 'shear_multiphase'
 VOF_ADVECT = 'Dick_Yue'
 ViscMeanIsArith = T
-DoMOF = T
+DoMOMCONS = T
 !=================================================================================================
 
 &end

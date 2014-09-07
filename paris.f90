@@ -212,7 +212,7 @@ Program paris
            if( DoLPP ) call StoreAfterConvectionTerms()
            call my_timer(3)
            if(DoVOF) then
-              if (DoMOF) then
+              if (DoMOMCONS) then
                  call vofandmomsweepsstaggered(itimestep)
                  call vofsweeps(itimestep)
 !                 call vofandmomsweepsold(itimestep)

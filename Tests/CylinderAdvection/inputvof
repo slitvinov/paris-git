@@ -6,7 +6,7 @@ VOFBDRY_COND = 'periodic' 'periodic' 'periodic'
 TEST_TYPE = 'cylinder_advection'
 VOF_ADVECT = 'CIAM'
 ViscMeanIsArith = T
-DoMOF = T
+DoMOMCONS = T
 !=================================================================================================
 
 &end

@@ -76,7 +76,7 @@ module module_VOF
   logical :: test_shear_multiphase = .false.
   logical :: test_KHI2D = .false.
   logical :: linfunc_initialized = .false.
-  logical :: DoMOF = .false.
+  logical :: DoMOMCONS = .false.
   logical :: use_Vofi
 !   logical :: oldvof
 
@@ -241,7 +241,7 @@ contains
     namelist /vofparameters/ vofbdry_cond,test_type,VOF_advect,refinement, &
        cylinder_dir, normal_up, DoLPP, &
        FreeSurface, ViscMeanIsArith, DensMeanIsArith, &
-       output_filtered_VOF, DoMOF, use_vofi,nfilter, &
+       output_filtered_VOF, DoMOMCONS, use_vofi,nfilter, &
        X_level! ,oldvof
     
 !     vofbdry_cond=['periodic','periodic','periodic','periodic','periodic','periodic']
@@ -255,7 +255,7 @@ contains
     FreeSurface=.false.; X_level = 0 
     ViscMeanIsArith=.true.; DensMeanIsArith=.true.
     output_filtered_VOF=.false. ! redundant
-    DoMOF = .false.
+    DoMOMCONS = .false.
     use_vofi = .false.
     nfilter = 0 
     ! oldvof = .false.  ! .true.
@@ -333,7 +333,7 @@ contains
     endif
     allocate(cvof(imin:imax,jmin:jmax,kmin:kmax),vof_flag(imin:imax,jmin:jmax,kmin:kmax),&
          vof_phase(imin:imax,jmin:jmax,kmin:kmax))
-    if (DoMOF) then
+    if (DoMOMCONS) then
       allocate(momentum(imin:imax,jmin:jmax,kmin:kmax))
       allocate(tmp_flag(imin:imax,jmin:jmax,kmin:kmax))
     endif
