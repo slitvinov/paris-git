@@ -49,7 +49,7 @@
      Open(unit=25,FILE=TRIM(out_path)//'/w_ass-'//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout,padding))//'.txt')
   endif
   !First loop to set level 0 velocities in liq-liq and liq-gas cells
-  do k=ks,ke; do j=js,je; do i=is,ie
+  do k=ks,ke; do j=js,je; do i=is,ie !loop relies on vof_phase in e+1. Should not be issue, as phase should be correct up to max.
      if (vof_phase(i,j,k) == 1) then 
         if (debug) write(19,13)x(i),y(j),z(k)
         if (vof_phase(i+1,j,k) == 0) then
@@ -87,7 +87,7 @@
   call MPI_WAITALL(24,req(1:24),sta(:,1:24),ierr)
   !Set levels 1 to X_level
   do level=1,X_level
-     do k=ks,ke; do j=js,je; do i=is,ie
+     do k=ks,ke; do j=js,je; do i=is,ie !uses indexes s-1 and e+1 to check assigned and set masks. Assigned should be set from past ghost operations
         !u-neighbours
         if (u_cmask(i,j,k)==level-1) then
            do nbr=-1,1,2
@@ -180,17 +180,14 @@ subroutine setuppoisson_fs(umask,vmask,wmask,vof_phase,rhot,dt,A,pmask,cvof,n1,n
   real(8), dimension(is:ie,js:je,ks:ke), intent(inout) :: pmask
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: cvof,n1,n2,n3
   real(8), dimension(is:ie,js:je,ks:ke,8), intent(out) :: A
-  real(8), dimension(is:ie,js:je,ks:ke) :: x_int, y_int, z_int
   integer, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: vof_phase
   real(8) :: alpha, x_test, y_test, z_test, n_x, n_y, n_z
   real(8) :: x_l, x_r, y_b, y_t, z_r, z_f
   real(8) :: nr(3),al3dnew,al3dold
   real(8) :: dt
   integer :: i,j,k,l,istep
-  !new variables
   real(8) :: mod0, mod1, count
 
-  x_int = 0d0; y_int = 0d0; z_int = 0d0
   x_mod=dxh((is+ie)/2); y_mod=dyh((js+je)/2); z_mod=dzh((ks+ke)/2) !assumes an unstretched grid
   P_g = 0d0
   pmask = 1d0
@@ -201,17 +198,13 @@ subroutine setuppoisson_fs(umask,vmask,wmask,vof_phase,rhot,dt,A,pmask,cvof,n1,n
      !Open(unit=52,file='P_g-'//TRIM(int2text(istep,padding))//'.txt') !remove, debugging
      !Open(unit=53,file='Phase-'//TRIM(int2text(istep,padding))//'.txt') !remove, debugging 
   endif 
-
-  !do k=ks,ke; do j=js,je; do i=is,ie
-  do k=ks,ke-1; do j=js,je-1; do i=is,ie-1 ! For new method, set upper bound to end-1, since we always check next cell in each direction
-     !----------------------------------------------------------------------------------------------
-     ! New setup: use topology criteria. If Pressure node neighbours are in different phases, A branch is modified
-     ! Check for gas-liquid neighbours
+  ! Check for gas-liquid neighbours
+  do k=ks,ke; do j=js,je; do i=is,ie
      if(vof_phase(i,j,k)==1) then
         if (cvof(i,j,k)<0.5d0) write(*,'("Vof phase error. Phase test 1, cvof: ",e14.5)')cvof(i,j,k) !debugging
         pmask(i,j,k) = 0d0 !pmask local, have to set
         !Check x-neighbour
-        if (vof_phase(i+1,j,k) == 0) then
+        if ((i<ie) .and. vof_phase(i+1,j,k) == 0) then
            if (cvof(i+1,j,k)>=0.5d0) write(*,'("Vof phase error. Phase test 0, cvof: ",e14.5)')cvof(i+1,j,k) !debugging
            count = 0d0; mod0 = 0d0; mod1 = 0d0
            !get_intersection for liq cell
@@ -252,7 +245,7 @@ subroutine setuppoisson_fs(umask,vmask,wmask,vof_phase,rhot,dt,A,pmask,cvof,n1,n
            P_g(i,j,k,1) = sigma*kap(i,j,k)/dx(i) !curvature taken in gas cell.
         endif
         !Check y-neighbour
-        if (vof_phase(i,j+1,k) == 0) then
+        if ((j<je) .and. vof_phase(i,j+1,k) == 0) then
            if (cvof(i,j+1,k)>=0.5d0) write(*,'("Vof phase error. Phase test 0, cvof: ",e14.5)')cvof(i,j+1,k)
            count = 0d0; mod0 = 0d0; mod1 = 0d0
            !get_intersection for liq cell
@@ -293,7 +286,7 @@ subroutine setuppoisson_fs(umask,vmask,wmask,vof_phase,rhot,dt,A,pmask,cvof,n1,n
            P_g(i,j,k,2) = sigma*kap(i,j,k)/dy(j) !curvature taken in gas cell.
         endif
         !Check z-neighbour
-        if (vof_phase(i,j,k+1) == 0) then
+        if ((k<ke) .and. vof_phase(i,j,k+1) == 0) then
            if (cvof(i,j,k+1)>=0.5d0) write(*,'("Vof phase error. Phase test 0, cvof: ",e14.5)')cvof(i,j,k+1)
            count = 0d0; mod0 = 0d0; mod1 = 0d0
            !get_intersection for liq cell
@@ -334,14 +327,14 @@ subroutine setuppoisson_fs(umask,vmask,wmask,vof_phase,rhot,dt,A,pmask,cvof,n1,n
            P_g(i,j,k,3) = sigma*kap(i,j,k)/dz(k) !curvature taken in gas cell.
         endif
      endif
-!-------------------------Liquid-gas neighbours
+  !-------------------------Liquid-gas neighbours
      if (vof_phase(i,j,k)==0) then
         if (cvof(i,j,k)>=0.5d0) write(*,'("Vof phase error. Phase test 0, cvof: ",e14.5)')cvof(i,j,k) 
         !Check x-neighbour
         if (vof_phase(i+1,j,k) == 1) then
            if (cvof(i+1,j,k)<0.5d0) write(*,'("Vof phase error. Phase test 1, cvof: ",e14.5)')cvof(i+1,j,k) !debugging
            count = 0d0; mod0 = 0d0; mod1 = 0d0
-           pmask(i+1,j,k) = 1d0
+           if (i<ie) pmask(i+1,j,k) = 1d0
            !get_intersection for gas cell
            nr(1) = n1(i+1,j,k); nr(2) = n2(i+1,j,k); nr(3) = n3(i+1,j,k)
            n_x = ABS(nr(1)); n_y = ABS(nr(2)); n_z = ABS(nr(3))
@@ -383,7 +376,7 @@ subroutine setuppoisson_fs(umask,vmask,wmask,vof_phase,rhot,dt,A,pmask,cvof,n1,n
         if (vof_phase(i,j+1,k) == 1) then
            if (cvof(i,j+1,k)<0.5d0) write(*,'("Vof phase error. Phase test 1, cvof: ",e14.5)')cvof(i,j+1,k) !debugging
            count = 0d0; mod0 = 0d0; mod1 = 0d0
-           pmask(i,j+1,k) = 1d0
+           if (j<je) pmask(i,j+1,k) = 1d0
            !get_intersection for gas cell
            nr(1) = n1(i,j+1,k); nr(2) = n2(i,j+1,k); nr(3) = n3(i,j+1,k)
            n_x = ABS(nr(1)); n_y = ABS(nr(2)); n_z = ABS(nr(3))
@@ -425,7 +418,7 @@ subroutine setuppoisson_fs(umask,vmask,wmask,vof_phase,rhot,dt,A,pmask,cvof,n1,n
         if (vof_phase(i,j,k+1) == 1) then
            if (cvof(i,j,k+1)<0.5d0) write(*,'("Vof phase error. Phase test 1, cvof: ",e14.5)')cvof(i,j,k+1) !debugging
            count = 0d0; mod0 = 0d0; mod1 = 0d0
-           pmask(i,j,k+1) = 1d0
+           if (k<ke) pmask(i,j,k+1) = 1d0
            !get_intersection for gas cell
            nr(1) = n1(i,j,k+1); nr(2) = n2(i,j,k+1); nr(3) = n3(i,j,k+1)
            n_x = ABS(nr(1)); n_y = ABS(nr(2)); n_z = ABS(nr(3))
@@ -442,7 +435,7 @@ subroutine setuppoisson_fs(umask,vmask,wmask,vof_phase,rhot,dt,A,pmask,cvof,n1,n
            nr(1) = n1(i,j,k); nr(2) = n2(i,j,k); nr(3) = n3(i,j,k)
            n_x = ABS(n1(i,j,k)); n_y = ABS(n2(i,j,k)); n_z = ABS(n3(i,j,k))
            alpha = al3dold(n_x,n_y,n_z,cvof(i,j,k))
-           
+
            if (n_z > 1d-14) then
               z_test = (alpha - (n_x+n_y)/2d0)/n_z
               if (z_test>-0.5d0 .and. n3(i,j,k)<0d0) then

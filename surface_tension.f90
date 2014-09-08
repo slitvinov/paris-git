@@ -241,13 +241,13 @@ contains
                     x_vel = x_vel + w(i+nbr,j,k)
                  endif
               enddo
-               do nbr = -1,1,2
+              do nbr = -1,1,2
                  if (w_cmask(i,j+nbr,k)==level-1) then
                     xcount = xcount+1d0
                     x_vel = x_vel + w(i,j+nbr,k)
                  endif
               enddo
-               do nbr = -1,1,2
+              do nbr = -1,1,2
                  if (w_cmask(i,j,k+nbr)==level-1) then
                     xcount = xcount+1d0
                     x_vel = x_vel + w(i,j,k+nbr)
