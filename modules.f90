@@ -338,7 +338,7 @@ module module_freesurface
   integer, dimension(:,:,:), allocatable :: u_cmask, v_cmask, w_cmask
   !real(8), dimension(:,:,:), allocatable :: pmask 
   integer :: X_level
-  logical :: FreeSurface, debug=.false.
+  logical :: FreeSurface, debug=.false., initialize_fs = .false.
 end module module_freesurface
 !=================================================================================================
 !=================================================================================================
