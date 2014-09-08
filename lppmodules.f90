@@ -51,7 +51,7 @@
       ! 3 marked as C node
       ! 4 marked as reference fluid 
       ! 5 marked as ghost layer
-   integer,parameter :: maxnum_diff_tag  = 23   ! ignore cases droplet spread over more than 1 block
+   integer,parameter :: maxnum_diff_tag  = 50  ! ignore cases droplet spread over more than 1 block
    integer :: total_num_tag,totalnum_drop,totalnum_drop_indep,num_new_drop
    integer, dimension(:), allocatable :: num_drop
    integer, dimension(:), allocatable :: num_drop_merge
@@ -636,7 +636,7 @@ contains
 
       ! update tag_id from local to global id (Note: no need to change domain 0)
       if ( rank > 0 ) then 
-         num_tag_accu = sum(num_drop(0:rank-1),1) + sum(num_drop_merge(0:rank-1),1)
+         num_tag_accu = sum(num_tag(0:rank-1),1)
          do i=is,ie; do j=js,je; do k=ks,ke
             if ( tag_id(i,j,k) > 0 ) tag_id(i,j,k)=tag_id(i,j,k)+num_tag_accu
          end do; end do; end do
@@ -688,15 +688,16 @@ contains
                else  ! a new differet tag is found
                   drops_merge(idrop,rank)%num_diff_tag = &
                   drops_merge(idrop,rank)%num_diff_tag + 1
-#ifdef DEBUG
-                  if ( drops_merge(idrop,rank)%num_diff_tag > maxnum_diff_tag ) & 
-                     call lpperror("Number of different tags of a droplet pieces exceeds the max number!") 
-#endif
-
-                  drops_merge(idrop,rank)%diff_tag_list(drops_merge(idrop,rank)%num_diff_tag) &
-                  = tag_id(drops_merge_gcell_list(1,iCell,idrop), &
-                           drops_merge_gcell_list(2,iCell,idrop), &
-                           drops_merge_gcell_list(3,iCell,idrop))
+                  if ( drops_merge(idrop,rank)%num_diff_tag <= maxnum_diff_tag ) then  
+!                     call lpperror("Number of different tags of a droplet pieces exceeds the max number!") 
+                     drops_merge(idrop,rank)%diff_tag_list(drops_merge(idrop,rank)%num_diff_tag) &
+                        = tag_id(drops_merge_gcell_list(1,iCell,idrop), &
+                                 drops_merge_gcell_list(2,iCell,idrop), &
+                                 drops_merge_gcell_list(3,iCell,idrop))
+                  else
+                     write(*,*) "Number of diff tags exceeds the max number!",time,rank,idrop 
+                     exit
+                  end if ! maxnum_diff_tag
                end if ! idiff_tag
             end do ! iCell
          end if ! drops_merge(idrop,irank)%num_gcell
@@ -1206,7 +1207,7 @@ contains
       implicit none
       integer :: i,j,k
 
-      call output_VOF(0,imin,imax,jmin,jmax,kmin,kmax)
+      call output_VOF(0,is,ie+1,js,je+1,ks,ke+1)
       call tag_drop()
       if (nPdomain > 1 ) then 
          call tag_drop_all()

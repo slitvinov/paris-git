@@ -588,7 +588,6 @@ or none at all")
          yc(ib)  = 0.15 + rand()*0.7
          zc(ib)  = 0.15 + rand()*0.7
       end do
-       
     end if ! NumBubble
   end subroutine random_bubbles 
   !=================================================================================================

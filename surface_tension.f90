@@ -78,7 +78,7 @@ contains
 !=================================================================================================
   subroutine initialize_surface_tension()
     implicit none
-    if(.not.recomputenormals .or. FreeSurface) then
+    if(recomputenormals .or. FreeSurface) then
        allocate(n1(imin:imax,jmin:jmax,kmin:kmax), n2(imin:imax,jmin:jmax,kmin:kmax),  &
                n3(imin:imax,jmin:jmax,kmin:kmax), kappa_fs(imin:imax,jmin:jmax,kmin:kmax))
        recomputenormals = .false.
@@ -754,6 +754,16 @@ contains
       real(8) :: points(NPOS,3),origin(3)
       real(8) :: xfit(NPOS),yfit(NPOS),hfit(NPOS),fit(NPOS,3)
       real(8) :: centroid(3),mxyz(3),stencil3x3(-1:1,-1:1,-1:1)
+
+! TEMPORARY - Stanley: avoid finding curvature for debry cells 
+      if ( n1(i0,j0,k0)==0.d0 .and. n2(i0,j0,k0)==0.d0 .and. n3(i0,j0,k0)==0.d0 ) then
+         kappa = 0.d0 
+         nfound = 0 
+         nposit = 0 
+         a      = 0.d0
+         return 
+      end if ! n1,n2,n3
+! END TEMPORARY 
 
       central=vof_flag(i0,j0,k0)
       call map3x3in2x2(i1,j1,k1,i0,j0,k0)
