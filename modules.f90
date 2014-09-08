@@ -335,7 +335,7 @@ end module module_2phase
 module module_freesurface
   real(8), dimension(:,:,:), allocatable :: x_mod, y_mod, z_mod
   real(8), dimension(:,:,:,:), allocatable :: P_g
-  integer, dimension(:,:,:,:), allocatable :: u_cmask, v_cmask, w_cmask
+  integer, dimension(:,:,:), allocatable :: u_cmask, v_cmask, w_cmask
   !real(8), dimension(:,:,:), allocatable :: pmask 
   integer :: X_level
   logical :: FreeSurface, debug=.false.

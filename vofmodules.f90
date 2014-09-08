@@ -342,12 +342,11 @@ contains
     vof_phase = 2
     !allocate matrices for Free Surface
     if(FreeSurface) then
-       allocate(u_cmask(imin:imax,jmin:jmax,kmin:kmax,0:X_level), &
-            v_cmask(imin:imax,jmin:jmax,kmin:kmax,0:X_level), &
-            w_cmask(imin:imax,jmin:jmax,kmin:kmax,0:X_level), &
-            x_mod(imin:imax,jmin:jmax,kmin:kmax), y_mod(imin:imax,jmin:jmax,kmin:kmax),&
-            z_mod(imin:imax,jmin:jmax,kmin:kmax), P_g(imin:imax,jmin:jmax,kmin:kmax,3))
-       u_cmask = 0; v_cmask = 0; w_cmask = 0
+        allocate(u_cmask(imin:imax,jmin:jmax,kmin:kmax), v_cmask(imin:imax,jmin:jmax,kmin:kmax), &
+            w_cmask(imin:imax,jmin:jmax,kmin:kmax), x_mod(imin:imax,jmin:jmax,kmin:kmax), &
+            y_mod(imin:imax,jmin:jmax,kmin:kmax), z_mod(imin:imax,jmin:jmax,kmin:kmax), &
+            P_g(imin:imax,jmin:jmax,kmin:kmax,3))
+       u_cmask = -1; v_cmask = -1; w_cmask = -1
        x_mod = 0d0; y_mod = 0d0; z_mod = 0d0
        P_g = 0d0
     endif
@@ -1196,6 +1195,7 @@ subroutine vofandmomsweepsstaggered(tswap)
    endif
 
    enddo
+
 
   end subroutine vofandmomsweepsstaggered
 

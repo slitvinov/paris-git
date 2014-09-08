@@ -30,13 +30,13 @@
   implicit none
   include 'mpif.h' 
   integer, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: vof_phase
-  integer, dimension(imin:imax,jmin:jmax,kmin:kmax) :: utmp, vtmp, wtmp 
   integer :: req(24),sta(MPI_STATUS_SIZE,24)
   integer :: i,j,k,level,iout,nbr,ierr
   logical, dimension(imin:imax,jmin:jmax,kmin:kmax) :: u_assigned, v_assigned, w_assigned
   !initialize pmask to 1d0 and all masks to -1 and unassigned
   !pmask = 1d0
-  u_cmask = 0; v_cmask = 0; w_cmask = 0
+  !insert initialize test
+  u_cmask = -1; v_cmask = -1; w_cmask = -1
   u_assigned = .false.; v_assigned=.false.; w_assigned=.false.
   debug = .false.
   if (debug) then
@@ -53,126 +53,111 @@
      if (vof_phase(i,j,k) == 1) then 
         if (debug) write(19,13)x(i),y(j),z(k)
         if (vof_phase(i+1,j,k) == 0) then
-           u_cmask(i,j,k,0) = 1; u_assigned(i,j,k) = .true.
+           u_cmask(i,j,k) = 0; u_assigned(i,j,k) = .true.
         endif
         if (vof_phase(i,j+1,k) == 0) then
-           v_cmask(i,j,k,0) = 1; v_assigned(i,j,k) = .true.
+           v_cmask(i,j,k) = 0; v_assigned(i,j,k) = .true.
         endif
         if (vof_phase(i,j,k+1) == 0) then 
-           w_cmask(i,j,k,0) = 1; w_assigned(i,j,k) = .true.
+           w_cmask(i,j,k) = 0; w_assigned(i,j,k) = .true.
         endif
      endif
      if (vof_phase(i,j,k) == 0) then
         if ((vof_phase(i+1,j,k) == 1) .or. (vof_phase(i+1,j,k) == 0)) then
-           u_cmask(i,j,k,0) = 1; u_assigned(i,j,k) = .true.
+           u_cmask(i,j,k) = 0; u_assigned(i,j,k) = .true.
         endif
         if ((vof_phase(i,j+1,k) == 1) .or. (vof_phase(i,j+1,k) == 0)) then
-           v_cmask(i,j,k,0) = 1; v_assigned(i,j,k) = .true.
+           v_cmask(i,j,k) = 0; v_assigned(i,j,k) = .true.
         endif
         if ((vof_phase(i,j,k+1) == 1) .or.(vof_phase(i,j,k+1) == 0)) then 
-           w_cmask(i,j,k,0) = 1; w_assigned(i,j,k) = .true.
+           w_cmask(i,j,k) = 0; w_assigned(i,j,k) = .true.
         endif
      endif
-    !if (u_cmask(i,j,k,2)==1 .or. v_cmask(i,j,k,2)==1 .or. w_cmask(i,j,k,2)==1) write(*,'("Error in lev0 loop",3I8)')i,j,k 
   enddo; enddo; enddo
-!!$  !fill ghost layers
-!!$  utmp = u_cmask(:,:,:,0); vtmp = v_cmask(:,:,:,0); wtmp=w_cmask(:,:,:,0)
-!!$  call ighost_x(utmp,2,req(1:4)); call ighost_x(vtmp,2,req(5:8)); call ighost_x(wtmp,2,req(9:12))
-!!$  call lghost_x(u_assigned,2,req(13:16)); call lghost_x(v_assigned,2,req(17:20)); call lghost_x(w_assigned,2,req(21:24))
-!!$  call MPI_WAITALL(24,req(1:24),sta(:,1:24),ierr)
-!!$  call ighost_y(utmp,2,req(1:4)); call ighost_y(vtmp,2,req(5:8)); call ighost_y(wtmp,2,req(9:12))
-!!$  call lghost_y(u_assigned,2,req(13:16)); call lghost_y(v_assigned,2,req(17:20)); call lghost_y(w_assigned,2,req(21:24))
-!!$  call MPI_WAITALL(24,req(1:24),sta(:,1:24),ierr)
-!!$  call ighost_z(utmp,2,req(1:4)); call ighost_z(vtmp,2,req(5:8)); call ighost_z(wtmp,2,req(9:12))
-!!$  call lghost_z(u_assigned,2,req(13:16)); call lghost_z(v_assigned,2,req(17:20)); call lghost_z(w_assigned,2,req(21:24))
-!!$  call MPI_WAITALL(24,req(1:24),sta(:,1:24),ierr)
-!!$  u_cmask(:,:,:,0)=utmp; v_cmask(:,:,:,0)=vtmp; w_cmask(:,:,:,0)=wtmp  
-!!$  !Set levels 1 to X_level
-!!$  do level=1,X_level
-!!$     do k=ks,ke; do j=js,je; do i=is,ie
-!!$        if (level ==2) write(*,*)'Assignment error, level !<= 1'
-!!$        if (X_level ==2) write(*,*)'Assignment error, X_level = 1'
-!!$        !Tests: in between gas nodes, neighbour level -1, unassigned
-!!$        !u-neighbours
-!!$        if (u_cmask(i,j,k,level-1)==1) then
-!!$           do nbr=-1,1,2
-!!$              if (.not.u_assigned(i,j+nbr,k)) then !.and. vof_phase(i,j+nbr,k)==1 .and. vof_phase(i+1,j+nbr,k)==1) then
-!!$                 u_cmask(i,j+nbr,k,level) = 1; u_assigned(i,j+nbr,k)=.true.
-!!$              endif
-!!$              if (.not.u_assigned(i+nbr,j,k)) then ! .and. vof_phase(i+nbr,j,k)==1 .and. vof_phase(i+nbr+1,j,k)==1) then
-!!$                 u_cmask(i+nbr,j,k,level) = 1; u_assigned(i+nbr,j,k) = .true.
-!!$              endif
-!!$              if (.not.u_assigned(i,j,k+nbr)) then ! .and. vof_phase(i,j,k+nbr)==1 .and. vof_phase(i+1,j,k+nbr)==1) then
-!!$                 u_cmask(i,j,k+nbr,level) = 1; u_assigned(i,j,k+nbr)=.true.
-!!$              endif
-!!$           enddo
-!!$        endif
-!!$        !v-neighbours
-!!$        if (v_cmask(i,j,k,level-1)==1) then
-!!$           do nbr=-1,1,2
-!!$              if (.not.v_assigned(i,j+nbr,k)) then ! .and. vof_phase(i,j+nbr,k)==1 .and. vof_phase(i,j+nbr+1,k)==1) then
-!!$                 v_cmask(i,j+nbr,k,level) = 1; v_assigned(i,j+nbr,k)=.true.
-!!$              endif
-!!$              if (.not.v_assigned(i+nbr,j,k)) then ! .and. vof_phase(i+nbr,j,k)==1 .and. vof_phase(i+nbr,j+1,k)==1) then
-!!$                 v_cmask(i+nbr,j,k,level) = 1; v_assigned(i+nbr,j,k) = .true.
-!!$              endif
-!!$              if (.not.v_assigned(i,j,k+nbr)) then ! .and. vof_phase(i,j,k+nbr)==1 .and. vof_phase(i,j+1,k+nbr)==1) then
-!!$                 v_cmask(i,j,k+nbr,level) = 1; v_assigned(i,j,k+nbr)=.true.
-!!$              endif
-!!$           enddo
-!!$        endif
-!!$        !w-neighbours
-!!$        if (w_cmask(i,j,k,level-1)==1) then
-!!$           do nbr=-1,1,2
-!!$              if (.not.w_assigned(i,j+nbr,k)) then ! .and. vof_phase(i,j+nbr,k)==1 .and. vof_phase(i,j+nbr,k+1)==1) then
-!!$                 w_cmask(i,j+nbr,k,level) = 1; w_assigned(i,j+nbr,k)=.true.
-!!$              endif
-!!$              if (.not.w_assigned(i+nbr,j,k)) then ! .and. vof_phase(i+nbr,j,k)==1 .and. vof_phase(i+nbr,j,k+1)==1) then
-!!$                 w_cmask(i+nbr,j,k,level) = 1; w_assigned(i+nbr,j,k) = .true.
-!!$              endif
-!!$              if (.not.w_assigned(i,j,k+nbr)) then ! .and. vof_phase(i,j,k+nbr)==1 .and. vof_phase(i,j,k+nbr+1)==1) then
-!!$                 w_cmask(i,j,k+nbr,level) = 1; w_assigned(i,j,k+nbr)=.true.
-!!$              endif
-!!$           enddo
-!!$        endif
-!!$        if (u_cmask(i,j,k,2)==1 .or. v_cmask(i,j,k,2)==1 .or. w_cmask(i,j,k,2)==1) write(*,'("Error in 1,level loop",3I8)')i,j,k
-!!$     enddo; enddo; enddo
-!!$     !utmp = u_cmask(:,:,:,level); vtmp = v_cmask(:,:,:,level); wtmp=w_cmask(:,:,:,level)
-!!$     call ighost_x(u_cmask(:,:,:,level),2,req(1:4)); call ighost_x(v_cmask(:,:,:,level),2,req(5:8))
-!!$     call ighost_x(w_cmask(:,:,:,level),2,req(9:12))
-!!$     call lghost_x(u_assigned,2,req(13:16)); call lghost_x(v_assigned,2,req(17:20)); call lghost_x(w_assigned,2,req(21:24))
-!!$     call MPI_WAITALL(24,req(1:24),sta(:,1:24),ierr)
-!!$     call ighost_y(u_cmask(:,:,:,level),2,req(1:4)); call ighost_y(v_cmask(:,:,:,level),2,req(5:8))
-!!$     call ighost_y(w_cmask(:,:,:,level),2,req(9:12))
-!!$     call lghost_y(u_assigned,2,req(13:16)); call lghost_y(v_assigned,2,req(17:20)); call lghost_y(w_assigned,2,req(21:24))
-!!$     call MPI_WAITALL(24,req(1:24),sta(:,1:24),ierr)
-!!$     call ighost_z(u_cmask(:,:,:,level),2,req(1:4)); call ighost_z(v_cmask(:,:,:,level),2,req(5:8))
-!!$     call ighost_z(w_cmask(:,:,:,level),2,req(9:12))
-!!$     call lghost_z(u_assigned,2,req(13:16)); call lghost_z(v_assigned,2,req(17:20)); call lghost_z(w_assigned,2,req(21:24))
-!!$     call MPI_WAITALL(24,req(1:24),sta(:,1:24),ierr)
-!!$     !u_cmask(:,:,:,level)=utmp; v_cmask(:,:,:,level)=vtmp; w_cmask(:,:,:,level)=wtmp
-!!$     write(*,*)level
-!!$  enddo
-
-  do k=ks,ke; do j=js,je; do i=is,ie
-     if ((X_level < 2) .and. (u_cmask(i,j,k,2)==1 .or. v_cmask(i,j,k,2)==1 .or. w_cmask(i,j,k,2)==1)) then
-        write(*,'("Error, level 2 assigned",3I8)')i,j,k
-     endif
-  enddo; enddo; enddo
+  !need to set bc for assigned, masks
+  !fill ghost layers
+  call ighost_x(u_cmask,2,req(1:4)); call ighost_x(v_cmask,2,req(5:8)); call ighost_x(w_cmask,2,req(9:12))
+  call lghost_x(u_assigned,2,req(13:16)); call lghost_x(v_assigned,2,req(17:20)); call lghost_x(w_assigned,2,req(21:24))
+  call MPI_WAITALL(24,req(1:24),sta(:,1:24),ierr)
+  call ighost_y(u_cmask,2,req(1:4)); call ighost_y(v_cmask,2,req(5:8)); call ighost_y(w_cmask,2,req(9:12))
+  call lghost_y(u_assigned,2,req(13:16)); call lghost_y(v_assigned,2,req(17:20)); call lghost_y(w_assigned,2,req(21:24))
+  call MPI_WAITALL(24,req(1:24),sta(:,1:24),ierr)
+  call ighost_z(u_cmask,2,req(1:4)); call ighost_z(v_cmask,2,req(5:8)); call ighost_z(w_cmask,2,req(9:12))
+  call lghost_z(u_assigned,2,req(13:16)); call lghost_z(v_assigned,2,req(17:20)); call lghost_z(w_assigned,2,req(21:24))
+  call MPI_WAITALL(24,req(1:24),sta(:,1:24),ierr)
+  !Set levels 1 to X_level
+  do level=1,X_level
+     do k=ks,ke; do j=js,je; do i=is,ie
+        !u-neighbours
+        if (u_cmask(i,j,k)==level-1) then
+           do nbr=-1,1,2
+              if (.not.u_assigned(i,j+nbr,k)) then !.and. vof_phase(i,j+nbr,k)==1 .and. vof_phase(i+1,j+nbr,k)==1) then
+                 u_cmask(i,j+nbr,k) = level; u_assigned(i,j+nbr,k)=.true.
+              endif
+              if (.not.u_assigned(i+nbr,j,k)) then ! .and. vof_phase(i+nbr,j,k)==1 .and. vof_phase(i+nbr+1,j,k)==1) then
+                 u_cmask(i+nbr,j,k) = level; u_assigned(i+nbr,j,k) = .true.
+              endif
+              if (.not.u_assigned(i,j,k+nbr)) then ! .and. vof_phase(i,j,k+nbr)==1 .and. vof_phase(i+1,j,k+nbr)==1) then
+                 u_cmask(i,j,k+nbr) = level; u_assigned(i,j,k+nbr)=.true.
+              endif
+           enddo
+        endif
+        !v-neighbours
+        if (v_cmask(i,j,k)==level-1) then
+           do nbr=-1,1,2
+              if (.not.v_assigned(i,j+nbr,k)) then ! .and. vof_phase(i,j+nbr,k)==1 .and. vof_phase(i,j+nbr+1,k)==1) then
+                 v_cmask(i,j+nbr,k) = level; v_assigned(i,j+nbr,k)=.true.
+              endif
+              if (.not.v_assigned(i+nbr,j,k)) then ! .and. vof_phase(i+nbr,j,k)==1 .and. vof_phase(i+nbr,j+1,k)==1) then
+                 v_cmask(i+nbr,j,k) = level; v_assigned(i+nbr,j,k) = .true.
+              endif
+              if (.not.v_assigned(i,j,k+nbr)) then ! .and. vof_phase(i,j,k+nbr)==1 .and. vof_phase(i,j+1,k+nbr)==1) then
+                 v_cmask(i,j,k+nbr) = level; v_assigned(i,j,k+nbr)=.true.
+              endif
+           enddo
+        endif
+        !w-neighbours
+        if (w_cmask(i,j,k)==level-1) then
+           do nbr=-1,1,2
+              if (.not.w_assigned(i,j+nbr,k)) then ! .and. vof_phase(i,j+nbr,k)==1 .and. vof_phase(i,j+nbr,k+1)==1) then
+                 w_cmask(i,j+nbr,k) = level; w_assigned(i,j+nbr,k)=.true.
+              endif
+              if (.not.w_assigned(i+nbr,j,k)) then ! .and. vof_phase(i+nbr,j,k)==1 .and. vof_phase(i+nbr,j,k+1)==1) then
+                 w_cmask(i+nbr,j,k) = level; w_assigned(i+nbr,j,k) = .true.
+              endif
+              if (.not.w_assigned(i,j,k+nbr)) then ! .and. vof_phase(i,j,k+nbr)==1 .and. vof_phase(i,j,k+nbr+1)==1) then
+                 w_cmask(i,j,k+nbr) = level; w_assigned(i,j,k+nbr)=.true.
+              endif
+           enddo
+        endif
+     enddo; enddo; enddo
+     call ighost_x(u_cmask(:,:,:),2,req(1:4)); call ighost_x(v_cmask(:,:,:),2,req(5:8))
+     call ighost_x(w_cmask(:,:,:),2,req(9:12))
+     call lghost_x(u_assigned,2,req(13:16)); call lghost_x(v_assigned,2,req(17:20)); call lghost_x(w_assigned,2,req(21:24))
+     call MPI_WAITALL(24,req(1:24),sta(:,1:24),ierr)
+     call ighost_y(u_cmask(:,:,:),2,req(1:4)); call ighost_y(v_cmask(:,:,:),2,req(5:8))
+     call ighost_y(w_cmask(:,:,:),2,req(9:12))
+     call lghost_y(u_assigned,2,req(13:16)); call lghost_y(v_assigned,2,req(17:20)); call lghost_y(w_assigned,2,req(21:24))
+     call MPI_WAITALL(24,req(1:24),sta(:,1:24),ierr)
+     call ighost_z(u_cmask(:,:,:),2,req(1:4)); call ighost_z(v_cmask(:,:,:),2,req(5:8))
+     call ighost_z(w_cmask(:,:,:),2,req(9:12))
+     call lghost_z(u_assigned,2,req(13:16)); call lghost_z(v_assigned,2,req(17:20)); call lghost_z(w_assigned,2,req(21:24))
+     call MPI_WAITALL(24,req(1:24),sta(:,1:24),ierr)
+  enddo
 
   if (debug) then
      do j=jmin,jmax; do i=imin,imax
         !write outputs for gnuplot 2D
         k=(ks+ke)/2
-        if (u_cmask(i,j,k,0)==1) write(20,13)xh(i),y(j),z(k)
-        if (v_cmask(i,j,k,0)==1) write(20,13)x(i),yh(j),z(k)
-        !if (w_cmask(i,j,k,0)==1) write(20,13)x(i),y(j),zh(k)
-        if (u_cmask(i,j,k,1)==1) write(21,13)xh(i),y(j),z(k)
-        if (v_cmask(i,j,k,1)==1) write(21,13)x(i),yh(j),z(k)
-        !if (w_cmask(i,j,k,1)==1) write(21,13)x(i),y(j),zh(k)
-        if (u_cmask(i,j,k,2)==1) write(22,13)xh(i),y(j),z(k)
-        if (v_cmask(i,j,k,2)==1) write(22,13)x(i),yh(j),z(k)
-        !if (w_cmask(i,j,k,2)==1) write(22,13)x(i),y(j),zh(k)
+        if (u_cmask(i,j,k)==0) write(20,13)xh(i),y(j),z(k)
+        if (v_cmask(i,j,k)==0) write(20,13)x(i),yh(j),z(k)
+        !if (w_cmask(i,j,k)==0) write(20,13)x(i),y(j),zh(k)
+        if (u_cmask(i,j,k)==1) write(21,13)xh(i),y(j),z(k)
+        if (v_cmask(i,j,k)==1) write(21,13)x(i),yh(j),z(k)
+        !if (w_cmask(i,j,k)==1) write(21,13)x(i),y(j),zh(k)
+        if (u_cmask(i,j,k)==2) write(22,13)xh(i),y(j),z(k)
+        if (v_cmask(i,j,k)==2) write(22,13)x(i),yh(j),z(k)
+        !if (w_cmask(i,j,k)==2) write(22,13)x(i),y(j),zh(k)
         if (u_assigned(i,j,k)) write(23,13)xh(i),y(j),z(k)
         if (v_assigned(i,j,k)) write(24,13)x(i),yh(j),z(k)
         if (w_assigned(i,j,k)) write(25,13)x(i),y(j),zh(k)
