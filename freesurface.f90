@@ -46,7 +46,7 @@
      Open(unit=25,FILE=TRIM(out_path)//'/w_ass-'//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout,padding))//'.txt')
   endif
   !First loop to set level 0 velocities in liq-liq and liq-gas cells
-  do k=ks,ke; do j=js,je; do i=is,ie !loop relies on vof_phase in e+1. Should not be issue, as phase should be correct up to max.
+  do k=ks,ke; do j=js,je; do i=is,ie !loop relies on vof_phase in e+1, but phase is updated up to max.
      if (vof_phase(i,j,k) == 1) then 
         if (debug) write(19,13)x(i),y(j),z(k)
         if (vof_phase(i+1,j,k) == 0) then
@@ -81,7 +81,7 @@
   call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
   !Set levels 1 to X_level
   do level=1,X_level
-     do k=ks,ke; do j=js,je; do i=is,ie !uses indexes s-1 and e+1 to check assigned and set masks. Assigned should be set from past ghost operations
+     do k=kmin+1,kmax-1; do j=jmin+1,jmax-1; do i=imin+1,imax-1 !uses indexes s-1 and e+1 to check assigned and set masks. Assigned should be set from past ghost operations
         !u-neighbours
         if (u_cmask(i,j,k)==level-1) then
            do nbr=-1,1,2
@@ -125,15 +125,15 @@
            enddo
         endif
      enddo; enddo; enddo
-     call ighost_x(u_cmask(:,:,:),2,req(1:4)); call ighost_x(v_cmask(:,:,:),2,req(5:8))
-     call ighost_x(w_cmask(:,:,:),2,req(9:12))
-     call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
-     call ighost_y(u_cmask(:,:,:),2,req(1:4)); call ighost_y(v_cmask(:,:,:),2,req(5:8))
-     call ighost_y(w_cmask(:,:,:),2,req(9:12))
-     call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
-     call ighost_z(u_cmask(:,:,:),2,req(1:4)); call ighost_z(v_cmask(:,:,:),2,req(5:8))
-     call ighost_z(w_cmask(:,:,:),2,req(9:12))
-     call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
+!!$     call ighost_x(u_cmask(:,:,:),2,req(1:4)); call ighost_x(v_cmask(:,:,:),2,req(5:8))
+!!$     call ighost_x(w_cmask(:,:,:),2,req(9:12))
+!!$     call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
+!!$     call ighost_y(u_cmask(:,:,:),2,req(1:4)); call ighost_y(v_cmask(:,:,:),2,req(5:8))
+!!$     call ighost_y(w_cmask(:,:,:),2,req(9:12))
+!!$     call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
+!!$     call ighost_z(u_cmask(:,:,:),2,req(1:4)); call ighost_z(v_cmask(:,:,:),2,req(5:8))
+!!$     call ighost_z(w_cmask(:,:,:),2,req(9:12))
+!!$     call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
   enddo
 
   if (debug) then

@@ -184,7 +184,7 @@ contains
 
 !New simple extrapolation: Velocities of neighbours at lower topological level averaged
      do level = 1, X_level
-        do k=ks,ke; do j=js,je; do i=is,ie
+        do k=kmin+1,kmax-1; do j=jmin+1,jmax-1; do i=imin+1,imax-1
            if (u_cmask(i,j,k) == level) then
               xcount = 0d0; x_vel = 0d0
               do nbr=-1,1,2
@@ -257,12 +257,12 @@ contains
                  w(i,j,k) = x_vel/xcount
               endif
            endif
-           call ghost_x(u  ,2,req( 1: 4));  call ghost_x(v,2,req( 5: 8)); call ghost_x(w,2,req( 9:12)); 
-           call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
-           call ghost_y(u  ,2,req( 1: 4));  call ghost_y(v,2,req( 5: 8)); call ghost_y(w,2,req( 9:12)); 
-           call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
-           call ghost_z(u  ,2,req( 1: 4));  call ghost_z(v,2,req( 5: 8)); call ghost_z(w,2,req( 9:12)); 
-           call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
+!!$           call ghost_x(u  ,2,req( 1: 4));  call ghost_x(v,2,req( 5: 8)); call ghost_x(w,2,req( 9:12)); 
+!!$           call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
+!!$           call ghost_y(u  ,2,req( 1: 4));  call ghost_y(v,2,req( 5: 8)); call ghost_y(w,2,req( 9:12)); 
+!!$           call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
+!!$           call ghost_z(u  ,2,req( 1: 4));  call ghost_z(v,2,req( 5: 8)); call ghost_z(w,2,req( 9:12)); 
+!!$           call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
         enddo; enddo; enddo
      enddo
 ! Simple volume conservation step after velocities have been extrapolated.
