@@ -146,6 +146,7 @@ contains
      integer :: i,j,k
      integer :: i0,j0,k0
      real(8) :: mxyz(3)
+     integer :: req(36),sta(MPI_STATUS_SIZE,36)
      if(.not.st_initialized) call initialize_surface_tension()
      if(recomputenormals) call pariserror("recomputenormals is true, normals not allocated")
 
@@ -163,6 +164,10 @@ contains
             enddo
          enddo
       enddo
+      call ghost_x(n1,1,req(1:4)); call ghost_x(n2,1,req(5:8)); call ghost_x(n3,1,req(9:12))
+      call ghost_y(n1,1,req(13:16)); call ghost_y(n2,1,req(17:20)); call ghost_y(n3,1,req(21:24))
+      call ghost_z(n1,1,req(25:28)); call ghost_z(n2,1,req(29:32)); call ghost_z(n3,1,req(33:36))
+      call MPI_WAITALL(36,req(1:36),sta(:,1:36),ierr)
    end subroutine get_normals
 !=================================================================================================
 !
