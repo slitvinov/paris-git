@@ -142,6 +142,7 @@ contains
 !=================================================================================================
    subroutine get_normals()
      implicit none
+     include 'mpif.h'
      real(8) :: stencil3x3(-1:1,-1:1,-1:1)
      integer :: i,j,k,ierr
      integer :: i0,j0,k0
