@@ -153,7 +153,7 @@
         if (v_cmask(i,j,k)==3) write(24,13)x(i),yh(j),z(k)
         if (w_cmask(i,j,k)==3) write(25,13)x(i),y(j),zh(k)
      enddo; enddo
-      close(unit=19); close(unit=20); close(unit=21); close(unit=22); close(unit=23); close(unit=24); close(unit=25)
+     close(unit=19); close(unit=20); close(unit=21); close(unit=22); close(unit=23); close(unit=24); close(unit=25)
   endif
 13 format(3e14.5)
 end subroutine set_topology
@@ -165,6 +165,7 @@ subroutine setuppoisson_fs(umask,vmask,wmask,vof_phase,rhot,dt,A,pmask,cvof,n1,n
   use module_freesurface
   use module_IO
   implicit none
+  include 'mpif.h'
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: rhot
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: umask,vmask,wmask
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: kap
@@ -172,11 +173,11 @@ subroutine setuppoisson_fs(umask,vmask,wmask,vof_phase,rhot,dt,A,pmask,cvof,n1,n
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: cvof,n1,n2,n3
   real(8), dimension(is:ie,js:je,ks:ke,8), intent(out) :: A
   integer, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: vof_phase
+  integer :: req(12),sta(MPI_STATUS_SIZE,12)
   real(8) :: alpha, x_test, y_test, z_test, n_x, n_y, n_z
-  real(8) :: x_l, x_r, y_b, y_t, z_r, z_f
   real(8) :: nr(3),al3dnew,al3dold
   real(8) :: dt
-  integer :: i,j,k,l,istep
+  integer :: i,j,k,l,istep,nbr,ierr
   real(8) :: mod0, mod1, count
 
   x_mod=dxh((is+ie)/2); y_mod=dyh((js+je)/2); z_mod=dzh((ks+ke)/2) !assumes an unstretched grid
@@ -189,267 +190,159 @@ subroutine setuppoisson_fs(umask,vmask,wmask,vof_phase,rhot,dt,A,pmask,cvof,n1,n
      !Open(unit=52,file='P_g-'//TRIM(int2text(istep,padding))//'.txt') !remove, debugging
      !Open(unit=53,file='Phase-'//TRIM(int2text(istep,padding))//'.txt') !remove, debugging 
   endif 
-  ! Check for gas-liquid neighbours
+  
   do k=ks,ke; do j=js,je; do i=is,ie
+     ! Check for gas-liquid neighbours, set pmask and P_g
      if(vof_phase(i,j,k)==1) then
         if (cvof(i,j,k)<0.5d0) write(*,'("Vof phase error. Phase test 1, cvof: ",e14.5)')cvof(i,j,k) !debugging
-        pmask(i,j,k) = 0d0 !pmask local, have to set
-        !Check x-neighbour
-        if ((i<ie) .and. vof_phase(i+1,j,k) == 0) then
-           if (cvof(i+1,j,k)>=0.5d0) write(*,'("Vof phase error. Phase test 0, cvof: ",e14.5)')cvof(i+1,j,k) !debugging
-           count = 0d0; mod0 = 0d0; mod1 = 0d0
-           !get_intersection for liq cell
-           nr(1) = n1(i+1,j,k); nr(2) = n2(i+1,j,k); nr(3) = n3(i+1,j,k)
-           n_x = ABS(nr(1)); n_y = ABS(nr(2)); n_z = ABS(nr(3))
-           alpha = al3dold(n_x,n_y,n_z,cvof(i+1,j,k))
-           if (n_x > 1d-14) then
-              x_test = (alpha - (n_y+n_z)/2d0)/n_x
-              if (x_test>-0.5d0 .and. n1(i+1,j,k)>0d0) then
-                 count = count + 1d0
-                 mod0 = (0.5d0-x_test)*dxh(i)
-                 if (debug) write(50,312)x(i+1)-mod0,z(k)
-              endif
-           endif
-           !get_intersection for gas cell
-           nr(1) = n1(i,j,k); nr(2) = n2(i,j,k); nr(3) = n3(i,j,k)
-           n_x = ABS(n1(i,j,k)); n_y = ABS(n2(i,j,k)); n_z = ABS(n3(i,j,k))
-           alpha = al3dold(n_x,n_y,n_z,cvof(i,j,k))
-           if (n_x > 1d-14) then
-              x_test = (alpha - (n_y+n_z)/2d0)/n_x
-              if (x_test<1.5d0 .and. n1(i,j,k)>0d0) then
-                 count = count + 1d0
-                 mod1 = (1.5d0-x_test)*dxh(i)
-                 if (debug) write(50,312)x(i+1)-mod1,z(k)
-              endif
-           endif
-           !average if interfaces in both cells intersect in between nodes
-           !adapt A coeff
-           if (count > 0d0) then
-              x_mod(i,j,k) = (mod0 + mod1)/count
-           else
-              x_mod(i,j,k) = dxh(i)/2d0
-              !write(*,'("WARNING: gas-liq x-pair has no interface intercepts between nodes",3I8)')i,j,k
-           endif
-           A(i+1,j,k,1) = 2d0*dt*umask(i,j,k)/(dx(i+1)*x_mod(i,j,k)*(rhot(i,j,k)+rhot(i+1,j,k)))
-           if (debug) write(51,314)x(i+1),z(k),-x_mod(i,j,k),0d0
-           if (A(i+1,j,k,1) /= A(i+1,j,k,1)) write(*,'("A1 NaN? ",2e14.4)')A(i+1,j,k,1), x_mod(i,j,k) !debugging
-           P_g(i,j,k,1) = sigma*kap(i,j,k)/dx(i) !curvature taken in gas cell.
-        endif
-        !Check y-neighbour
-        if ((j<je) .and. vof_phase(i,j+1,k) == 0) then
-           if (cvof(i,j+1,k)>=0.5d0) write(*,'("Vof phase error. Phase test 0, cvof: ",e14.5)')cvof(i,j+1,k)
-           count = 0d0; mod0 = 0d0; mod1 = 0d0
-           !get_intersection for liq cell
-           nr(1) = n1(i,j+1,k); nr(2) = n2(i,j+1,k); nr(3) = n3(i,j+1,k)
-           n_x = ABS(nr(1)); n_y = ABS(nr(2)); n_z = ABS(nr(3))
-           alpha = al3dold(n_x,n_y,n_z,cvof(i,j+1,k))
-           if (n_y > 1d-14) then
-              y_test = (alpha - (n_x+n_z)/2d0)/n_y
-              if (y_test>-0.5d0 .and. n2(i,j+1,k)>0d0) then
-                 count = count + 1d0
-                 mod0 = (0.5d0-y_test)*dyh(j)
-                 !if (debug) write(50,312)x(i),y(j+1)-mod0
-              endif
-           endif
-           !get_intersection for gas cell.
-           nr(1) = n1(i,j,k); nr(2) = n2(i,j,k); nr(3) = n3(i,j,k)
-           n_x = ABS(n1(i,j,k)); n_y = ABS(n2(i,j,k)); n_z = ABS(n3(i,j,k))
-           alpha = al3dold(n_x,n_y,n_z,cvof(i,j,k))
-           if (n_y > 1d-14) then
-              y_test = (alpha - (n_x+n_z)/2d0)/n_y
-              if (y_test<1.5d0 .and. n2(i,j,k)>0d0) then
-                 count = count + 1d0
-                 mod1 = (1.5d0-y_test)*dyh(j)
-                 !if (debug) write(50,312)x(i),y(j+1)-mod1
-              endif
-           endif
-           !average if interfaces in both cells intersect in between nodes
-           !adapt A coeff
-           if (count > 0d0) then
-              y_mod(i,j,k) = (mod0 + mod1)/count
-           else
-              y_mod(i,j,k) = dyh(j)/2d0
-              !write(*,'("WARNING: gas-liq y-pair has no interface intercepts between nodes",3I8)')i,j,k
-           endif
-           A(i,j+1,k,3) = 2d0*dt*vmask(i,j,k)/(dy(j+1)*y_mod(i,j,k)*(rhot(i,j,k)+rhot(i,j+1,k)))
-           !if (debug) write(51,314)x(i),y(j+1),0d0,-y_mod(i,j,k)
-           if (A(i,j+1,k,3) /= A(i,j+1,k,3)) write(*,'("A3 NaN? ",2e14.4)')A(i,j+1,k,3), y_mod(i,j,k) !debugging
-           P_g(i,j,k,2) = sigma*kap(i,j,k)/dy(j) !curvature taken in gas cell.
-        endif
-        !Check z-neighbour
-        if ((k<ke) .and. vof_phase(i,j,k+1) == 0) then
-           if (cvof(i,j,k+1)>=0.5d0) write(*,'("Vof phase error. Phase test 0, cvof: ",e14.5)')cvof(i,j,k+1)
-           count = 0d0; mod0 = 0d0; mod1 = 0d0
-           !get_intersection for liq cell
-           nr(1) = n1(i,j,k+1); nr(2) = n2(i,j,k+1); nr(3) = n3(i,j,k+1)
-           n_x = ABS(nr(1)); n_y = ABS(nr(2)); n_z = ABS(nr(3))
-           alpha = al3dold(n_x,n_y,n_z,cvof(i,j,k+1))
-           if (n_z > 1d-14) then
-              z_test = (alpha - (n_x+n_y)/2d0)/n_z
-              if (z_test>-0.5d0 .and. n3(i,j,k+1)>0d0) then
-                 count = count + 1d0
-                 mod0 = (0.5d0-z_test)*dzh(k)
-                 if (debug) write(50,312)x(i),z(k+1)-mod0
-              endif
-           endif
-           !get_intersection for gas cell
-           nr(1) = n1(i,j,k); nr(2) = n2(i,j,k); nr(3) = n3(i,j,k)
-           n_x = ABS(n1(i,j,k)); n_y = ABS(n2(i,j,k)); n_z = ABS(n3(i,j,k))
-           alpha = al3dold(n_x,n_y,n_z,cvof(i,j,k))
-           if (n_z > 1d-14) then
-              z_test = (alpha - (n_x+n_y)/2d0)/n_z
-              if (z_test<1.5d0 .and. n3(i,j,k)>0d0) then
-                 count = count + 1d0
-                 mod1 = (1.5d0-z_test)*dzh(k)
-                 if (debug) write(50,312)x(i),z(k+1)-mod0
-              endif
-           endif
-           !average if interfaces in both cells intersect in between nodes
-           !adapt A coeff
-           if (count > 0d0) then
-              z_mod(i,j,k) = (mod0 + mod1)/count
-           else
-              z_mod(i,j,k) = dzh(k)/2d0
-              !write(*,'("WARNING: gas-liq z-pair has no interface intercepts between nodes",3I8)')i,j,k
-           endif
-           A(i,j,k+1,5) = 2d0*dt*wmask(i,j,k)/(dz(k+1)*z_mod(i,j,k)*(rhot(i,j,k)+rhot(i,j,k+1)))
-           if (debug) write(51,314)x(i),z(k+1),0d0,-z_mod(i,j,k)
-           if (A(i,j,k+1,5) /= A(i,j,k+1,5)) write(*,'("A5 NaN? ",2e14.4)')A(i,j,k+1,5), z_mod(i,j,k) !debugging
-           P_g(i,j,k,3) = sigma*kap(i,j,k)/dz(k) !curvature taken in gas cell.
-        endif
+        pmask(i,j,k)=0d0
+        do nbr=-1,1,2
+           if (vof_phase(i+nbr,j,k)==0) P_g(i,j,k,1) = sigma*kap(i,j,k)/dx(i) !!filaments and droplets of one cell will be a problem
+           if (vof_phase(i,j+nbr,k)==0) P_g(i,j,k,2) = sigma*kap(i,j,k)/dy(j)
+           if (vof_phase(i,j,k+nbr)==0) P_g(i,j,k,3) = sigma*kap(i,j,k)/dz(k)
+        enddo
      endif
-  !-------------------------Liquid-gas neighbours
+     ! Liquid-gas neighbours
      if (vof_phase(i,j,k)==0) then
-        if (cvof(i,j,k)>=0.5d0) write(*,'("Vof phase error. Phase test 0, cvof: ",e14.5)')cvof(i,j,k) 
-        !Check x-neighbour
-        if (vof_phase(i+1,j,k) == 1) then
-           if (cvof(i+1,j,k)<0.5d0) write(*,'("Vof phase error. Phase test 1, cvof: ",e14.5)')cvof(i+1,j,k) !debugging
-           count = 0d0; mod0 = 0d0; mod1 = 0d0
-           if (i<ie) pmask(i+1,j,k) = 1d0
-           !get_intersection for gas cell
-           nr(1) = n1(i+1,j,k); nr(2) = n2(i+1,j,k); nr(3) = n3(i+1,j,k)
-           n_x = ABS(nr(1)); n_y = ABS(nr(2)); n_z = ABS(nr(3))
-           alpha = al3dold(n_x,n_y,n_z,cvof(i+1,j,k))
-           if (n_x > 1d-14) then
-              x_test = (alpha - (n_y+n_z)/2d0)/n_x
-              if (x_test<1.5d0 .and. n1(i+1,j,k)<0d0) then
-                 count = count + 1d0
-                 mod1 = (1.5d0-x_test)*dxh(i)
-                 if (debug) write(50,312)x(i)+mod1,z(k)
+        if (cvof(i,j,k)>=0.5d0) write(*,'("Vof phase error. Phase test 0, cvof: ",e14.5)')cvof(i,j,k) !debugging check
+        !Check x-neighbours in 2 directions 
+        do nbr=-1,1,2
+           if (vof_phase(i+nbr,j,k) == 1) then
+              if (cvof(i+nbr,j,k)<0.5d0) write(*,'("Vof phase error. Phase test 1, cvof: ",e14.5)')cvof(i+nbr,j,k) !debugging
+              count=0d0; mod0=0d0; mod1=0d0
+              !get_intersection for gas cell
+              nr(1) = n1(i+nbr,j,k); nr(2) = n2(i+nbr,j,k); nr(3) = n3(i+nbr,j,k)
+              n_x = ABS(nr(1)); n_y = ABS(nr(2)); n_z = ABS(nr(3))
+              alpha = al3dold(n_x,n_y,n_z,cvof(i+nbr,j,k))
+              if (n_x > 1d-14) then
+                 x_test = (alpha - (n_y+n_z)/2d0)/n_x
+                 if ( (x_test<1.5d0) .and. (n1(i+nbr,j,k)*nbr)<0d0 ) then !warning, mult real by integer
+                    count = count + 1d0
+                    mod1 = (1.5d0-x_test)*dxh(i+(nbr-1)/2)
+                    if (debug) write(50,312)x(i)+nbr*mod1,y(j)!z(k) !warning, multiplication of real with integer
+                 endif
               endif
-           endif
-           !get_intersection for liq cell
-           nr(1) = n1(i,j,k); nr(2) = n2(i,j,k); nr(3) = n3(i,j,k)
-           n_x = ABS(n1(i,j,k)); n_y = ABS(n2(i,j,k)); n_z = ABS(n3(i,j,k))
-           alpha = al3dold(n_x,n_y,n_z,cvof(i,j,k))
-           if (n_x > 1d-14) then
-              x_test = (alpha - (n_y+n_z)/2d0)/n_x
-              if (x_test>-0.5d0 .and. n1(i,j,k)<0d0) then
-                 count = count + 1d0
-                 mod0 = (0.5d0-x_test)*dxh(i)
-                 if (debug) write(50,312)x(i)+mod0,z(k)
+              !get_intersection for liq cell
+              nr(1) = n1(i,j,k); nr(2) = n2(i,j,k); nr(3) = n3(i,j,k)
+              n_x = ABS(n1(i,j,k)); n_y = ABS(n2(i,j,k)); n_z = ABS(n3(i,j,k))
+              alpha = al3dold(n_x,n_y,n_z,cvof(i,j,k))
+              if (n_x > 1d-14) then
+                 x_test = (alpha - (n_y+n_z)/2d0)/n_x
+                 if (x_test>-0.5d0 .and. n1(i,j,k)*nbr<0d0) then
+                    count = count + 1d0
+                    mod0 = (0.5d0-x_test)*dxh(i+(nbr-1)/2)
+                    if (debug) write(50,312)x(i)+nbr*mod0,y(j)
+                 endif
               endif
-           endif
-           !average if interfaces in both cells intersect in between nodes
-           !adapt A coeff
-           if (count > 0d0) then
-              x_mod(i,j,k) = (mod0 + mod1)/count
-           else
-              x_mod(i,j,k) = dxh(i)/2d0
-              !write(*,'("WARNING: liq-gas x-pair has no interface intercepts between nodes",3I8)')i,j,k
-           endif
-           A(i,j,k,2) = 2d0*dt*umask(i,j,k)/(dx(i)*x_mod(i,j,k)*(rhot(i,j,k)+rhot(i+1,j,k)))
-           if (A(i,j,k,2) /= A(i,j,k,2)) write(*,'("A2 NaN? ",2e14.4)')A(i,j,k,2), x_mod(i,j,k) !debugging
-           if (debug) write(51,314)x(i),z(k),x_mod(i,j,k),0d0
-           P_g(i+1,j,k,1) = sigma*kap(i,j,k)/dx(i) !check, fix
-        endif
-        !Check y-neighbour
-        if (vof_phase(i,j+1,k) == 1) then
-           if (cvof(i,j+1,k)<0.5d0) write(*,'("Vof phase error. Phase test 1, cvof: ",e14.5)')cvof(i,j+1,k) !debugging
-           count = 0d0; mod0 = 0d0; mod1 = 0d0
-           if (j<je) pmask(i,j+1,k) = 1d0
-           !get_intersection for gas cell
-           nr(1) = n1(i,j+1,k); nr(2) = n2(i,j+1,k); nr(3) = n3(i,j+1,k)
-           n_x = ABS(nr(1)); n_y = ABS(nr(2)); n_z = ABS(nr(3))
-           alpha = al3dold(n_x,n_y,n_z,cvof(i,j+1,k))
-           if (n_y > 1d-14) then
-              y_test = (alpha - (n_x+n_z)/2d0)/n_y
-              if (y_test<1.5d0 .and. n2(i,j+1,k)<0d0) then
-                 count = count + 1d0
-                 mod1 = (1.5d0-y_test)*dyh(j)
-                 !if (debug) write(50,312)x(i),y(j)+mod1
+              !enddo
+              !average if interfaces in both cells intersect in between nodes
+              !adapt A coeff
+              if (count > 0d0) then
+                 x_mod(i+(nbr-1)/2,j,k) = (mod0 + mod1)/count
+              else
+                 x_mod(i+(nbr-1)/2,j,k) = dxh(i+(nbr-1)/2)/2d0
+                 !write(*,'("WARNING: liq-gas x-pair has no interface intercepts between nodes",3I8)')i,j,k
               endif
+              A(i,j,k,2+(nbr-1)/2) = 2d0*dt*umask(i+(nbr-1)/2,j,k)/(dx(i)*x_mod(i+(nbr-1)/2,j,k)*(rhot(i+nbr,j,k)+rhot(i,j,k)))
+              if (A(i,j,k,2+(nbr-1)/2) /= A(i,j,k,2+(nbr-1)/2)) &
+                   write(*,'("A1 or A2 NaN? ",2e14.4)')A(i,j,k,2+(nbr-1)/2),x_mod(i+(nbr-1)/2,j,k) !debugging
+              if (debug) write(51,314)x(i),y(j),nbr*x_mod(i+(nbr-1)/2,j,k),0d0
+              !P_g(i+nbr,j,k,1) = sigma*kap(i,j,k)/dx(i) !check, fix
            endif
-           !get_intersection for liq cell
-           nr(1) = n1(i,j,k); nr(2) = n2(i,j,k); nr(3) = n3(i,j,k)
-           n_x = ABS(n1(i,j,k)); n_y = ABS(n2(i,j,k)); n_z = ABS(n3(i,j,k))
-           alpha = al3dold(n_x,n_y,n_z,cvof(i,j,k))
-           if (n_y > 1d-14) then
-              y_test = (alpha - (n_x+n_z)/2d0)/n_y
-              if (y_test>-0.5d0 .and. n2(i,j,k)<0d0) then
-                 count = count + 1d0
-                 mod0 = (0.5d0-y_test)*dyh(j)
-                 !if (debug) write(50,312)x(i),y(j)+mod0
+        enddo
+        !Check y-neighbours in both directions
+        do nbr=-1,1,2
+           if (vof_phase(i,j+nbr,k) == 1) then
+              if (cvof(i,j+nbr,k)<0.5d0) write(*,'("Vof phase error. Phase test 1, cvof: ",e14.5)')cvof(i,j+nbr,k) !debugging
+              count = 0d0; mod0 = 0d0; mod1 = 0d0
+              !get_intersection for gas cell
+              nr(1) = n1(i,j+nbr,k); nr(2) = n2(i,j+nbr,k); nr(3) = n3(i,j+nbr,k)
+              n_x = ABS(nr(1)); n_y = ABS(nr(2)); n_z = ABS(nr(3))
+              alpha = al3dold(n_x,n_y,n_z,cvof(i,j+nbr,k))
+              if (n_y > 1d-14) then
+                 y_test = (alpha - (n_x+n_z)/2d0)/n_y
+                 if ((y_test<1.5d0) .and. (n2(i,j+nbr,k)*nbr)<0d0) then
+                    count = count + 1d0
+                    mod1 = (1.5d0-y_test)*dyh(j+(nbr-1)/2)
+                    if (debug) write(50,312)x(i),y(j)+nbr*mod1
+                 endif
               endif
-           endif
-           !average if interfaces in both cells intersect in between nodes
-           !adapt A coeff
-           if (count > 0d0) then
-              y_mod(i,j,k) = (mod0 + mod1)/count
-           else
-              y_mod(i,j,k) = dyh(j)/2d0
-              !write(*,'("WARNING: liq-gas y-pair has no interface intercepts between nodes",3I8)')i,j,k
-           endif
-           A(i,j,k,4) = 2d0*dt*vmask(i,j,k)/(dy(j)*y_mod(i,j,k)*(rhot(i,j,k)+rhot(i,j+1,k)))
-           !if (debug) write(51,314)x(i),y(j),0d0,y_mod(i,j,k)
-           if (A(i,j,k,4) /= A(i,j,k,4)) write(*,'("A4 NaN? ",2e14.4)')A(i,j,k,4), y_mod(i,j,k) !debugging
-           P_g(i,j+1,k,2) = sigma*kap(i,j,k)/dy(j) !check, fix
-        endif
-        !Check z-neighbour
-        if (vof_phase(i,j,k+1) == 1) then
-           if (cvof(i,j,k+1)<0.5d0) write(*,'("Vof phase error. Phase test 1, cvof: ",e14.5)')cvof(i,j,k+1) !debugging
-           count = 0d0; mod0 = 0d0; mod1 = 0d0
-           if (k<ke) pmask(i,j,k+1) = 1d0
-           !get_intersection for gas cell
-           nr(1) = n1(i,j,k+1); nr(2) = n2(i,j,k+1); nr(3) = n3(i,j,k+1)
-           n_x = ABS(nr(1)); n_y = ABS(nr(2)); n_z = ABS(nr(3))
-           alpha = al3dold(n_x,n_y,n_z,cvof(i,j,k+1))
-           if (n_z > 1d-14) then
-              z_test = (alpha - (n_x+n_y)/2d0)/n_z
-              if (z_test<1.5d0 .and. n3(i,j,k+1)<0d0) then
-                 count = count + 1d0
-                 mod1 = (1.5d0-z_test)*dzh(k)
-                 if (debug) write(50,312)x(i),z(k)+mod1
+              !get_intersection for liq cell
+              nr(1) = n1(i,j,k); nr(2) = n2(i,j,k); nr(3) = n3(i,j,k)
+              n_x = ABS(n1(i,j,k)); n_y = ABS(n2(i,j,k)); n_z = ABS(n3(i,j,k))
+              alpha = al3dold(n_x,n_y,n_z,cvof(i,j,k))
+              if (n_y > 1d-14) then
+                 y_test = (alpha - (n_x+n_z)/2d0)/n_y
+                 if (y_test>-0.5d0 .and. n2(i,j,k)*nbr<0d0) then
+                    count = count + 1d0
+                    mod0 = (0.5d0-y_test)*dyh(j+(nbr-1)/2)
+                    if (debug) write(50,312)x(i),y(j)+nbr*mod0
+                 endif
               endif
-           endif
-           !get_intersection for liq cell
-           nr(1) = n1(i,j,k); nr(2) = n2(i,j,k); nr(3) = n3(i,j,k)
-           n_x = ABS(n1(i,j,k)); n_y = ABS(n2(i,j,k)); n_z = ABS(n3(i,j,k))
-           alpha = al3dold(n_x,n_y,n_z,cvof(i,j,k))
-
-           if (n_z > 1d-14) then
-              z_test = (alpha - (n_x+n_y)/2d0)/n_z
-              if (z_test>-0.5d0 .and. n3(i,j,k)<0d0) then
-                 count = count + 1d0
-                 mod0 = (0.5d0-z_test)*dzh(k)
-                 if (debug) write(50,312)x(i),z(k)+mod0
+              !average if interfaces in both cells intersect in between nodes
+              !adapt A coeff
+              if (count > 0d0) then
+                 y_mod(i,j+(nbr-1)/2,k) = (mod0 + mod1)/count
+              else
+                 y_mod(i,j+(nbr-1)/2,k) = dyh(j+(nbr-1)/2)/2d0
+                 !write(*,'("WARNING: liq-gas y-pair has no interface intercepts between nodes",3I8)')i,j,k
               endif
+              A(i,j,k,4+(nbr-1)/2) = 2d0*dt*vmask(i,j+(nbr-1)/2,k)/(dy(j)*y_mod(i,j+(nbr-1)/2,k)*(rhot(i,j,k)+rhot(i,j+nbr,k)))
+              if (debug) write(51,314)x(i),y(j),0d0,nbr*y_mod(i,j+(nbr-1)/2,k)
+              if (A(i,j,k,4+(nbr-1)/2) /= A(i,j,k,4+(nbr-1)/2)) &
+                   write(*,'("A3 or A4 NaN? ",2e14.4)')A(i,j,k,4+(nbr-1)/2), y_mod(i,j+(nbr-1)/2,k) !debugging
+              !P_g(i,j+1,k,2) = sigma*kap(i,j,k)/dy(j) !check, fix
            endif
-           !average if interfaces in both cells intersect in between nodes
-           !adapt A coeff
-           if (count > 0d0) then
-              z_mod(i,j,k) = (mod0 + mod1)/count
-           else
-              z_mod(i,j,k) = dzh(k)/2d0
-              !write(*,'("WARNING: liq-gas z-pair has no interface intercepts between nodes",3I8)')i,j,k
+        enddo
+        !Check z-neighbours
+        do nbr=-1,1,2
+           if (vof_phase(i,j,k+nbr) == 1) then
+              if (cvof(i,j,k+nbr)<0.5d0) write(*,'("Vof phase error. Phase test 1, cvof: ",e14.5)')cvof(i,j,k+nbr) !debugging
+              count = 0d0; mod0 = 0d0; mod1 = 0d0
+              !get_intersection for gas cell
+              nr(1) = n1(i,j,k+nbr); nr(2) = n2(i,j,k+nbr); nr(3) = n3(i,j,k+nbr)
+              n_x = ABS(nr(1)); n_y = ABS(nr(2)); n_z = ABS(nr(3))
+              alpha = al3dold(n_x,n_y,n_z,cvof(i,j,k+nbr))
+              if (n_z > 1d-14) then
+                 z_test = (alpha - (n_x+n_y)/2d0)/n_z
+                 if (z_test<1.5d0 .and. (n3(i,j,k+nbr)*nbr)<0d0) then
+                    count = count + 1d0
+                    mod1 = (1.5d0-z_test)*dzh(k+(nbr-1)/2)
+                    !if (debug) write(50,312)x(i),z(k)+mod1
+                 endif
+              endif
+              !get_intersection for liq cell
+              nr(1) = n1(i,j,k); nr(2) = n2(i,j,k); nr(3) = n3(i,j,k)
+              n_x = ABS(n1(i,j,k)); n_y = ABS(n2(i,j,k)); n_z = ABS(n3(i,j,k))
+              alpha = al3dold(n_x,n_y,n_z,cvof(i,j,k))
+              if (n_z > 1d-14) then
+                 z_test = (alpha - (n_x+n_y)/2d0)/n_z
+                 if (z_test>-0.5d0 .and. n3(i,j,k)*nbr<0d0) then
+                    count = count + 1d0
+                    mod0 = (0.5d0-z_test)*dzh(k)
+                    !if (debug) write(50,312)x(i),z(k)+mod0
+                 endif
+              endif
+              !average if interfaces in both cells intersect in between nodes
+              !adapt A coeff
+              if (count > 0d0) then
+                 z_mod(i,j,k+(nbr-1)/2) = (mod0 + mod1)/count
+              else
+                 z_mod(i,j,k+(nbr-1)/2) = dzh(k+(nbr-1)/2)/2d0
+                 !write(*,'("WARNING: liq-gas z-pair has no interface intercepts between nodes",3I8)')i,j,k
+              endif
+              A(i,j,k,6+(nbr-1)/2) = 2d0*dt*wmask(i,j,k+(nbr-1)/2)/(dz(k)*z_mod(i,j,k+(nbr-1)/2)*(rhot(i,j,k)+rhot(i,j,k+nbr)))
+              !if (debug) write(51,314)x(i),z(k),0d0,z_mod(i,j,k)
+              if (A(i,j,k,6+(nbr-1)/2) /= A(i,j,k,6+(nbr-1)/2)) &
+                   write(*,'("A5 or A6 NaN? ",2e14.4)')A(i,j,k,6), z_mod(i,j,k) !debugging
+              !P_g(i,j,k+1,3) = sigma*kap(i,j,k)/dz(k) !check, fix
            endif
-           A(i,j,k,6) = 2d0*dt*wmask(i,j,k)/(dz(k)*z_mod(i,j,k)*(rhot(i,j,k)+rhot(i,j,k+1)))
-           if (debug) write(51,314)x(i),z(k),0d0,z_mod(i,j,k)
-           if (A(i,j,k,6) /= A(i,j,k,6)) write(*,'("A6 NaN? ",2e14.4)')A(i,j,k,6), z_mod(i,j,k) !debugging
-           P_g(i,j,k+1,3) = sigma*kap(i,j,k)/dz(k) !check, fix
-        endif
+        enddo
      endif
   enddo;enddo;enddo
+  call ghost_x(P_g(:,:,:,1),1,req( 1: 4)); call ghost_y(P_g(:,:,:,2),1,req( 5: 8)); call ghost_z(P_g(:,:,:,3),1,req( 9:12))
+  !call ghost_x(x_mod,1,req( 1: 4)); call ghost_y(y_mod,1,req( 5: 8)); call ghost_z(z_mod,1,req( 9:12))
+  call MPI_WAITALL(12,req,sta,ierr) 
 close(unit=50); close(unit=51); close(unit=52); close(unit=53)
 312 format(2e14.5) !remove, debugging
 313 format(3e14.5) !remove, debugging

@@ -143,7 +143,7 @@ contains
    subroutine get_normals()
      implicit none
      real(8) :: stencil3x3(-1:1,-1:1,-1:1)
-     integer :: i,j,k
+     integer :: i,j,k,ierr
      integer :: i0,j0,k0
      real(8) :: mxyz(3)
      integer :: req(36),sta(MPI_STATUS_SIZE,36)
