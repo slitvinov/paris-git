@@ -388,6 +388,44 @@ Program paris
 !----------------------------------EXTRAPOLATION FOR FREE SURFACE---------------------------------
            if (DoVOF .and. FreeSurface) then
               call extrapolate_velocities()
+!!$              call setuppoisson_fs2(u,v,w,umask,vmask,wmask,rho,dt,A,cvof,itimestep)
+!!$              ! Solve for an intermediate pressure in gas
+!!$              p_ext = p
+!!$              if(HYPRE)then
+!!$                 call poi_solve(A,p_ext(is:ie,js:je,ks:ke),maxError/dt,maxit,it)
+!!$                 call ghost_x(p_ext,1,req(1:4 ))
+!!$                 call ghost_y(p_ext,1,req(5:8 ))
+!!$                call ghost_z(p_ext,1,req(9:12)) 
+!!$                 call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
+!!$              else
+!!$                 call NewSolver(A,p_ext,maxError/dt,beta,maxit,it,ierr,cvof,vof_flag)
+!!$              endif
+!!$              ! Correct ONLY masked gas velocities. And ONLY those between masked pressure nodes.
+!!$              do k=ks,ke;  do j=js,je; do i=is,ieu    ! CORRECT THE u-velocity 
+!!$                 if ((cvof(i,j,k)>=0.5d0) .and. (cvof(i+1,j,k)>=0.5d0)) then
+!!$                    u(i,j,k)=u(i,j,k)-dt*u_cmask(i,j,k)*(2.0*umask(i,j,k)/dxh(i))*&
+!!$                         (p_ext(i+1,j,k)-p_ext(i,j,k))/(rho(i+1,j,k)+rho(i,j,k))
+!!$                 endif
+!!$              enddo; enddo; enddo
+!!$
+!!$              do k=ks,ke;  do j=js,jev; do i=is,ie    ! CORRECT THE v-velocity
+!!$                 if ((cvof(i,j,k)>=0.5d0) .and. (cvof(i,j+1,k)>=0.5d0)) then
+!!$                    v(i,j,k)=v(i,j,k)-dt*v_cmask(i,j,k)*(2.0*vmask(i,j,k)/dyh(j))*&
+!!$                         (p_ext(i,j+1,k)-p_ext(i,j,k))/(rho(i,j+1,k)+rho(i,j,k))
+!!$                 endif
+!!$              enddo; enddo; enddo
+!!$
+!!$              do k=ks,kew;  do j=js,je; do i=is,ie   ! CORRECT THE w-velocity
+!!$                 if ((cvof(i,j,k)>=0.5d0) .and. (cvof(i,j,k+1)>=0.5d0)) then
+!!$                    w(i,j,k)=w(i,j,k)-w_cmask(i,j,k)*dt*(2.0*wmask(i,j,k)/dzh(k))*&
+!!$                         (p_ext(i,j,k+1)-p_ext(i,j,k))/(rho(i,j,k+1)+rho(i,j,k))
+!!$                 endif
+!!$              enddo; enddo; enddo
+!!$              do k=ks,ke;  do j=js,je; do i=is,ie !simple test to check whether boundary values for P change
+!!$                 if ((cvof(i,j,k) < 0.5d0) .and. (abs(p_ext(i,j,k)-p(i,j,k))>1d-12)) then
+!!$                    write(*,'("FAIL",e14.5)')abs(p_ext(i,j,k)-p(i,j,k))
+!!$                 endif
+!!$              enddo; enddo; enddo
            endif !Extrapolation
 !------------------------------------------------------------------------------------------------
 

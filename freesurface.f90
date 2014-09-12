@@ -173,7 +173,7 @@ subroutine setuppoisson_fs(umask,vmask,wmask,vof_phase,rhot,dt,A,pmask,cvof,n1,n
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: cvof,n1,n2,n3
   real(8), dimension(is:ie,js:je,ks:ke,8), intent(out) :: A
   integer, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: vof_phase
-  integer :: req(12),sta(MPI_STATUS_SIZE,12)
+  integer :: req(24),sta(MPI_STATUS_SIZE,24)
   real(8) :: alpha, x_test, y_test, z_test, n_x, n_y, n_z
   real(8) :: nr(3),al3dnew,al3dold
   real(8) :: dt
@@ -341,8 +341,8 @@ subroutine setuppoisson_fs(umask,vmask,wmask,vof_phase,rhot,dt,A,pmask,cvof,n1,n
      endif
   enddo;enddo;enddo
   call ghost_x(P_g(:,:,:,1),1,req( 1: 4)); call ghost_y(P_g(:,:,:,2),1,req( 5: 8)); call ghost_z(P_g(:,:,:,3),1,req( 9:12))
-  !call ghost_x(x_mod,1,req( 1: 4)); call ghost_y(y_mod,1,req( 5: 8)); call ghost_z(z_mod,1,req( 9:12))
-  call MPI_WAITALL(12,req,sta,ierr) 
+  call ghost_x(x_mod,1,req(13:16)); call ghost_y(y_mod,1,req(17:20)); call ghost_z(z_mod,1,req(21:24))
+  call MPI_WAITALL(24,req,sta,ierr) 
 close(unit=50); close(unit=51); close(unit=52); close(unit=53)
 312 format(2e14.5) !remove, debugging
 313 format(3e14.5) !remove, debugging
@@ -371,3 +371,48 @@ close(unit=50); close(unit=51); close(unit=52); close(unit=53)
      endif
   enddo;enddo;enddo
 end subroutine setuppoisson_fs
+!--------------------------------------------------------------------------------------------------------------------
+!!$subroutine setuppoisson_fs2(dt,A,cvof,istep)
+!!$  use module_grid
+!!$  use module_BC
+!!$  use module_2phase
+!!$  use module_IO
+!!$  implicit none
+!!$  !real(8), dimension(is:ie,js:je,ks:ke), intent(inout) :: pmask2
+!!$  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: cvof
+!!$  real(8), dimension(is:ie,js:je,ks:ke,8), intent(out) :: A
+!!$  real(8) :: dt
+!!$  integer :: i,j,k
+!!$  integer :: istep
+!!$
+!!$  do k=ks,ke; do j=js,je; do i=is,ie;
+!!$     if(cvof(i,j,k) >= 0.5d0) then 
+!!$        !pmask2(i,j,k) = 1d0 
+!!$        A(i,j,k,1) = 2d0*dt*umask(i-1,j,k)/(dx(i)*dxh(i-1)*(rhot(i-1,j,k)+rhot(i,j,k)))
+!!$        A(i,j,k,2) = 2d0*dt*umask(i,j,k)/(dx(i)*dxh(i  )*(rhot(i+1,j,k)+rhot(i,j,k)))
+!!$        A(i,j,k,3) = 2d0*dt*vmask(i,j-1,k)/(dy(j)*dyh(j-1)*(rhot(i,j-1,k)+rhot(i,j,k)))
+!!$        A(i,j,k,4) = 2d0*dt*vmask(i,j,k)/(dy(j)*dyh(j  )*(rhot(i,j+1,k)+rhot(i,j,k)))
+!!$        A(i,j,k,5) = 2d0*dt*wmask(i,j,k-1)/(dz(k)*dzh(k-1)*(rhot(i,j,k-1)+rhot(i,j,k)))
+!!$        A(i,j,k,6) = 2d0*dt*wmask(i,j,k)/(dz(k)*dzh(k  )*(rhot(i,j,k+1)+rhot(i,j,k)))
+!!$        A(i,j,k,7) = sum(A(i,j,k,1:6))
+!!$        A(i,j,k,8) =  -((utmp(i,j,k)-utmp(i-1,j,k))/dx(i) &
+!!$             +  (vtmp(i,j,k)-vtmp(i,j-1,k))/dy(j) &
+!!$             +  (wtmp(i,j,k)-wtmp(i,j,k-1))/dz(k) )
+!!$     else
+!!$        !pmask2(i,j,k)=0d0
+!!$        do l=1,6
+!!$           A(i,j,k,l) = 0d0
+!!$        enddo
+!!$        A(i,j,k,7) = 1d0
+!!$        A(i,j,k,8) = 0d0
+!!$     endif
+!!$  enddo; enddo; enddo
+!!$  !do k=ks,ke; do j=js,je; do i=is,ie
+!!$  !   do l=1,6
+!!$  !      A(i,j,k,l) = pmask(i,j,k)*A(i,j,k,l)
+!!$  !   enddo
+!!$  !   A(i,j,k,7) = sum(A(i,j,k,1:6)) + (1d0-pmask(i,j,k))
+!!$  !   A(i,j,k,8) = pmask(i,j,k)*A(i,j,k,8)
+!!$  !enddo;enddo;enddo
+!!$end subroutine setuppoisson_fs2
+!--------------------------------------------------------------------------------------------------------------------
