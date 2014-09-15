@@ -243,9 +243,9 @@ FUNCTION AREA3D(nr,cc)
   IMPLICIT NONE
   REAL(8), INTENT(IN):: nr(3),cc
   REAL(8) :: AREA3D
-  REAL(8) :: cch,al,c00,c01,c02,c03,np1,np2,np3
+  REAL(8) :: cch,ccr,al,c00,c01,c02,c03,np1,np2,np3
   REAL(8) :: m1,m2,m3,m12,numer,denom,p,pst,q,arc,csarc
-  REAL(8), PARAMETER :: athird=1.d0/3.d0 
+  REAL(8), PARAMETER :: athird=1.d0/3.d0,cmin=1.d-14 
   INTRINSIC DABS,DMIN1,DMAX1,DSQRT,DACOS,DCOS
 
   np1 = DABS(nr(1))                                 ! need positive coefficients
@@ -263,6 +263,7 @@ FUNCTION AREA3D(nr,cc)
      m2 = np3
   endif
   cch = DMIN1(cc,1.d0-cc)                              ! limit to: 0 < cch < 1/2
+  ccr = DMAX1(cch,cmin)                       ! full and empty neighboring cells  
   denom = DMAX1(2.d0*m1*m2*m3,1.d-50)                           ! get cch ranges
   c01 = m1*m1*m1/(3.d0*denom)
   c02  = c01 + 0.5d0*(m2-m1)/m3
@@ -276,13 +277,13 @@ FUNCTION AREA3D(nr,cc)
   c00 = DSQRT(m1*m1 + m2*m2 + m3*m3)
 
 ! 1: C<=C1; 2: C1<=C<=C2; 3: C2<=C<=C3; 4: C3<=C<=1/2 (a: m12<=m3; b: m3<m12)) 
-  if (cch <= c01) then
+  if (ccr <= c01) then
      al = (3.d0*denom*cch)**athird                                         
      AREA3D = c00*al*al/denom                                         ! case (1)
-  else if (cch <= c02) then 
+  else if (ccr <= c02) then 
     al = 0.5d0*(m1 + DSQRT(m1*m1 + 8.d0*m2*m3*(cch - c01)))           
     AREA3D = c00*(2.d0*al-m1)/(2.d0*m2*m3)                            ! case (2)
-  else if (cch <= c03) then
+  else if (ccr <= c03) then
      p = 2.d0*m1*m2                                                   
      q = 1.5d0*m1*m2*(m12 - 2.d0*m3*cch)
      pst = DSQRT(p)
@@ -322,10 +323,10 @@ SUBROUTINE CENT3D(nr,cc,xc0)
   REAL(8), INTENT(IN) :: nr(3),cc
   REAL(8), INTENT(out) :: xc0(3)
   REAL(8) :: ctd0(3)
-  REAL(8) :: cch,al,c01,c02,c03,np1,np2,np3
+  REAL(8) :: cch,ccr,al,c01,c02,c03,np1,np2,np3
   REAL(8) :: m1,m2,m3,m12,numer,denom,p,pst,q,arc,csarc,top,bot
   INTEGER :: ind(3)
-  REAL(8), PARAMETER :: athird=1.d0/3.d0 
+  REAL(8), PARAMETER :: athird=1.d0/3.d0,cmin=1.d-14 
   INTRINSIC DMAX1,DMIN1,DSQRT,DACOS,DCOS
 
   np1 = DABS(nr(1))                                 ! need positive coefficients
@@ -359,6 +360,7 @@ SUBROUTINE CENT3D(nr,cc,xc0)
     ind(2) = 3
   endif
   cch = DMIN1(cc,1.d0-cc)                              ! limit to: 0 < cch < 1/2
+  ccr = DMAX1(cch,cmin)                       ! full and empty neighboring cells  
   denom = DMAX1(6.d0*m1*m2*m3,1.d-50)                           ! get cch ranges
   c01 = m1*m1*m1/denom
   c02  = c01 + 0.5d0*(m2-m1)/m3
@@ -371,19 +373,19 @@ SUBROUTINE CENT3D(nr,cc,xc0)
   endif
   
 ! 1: C<=C1; 2: C1<=C<=C2; 3: C2<=C<=C3; 4: C3<=C<=1/2 (a: m12<=m3; b: m3<m12)) 
-  if (cch <= c01) then
+  if (ccr <= c01) then
     al = (denom*cch)**athird 
     ctd0(1) = athird*al/m1
     ctd0(2) = athird*al/m2
     ctd0(3) = athird*al/m3                                            ! case (1)
-  else if (cch <= c02) then 
+  else if (ccr <= c02) then 
     al = 0.5d0*(m1 + DSQRT(m1*m1 + 8.d0*m2*m3*(cch - c01)))    
     top = m1*m1 + 3.*al*(al-m1)
     bot = 3.*(2.*al-m1)
     ctd0(1) = (3.*al-2.*m1)/bot
     ctd0(2) = top/(m2*bot)
     ctd0(3) = top/(m3*bot)                                            ! case (2)
-  else if (cch <= c03) then
+  else if (ccr <= c03) then
     p = 2.d0*m1*m2                                                   
     q = 1.5d0*m1*m2*(m12 - 2.d0*m3*cch)
     pst = DSQRT(p)
