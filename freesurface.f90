@@ -30,11 +30,11 @@
   implicit none
   include 'mpif.h' 
   integer, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: vof_phase
-  integer :: req(12),sta(MPI_STATUS_SIZE,12)
+  integer :: req(16),sta(MPI_STATUS_SIZE,16)
   integer :: i,j,k,level,iout,nbr,ierr
   !initialize all masks to 3
   if (.not.initialize_fs) call pariserror("Error: Free surface variables not initialized")
-  u_cmask = 3; v_cmask = 3; w_cmask = 3
+  u_cmask = 3; v_cmask = 3; w_cmask = 3; pcmask = 3
   debug = .false.
   if (debug) then
      Open(unit=19,FILE=TRIM(out_path)//'/Pmask-'//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout,padding))//'.txt')
@@ -44,6 +44,9 @@
      Open(unit=23,FILE=TRIM(out_path)//'/u_ass-'//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout,padding))//'.txt')
      Open(unit=24,FILE=TRIM(out_path)//'/v_ass-'//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout,padding))//'.txt')
      Open(unit=25,FILE=TRIM(out_path)//'/w_ass-'//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout,padding))//'.txt')
+     Open(unit=26,FILE=TRIM(out_path)//'/P1-'//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout,padding))//'.txt')
+     Open(unit=27,FILE=TRIM(out_path)//'/P2-'//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout,padding))//'.txt')
+     Open(unit=28,FILE=TRIM(out_path)//'/P3-'//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout,padding))//'.txt') 
   endif
   !First loop to set level 0 velocities in liq-liq and liq-gas cells
   do k=ks,ke; do j=js,je; do i=is,ie !loop relies on vof_phase in e+1, but phase is updated up to max.
@@ -60,6 +63,7 @@
         endif
      endif
      if (vof_phase(i,j,k) == 0) then
+        pcmask(i,j,k)=0
         if ((vof_phase(i+1,j,k) == 1) .or. (vof_phase(i+1,j,k) == 0)) then
            u_cmask(i,j,k) = 0
         endif
@@ -74,14 +78,14 @@
   !need to set bc for assigned, masks
   !fill ghost layers
   call ighost_x(u_cmask,2,req(1:4)); call ighost_x(v_cmask,2,req(5:8)); call ighost_x(w_cmask,2,req(9:12))
-  call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
+  call ighost_x(pcmask,2,req(13:16)); call MPI_WAITALL(16,req(1:16),sta(:,1:16),ierr)
   call ighost_y(u_cmask,2,req(1:4)); call ighost_y(v_cmask,2,req(5:8)); call ighost_y(w_cmask,2,req(9:12))
-  call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
+  call ighost_y(pcmask,2,req(13:16)); call MPI_WAITALL(16,req(1:16),sta(:,1:16),ierr)
   call ighost_z(u_cmask,2,req(1:4)); call ighost_z(v_cmask,2,req(5:8)); call ighost_z(w_cmask,2,req(9:12))
-  call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
+  call ighost_z(pcmask,2,req(13:16)); call MPI_WAITALL(16,req(1:16),sta(:,1:16),ierr)
   !Set levels 1 to X_level
   do level=1,X_level
-     do k=kmin+1,kmax-1; do j=jmin+1,jmax-1; do i=imin+1,imax-1 !uses indexes s-1 and e+1 to check assigned and set masks. Assigned should be set from past ghost operations
+     do k=kmin+1,kmax-1; do j=jmin+1,jmax-1; do i=imin+1,imax-1 !uses indexes s-1 and e+1 to check assigned and set masks. 2 ghost layers
         !u-neighbours
         if (u_cmask(i,j,k)==level-1) then
            do nbr=-1,1,2
@@ -124,6 +128,19 @@
               endif
            enddo
         endif
+        if (pcmask(i,j,k)==level-1) then
+           do nbr=-1,1,2
+              if (pcmask(i+nbr,j,k)==3) then
+                 pcmask(i+nbr,j,k) = level
+              endif
+              if (pcmask(i,j+nbr,k)==3) then
+                 pcmask(i,j+nbr,k) = level
+              endif
+              if (pcmask(i,j,k+nbr)==3) then
+                 pcmask(i,j,k+nbr) = level
+              endif
+           enddo
+        endif
      enddo; enddo; enddo
 !!$     call ighost_x(u_cmask(:,:,:),2,req(1:4)); call ighost_x(v_cmask(:,:,:),2,req(5:8))
 !!$     call ighost_x(w_cmask(:,:,:),2,req(9:12))
@@ -146,19 +163,22 @@
         if (u_cmask(i,j,k)==1) write(21,13)xh(i),y(j),z(k)
         if (v_cmask(i,j,k)==1) write(21,13)x(i),yh(j),z(k)
         !if (w_cmask(i,j,k)==1) write(21,13)x(i),y(j),zh(k)
+        if (pcmask(i,j,k)==1) write(26,13)x(i),y(j),z(k)
         if (u_cmask(i,j,k)==2) write(22,13)xh(i),y(j),z(k)
         if (v_cmask(i,j,k)==2) write(22,13)x(i),yh(j),z(k)
         !if (w_cmask(i,j,k)==2) write(22,13)x(i),y(j),zh(k)
+        if (pcmask(i,j,k)==2) write(27,13)x(i),y(j),z(k)
         if (u_cmask(i,j,k)==3) write(23,13)xh(i),y(j),z(k)
         if (v_cmask(i,j,k)==3) write(24,13)x(i),yh(j),z(k)
         if (w_cmask(i,j,k)==3) write(25,13)x(i),y(j),zh(k)
+        if (pcmask(i,j,k)==3) write(28,13)x(i),y(j),z(k)
      enddo; enddo
      close(unit=19); close(unit=20); close(unit=21); close(unit=22); close(unit=23); close(unit=24); close(unit=25)
   endif
 13 format(3e14.5)
 end subroutine set_topology
 !-------------------------------------------------------------------------------------------------
-subroutine setuppoisson_fs(umask,vmask,wmask,vof_phase,rhot,dt,A,pmask,cvof,n1,n2,n3,kap,istep)    
+subroutine setuppoisson_fs(vof_phase,rhot,dt,A,pmask,cvof,n1,n2,n3,kap,istep)    
   use module_grid
   use module_BC
   use module_2phase
@@ -167,7 +187,6 @@ subroutine setuppoisson_fs(umask,vmask,wmask,vof_phase,rhot,dt,A,pmask,cvof,n1,n
   implicit none
   include 'mpif.h'
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: rhot
-  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: umask,vmask,wmask
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: kap
   real(8), dimension(is:ie,js:je,ks:ke), intent(inout) :: pmask
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: cvof,n1,n2,n3
@@ -243,9 +262,10 @@ subroutine setuppoisson_fs(umask,vmask,wmask,vof_phase,rhot,dt,A,pmask,cvof,n1,n
                  x_mod(i+(nbr-1)/2,j,k) = dxh(i+(nbr-1)/2)/2d0
                  !write(*,'("WARNING: liq-gas x-pair has no interface intercepts between nodes",3I8)')i,j,k
               endif
-              A(i,j,k,2+(nbr-1)/2) = 2d0*dt*umask(i+(nbr-1)/2,j,k)/(dx(i)*x_mod(i+(nbr-1)/2,j,k)*(rhot(i+nbr,j,k)+rhot(i,j,k)))
-              if (A(i,j,k,2+(nbr-1)/2) /= A(i,j,k,2+(nbr-1)/2)) &
-                   write(*,'("A1 or A2 NaN? ",2e14.4)')A(i,j,k,2+(nbr-1)/2),x_mod(i+(nbr-1)/2,j,k) !debugging
+              A(i,j,k,2+(nbr-1)/2) = dt/(dx(i)*x_mod(i+(nbr-1)/2,j,k)*(rhot(i,j,k)))
+              if (A(i,j,k,2+(nbr-1)/2) /= A(i,j,k,2+(nbr-1)/2)) then
+                 write(*,'("A1 or A2 NaN? ",2e14.4)')A(i,j,k,2+(nbr-1)/2),x_mod(i+(nbr-1)/2,j,k) !debugging
+              endif
               if (debug) write(51,314)x(i),y(j),nbr*x_mod(i+(nbr-1)/2,j,k),0d0
               !P_g(i+nbr,j,k,1) = sigma*kap(i,j,k)/dx(i) !check, fix
            endif
@@ -287,10 +307,11 @@ subroutine setuppoisson_fs(umask,vmask,wmask,vof_phase,rhot,dt,A,pmask,cvof,n1,n
                  y_mod(i,j+(nbr-1)/2,k) = dyh(j+(nbr-1)/2)/2d0
                  !write(*,'("WARNING: liq-gas y-pair has no interface intercepts between nodes",3I8)')i,j,k
               endif
-              A(i,j,k,4+(nbr-1)/2) = 2d0*dt*vmask(i,j+(nbr-1)/2,k)/(dy(j)*y_mod(i,j+(nbr-1)/2,k)*(rhot(i,j,k)+rhot(i,j+nbr,k)))
+              A(i,j,k,4+(nbr-1)/2) = dt/(dy(j)*y_mod(i,j+(nbr-1)/2,k)*(rhot(i,j,k)))
               if (debug) write(51,314)x(i),y(j),0d0,nbr*y_mod(i,j+(nbr-1)/2,k)
-              if (A(i,j,k,4+(nbr-1)/2) /= A(i,j,k,4+(nbr-1)/2)) &
-                   write(*,'("A3 or A4 NaN? ",2e14.4)')A(i,j,k,4+(nbr-1)/2), y_mod(i,j+(nbr-1)/2,k) !debugging
+              if (A(i,j,k,4+(nbr-1)/2) /= A(i,j,k,4+(nbr-1)/2)) then
+                 write(*,'("A3 or A4 NaN? ",2e14.4)')A(i,j,k,4+(nbr-1)/2), y_mod(i,j+(nbr-1)/2,k) !debugging
+              endif
               !P_g(i,j+1,k,2) = sigma*kap(i,j,k)/dy(j) !check, fix
            endif
         enddo
@@ -331,10 +352,11 @@ subroutine setuppoisson_fs(umask,vmask,wmask,vof_phase,rhot,dt,A,pmask,cvof,n1,n
                  z_mod(i,j,k+(nbr-1)/2) = dzh(k+(nbr-1)/2)/2d0
                  !write(*,'("WARNING: liq-gas z-pair has no interface intercepts between nodes",3I8)')i,j,k
               endif
-              A(i,j,k,6+(nbr-1)/2) = 2d0*dt*wmask(i,j,k+(nbr-1)/2)/(dz(k)*z_mod(i,j,k+(nbr-1)/2)*(rhot(i,j,k)+rhot(i,j,k+nbr)))
+              A(i,j,k,6+(nbr-1)/2) = dt/(dz(k)*z_mod(i,j,k+(nbr-1)/2)*(rhot(i,j,k)))
               !if (debug) write(51,314)x(i),z(k),0d0,z_mod(i,j,k)
-              if (A(i,j,k,6+(nbr-1)/2) /= A(i,j,k,6+(nbr-1)/2)) &
-                   write(*,'("A5 or A6 NaN? ",2e14.4)')A(i,j,k,6), z_mod(i,j,k) !debugging
+              if (A(i,j,k,6+(nbr-1)/2) /= A(i,j,k,6+(nbr-1)/2)) then
+                 write(*,'("A5 or A6 NaN? ",2e14.4)')A(i,j,k,6), z_mod(i,j,k+(nbr-1)/2) !debugging
+              endif
               !P_g(i,j,k+1,3) = sigma*kap(i,j,k)/dz(k) !check, fix
            endif
         enddo
@@ -350,22 +372,22 @@ close(unit=50); close(unit=51); close(unit=52); close(unit=53)
 314 format(4e14.5) !remove, debugging
 414 format(3e14.5,I8)
   do k=ks,ke; do j=js,je; do i=is,ie
-     do l=1,6
-        A(i,j,k,l) = pmask(i,j,k)*A(i,j,k,l)
-        if (A(i,j,k,l) /= A(i,j,k,l)) write(*,*)'A NaN, error imminent'
-     enddo
-     A(i,j,k,7) = sum(A(i,j,k,1:6)) + (1d0-pmask(i,j,k))
-     A(i,j,k,8) = pmask(i,j,k)*(A(i,j,k,8) + dt/(rhot(i,j,k))*&
+     !do l=1,6
+     !   A(i,j,k,l) = pmask(i,j,k)*A(i,j,k,l)
+     !   if (A(i,j,k,l) /= A(i,j,k,l)) write(*,'("A*pmask is NaN. pmask, A :",2e14.5)')pmask(i,j,k),A(i,j,k,l)
+     !enddo
+     A(i,j,k,7) = sum(A(i,j,k,1:6)) !+ (1d0-pmask(i,j,k))
+     A(i,j,k,8) = A(i,j,k,8) + dt/rhot(i,j,k)*&
           (P_g(i+1,j,k,1)/(dx(i)*x_mod(i,j,k))+P_g(i-1,j,k,1)/(dx(i)*x_mod(i-1,j,k))&
           +P_g(i,j+1,k,2)/(dy(j)*y_mod(i,j,k))+P_g(i,j-1,k,2)/(dy(j)*y_mod(i,j-1,k))&
-          +P_g(i,j,k+1,3)/(dz(k)*z_mod(i,j,k))+P_g(i,j,k-1,3)/(dz(k)*z_mod(i,j,k-1))))
+          +P_g(i,j,k+1,3)/(dz(k)*z_mod(i,j,k))+P_g(i,j,k-1,3)/(dz(k)*z_mod(i,j,k-1)))
      if (A(i,j,k,8) /= A(i,j,k,8)) then
         write(*,'("A8 NaN, error imminent. Neigbours mods :",6e14.5)')x_mod(i-1,j,k),x_mod(i,j,k),&
              y_mod(i,j-1,k),y_mod(i,j,k),z_mod(i,j,k-1),z_mod(i,j,k)
-!!$        write(*,'("A8 NaN, error imminent. P_g :",6e14.5)')P_g(i-1,j,k,1),P_g(i+1,j,k,1),&
-!!$             P_g(i,j-1,k,2),P_g(i,j+1,k,2),P_g(i,j,k-1,3),P_g(i,j,k+1,3)
-!!$        write(*,'("pmask :",e14.5)')pmask(i,j,k)
-!!$        write(*,'("sigma :",e14.5)')sigma
+        write(*,'("A8 NaN, error imminent. P_g :",6e14.5)')P_g(i-1,j,k,1),P_g(i+1,j,k,1),&
+             P_g(i,j-1,k,2),P_g(i,j+1,k,2),P_g(i,j,k-1,3),P_g(i,j,k+1,3)
+        write(*,'("rho :",e14.5)')rhot(i,j,k)
+        write(*,'("pmask :",e14.5)')pmask(i,j,k)
 !!$        write(*,'("A8 NaN, kap :",6e14.5)')kap(i-1,j,k),kap(i,j,k),&
 !!$             kap(i,j-1,k),kap(i,j,k),kap(i,j,k-1),kap(i,j,k)
      endif

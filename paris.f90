@@ -337,20 +337,17 @@ Program paris
               enddo; enddo; enddo
            else
               do k=ks,ke;  do j=js,je; do i=is,ieu    ! CORRECT THE u-velocity 
-                 u(i,j,k)=u(i,j,k)-dt*(2.0*umask(i,j,k)/x_mod(i,j,k))*(p(i+1,j,k)+P_g(i+1,j,k,1)-p(i,j,k)-P_g(i,j,k,1))&
-                      /(rho(i+1,j,k)+rho(i,j,k))
+                 u(i,j,k)=u(i,j,k)-dt/rho(i,j,k)*(p(i+1,j,k)+P_g(i+1,j,k,1)-p(i,j,k)-P_g(i,j,k,1))/x_mod(i,j,k)
                  if (u(i,j,k) /= u(i,j,k)) write(*,'("WARNING u NaN :",2e14.5)')u(i,j,k), x_mod(i,j,k)
               enddo; enddo; enddo
 
               do k=ks,ke;  do j=js,jev; do i=is,ie    ! CORRECT THE v-velocity
-                 v(i,j,k)=v(i,j,k)-dt*(2.0*vmask(i,j,k)/y_mod(i,j,k))*(p(i,j+1,k)+P_g(i,j+1,k,2)-p(i,j,k)-P_g(i,j,k,2))&
-                      /(rho(i,j+1,k)+rho(i,j,k))
+                 v(i,j,k)=v(i,j,k)-dt/rho(i,j,k)*(p(i,j+1,k)+P_g(i,j+1,k,2)-p(i,j,k)-P_g(i,j,k,2))/y_mod(i,j,k)
                  if (v(i,j,k) /= v(i,j,k)) write(*,'("WARNING v NaN :",2e14.5)')v(i,j,k), y_mod(i,j,k)
               enddo; enddo; enddo
 
               do k=ks,kew;  do j=js,je; do i=is,ie   ! CORRECT THE w-velocity
-                 w(i,j,k)=w(i,j,k)-dt*(2.0*wmask(i,j,k)/z_mod(i,j,k))*(p(i,j,k+1)+P_g(i,j,k+1,3)-p(i,j,k)-P_g(i,j,k,3))&
-                      /(rho(i,j,k+1)+rho(i,j,k))
+                 w(i,j,k)=w(i,j,k)-dt/rho(i,j,k)*(p(i,j,k+1)+P_g(i,j,k+1,3)-p(i,j,k)-P_g(i,j,k,3))/z_mod(i,j,k)
                  if (w(i,j,k) /= w(i,j,k)) write(*,'("WARNING w NaN :",2e14.5)')w(i,j,k), z_mod(i,j,k)
               enddo; enddo; enddo
            endif

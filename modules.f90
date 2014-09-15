@@ -335,7 +335,7 @@ end module module_2phase
 module module_freesurface
   real(8), dimension(:,:,:), allocatable :: x_mod, y_mod, z_mod
   real(8), dimension(:,:,:,:), allocatable :: P_g
-  integer, dimension(:,:,:), allocatable :: u_cmask, v_cmask, w_cmask
+  integer, dimension(:,:,:), allocatable :: u_cmask,v_cmask,w_cmask,pcmask
   !real(8), dimension(:,:,:), allocatable :: pmask 
   integer :: X_level
   logical :: FreeSurface, debug=.false., initialize_fs = .false.
@@ -2114,7 +2114,7 @@ subroutine SetupPoisson(utmp,vtmp,wtmp,umask,vmask,wmask,vof_phase,rhot,dt,A,pma
 !    endif
   enddo; enddo; enddo
   if(FreeSurface) then
-   call setuppoisson_fs(umask,vmask,wmask,vof_phase,rhot,dt,A,pmask,cvof,n1,n2,n3,kappa_fs,istep)
+   call setuppoisson_fs(vof_phase,rhot,dt,A,pmask,cvof,n1,n2,n3,kappa_fs,istep)
   endif
   P_bc = 0d0
   ! dp/dn = 0 for inflow bc on face 1 == x- : do not correct u(is-1)
@@ -2259,6 +2259,7 @@ subroutine SetupPoisson(utmp,vtmp,wtmp,umask,vmask,wmask,vof_phase,rhot,dt,A,pma
            endif
         endif
      enddo; enddo; enddo
+     check_setup =.false.
      if(check_setup) call check_poisson_setup(A,pmask,umask,vmask,wmask)
   endif
 ! End debugging and checking

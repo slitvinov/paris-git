@@ -35,6 +35,7 @@ subroutine NewSolver(A,p,maxError,beta,maxit,it,ierr)
   use module_grid
   use module_BC
   use module_IO
+  use module_freesurface
   implicit none
   include 'mpif.h'
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: p
@@ -55,6 +56,11 @@ subroutine NewSolver(A,p,maxError,beta,maxit,it,ierr)
      OPEN(UNIT=89,FILE=TRIM(out_path)//'/convergence_history-'//TRIM(int2text(itime,padding))//'.txt')
   endif
   itime=itime+1
+  if (FreeSurface) then
+     do k=ks,ke; do j=js,je; do i=is,ie
+        if (pcmask(i,j,k)>0) p(i,j,k) = 0d0
+     enddo; enddo; enddo
+  endif
   !--------------------------------------ITERATION LOOP--------------------------------------------  
   do it=1,maxit
      if(relaxtype==2) then 
@@ -66,19 +72,35 @@ subroutine NewSolver(A,p,maxError,beta,maxit,it,ierr)
     res1 = 0d0; res2=0.d0; resinf=0.d0; intvol=0.d0
     call ghost_x(p,1,req( 1: 4)); call ghost_y(p,1,req( 5: 8)); call ghost_z(p,1,req( 9:12))
     do k=ks+1,ke-1; do j=js+1,je-1; do i=is+1,ie-1
-      res2=res2+abs(-p(i,j,k) * A(i,j,k,7) +                           &
-        A(i,j,k,1) * p(i-1,j,k) + A(i,j,k,2) * p(i+1,j,k) +            &
-        A(i,j,k,3) * p(i,j-1,k) + A(i,j,k,4) * p(i,j+1,k) +            &
-        A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8) )**norm
+      if (FreeSurface) then
+          if (pcmask(i,j,k)==0) then
+             res2=res2+abs(-p(i,j,k) * A(i,j,k,7) +                           &
+                  A(i,j,k,1) * p(i-1,j,k) + A(i,j,k,2) * p(i+1,j,k) +            &
+                  A(i,j,k,3) * p(i,j-1,k) + A(i,j,k,4) * p(i,j+1,k) +            &
+                  A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8) )**norm
+          endif
+       else
+          res2=res2+abs(-p(i,j,k) * A(i,j,k,7) +                           &
+               A(i,j,k,1) * p(i-1,j,k) + A(i,j,k,2) * p(i+1,j,k) +            &
+               A(i,j,k,3) * p(i,j-1,k) + A(i,j,k,4) * p(i,j+1,k) +            &
+               A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8) )**norm 
+       endif
     enddo; enddo; enddo
     call MPI_WAITALL(12,req,sta,ierr)
     mask=.true.
     mask(is+1:ie-1,js+1:je-1,ks+1:ke-1)=.false.
     do k=ks,ke; do j=js,je; do i=is,ie
-      if(mask(i,j,k)) res2=res2+abs(-p(i,j,k) * A(i,j,k,7) +            &
-        A(i,j,k,1) * p(i-1,j,k) + A(i,j,k,2) * p(i+1,j,k) +            &
-        A(i,j,k,3) * p(i,j-1,k) + A(i,j,k,4) * p(i,j+1,k) +            &
-        A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8) )**norm
+       if (FreeSurface) then
+          if(mask(i,j,k) .and. pcmask(i,j,k)==0) res2=res2+abs(-p(i,j,k) * A(i,j,k,7) +&
+               A(i,j,k,1) * p(i-1,j,k) + A(i,j,k,2) * p(i+1,j,k) +            &
+               A(i,j,k,3) * p(i,j-1,k) + A(i,j,k,4) * p(i,j+1,k) +            &
+               A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8) )**norm
+       else
+          if(mask(i,j,k)) res2=res2+abs(-p(i,j,k) * A(i,j,k,7) +            &
+               A(i,j,k,1) * p(i-1,j,k) + A(i,j,k,2) * p(i+1,j,k) +            &
+               A(i,j,k,3) * p(i,j-1,k) + A(i,j,k,4) * p(i,j+1,k) +            &
+               A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8) )**norm
+       endif
     enddo; enddo; enddo
     res2 = res2/dble(Nx*Ny*Nz)
     call catch_divergence(res2,ierr)
@@ -136,6 +158,7 @@ subroutine RedBlackRelax(A,p,beta)
   use module_grid
   use module_BC
   use module_IO
+  use module_freesurface
   implicit none
   include 'mpif.h'
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: p
@@ -151,10 +174,19 @@ subroutine RedBlackRelax(A,p,beta)
         isw=jsw
         do j=js,je
            do i=isw+is-1,ie,2
-              p(i,j,k)=(1d0-beta)*p(i,j,k) + (beta/A(i,j,k,7))*(             &
-                   A(i,j,k,1) * p(i-1,j,k) + A(i,j,k,2) * p(i+1,j,k) +       &
-                   A(i,j,k,3) * p(i,j-1,k) + A(i,j,k,4) * p(i,j+1,k) +       &
-                   A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8))
+              if (FreeSurface) then
+                 if (pcmask(i,j,k)==0) then !only solve for liq cells
+                    p(i,j,k)=(1d0-beta)*p(i,j,k) + (beta/A(i,j,k,7))*(              &
+                         A(i,j,k,1) * p(i-1,j,k) + A(i,j,k,2) * p(i+1,j,k) +        &
+                         A(i,j,k,3) * p(i,j-1,k) + A(i,j,k,4) * p(i,j+1,k) +        &
+                         A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8))
+                 endif
+              else
+                 p(i,j,k)=(1d0-beta)*p(i,j,k) + (beta/A(i,j,k,7))*(             &
+                      A(i,j,k,1) * p(i-1,j,k) + A(i,j,k,2) * p(i+1,j,k) +       &
+                      A(i,j,k,3) * p(i,j-1,k) + A(i,j,k,4) * p(i,j+1,k) +       &
+                      A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8))
+              endif
            enddo
            isw=3-isw
         enddo
@@ -170,6 +202,7 @@ end subroutine RedBlackRelax
 !--------------------------------------ONE RELAXATION ITERATION (SMOOTHER)----------------------------------
 subroutine LineRelax(A,p,beta)
   use module_grid
+  use module_freesurface
   implicit none
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: p
   real(8), dimension(is:ie,js:je,ks:ke,8), intent(in) :: A
@@ -177,10 +210,19 @@ subroutine LineRelax(A,p,beta)
   integer :: i,j,k
 !--------------------------------------ITERATION LOOP--------------------------------------------  
   do k=ks,ke; do j=js,je; do i=is,ie
-     p(i,j,k)=(1d0-beta)*p(i,j,k) + (beta/A(i,j,k,7))*(              &
-          A(i,j,k,1) * p(i-1,j,k) + A(i,j,k,2) * p(i+1,j,k) +        &
-          A(i,j,k,3) * p(i,j-1,k) + A(i,j,k,4) * p(i,j+1,k) +        &
-          A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8))
+     if (FreeSurface) then
+        if (pcmask(i,j,k)==0) then
+           p(i,j,k)=(1d0-beta)*p(i,j,k) + (beta/A(i,j,k,7))*(              &
+                A(i,j,k,1) * p(i-1,j,k) + A(i,j,k,2) * p(i+1,j,k) +        &
+                A(i,j,k,3) * p(i,j-1,k) + A(i,j,k,4) * p(i,j+1,k) +        &
+                A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8))
+        endif
+     else
+        p(i,j,k)=(1d0-beta)*p(i,j,k) + (beta/A(i,j,k,7))*(              &
+             A(i,j,k,1) * p(i-1,j,k) + A(i,j,k,2) * p(i+1,j,k) +        &
+             A(i,j,k,3) * p(i,j-1,k) + A(i,j,k,4) * p(i,j+1,k) +        &
+             A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8))
+     endif
   enddo; enddo; enddo
 end subroutine LineRelax
 !=================================================================================================
