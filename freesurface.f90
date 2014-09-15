@@ -37,7 +37,6 @@
   u_cmask = 3; v_cmask = 3; w_cmask = 3; pcmask = 3
   debug = .false.
   if (debug) then
-     Open(unit=19,FILE=TRIM(out_path)//'/Pmask-'//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout,padding))//'.txt')
      Open(unit=20,FILE=TRIM(out_path)//'/Top_0-'//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout,padding))//'.txt')
      Open(unit=21,FILE=TRIM(out_path)//'/Top_1-'//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout,padding))//'.txt')
      Open(unit=22,FILE=TRIM(out_path)//'/Top_2-'//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout,padding))//'.txt')
@@ -49,9 +48,8 @@
      Open(unit=28,FILE=TRIM(out_path)//'/P3-'//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout,padding))//'.txt') 
   endif
   !First loop to set level 0 velocities in liq-liq and liq-gas cells
-  do k=ks,ke; do j=js,je; do i=is,ie !loop relies on vof_phase in e+1, but phase is updated up to max.
-     if (vof_phase(i,j,k) == 1) then 
-        if (debug) write(19,13)x(i),y(j),z(k)
+  do k=ks,ke; do j=js,je; do i=is,ie
+     if (vof_phase(i,j,k) == 1) then
         if (vof_phase(i+1,j,k) == 0) then
            u_cmask(i,j,k) = 0
         endif
@@ -75,8 +73,7 @@
         endif
      endif
   enddo; enddo; enddo
-  !need to set bc for assigned, masks
-  !fill ghost layers
+  !fill ghost layers for zero masks
   call ighost_x(u_cmask,2,req(1:4)); call ighost_x(v_cmask,2,req(5:8)); call ighost_x(w_cmask,2,req(9:12))
   call ighost_x(pcmask,2,req(13:16)); call MPI_WAITALL(16,req(1:16),sta(:,1:16),ierr)
   call ighost_y(u_cmask,2,req(1:4)); call ighost_y(v_cmask,2,req(5:8)); call ighost_y(w_cmask,2,req(9:12))
@@ -85,17 +82,17 @@
   call ighost_z(pcmask,2,req(13:16)); call MPI_WAITALL(16,req(1:16),sta(:,1:16),ierr)
   !Set levels 1 to X_level
   do level=1,X_level
-     do k=kmin+1,kmax-1; do j=jmin+1,jmax-1; do i=imin+1,imax-1 !uses indexes s-1 and e+1 to check assigned and set masks. 2 ghost layers
+     do k=js-1,ke+1; do j=js-1,je+1; do i=is-1,ie+1
         !u-neighbours
         if (u_cmask(i,j,k)==level-1) then
            do nbr=-1,1,2
-              if (u_cmask(i+nbr,j,k)==3) then ! .and. vof_phase(i+nbr,j,k)==1 .and. vof_phase(i+nbr+1,j,k)==1) then
+              if (u_cmask(i+nbr,j,k)==3) then
                  u_cmask(i+nbr,j,k) = level
               endif
-              if (u_cmask(i,j+nbr,k)==3) then !.and. vof_phase(i,j+nbr,k)==1 .and. vof_phase(i+1,j+nbr,k)==1) then
+              if (u_cmask(i,j+nbr,k)==3) then
                  u_cmask(i,j+nbr,k) = level
               endif
-              if (u_cmask(i,j,k+nbr)==3) then ! .and. vof_phase(i,j,k+nbr)==1 .and. vof_phase(i+1,j,k+nbr)==1) then
+              if (u_cmask(i,j,k+nbr)==3) then
                  u_cmask(i,j,k+nbr) = level
               endif
            enddo
@@ -103,13 +100,13 @@
         !v-neighbours
         if (v_cmask(i,j,k)==level-1) then
            do nbr=-1,1,2
-              if (v_cmask(i+nbr,j,k)==3) then ! .and. vof_phase(i+nbr,j,k)==1 .and. vof_phase(i+nbr,j+1,k)==1) then
+              if (v_cmask(i+nbr,j,k)==3) then
                  v_cmask(i+nbr,j,k) = level
               endif
-              if (v_cmask(i,j+nbr,k)==3) then ! .and. vof_phase(i,j+nbr,k)==1 .and. vof_phase(i,j+nbr+1,k)==1) then
+              if (v_cmask(i,j+nbr,k)==3) then
                  v_cmask(i,j+nbr,k) = level
               endif
-              if (v_cmask(i,j,k+nbr)==3) then ! .and. vof_phase(i,j,k+nbr)==1 .and. vof_phase(i,j+1,k+nbr)==1) then
+              if (v_cmask(i,j,k+nbr)==3) then
                  v_cmask(i,j,k+nbr) = level
               endif
            enddo
@@ -117,13 +114,13 @@
         !w-neighbours
         if (w_cmask(i,j,k)==level-1) then
            do nbr=-1,1,2
-              if (w_cmask(i+nbr,j,k)==3) then ! .and. vof_phase(i+nbr,j,k)==1 .and. vof_phase(i+nbr,j,k+1)==1) then
+              if (w_cmask(i+nbr,j,k)==3) then
                  w_cmask(i+nbr,j,k) = level
               endif
-              if (w_cmask(i,j+nbr,k)==3) then ! .and. vof_phase(i,j+nbr,k)==1 .and. vof_phase(i,j+nbr,k+1)==1) then
+              if (w_cmask(i,j+nbr,k)==3) then
                  w_cmask(i,j+nbr,k) = level
               endif
-              if (w_cmask(i,j,k+nbr)==3) then ! .and. vof_phase(i,j,k+nbr)==1 .and. vof_phase(i,j,k+nbr+1)==1) then
+              if (w_cmask(i,j,k+nbr)==3) then
                  w_cmask(i,j,k+nbr) = level
               endif
            enddo
@@ -142,15 +139,6 @@
            enddo
         endif
      enddo; enddo; enddo
-!!$     call ighost_x(u_cmask(:,:,:),2,req(1:4)); call ighost_x(v_cmask(:,:,:),2,req(5:8))
-!!$     call ighost_x(w_cmask(:,:,:),2,req(9:12))
-!!$     call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
-!!$     call ighost_y(u_cmask(:,:,:),2,req(1:4)); call ighost_y(v_cmask(:,:,:),2,req(5:8))
-!!$     call ighost_y(w_cmask(:,:,:),2,req(9:12))
-!!$     call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
-!!$     call ighost_z(u_cmask(:,:,:),2,req(1:4)); call ighost_z(v_cmask(:,:,:),2,req(5:8))
-!!$     call ighost_z(w_cmask(:,:,:),2,req(9:12))
-!!$     call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
   enddo
 
   if (debug) then
@@ -173,12 +161,12 @@
         if (w_cmask(i,j,k)==3) write(25,13)x(i),y(j),zh(k)
         if (pcmask(i,j,k)==3) write(28,13)x(i),y(j),z(k)
      enddo; enddo
-     close(unit=19); close(unit=20); close(unit=21); close(unit=22); close(unit=23); close(unit=24); close(unit=25)
+     close(unit=20); close(unit=21); close(unit=22); close(unit=23); close(unit=24); close(unit=25)
   endif
 13 format(3e14.5)
 end subroutine set_topology
 !-------------------------------------------------------------------------------------------------
-subroutine setuppoisson_fs(vof_phase,rhot,dt,A,pmask,cvof,n1,n2,n3,kap,istep)    
+subroutine setuppoisson_fs(vof_phase,rhot,dt,A,cvof,n1,n2,n3,kap,istep)    
   use module_grid
   use module_BC
   use module_2phase
@@ -188,7 +176,6 @@ subroutine setuppoisson_fs(vof_phase,rhot,dt,A,pmask,cvof,n1,n2,n3,kap,istep)
   include 'mpif.h'
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: rhot
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: kap
-  real(8), dimension(is:ie,js:je,ks:ke), intent(inout) :: pmask
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: cvof,n1,n2,n3
   real(8), dimension(is:ie,js:je,ks:ke,8), intent(out) :: A
   integer, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: vof_phase
@@ -201,24 +188,23 @@ subroutine setuppoisson_fs(vof_phase,rhot,dt,A,pmask,cvof,n1,n2,n3,kap,istep)
 
   x_mod=dxh((is+ie)/2); y_mod=dyh((js+je)/2); z_mod=dzh((ks+ke)/2) !assumes an unstretched grid
   P_g = 0d0
-  pmask = 1d0
   debug = .false.
   if (debug) then
      Open(unit=50,file='C_int-'//TRIM(int2text(istep,padding))//'.txt') !remove, debugging
      Open(unit=51,file='COEFFS-'//TRIM(int2text(istep,padding))//'.txt') !remove, debugging
-     !Open(unit=52,file='P_g-'//TRIM(int2text(istep,padding))//'.txt') !remove, debugging
-     !Open(unit=53,file='Phase-'//TRIM(int2text(istep,padding))//'.txt') !remove, debugging 
   endif 
   
   do k=ks,ke; do j=js,je; do i=is,ie
      ! Check for gas-liquid neighbours, set pmask and P_g
      if(vof_phase(i,j,k)==1) then
         if (cvof(i,j,k)<0.5d0) write(*,'("Vof phase error. Phase test 1, cvof: ",e14.5)')cvof(i,j,k) !debugging
-        pmask(i,j,k)=0d0
         do nbr=-1,1,2
            if (vof_phase(i+nbr,j,k)==0) P_g(i,j,k,1) = sigma*kap(i,j,k)/dx(i) !!filaments and droplets of one cell will be a problem
+           if (P_g(i,j,k,1) /= P_g(i,j,k,1)) write(*,*)'WARNING, P_g NaN x-dir' 
            if (vof_phase(i,j+nbr,k)==0) P_g(i,j,k,2) = sigma*kap(i,j,k)/dy(j)
+           if (P_g(i,j,k,2) /= P_g(i,j,k,2)) write(*,*)'WARNING, P_g NaN y-dir'
            if (vof_phase(i,j,k+nbr)==0) P_g(i,j,k,3) = sigma*kap(i,j,k)/dz(k)
+           if (P_g(i,j,k,3) /= P_g(i,j,k,3)) write(*,*)'WARNING, P_g NaN z-dir'
         enddo
      endif
      ! Liquid-gas neighbours
@@ -253,9 +239,6 @@ subroutine setuppoisson_fs(vof_phase,rhot,dt,A,pmask,cvof,n1,n2,n3,kap,istep)
                     if (debug) write(50,312)x(i)+nbr*mod0,y(j)
                  endif
               endif
-              !enddo
-              !average if interfaces in both cells intersect in between nodes
-              !adapt A coeff
               if (count > 0d0) then
                  x_mod(i+(nbr-1)/2,j,k) = (mod0 + mod1)/count
               else
@@ -267,7 +250,6 @@ subroutine setuppoisson_fs(vof_phase,rhot,dt,A,pmask,cvof,n1,n2,n3,kap,istep)
                  write(*,'("A1 or A2 NaN? ",2e14.4)')A(i,j,k,2+(nbr-1)/2),x_mod(i+(nbr-1)/2,j,k) !debugging
               endif
               if (debug) write(51,314)x(i),y(j),nbr*x_mod(i+(nbr-1)/2,j,k),0d0
-              !P_g(i+nbr,j,k,1) = sigma*kap(i,j,k)/dx(i) !check, fix
            endif
         enddo
         !Check y-neighbours in both directions
@@ -299,8 +281,6 @@ subroutine setuppoisson_fs(vof_phase,rhot,dt,A,pmask,cvof,n1,n2,n3,kap,istep)
                     if (debug) write(50,312)x(i),y(j)+nbr*mod0
                  endif
               endif
-              !average if interfaces in both cells intersect in between nodes
-              !adapt A coeff
               if (count > 0d0) then
                  y_mod(i,j+(nbr-1)/2,k) = (mod0 + mod1)/count
               else
@@ -312,7 +292,6 @@ subroutine setuppoisson_fs(vof_phase,rhot,dt,A,pmask,cvof,n1,n2,n3,kap,istep)
               if (A(i,j,k,4+(nbr-1)/2) /= A(i,j,k,4+(nbr-1)/2)) then
                  write(*,'("A3 or A4 NaN? ",2e14.4)')A(i,j,k,4+(nbr-1)/2), y_mod(i,j+(nbr-1)/2,k) !debugging
               endif
-              !P_g(i,j+1,k,2) = sigma*kap(i,j,k)/dy(j) !check, fix
            endif
         enddo
         !Check z-neighbours
@@ -344,8 +323,6 @@ subroutine setuppoisson_fs(vof_phase,rhot,dt,A,pmask,cvof,n1,n2,n3,kap,istep)
                     !if (debug) write(50,312)x(i),z(k)+mod0
                  endif
               endif
-              !average if interfaces in both cells intersect in between nodes
-              !adapt A coeff
               if (count > 0d0) then
                  z_mod(i,j,k+(nbr-1)/2) = (mod0 + mod1)/count
               else
@@ -357,7 +334,6 @@ subroutine setuppoisson_fs(vof_phase,rhot,dt,A,pmask,cvof,n1,n2,n3,kap,istep)
               if (A(i,j,k,6+(nbr-1)/2) /= A(i,j,k,6+(nbr-1)/2)) then
                  write(*,'("A5 or A6 NaN? ",2e14.4)')A(i,j,k,6), z_mod(i,j,k+(nbr-1)/2) !debugging
               endif
-              !P_g(i,j,k+1,3) = sigma*kap(i,j,k)/dz(k) !check, fix
            endif
         enddo
      endif
@@ -372,11 +348,7 @@ close(unit=50); close(unit=51); close(unit=52); close(unit=53)
 314 format(4e14.5) !remove, debugging
 414 format(3e14.5,I8)
   do k=ks,ke; do j=js,je; do i=is,ie
-     !do l=1,6
-     !   A(i,j,k,l) = pmask(i,j,k)*A(i,j,k,l)
-     !   if (A(i,j,k,l) /= A(i,j,k,l)) write(*,'("A*pmask is NaN. pmask, A :",2e14.5)')pmask(i,j,k),A(i,j,k,l)
-     !enddo
-     A(i,j,k,7) = sum(A(i,j,k,1:6)) !+ (1d0-pmask(i,j,k))
+     A(i,j,k,7) = sum(A(i,j,k,1:6))
      A(i,j,k,8) = A(i,j,k,8) + dt/rhot(i,j,k)*&
           (P_g(i+1,j,k,1)/(dx(i)*x_mod(i,j,k))+P_g(i-1,j,k,1)/(dx(i)*x_mod(i-1,j,k))&
           +P_g(i,j+1,k,2)/(dy(j)*y_mod(i,j,k))+P_g(i,j-1,k,2)/(dy(j)*y_mod(i,j-1,k))&
@@ -387,9 +359,6 @@ close(unit=50); close(unit=51); close(unit=52); close(unit=53)
         write(*,'("A8 NaN, error imminent. P_g :",6e14.5)')P_g(i-1,j,k,1),P_g(i+1,j,k,1),&
              P_g(i,j-1,k,2),P_g(i,j+1,k,2),P_g(i,j,k-1,3),P_g(i,j,k+1,3)
         write(*,'("rho :",e14.5)')rhot(i,j,k)
-        write(*,'("pmask :",e14.5)')pmask(i,j,k)
-!!$        write(*,'("A8 NaN, kap :",6e14.5)')kap(i-1,j,k),kap(i,j,k),&
-!!$             kap(i,j-1,k),kap(i,j,k),kap(i,j,k-1),kap(i,j,k)
      endif
   enddo;enddo;enddo
 end subroutine setuppoisson_fs

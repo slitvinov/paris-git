@@ -2114,7 +2114,7 @@ subroutine SetupPoisson(utmp,vtmp,wtmp,umask,vmask,wmask,vof_phase,rhot,dt,A,pma
 !    endif
   enddo; enddo; enddo
   if(FreeSurface) then
-   call setuppoisson_fs(vof_phase,rhot,dt,A,pmask,cvof,n1,n2,n3,kappa_fs,istep)
+   call setuppoisson_fs(vof_phase,rhot,dt,A,cvof,n1,n2,n3,kappa_fs,istep)
   endif
   P_bc = 0d0
   ! dp/dn = 0 for inflow bc on face 1 == x- : do not correct u(is-1)
@@ -2259,7 +2259,6 @@ subroutine SetupPoisson(utmp,vtmp,wtmp,umask,vmask,wmask,vof_phase,rhot,dt,A,pma
            endif
         endif
      enddo; enddo; enddo
-     check_setup =.false.
      if(check_setup) call check_poisson_setup(A,pmask,umask,vmask,wmask)
   endif
 ! End debugging and checking

@@ -57,8 +57,8 @@ subroutine NewSolver(A,p,maxError,beta,maxit,it,ierr)
   endif
   itime=itime+1
   if (FreeSurface) then
-     do k=ks,ke; do j=js,je; do i=is,ie
-        if (pcmask(i,j,k)>0) p(i,j,k) = 0d0
+     do k=ks,ke; do j=js,je; do i=is,ie !assign zero pressure to all non-liquid cells
+        if (pcmask(i,j,k)>0) p(i,j,k) = 0d0 
      enddo; enddo; enddo
   endif
   !--------------------------------------ITERATION LOOP--------------------------------------------  

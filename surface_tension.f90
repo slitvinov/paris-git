@@ -1210,7 +1210,7 @@ contains
       !*(3)*  
       alpha = al3dold(dmx,dmy,dmz,cvof(i,j,k))
       !*(4)*  
-      call PlaneAreaCenter(dmx,dmy,dmz,alpha,px,py,pz)
+      call PlaneAreaCenter(dmx,dmy,dmz,alpha,px,py,pz,cvof(i,j,k))
       !*(5)*
       ! trap NaNs
       !      if(px.ne.px) call pariserror("FCAC:invalid px")
@@ -1237,16 +1237,18 @@ contains
 !
 !  assumptions: dmx,dmy,dmz > 0 and |dmx| + |dmy| + |dmz| = 1
 !
-   subroutine PlaneAreaCenter (dmx,dmy,dmz, alpha, px,py,pz)
+   subroutine PlaneAreaCenter (dmx,dmy,dmz, alpha, px,py,pz,c)
      implicit none
-     real(8), intent(in) :: dmx,dmy,dmz,alpha
+     real(8), intent(in) :: dmx,dmy,dmz,alpha,c
      real(8), intent(out) :: px,py,pz
      real(8) :: nx,ny,qx,qy
      real(8) :: area,b,amax
 
      if(dmx<0.d0.or.dmy<0.d0.or.dmz<0.d0) call pariserror("invalid dmx dmy dmz")
-     if(abs(dmx+dmy+dmz-1d0)>EPS_GEOM) call pariserror("invalid dmx+dmy+dmz")
-
+     if(abs(dmx+dmy+dmz-1d0)>EPS_GEOM) then
+        write(*,'("norms in PlaneAreaCenter :",4e14.5)')dmx,dmy,dmz,c
+        call pariserror("invalid dmx+dmy+dmz")
+     endif
      if (dmx < EPS_GEOM) then
         nx = dmy
         ny = dmz
