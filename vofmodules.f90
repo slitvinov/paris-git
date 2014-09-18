@@ -345,10 +345,11 @@ contains
         allocate(u_cmask(imin:imax,jmin:jmax,kmin:kmax), v_cmask(imin:imax,jmin:jmax,kmin:kmax), &
             w_cmask(imin:imax,jmin:jmax,kmin:kmax), x_mod(imin:imax,jmin:jmax,kmin:kmax), &
             y_mod(imin:imax,jmin:jmax,kmin:kmax), z_mod(imin:imax,jmin:jmax,kmin:kmax), &
-            P_g(imin:imax,jmin:jmax,kmin:kmax,3), pcmask(imin:imax,jmin:jmax,kmin:kmax))
+            P_g(imin:imax,jmin:jmax,kmin:kmax,3), pcmask(imin:imax,jmin:jmax,kmin:kmax), &
+            p_ext(imin:imax,jmin:jmax,kmin:kmax))
        u_cmask = 3; v_cmask = 3; w_cmask = 3
-       x_mod = 0d0; y_mod = 0d0; z_mod = 0d0
-       P_g = 0d0; pcmask=3
+       x_mod = dxh((is+ie)/2); y_mod = dyh((js+je)/2); z_mod = dzh((ks+ke)/2)
+       P_g = 0d0; pcmask=3; p_ext=0d0
        initialize_fs = .true.
     endif
     if ( itime_scheme == 2 ) then  
@@ -444,11 +445,8 @@ or none at all")
   subroutine get_vof_phase(c)
     use module_IO
     use module_flow
-    integer :: i,j,k!,iout
+    integer :: i,j,k
     real (8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: c
-    !character(2) :: flag
-    !iout = itimestep
-    !OPEN(UNIT=21,FILE='Phase_flags-'//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout,padding))//'.txt')
     do k=kmin,kmax
        do j=jmin,jmax
           do i=imin,imax
@@ -457,13 +455,9 @@ or none at all")
              else
                 vof_phase(i,j,k) = 1
              endif
-             !if (k==(ks+ke)/2) then
-              !write(21,'(2e14.5,I4)')x(i),y(j),vof_phase(i,j,k)
-             !endif
           enddo
        enddo
     enddo
-    !close(unit=21)
   end subroutine get_vof_phase
   !=================================================================================================
   !=================================================================================================
@@ -471,7 +465,7 @@ or none at all")
   !=================================================================================================
   subroutine initconditions_VOF()
     use module_grid
-    
+
     use module_flow
     use module_BC
     use module_2phase

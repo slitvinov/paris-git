@@ -57,9 +57,12 @@ subroutine NewSolver(A,p,maxError,beta,maxit,it,ierr)
   endif
   itime=itime+1
   if (FreeSurface) then
-     do k=ks,ke; do j=js,je; do i=is,ie !assign zero pressure to all non-liquid cells
-        if (pcmask(i,j,k)>0) p(i,j,k) = 0d0 
-     enddo; enddo; enddo
+     if (solver_flag == 0) call pariserror("Free Surface solver flag needs to be 1 or 2")
+     if (solver_flag == 1) then
+        do k=ks,ke; do j=js,je; do i=is,ie !assign zero pressure to all non-liquid cells
+           if (pcmask(i,j,k)>0) p(i,j,k) = 0d0 
+        enddo; enddo; enddo
+     endif
   endif
   !--------------------------------------ITERATION LOOP--------------------------------------------  
   do it=1,maxit
@@ -73,7 +76,8 @@ subroutine NewSolver(A,p,maxError,beta,maxit,it,ierr)
     call ghost_x(p,1,req( 1: 4)); call ghost_y(p,1,req( 5: 8)); call ghost_z(p,1,req( 9:12))
     do k=ks+1,ke-1; do j=js+1,je-1; do i=is+1,ie-1
       if (FreeSurface) then
-          if (pcmask(i,j,k)==0) then
+          if ((pcmask(i,j,k)==0 .and. solver_flag==1)&
+               .or.((pcmask(i,j,k)==1 .or. pcmask(i,j,k)==2) .and. solver_flag==2)) then
              res2=res2+abs(-p(i,j,k) * A(i,j,k,7) +                           &
                   A(i,j,k,1) * p(i-1,j,k) + A(i,j,k,2) * p(i+1,j,k) +            &
                   A(i,j,k,3) * p(i,j-1,k) + A(i,j,k,4) * p(i,j+1,k) +            &
@@ -91,10 +95,13 @@ subroutine NewSolver(A,p,maxError,beta,maxit,it,ierr)
     mask(is+1:ie-1,js+1:je-1,ks+1:ke-1)=.false.
     do k=ks,ke; do j=js,je; do i=is,ie
        if (FreeSurface) then
-          if(mask(i,j,k) .and. pcmask(i,j,k)==0) res2=res2+abs(-p(i,j,k) * A(i,j,k,7) +&
+          if(mask(i,j,k) .and. ((pcmask(i,j,k)==0 .and. solver_flag==1) .or. &
+               ((pcmask(i,j,k)==1 .or. pcmask(i,j,k)==2) .and. solver_flag==2))) then
+          res2=res2+abs(-p(i,j,k) * A(i,j,k,7) +&
                A(i,j,k,1) * p(i-1,j,k) + A(i,j,k,2) * p(i+1,j,k) +            &
                A(i,j,k,3) * p(i,j-1,k) + A(i,j,k,4) * p(i,j+1,k) +            &
                A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8) )**norm
+          endif
        else
           if(mask(i,j,k)) res2=res2+abs(-p(i,j,k) * A(i,j,k,7) +            &
                A(i,j,k,1) * p(i-1,j,k) + A(i,j,k,2) * p(i+1,j,k) +            &
@@ -175,11 +182,12 @@ subroutine RedBlackRelax(A,p,beta)
         do j=js,je
            do i=isw+is-1,ie,2
               if (FreeSurface) then
-                 if (pcmask(i,j,k)==0) then !only solve for liq cells
+                 if ((pcmask(i,j,k)==0 .and. solver_flag==1) &
+                      .or.((pcmask(i,j,k)==1 .or. pcmask(i,j,k)==2) .and. solver_flag==2)) then
                     p(i,j,k)=(1d0-beta)*p(i,j,k) + (beta/A(i,j,k,7))*(              &
                          A(i,j,k,1) * p(i-1,j,k) + A(i,j,k,2) * p(i+1,j,k) +        &
                          A(i,j,k,3) * p(i,j-1,k) + A(i,j,k,4) * p(i,j+1,k) +        &
-                         A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8))
+                         A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8))   
                  endif
               else
                  p(i,j,k)=(1d0-beta)*p(i,j,k) + (beta/A(i,j,k,7))*(             &
@@ -211,7 +219,7 @@ subroutine LineRelax(A,p,beta)
 !--------------------------------------ITERATION LOOP--------------------------------------------  
   do k=ks,ke; do j=js,je; do i=is,ie
      if (FreeSurface) then
-        if (pcmask(i,j,k)==0) then
+        if ((pcmask(i,j,k)==0 .and. solver_flag==1).or.((pcmask(i,j,k)==1 .or. pcmask(i,j,k)==2) .and. solver_flag==2)) then
            p(i,j,k)=(1d0-beta)*p(i,j,k) + (beta/A(i,j,k,7))*(              &
                 A(i,j,k,1) * p(i-1,j,k) + A(i,j,k,2) * p(i+1,j,k) +        &
                 A(i,j,k,3) * p(i,j-1,k) + A(i,j,k,4) * p(i,j+1,k) +        &

@@ -165,10 +165,11 @@ contains
             enddo
          enddo
       enddo
-      call ghost_x(n1,1,req(1:4)); call ghost_x(n2,1,req(5:8)); call ghost_x(n3,1,req(9:12))
-      call ghost_y(n1,1,req(13:16)); call ghost_y(n2,1,req(17:20)); call ghost_y(n3,1,req(21:24))
-      call ghost_z(n1,1,req(25:28)); call ghost_z(n2,1,req(29:32)); call ghost_z(n3,1,req(33:36))
-      call MPI_WAITALL(36,req(1:36),sta(:,1:36),ierr)
+      call do_ghost_vector(n1,n2,n3)
+      !call ghost_x(n1,1,req(1:4)); call ghost_x(n2,1,req(5:8)); call ghost_x(n3,1,req(9:12))
+      !call ghost_y(n1,1,req(13:16)); call ghost_y(n2,1,req(17:20)); call ghost_y(n3,1,req(21:24))
+      !call ghost_z(n1,1,req(25:28)); call ghost_z(n2,1,req(29:32)); call ghost_z(n3,1,req(33:36))
+      !call MPI_WAITALL(36,req(1:36),sta(:,1:36),ierr) 
    end subroutine get_normals
 !=================================================================================================
 !
@@ -190,7 +191,7 @@ contains
 
 !New simple extrapolation: Velocities of neighbours at lower topological level averaged
      do level = 1, X_level
-        do k=kmin+1,kmax-1; do j=jmin+1,jmax-1; do i=imin+1,imax-1
+        do k=ks-1,ke+1; do j=js-1,je+1; do i=is-1,ie+1
            if (u_cmask(i,j,k) == level) then
               xcount = 0d0; x_vel = 0d0
               do nbr=-1,1,2
@@ -263,39 +264,8 @@ contains
                  w(i,j,k) = x_vel/xcount
               endif
            endif
-!!$           call ghost_x(u  ,2,req( 1: 4));  call ghost_x(v,2,req( 5: 8)); call ghost_x(w,2,req( 9:12)); 
-!!$           call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
-!!$           call ghost_y(u  ,2,req( 1: 4));  call ghost_y(v,2,req( 5: 8)); call ghost_y(w,2,req( 9:12)); 
-!!$           call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
-!!$           call ghost_z(u  ,2,req( 1: 4));  call ghost_z(v,2,req( 5: 8)); call ghost_z(w,2,req( 9:12)); 
-!!$           call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
         enddo; enddo; enddo
      enddo
-! Simple volume conservation step after velocities have been extrapolated.
-!!$     Src = 0d0
-!!$     do level = 1, X_level
-!!$        do k=ks,ke; do j=js,je; do i=is,ie
-!!$           a_l = 0d0; a_rt = 0d0; a_t = 0d0; a_b = 0d0; a_f = 0d0; a_rr = 0d0    
-!!$           Src = (u(i-1,j,k)-u(i,j,k))*dz(k)*dy(j) + (v(i,j-1,k)-v(i,j,k))*dx(i)*dz(k) + (w(i,j,k-1)-w(i,j,k))*dx(i)*dy(j)
-!!$           if ((n1(i,j,k) > 0d0) .and. (u_cmask(i-1,j,k)==level-1)) a_l = 1d0
-!!$           if ((n1(i,j,k) < 0d0) .and. (u_cmask(i,j,k)==level-1)) a_rt = 1d0
-!!$           if ((n2(i,j,k) > 0d0) .and. (v_cmask(i,j-1,k)==level-1)) a_b = 1d0
-!!$           if ((n2(i,j,k) < 0d0) .and. (v_cmask(i,j,k)==level-1)) a_t = 1d0
-!!$           if ((n3(i,j,k) > 0d0) .and. (w_cmask(i,j,k-1)==level-1)) a_rr = 1d0
-!!$           if ((n3(i,j,k) < 0d0) .and. (w_cmask(i,j,k)==level-1)) a_f = 1d0
-!!$           P_a = (a_l+a_rt)*abs(n1(i,j,k))*dy(j)*dz(k) + &
-!!$                (a_t + a_b)*abs(n2(i,j,k))*dx(i)*dz(k) + &
-!!$                (a_f + a_rr)*abs(n3(i,j,k))*dx(i)*dy(j)
-!!$           if (P_a .ne. 0) then
-!!$              u(i,j,k) = u(i,j,k) + a_rt*Src/P_a*abs(n1(i,j,k)) 
-!!$              v(i,j,k) = v(i,j,k) + a_t*Src/P_a*abs(n2(i,j,k))  
-!!$              w(i,j,k) = w(i,j,k) + a_f*Src/P_a*abs(n3(i,j,k))
-!!$              u(i-1,j,k) = u(i-1,j,k) - a_l*Src/P_a*abs(n1(i,j,k)) 
-!!$              v(i,j-1,k) = v(i,j-1,k) - a_b*Src/P_a*abs(n2(i,j,k))  
-!!$              w(i,j,k-1) = w(i,j,k-1) - a_rr*Src/P_a*abs(n3(i,j,k))
-!!$           endif
-!!$        enddo; enddo; enddo
-!!$     enddo
    end subroutine extrapolate_velocities
 !=================================================================================================
 !
@@ -1210,7 +1180,7 @@ contains
       !*(3)*  
       alpha = al3dold(dmx,dmy,dmz,cvof(i,j,k))
       !*(4)*  
-      call PlaneAreaCenter(dmx,dmy,dmz,alpha,px,py,pz,cvof(i,j,k))
+      call PlaneAreaCenter(dmx,dmy,dmz,alpha,px,py,pz)
       !*(5)*
       ! trap NaNs
       !      if(px.ne.px) call pariserror("FCAC:invalid px")
@@ -1237,18 +1207,15 @@ contains
 !
 !  assumptions: dmx,dmy,dmz > 0 and |dmx| + |dmy| + |dmz| = 1
 !
-   subroutine PlaneAreaCenter (dmx,dmy,dmz, alpha, px,py,pz,c)
+   subroutine PlaneAreaCenter (dmx,dmy,dmz, alpha, px,py,pz)
      implicit none
-     real(8), intent(in) :: dmx,dmy,dmz,alpha,c
+     real(8), intent(in) :: dmx,dmy,dmz,alpha
      real(8), intent(out) :: px,py,pz
      real(8) :: nx,ny,qx,qy
      real(8) :: area,b,amax
 
      if(dmx<0.d0.or.dmy<0.d0.or.dmz<0.d0) call pariserror("invalid dmx dmy dmz")
-     if(abs(dmx+dmy+dmz-1d0)>EPS_GEOM) then
-        write(*,'("norms in PlaneAreaCenter :",4e14.5)')dmx,dmy,dmz,c
-        call pariserror("invalid dmx+dmy+dmz")
-     endif
+     if(abs(dmx+dmy+dmz-1d0)>EPS_GEOM) call pariserror("invalid dmx+dmy+dmz")
      if (dmx < EPS_GEOM) then
         nx = dmy
         ny = dmz
