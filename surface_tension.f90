@@ -166,10 +166,6 @@ contains
          enddo
       enddo
       call do_ghost_vector(n1,n2,n3)
-      !call ghost_x(n1,1,req(1:4)); call ghost_x(n2,1,req(5:8)); call ghost_x(n3,1,req(9:12))
-      !call ghost_y(n1,1,req(13:16)); call ghost_y(n2,1,req(17:20)); call ghost_y(n3,1,req(21:24))
-      !call ghost_z(n1,1,req(25:28)); call ghost_z(n2,1,req(29:32)); call ghost_z(n3,1,req(33:36))
-      !call MPI_WAITALL(36,req(1:36),sta(:,1:36),ierr) 
    end subroutine get_normals
 !=================================================================================================
 !
