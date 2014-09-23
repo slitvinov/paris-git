@@ -415,31 +415,22 @@ subroutine setuppoisson_fs2(utmp,vtmp,wtmp,dt,A,vof_phase,istep)
         A(i,j,k,5) = dt/(dz(k)*dzh(k-1))
         A(i,j,k,6) = dt/(dz(k)*dzh(k))
      endif
-!!$     if (vof_phase(i,j,k)==1) then
-!!$        do nbr=-1,1,2
-!!$           if (vof_phase(i+nbr,j,k) == 0) then
-!!$              h_mod = dxh(i+(nbr-1)/2)-x_mod(i+(nbr-1)/2,j,k)
-!!$              A(i,j,k,2+(nbr-1)/2) = dt/(dx(i)*h_mod)
-!!$              if (A(i,j,k,2+(nbr-1)/2) /= A(i,j,k,2+(nbr-1)/2) .or. A(i,j,k,2+(nbr-1)/2)>1d10 ) then
-!!$                 write(*,'("A1 or A2 NaN fs2 ? ",4e14.4)')A(i,j,k,2+(nbr-1)/2),h_mod,x_mod(i+(nbr-1)/2,j,k),dxh(i+(nbr-1)/2) !debugging
-!!$              endif
-!!$           endif
-!!$           if (vof_phase(i,j+nbr,k) == 0) then
-!!$              h_mod = dyh(j+(nbr-1)/2)-y_mod(i,j+(nbr-1)/2,k)
-!!$              A(i,j,k,4+(nbr-1)/2) = dt/(dy(j)*h_mod)
-!!$              if (A(i,j,k,4+(nbr-1)/2) /= A(i,j,k,4+(nbr-1)/2) .or. A(i,j,k,4+(nbr-1)/2)>1d10 ) then
-!!$                 write(*,'("A3 or A4 NaN fs2 ? ",3e14.4)')A(i,j,k,4+(nbr-1)/2),h_mod,y_mod(i,j+(nbr-1)/2,k),dyh(j+(nbr-1)/2) !debugging
-!!$              endif
-!!$           endif
-!!$           if (vof_phase(i,j,k+nbr) == 0) then
-!!$              h_mod = dzh(k+(nbr-1)/2)-z_mod(i,j,k+(nbr-1)/2)
-!!$              A(i,j,k,6+(nbr-1)/2) = dt/(dz(k)*h_mod)
-!!$              if (A(i,j,k,6+(nbr-1)/2) /= A(i,j,k,6+(nbr-1)/2) .or. A(i,j,k,6+(nbr-1)/2)>1d10 ) then
-!!$                 write(*,'("A5 or A6 NaN fs2 ? ",3e14.4)')A(i,j,k,6+(nbr-1)/2),h_mod,z_mod(i,j,k+(nbr-1)/2),dzh(k+(nbr-1)/2) !debugging
-!!$              endif
-!!$           endif
-!!$        enddo
-!!$     endif
+     if (vof_phase(i,j,k)==1) then
+        do nbr=-1,1,2
+           if (vof_phase(i+nbr,j,k) == 0) then
+              h_mod = dxh(i+(nbr-1)/2)-x_mod(i+(nbr-1)/2,j,k)
+              if (h_mod > (1d-10)) A(i,j,k,2+(nbr-1)/2) = dt/(dx(i)*h_mod)
+           endif
+           if (vof_phase(i,j+nbr,k) == 0) then
+              h_mod = dyh(j+(nbr-1)/2)-y_mod(i,j+(nbr-1)/2,k)
+              if (h_mod > (1d-10)) A(i,j,k,4+(nbr-1)/2) = dt/(dy(j)*h_mod)
+           endif
+           if (vof_phase(i,j,k+nbr) == 0) then
+              h_mod = dzh(k+(nbr-1)/2)-z_mod(i,j,k+(nbr-1)/2)
+              if (h_mod > (1d-10)) A(i,j,k,6+(nbr-1)/2) = dt/(dz(k)*h_mod)
+           endif
+        enddo
+     endif
      A(i,j,k,7) = sum(A(i,j,k,1:6))
      A(i,j,k,8) =  -((utmp(i,j,k)-utmp(i-1,j,k))/dx(i) &
           +  (vtmp(i,j,k)-vtmp(i,j-1,k))/dy(j) &
