@@ -292,7 +292,7 @@ subroutine setuppoisson_fs(vof_phase,rhot,dt,A,cvof,n1,n2,n3,kap,iout)
                  z_test = (alpha - (n_x+n_y)/2d0)/n_z
                  if (z_test<1.5d0 .and. (n3(i,j,k+nbr)*nbr)<0d0) then
                     count = count + 1d0
-                    mod1 = (1.5d0-z_test)*dzh(3)
+                    mod1 = (1.5d0-z_test)*dzh(k+(nbr-1)/2)
                     !if (debug) write(50,312)x(i),z(k)+mod1
                  endif
               endif
@@ -304,7 +304,7 @@ subroutine setuppoisson_fs(vof_phase,rhot,dt,A,cvof,n1,n2,n3,kap,iout)
                  z_test = (alpha - (n_x+n_y)/2d0)/n_z
                  if (z_test>-0.5d0 .and. n3(i,j,k)*nbr<0d0) then
                     count = count + 1d0
-                    mod0 = (0.5d0-z_test)*dzh(3)
+                    mod0 = (0.5d0-z_test)*dzh(k+(nbr-1)/2)
                     !if (debug) write(50,312)x(i),z(k)+mod0
                  endif
               endif
