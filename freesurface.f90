@@ -449,21 +449,22 @@ subroutine discrete_divergence(u,v,w,iout)
   real(8), dimension(0:3) :: divtot, domain
   integer :: i,j,k,l,iout,ierr
 
-OPEN(unit=20,file=TRIM(out_path)//'/divergence-'//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout,padding))//'.txt')
+!OPEN(unit=20,file=TRIM(out_path)//'/divergence-'//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout,padding))//'.txt')
 OPEN(unit=21,file='div_type.txt',access='append')
 
 divtot = 0d0
 
 do k=ks,ke; do j=js,je; do i=is,ie
-   div(i,j,k)=u(i-1,j,k)-u(i,j,k)+v(i,j-1,k)-v(i,j,k)+w(i,j,k-1)-w(i,j,k)
-   write(20,14)x(i),y(j),z(k),div(i,j,k)
+   div(i,j,k)=(u(i-1,j,k)-u(i,j,k))*dy(j)*dz(k)+(v(i,j-1,k)-v(i,j,k))*dx(i)*dz(k)+(w(i,j,k-1)-w(i,j,k))*dx(i)*dy(j)
+   !write(20,14)x(i),y(j),z(k),div(i,j,k)
    do l=0,3
       if (pcmask(i,j,k)==l) divtot(l)=divtot(l)+ABS(div(i,j,k))
    enddo
 enddo; enddo; enddo
 call MPI_ALLREDUCE(divtot,domain,4, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_Cart, ierr)
 write(21,15)iout,domain(0),domain(1),domain(2),domain(3)
-close(unit=20); close(unit=21)
+!close(unit=20)
+close(unit=21)
 14 format(4e14.5)
 15 format(I8,4e14.5)
 end subroutine discrete_divergence
