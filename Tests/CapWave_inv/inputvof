@@ -1,0 +1,17 @@
+&VOFPARAMETERS
+
+VOFBDRY_COND = 'periodic' 'periodic' 'wet' 'periodic' 'periodic' 'dry'
+                   ! Type of VOF boundary condition in x,y,z direction: 'wet', '90deg','periodic'
+
+TEST_TYPE = 'Capillary_wave'
+VOF_ADVECT = 'Dick_Yue'
+REFINEMENT = 1
+CYLINDER_DIR = 2
+NORMAL_UP = T
+FreeSurface = T
+X_level = 2
+use_vofi = F
+!=================================================================================================
+
+&end
+! end of the namelist
