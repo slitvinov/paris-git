@@ -415,26 +415,6 @@ subroutine setuppoisson_fs2(utmp,vtmp,wtmp,dt,A,vof_phase,istep)
         A(i,j,k,5) = dt/(dz(k)*dzh(k-1))
         A(i,j,k,6) = dt/(dz(k)*dzh(k))
      endif
-     if (vof_phase(i,j,k)==1) then
-        do nbr=-1,1,2
-           if (vof_phase(i+nbr,j,k) == 0) then
-              h_mod = dxh(i+(nbr-1)/2)-x_mod(i+(nbr-1)/2,j,k)
-              if (h_mod > (1d-10)) A(i,j,k,2+(nbr-1)/2) = dt/(dx(i)*h_mod)
-           endif
-           if (vof_phase(i,j+nbr,k) == 0) then
-              h_mod = dyh(j+(nbr-1)/2)-y_mod(i,j+(nbr-1)/2,k)
-              if (h_mod > (1d-10)) A(i,j,k,4+(nbr-1)/2) = dt/(dy(j)*h_mod)
-           endif
-           if (vof_phase(i,j,k+nbr) == 0) then
-              h_mod = dzh(k+(nbr-1)/2)-z_mod(i,j,k+(nbr-1)/2)
-              if (h_mod > (1d-10)) A(i,j,k,6+(nbr-1)/2) = dt/(dz(k)*h_mod)
-           endif
-        enddo
-     endif
-     A(i,j,k,7) = sum(A(i,j,k,1:6))
-     A(i,j,k,8) =  -((utmp(i,j,k)-utmp(i-1,j,k))/dx(i) &
-          +  (vtmp(i,j,k)-vtmp(i,j-1,k))/dy(j) &
-          +  (wtmp(i,j,k)-wtmp(i,j,k-1))/dz(k))
   enddo; enddo; enddo
 end subroutine setuppoisson_fs2
 !--------------------------------------------------------------------------------------------------------------------
@@ -455,12 +435,13 @@ OPEN(unit=21,file='div_type.txt',access='append')
 divtot = 0d0
 
 do k=ks,ke; do j=js,je; do i=is,ie
-   div(i,j,k)=(u(i-1,j,k)-u(i,j,k))*dy(j)*dz(k)+(v(i,j-1,k)-v(i,j,k))*dx(i)*dz(k)+(w(i,j,k-1)-w(i,j,k))*dx(i)*dy(j)
+   div(i,j,k)=(u(i-1,j,k)-u(i,j,k))/dx(i)+(v(i,j-1,k)-v(i,j,k))/dy(j)+(w(i,j,k-1)-w(i,j,k))/dz(k)
    !write(20,14)x(i),y(j),z(k),div(i,j,k)
    do l=0,3
       if (pcmask(i,j,k)==l) divtot(l)=divtot(l)+ABS(div(i,j,k))
    enddo
 enddo; enddo; enddo
+divtot=divtot/(Nx*Ny*Nz)
 call MPI_ALLREDUCE(divtot,domain,4, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_Cart, ierr)
 write(21,15)iout,domain(0),domain(1),domain(2),domain(3)
 !close(unit=20)
