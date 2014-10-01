@@ -468,20 +468,34 @@ Program paris
               if ( DoLPP ) call backup_LPP_write 
            end if ! DoFront, DoVOF
         end if ! itimestep
-!        if(mod(itimestep,noutuv)==0) then 
-        if(mod(itimestep-itimestepRestart,nout)==0) then 
-           nfile = ITIMESTEP/nout
-           if ( tout > 0.d0 .and. dtFlag == 1 ) nfile = NINT(time/tout)
-           call write_vec_gnuplot(u,v,cvof,p,itimestep,DoVOF)
-           call output(nfile,is,ie+1,js,je+1,ks,ke+1)
-           if(DoVOF) call output_VOF(nfile,is,ie+1,js,je+1,ks,ke+1)
-           if(DoLPP) call output_LPP(nfile,is,ie+1,js,je+1,ks,ke+1)
-           if(test_droplet) call output_droplet(w,time)
-           if(rank==0)then
-              end_time =  MPI_WTIME()
-              write(out,'("Step:",I9," Iterations:",I9," cpu(s):",f10.2)')itimestep,it,end_time-start_time
-           endif
-        endif
+!        if(mod(itimestep,noutuv)==0) then
+        if ( tout > 0.d0 ) then  ! output based on time 
+            if ( (tout - (time-timeLastOutput)) < 0.9999*dt ) then 
+               nfile = NINT(time/tout)
+               call output(nfile,is,ie+1,js,je+1,ks,ke+1)
+               if(DoVOF) call output_VOF(nfile,is,ie+1,js,je+1,ks,ke+1)
+               if(DoLPP) call output_LPP(nfile,is,ie+1,js,je+1,ks,ke+1)
+               if(rank==0)then
+                  end_time =  MPI_WTIME()
+                  write(out,'("Step:",I9," Iterations:",I9," cpu(s):",f10.2)')itimestep,it,end_time-start_time
+               endif
+               timeLastOutput = time
+            end if! timeAfterOuput
+        else                     ! output based on timestep
+            if(mod(itimestep-itimestepRestart,nout)==0) then 
+               nfile = ITIMESTEP/nout
+               if ( tout > 0.d0 .and. dtFlag == 1 ) nfile = NINT(time/tout)
+               call write_vec_gnuplot(u,v,cvof,p,itimestep,DoVOF)
+               call output(nfile,is,ie+1,js,je+1,ks,ke+1)
+               if(DoVOF) call output_VOF(nfile,is,ie+1,js,je+1,ks,ke+1)
+               if(DoLPP) call output_LPP(nfile,is,ie+1,js,je+1,ks,ke+1)
+               if(test_droplet) call output_droplet(w,time)
+               if(rank==0)then
+                  end_time =  MPI_WTIME()
+                  write(out,'("Step:",I9," Iterations:",I9," cpu(s):",f10.2)')itimestep,it,end_time-start_time
+               endif
+            endif
+        end if ! tout
         if(nstats==0) call pariserror(" *** Main: nstats = 0")
         if(mod(itimestep,nstats)==0.and.rank==0)then
               !        open(unit=121,file='track')
@@ -1845,7 +1859,7 @@ subroutine InitCondition
         call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
         call ghost_z(u,2,req( 1: 4)); call ghost_z(v,2,req( 5: 8)); call ghost_z(w,2,req( 9:12))
         call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
-        write(*,*) "Read backup files done!",rank,time,itimestep 
+        write(*,*) "Read backup files done!",rank,time,itimestep
      else
         ! Set velocities and the color function. 
         ! The color function is used for density and viscosity in the domain 
@@ -2008,6 +2022,7 @@ subroutine InitCondition
      iTimeStep = 0
   endif
   iTimeStepRestart = iTimeStep
+  timeLastOutput = time
 end subroutine InitCondition
 
 !=================================================================================================

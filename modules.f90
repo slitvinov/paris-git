@@ -352,7 +352,7 @@ module module_IO
   character(len=20) :: out_path, x_file, y_file, z_file
   logical :: read_x, read_y, read_z, restart, ICOut, restartFront, restartAverages, zip_data
   logical :: out_P, out_mom
-  real(8) :: tout
+  real(8) :: tout,timeLastOutput
 contains
     !=================================================================================================
   subroutine write_vec_gnuplot(u,v,cvof,p,iout,DoVOF)
@@ -814,17 +814,17 @@ module module_BC
 
 
   ! for walls set the mask to zero  ! @@@ Aijk coefficients should be changed too. 
-    if(bdry_cond(1)==0) then
+    if(bdry_cond(1)==0 .or. bdry_cond(1)==2) then
       if(coords(1)==0    ) umask(is-1,js-1:je+1,ks-1:ke+1)=0d0
       if(coords(1)==nPx-1) umask(ie,js-1:je+1,ks-1:ke+1)=0d0
     endif
 
-    if(bdry_cond(2)==0) then
+    if(bdry_cond(2)==0 .or. bdry_cond(2)==2) then
       if(coords(2)==0    ) vmask(is-1:ie+1,js-1,ks-1:ke+1)=0d0
       if(coords(2)==nPy-1) vmask(is-1:ie+1,je,ks-1:ke+1)=0d0
     endif 
 
-    if(bdry_cond(3)==0) then
+    if(bdry_cond(3)==0 .or. bdry_cond(3)==2) then
       if(coords(3)==0    ) wmask(is-1:ie+1,js-1:je+1,ks-1)=0d0
       if(coords(3)==nPz-1) wmask(is-1:ie+1,js-1:je+1,ke)=0d0
     endif
@@ -973,26 +973,38 @@ module module_BC
     endif
     ! wall boundary condition: shear
     if(bdry_cond(1)==2 .and. coords(1)==0    ) then
+        u(is-1,:,:)=0d0
+        u(is-2,:,:)=-u(is,:,:)
         v(is-1,:,:) = -dxh(is-1)*WallShear(1,2)+v(is,:,:)
         w(is-1,:,:) = -dxh(is-1)*WallShear(1,3)+w(is,:,:)
     endif
     if(bdry_cond(4)==2 .and. coords(1)==nPx-1) then
+        u(ie  ,:,:)=0d0
+        u(ie+1,:,:)=-u(ie-1,:,:)
         v(ie+1,:,:) = dxh(ie)*WallShear(2,2)+v(ie,:,:)
         w(ie+1,:,:) = dxh(ie)*WallShear(2,3)+w(ie,:,:)
     endif
     if(bdry_cond(2)==2 .and. coords(2)==0    ) then
+        v(:,js-1,:)=0d0
+        v(:,js-2,:)=-v(:,js,:)
         u(:,js-1,:) = -dyh(js-1)*WallShear(3,1)+u(:,js,:)
         w(:,js-1,:) = -dyh(js-1)*WallShear(3,3)+w(:,js,:)
     endif
     if(bdry_cond(5)==2 .and. coords(2)==nPy-1) then
+        v(:,je  ,:)=0d0
+        v(:,je+1,:)=-v(:,je-1,:)
         u(:,je+1,:) = dyh(je)*WallShear(4,1)+u(:,je,:)
         w(:,je+1,:) = dyh(je)*WallShear(4,3)+w(:,je,:)
     endif
     if(bdry_cond(3)==2 .and. coords(3)==0    ) then
+        w(:,:,ks-1)=0d0
+        w(:,:,ks-2)=-w(:,:,ks)
         u(:,:,ks-1) = -dzh(ks-1)*WallShear(5,1)+u(:,:,ks)
         v(:,:,ks-1) = -dzh(ks-1)*WallShear(5,2)+v(:,:,ks)
     endif
     if(bdry_cond(6)==2 .and. coords(3)==nPz-1) then
+        w(:,:,ke  )=0d0
+        w(:,:,ke+1)=-w(:,:,ke-1)
         u(:,:,ke+1) = dzh(ke)*WallShear(6,1)+u(:,:,ke)
         v(:,:,ke+1) = dzh(ke)*WallShear(6,2)+v(:,:,ke)
     endif

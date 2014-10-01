@@ -807,7 +807,7 @@ contains
          nfound = - ind_pos(points,nposit) 
       endif ! nfound == 9
       ! *** determine the origin. 
-      call FindCutAreaCentroid(i0,j0,k0,centroid)
+      call NewFindCutAreaCentroid(i0,j0,k0,centroid)
       do n=1,3
          origin(n) = centroid(n)
       enddo
@@ -846,7 +846,7 @@ contains
          c(3)=l
          if(vof_flag(i,j,k) == 2) then
             nposit = nposit + 1
-            call FindCutAreaCentroid(i,j,k,centroid)
+            call NewFindCutAreaCentroid(i,j,k,centroid)
             do s=1,3 
                fit(nposit,s) = centroid(s) + c(s)
             end do

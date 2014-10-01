@@ -472,6 +472,7 @@ or none at all")
     use module_flow
     use module_BC
     use module_2phase
+    use module_solid
 
     implicit none
     include 'mpif.h'
@@ -480,7 +481,6 @@ or none at all")
     integer :: ipar
     integer, parameter :: root_rank = 0
     integer :: i,j,k
-    real(8) :: lnozzle = 4.d-3   ! need to be consistent with lnozzle in solids
     real(8) :: ryz
     
     if( test_D2P .or. test_tag ) then 

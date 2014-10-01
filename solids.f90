@@ -39,7 +39,8 @@ module module_solid
   integer :: NumSpheres
   logical :: bitmap_opened=.false.
   integer :: remove_layers=0
-  real(8) :: porosity 
+  real(8) :: porosity
+  real(8) :: thickness2cell,lnozzle
 !***********************************************************************
 contains
 !***********************************************************************
@@ -110,13 +111,7 @@ contains
     real(8) :: x0,y0,z0,radius,x2,y2,z2
     ! for 2d nozzle
     real(8), parameter :: PI = 3.14159265359d0
-    real(8) :: hmin,lnozzle,beta,h,l1,ryz
-    hmin = xlength/dble(nx)    
-    lnozzle = 4.d-3
-    beta=1d0
-    l1=0.d0
-    !beta = 3.5d0/180.d0*PI 
-    ! Note: small beta is only meaningful when resolution is very high
+    real(8) :: h,ryz
 
     call ReadSolidParameters
     if(dosolids) then
@@ -150,9 +145,7 @@ contains
           else if (solid_type == 'BitMap') then
              s1 = read_bitmap(i,j,k)
           else if (solid_type == '2D_nozzle') then
-             !l1 = hmin*0.5d0/tan(beta)
-             !h = tan(beta)*(lnozzle+l1-x(i))
-             h = hmin*1.d0 
+             h = xlength/dble(nx)*thickness2cell*0.5d0    
              if ( x(i) < lnozzle .and. & 
                   y(j) < radius_liq_inject+h .and. & 
                   y(j) > radius_liq_inject-h ) then 
@@ -162,7 +155,6 @@ contains
              end if ! x(i),y(j)
           else if (solid_type == '3D_nozzle') then
              ryz = sqrt( (y(j) - jetcenter_yc)**2.d0 + (z(k) - jetcenter_zc)**2.d0 )
-             h = hmin*1.d0 
              if ( x(i) < lnozzle .and. & 
                   ryz < radius_liq_inject+h .and. & 
                   ryz > radius_liq_inject-h ) then 
@@ -361,13 +353,15 @@ contains
       integer ierr,in
       logical file_is_there
       namelist /solidparameters/ dosolids, solid_type, solid_radius,NumSpheres,sxyzrad, &
-           remove_layers
+           remove_layers,thickness2cell,lnozzle
       dosolids=.false.
       solid_type='SingleSphere'
       solid_radius=0.1d0
       NumSpheres=1;
       sxyzrad=0d0
       remove_layers=0
+      thickness2cell=2.d0
+      lnozzle = 4.d-3
 
       in=1
       call MPI_COMM_RANK(MPI_COMM_WORLD, rank, ierr)
