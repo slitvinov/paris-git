@@ -340,18 +340,24 @@ Program paris
               enddo; enddo; enddo
            else
               do k=ks,ke;  do j=js,je; do i=is,ieu    ! CORRECT THE u-velocity 
-                 u(i,j,k)=u(i,j,k)-dt/rho(i,j,k)*(p(i+1,j,k)+P_g(i+1,j,k,1)-p(i,j,k)-P_g(i,j,k,1))/x_mod(i,j,k)
-                 if (u(i,j,k) /= u(i,j,k)) write(*,'("WARNING u NaN :",2e14.5)')u(i,j,k), x_mod(i,j,k)
+                 if (u_cmask(i,j,k)==0) then
+                    u(i,j,k)=u(i,j,k)-dt/rho(i,j,k)*(p(i+1,j,k)+P_gx(i+1,j,k)-p(i,j,k)-P_gx(i,j,k))/x_mod(i,j,k)
+                    if (u(i,j,k) /= u(i,j,k)) write(*,'("WARNING u NaN :",2e14.5)')u(i,j,k), x_mod(i,j,k)
+                 endif
               enddo; enddo; enddo
 
               do k=ks,ke;  do j=js,jev; do i=is,ie    ! CORRECT THE v-velocity
-                 v(i,j,k)=v(i,j,k)-dt/rho(i,j,k)*(p(i,j+1,k)+P_g(i,j+1,k,2)-p(i,j,k)-P_g(i,j,k,2))/y_mod(i,j,k)
-                 if (v(i,j,k) /= v(i,j,k)) write(*,'("WARNING v NaN :",2e14.5)')v(i,j,k), y_mod(i,j,k)
+                 if (v_cmask(i,j,k)==0) then
+                    v(i,j,k)=v(i,j,k)-dt/rho(i,j,k)*(p(i,j+1,k)+P_gy(i,j+1,k)-p(i,j,k)-P_gy(i,j,k))/y_mod(i,j,k)
+                    if (v(i,j,k) /= v(i,j,k)) write(*,'("WARNING v NaN :",2e14.5)')v(i,j,k), y_mod(i,j,k)
+                 endif
               enddo; enddo; enddo
 
               do k=ks,kew;  do j=js,je; do i=is,ie   ! CORRECT THE w-velocity
-                 w(i,j,k)=w(i,j,k)-dt/rho(i,j,k)*(p(i,j,k+1)+P_g(i,j,k+1,3)-p(i,j,k)-P_g(i,j,k,3))/z_mod(i,j,k)
-                 if (w(i,j,k) /= w(i,j,k)) write(*,'("WARNING w NaN :",2e14.5)')w(i,j,k), z_mod(i,j,k)
+                 if (w_cmask(i,j,k)==0) then
+                    w(i,j,k)=w(i,j,k)-dt/rho(i,j,k)*(p(i,j,k+1)+P_gz(i,j,k+1)-p(i,j,k)-P_gz(i,j,k))/z_mod(i,j,k)
+                    if (w(i,j,k) /= w(i,j,k)) write(*,'("WARNING w NaN :",2e14.5)')w(i,j,k), z_mod(i,j,k)
+                 endif
               enddo; enddo; enddo
            endif
    

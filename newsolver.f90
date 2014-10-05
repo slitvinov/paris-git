@@ -121,7 +121,10 @@ subroutine NewSolver(A,p,maxError,beta,maxit,it,ierr)
     endif
   enddo
   if(rank==0.and.recordconvergence) close(89)
-  if(it==maxit+1 .and. rank==0) write(*,*) 'Warning: LinearSolver reached maxit: ||res||: ',tres2
+  if(it==maxit+1 .and. rank==0) then
+     write(*,*) 'Warning: LinearSolver reached maxit: ||res||: ',tres2
+     if (FreeSurface) write(*,'("Solver flag:",I8)')solver_flag
+  endif
 contains
   subroutine catch_divergence(res2,ierr)
     real(8), intent(in) :: res2
