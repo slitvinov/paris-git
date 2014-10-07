@@ -396,7 +396,7 @@ Program paris
               call extrapolate_velocities()
               call setuppoisson_fs2(u,v,w,dt,A,vof_phase,itimestep)
               ! Solve for an intermediate pressure in gas
-              p_ext = 0d0
+              !p_ext = 0d0
               solver_flag = 2
               if(HYPRE)then !HYPRE will not work with removed nodes from domain.
                  call pariserror("HYPRE solver not yet available for Free Surfaces")

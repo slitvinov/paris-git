@@ -354,6 +354,7 @@ contains
        P_gx = 0d0; P_gy = 0d0; P_gz = 0d0
        pcmask=3; p_ext=0d0
        initialize_fs = .true.
+       div_opened = .false.
     endif
     if ( itime_scheme == 2 ) then  
       allocate(cvofold(imin:imax,jmin:jmax,kmin:kmax))
@@ -455,7 +456,7 @@ or none at all")
     do k=kmin,kmax
        do j=jmin,jmax
           do i=imin,imax
-             if (c(i,j,k)<0.49d0) then
+             if (c(i,j,k)<(0.5d0-EPSC)) then
                 vof_phase(i,j,k) = 0
              else
                 vof_phase(i,j,k) = 1

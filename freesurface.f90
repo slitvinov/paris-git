@@ -168,7 +168,7 @@ subroutine setuppoisson_fs(vof_phase,rhot,dt,A,cvof,n1,n2,n3,kap,iout)
 
   x_mod=dxh((is+ie)/2); y_mod=dyh((js+je)/2); z_mod=dzh((ks+ke)/2) !assumes an unstretched grid
   P_gx = 0d0; P_gy = 0d0; P_gz = 0d0
-  limit = 1d-11
+  limit = 1d-7/dx((is+ie)/2)
 !Debugging
 debug = .false.
   no=1
@@ -178,24 +178,23 @@ debug = .false.
      Open(unit=55,file=TRIM(out_path)//'/C0-'//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout/no,padding))//'.txt')
      Open(unit=56,file=TRIM(out_path)//'/C1-'//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout/no,padding))//'.txt')
   endif
-  do k=ks,ke; do j=js,je; do i=is,ie
+  do k=ks-1,ke; do j=js-1,je; do i=is-1,ie
      !----Cav-liquid neighbours, set P_g in cavity cells
      if(vof_phase(i,j,k)==1) then
         !if (cvof(i,j,k)<0.49d0) write(*,'("Vof phase error. Phase test 1, cvof: ",e14.5)')cvof(i,j,k) !debugging
-        do nbr=-1,1,2
-           if (vof_phase(i+nbr,j,k)==0) then
-              P_gx(i,j,k) = sigma*kap(i,j,k)/dx(i) !!filaments and droplets of one cell will be an issue here
-              if (P_gx(i,j,k) /= P_gx(i,j,k)) write(*,*)'WARNING, P_g NaN x-dir'
-           endif
-           if (vof_phase(i,j+nbr,k)==0) then
-              P_gy(i,j,k) = sigma*kap(i,j,k)/dy(j)
-              if (P_gy(i,j,k) /= P_gy(i,j,k)) write(*,*)'WARNING, P_g NaN y-dir'
-           endif
-           if (vof_phase(i,j,k+nbr)==0) then
-              P_gz(i,j,k) = sigma*kap(i,j,k)/dz(k)
-              if (P_gz(i,j,k) /= P_gz(i,j,k)) write(*,*)'WARNING, P_g NaN z-dir'
-           endif
-        enddo
+        if (vof_phase(i+1,j,k)==0) then
+           P_gx(i,j,k) = sigma*kap(i,j,k)/dx(i) !!filaments and droplets of one cell will be an issue here
+           if (P_gx(i,j,k) /= P_gx(i,j,k)) write(*,*)'WARNING, P_g NaN x-dir'
+        endif
+        if (vof_phase(i,j+1,k)==0) then
+           P_gy(i,j,k) = sigma*kap(i,j,k)/dy(j)
+           if (P_gy(i,j,k) /= P_gy(i,j,k)) write(*,*)'WARNING, P_g NaN y-dir'
+        endif
+        if (vof_phase(i,j,k+1)==0) then
+           P_gz(i,j,k) = sigma*kap(i,j,k)/dz(k)
+           if (P_gz(i,j,k) /= P_gz(i,j,k)) write(*,*)'WARNING, P_g NaN z-dir'
+        endif
+
         !Check x-neighbour         
         if (vof_phase(i+1,j,k) == 0) then
            !if (cvof(i+1,j,k)>0.499d0) write(*,'("Vof phase error. Phase test 0, cvof: ",e14.5)')cvof(i+1,j,k) !debugging
@@ -230,15 +229,14 @@ debug = .false.
            alpha2=al3dnew(n_avg,c_stag)
            if (ABS(n_avg(1))>1d-12) then
               x_test2 = (alpha2 - (n_avg(2)+n_avg(3))/2d0)/n_avg(1)
-              if (x_test2>limit .and. x_test2<(1d0-limit)) then
-                 x_mod(i,j,k) = dxh(i)*(1d0-x_test2)
-              else
-                 if (x_test2>=(1d0-limit)) x_mod(i,j,k) = limit*dxh(i)
-                 if (x_test2<=(limit)) x_mod(i,j,k) = (1d0-limit)*dxh(i)
-              endif
-           else
-              write(*,'("WARNING: x-branch tiny normal",5e14.5,2I8)')&
-                   c_stag,x_mod(i,j,k),cvof(i,j,k),cvof(i+1,j,k),n_avg(1),vof_phase(i,j,k),vof_phase(i+1,j,k)
+              x_mod(i,j,k) = dxh(i)*(1d0-x_test2)
+              if (x_mod(i,j,k)>dxh(i)) x_mod(i,j,k) = dxh(i)
+              if (x_mod(i,j,k)<limit*dxh(i)) x_mod(i,j,k) = limit*dxh(i)
+              if (x_mod(i,j,k) /= x_mod(i,j,k)) write(*,'("x_mod NaN. c_st, n, vofs, phases:",4e14.5,5I8)')&
+                   c_stag,n_avg(1),cvof(i,j,k),cvof(i+1,j,k),vof_phase(i,j,k),vof_phase(i+1,j,k),i,j,k
+!!$           else
+!!$              write(*,'("WARNING: x-branch tiny normal",5e14.5,2I8)')&
+!!$                   c_stag,x_mod(i,j,k),cvof(i,j,k),cvof(i+1,j,k),n_avg(1),vof_phase(i,j,k),vof_phase(i+1,j,k)
            endif
            if (debug .and. j==(js+je)/2 .and. mod(iout,no)==0) then
               write(50,314)x(i+1)-x_mod(i,j,k),z(k) 
@@ -274,19 +272,18 @@ debug = .false.
               n_avg(1)= n1(i,j,k)
               n_avg(2)= n2(i,j,k)
               n_avg(3)= n3(i,j,k)
-           endif
+           endif 
            alpha2=al3dnew(n_avg,c_stag)
            if (ABS(n_avg(2))>1d-12) then
               y_test2 = (alpha2 - (n_avg(1)+n_avg(3))/2d0)/n_avg(2)
-              if (y_test2>limit .and. y_test2<(1d0-limit)) then
-                 y_mod(i,j,k) = dyh(j)*(1d0-y_test2)
-              else
-                 if (y_test2>=(1d0-limit)) y_mod(i,j,k) = limit*dyh(j)
-                 if (y_test2<=(limit)) y_mod(i,j,k) = (1d0-limit)*dyh(j)
-              endif
-           else
-              write(*,'("WARNING: y-branch tiny normal",5e14.5,2I8)')&
-                   c_stag,y_mod(i,j,k),cvof(i,j,k),cvof(i,j+1,k),n_avg(2),vof_phase(i,j,k),vof_phase(i,j+1,k)
+              y_mod(i,j,k) = dyh(j)*(1d0-y_test2)
+              if (y_mod(i,j,k)>dyh(j)) y_mod(i,j,k) = dyh(j)
+              if (y_mod(i,j,k)<limit*dyh(j)) y_mod(i,j,k) = limit*dyh(j)
+              if (y_mod(i,j,k) /= y_mod(i,j,k)) write(*,'("y_mod NaN. c_st, n, vofs, phases:",4e14.5,2I8)')&
+                   c_stag,n_avg(2),cvof(i,j,k),cvof(i,j+1,k),vof_phase(i,j,k),vof_phase(i,j+1,k)
+!!$              else
+!!$                 write(*,'("WARNING: y-branch tiny normal",5e14.5,2I8)')&
+!!$                      c_stag,y_mod(i,j,k),cvof(i,j,k),cvof(i,j+1,k),n_avg(2),vof_phase(i,j,k),vof_phase(i,j+1,k)             
            endif
 !!$              if (debug .and. k==(ks+ke)/2 .and. mod(iout,no)==0) then
 !!$                 write(50,314)x(i),y(j)+nrl*y_mod(i,j+(1-1)/2,k) 
@@ -325,15 +322,14 @@ debug = .false.
            alpha2=al3dnew(n_avg,c_stag)
            if (ABS(n_avg(3))>1d-12) then
               z_test2 = (alpha2 - (n_avg(1)+n_avg(2))/2d0)/n_avg(3)
-              if (z_test2>limit .and. z_test2<(1d0-limit)) then
-                 z_mod(i,j,k) = dzh(k)*(1d0-z_test2)
-              else
-                 if (z_test2>=(1d0-limit)) z_mod(i,j,k+(1-1)/2) = limit*dzh(k+(1-1)/2)
-                 if (z_test2<=(limit)) z_mod(i,j,k+(1-1)/2) = (1d0-limit)*dzh(k+(1-1)/2)
-              endif
-           else
-              write(*,'("WARNING: z-branch tiny normal",5e14.5,2I8)')&
-                   c_stag,z_mod(i,j,k),cvof(i,j,k),cvof(i,j,k+1),n_avg(3),vof_phase(i,j,k),vof_phase(i,j,k+1)
+              z_mod(i,j,k) = dzh(k)*(1d0-z_test2)
+              if (z_mod(i,j,k)>dzh(k)) z_mod(i,j,k) = dzh(k)
+              if (z_mod(i,j,k)<limit*dzh(k)) z_mod(i,j,k) = limit*dzh(k)
+              if (z_mod(i,j,k) /= z_mod(i,j,k)) write(*,'("z_mod NaN. c_st, n, vofs, phases:",4e14.5,2I8)')&
+                   c_stag,n_avg(3),cvof(i,j,k),cvof(i,j,k+1),vof_phase(i,j,k),vof_phase(i,j,k+1)
+!!$              else
+!!$                 write(*,'("WARNING: z-branch tiny normal",5e14.5,2I8)')&
+!!$                      c_stag,z_mod(i,j,k),cvof(i,j,k),cvof(i,j,k+1),n_avg(3),vof_phase(i,j,k),vof_phase(i,j,k+1)
            endif
            if (debug .and. j==(js+je)/2 .and. mod(iout,no)==0) then
               write(50,314)x(i),z(k+1)-z_mod(i,j,k) 
@@ -343,6 +339,18 @@ debug = .false.
      endif
 !----Liquid-cavity neighbours
      if (vof_phase(i,j,k)==0) then
+        if (vof_phase(i+1,j,k)==1) then
+           P_gx(i+1,j,k) = sigma*kap(i+1,j,k)/dx(i) !!filaments and droplets of one cell will be an issue here
+           if (P_gx(i+1,j,k) /= P_gx(i+1,j,k)) write(*,*)'WARNING, P_g NaN x-dir'
+        endif
+        if (vof_phase(i,j+1,k)==1) then
+           P_gy(i,j+1,k) = sigma*kap(i,j+1,k)/dy(j)
+           if (P_gy(i,j+1,k) /= P_gy(i,j+1,k)) write(*,*)'WARNING, P_g NaN y-dir'
+        endif
+        if (vof_phase(i,j,k+1)==1) then
+           P_gz(i,j,k+1) = sigma*kap(i,j,k+1)/dz(k)
+           if (P_gz(i,j,k+1) /= P_gz(i,j,k+1)) write(*,*)'WARNING, P_g NaN z-dir'
+        endif
         !if (cvof(i,j,k)>=0.499d0) write(*,'("Vof phase error. Phase test 0, cvof: ",e14.5)')cvof(i,j,k) !debugging check
         !Check x-neighbour
         if (vof_phase(i+1,j,k) == 1) then
@@ -378,15 +386,14 @@ debug = .false.
            alpha2=al3dnew(n_avg,c_stag)
            if (ABS(n_avg(1))>1d-12) then
               x_test2 = (alpha2 - (n_avg(2)+n_avg(3))/2d0)/n_avg(1)
-              if (x_test2>limit .and. x_test2<(1d0-limit)) then
-                 x_mod(i,j,k) = dxh(i)*x_test2
-              else
-                 if (x_test2>=(1d0-limit)) x_mod(i,j,k) = (1d0-limit)*dxh(i)
-                 if (x_test2<=(limit)) x_mod(i,j,k) = limit*dxh(i)
-              endif
-           else
-              write(*,'("WARNING: x-branch tiny normal",5e14.5,2I8)')&
-                   c_stag,x_mod(i,j,k),cvof(i,j,k),cvof(i+1,j,k),n_avg(1),vof_phase(i,j,k),vof_phase(i+1,j,k)
+              x_mod(i,j,k) = dxh(i)*x_test2
+              if (x_mod(i,j,k)>dxh(i)) x_mod(i,j,k) = dxh(i)
+              if (x_mod(i,j,k)<limit*dxh(i)) x_mod(i,j,k) = limit*dxh(i)
+              if (x_mod(i,j,k) /= x_mod(i,j,k)) write(*,'("x_mod NaN. c_st, n, vofs, phases:",4e14.5,2I8)')&
+                   c_stag,n_avg(1),cvof(i,j,k),cvof(i+1,j,k),vof_phase(i,j,k),vof_phase(i+1,j,k)
+!!$           else
+!!$              write(*,'("WARNING: x-branch tiny normal",5e14.5,2I8)')&
+!!$                   c_stag,x_mod(i,j,k),cvof(i,j,k),cvof(i+1,j,k),n_avg(1),vof_phase(i,j,k),vof_phase(i+1,j,k)
            endif
            if (debug .and. j==(js+je)/2 .and. mod(iout,no)==0) then
               write(50,314)x(i)+x_mod(i,j,k),z(k) 
@@ -427,15 +434,14 @@ debug = .false.
            alpha2=al3dnew(n_avg,c_stag)
            if (ABS(n_avg(2))>1d-12) then
               y_test2 = (alpha2 - (n_avg(1)+n_avg(3))/2d0)/n_avg(2)
-              if (y_test2>limit .and. y_test2<(1d0-limit)) then
-                 y_mod(i,j,k) = dyh(j)*y_test2
-              else
-                 if (y_test2>=(1d0-limit)) y_mod(i,j,k) = (1d0-limit)*dyh(j)
-                 if (y_test2<=(limit)) y_mod(i,j,k) = limit*dyh(j)
-              endif
-           else 
-              write(*,'("WARNING: y-branch tiny normal",5e14.5,2I8)')&
-                   c_stag,y_mod(i,j,k),cvof(i,j,k),cvof(i,j+1,k),n_avg(2),vof_phase(i,j,k),vof_phase(i,j+1,k)
+              y_mod(i,j,k) = dyh(j)*y_test2
+              if (y_mod(i,j,k)>dyh(j)) y_mod(i,j,k) = dyh(j)
+              if (y_mod(i,j,k)<limit*dyh(j)) y_mod(i,j,k) = limit*dyh(j)
+              if (y_mod(i,j,k) /= y_mod(i,j,k)) write(*,'("y_mod NaN. c_st, n, vofs, phases:",4e14.5,2I8)')&
+                   c_stag,n_avg(2),cvof(i,j,k),cvof(i,j+1,k),vof_phase(i,j,k),vof_phase(i,j+1,k)
+!!$              else 
+!!$                 write(*,'("WARNING: y-branch tiny normal",5e14.5,2I8)')&
+!!$                      c_stag,y_mod(i,j,k),cvof(i,j,k),cvof(i,j+1,k),n_avg(2),vof_phase(i,j,k),vof_phase(i,j+1,k)
            endif
 !!$              if (debug .and. k==(ks+ke)/2 .and. mod(iout,no)==0) then
 !!$                 write(50,314)x(i),y(j)+nrl*y_mod(i,j+(1-1)/2,k) 
@@ -474,15 +480,14 @@ debug = .false.
            alpha2=al3dnew(n_avg,c_stag)
            if (ABS(n_avg(3))>1d-12) then
               z_test2 = (alpha2 - (n_avg(1)+n_avg(2))/2d0)/n_avg(3)
-              if (z_test2>limit .and. z_test2<(1d0-limit)) then
-                 z_mod(i,j,k) = dzh(k)*z_test2
-              else
-                 if (z_test2>=(1d0-limit)) z_mod(i,j,k) = (1d0-limit)*dzh(k)
-                 if (z_test2<=(limit)) z_mod(i,j,k) = limit*dzh(k)
-              endif
-           else
-              write(*,'("WARNING: z-branch tiny normal",5e14.5,2I8)')&
-                   c_stag,z_mod(i,j,k),cvof(i,j,k),cvof(i,j,k+1),n_avg(3),vof_phase(i,j,k),vof_phase(i,j,k+1)
+              z_mod(i,j,k) = dzh(k)*z_test2
+              if (z_mod(i,j,k)>dzh(k)) z_mod(i,j,k) = dzh(k)
+              if (z_mod(i,j,k)<limit*dzh(k)) z_mod(i,j,k) = limit*dzh(k)
+              if (z_mod(i,j,k) /= z_mod(i,j,k)) write(*,'("z_mod NaN. c_st, n, vofs, phases:",4e14.5,2I8)')&
+                   c_stag,n_avg(3),cvof(i,j,k),cvof(i,j,k+1),vof_phase(i,j,k),vof_phase(i,j,k+1)
+!!$           else
+!!$              write(*,'("WARNING: z-branch tiny normal",5e14.5,2I8)')&
+!!$                   c_stag,z_mod(i,j,k),cvof(i,j,k),cvof(i,j,k+1),n_avg(3),vof_phase(i,j,k),vof_phase(i,j,k+1)
            endif
            if (debug .and. j==(js+je)/2 .and. mod(iout,no)==0) then
               write(50,314)x(i),z(k)+z_mod(i,j,k) 
@@ -491,16 +496,16 @@ debug = .false.
         endif
      endif
   enddo;enddo;enddo
-!--Debugging
-  call ghost_x(P_gx,1,req(1:4)); call ghost_y(P_gy,1,req(5:8)); call ghost_z(P_gz,1,req(9:12)) 
-  call ghost_x(x_mod,1,req(13:16)); call ghost_y(y_mod,1,req(17:20)); call ghost_z(z_mod,1,req(21:24)) 
-  call MPI_WAITALL(24,req(1:24),sta(:,1:24),ierr)
+!!$  call ghost_x(P_gx,1,req(1:4)); call ghost_y(P_gy,1,req(5:8)); call ghost_z(P_gz,1,req(9:12)) 
+!!$  call ghost_x(x_mod,1,req(13:16)); call ghost_y(y_mod,1,req(17:20)); call ghost_z(z_mod,1,req(21:24)) 
+!!$  call MPI_WAITALL(24,req(1:24),sta(:,1:24),ierr)
 !!$  call ghost_x(P_gy,1,req(1:4)); call ghost_y(P_gy,1,req(5:8)); call ghost_z(P_gy,1,req(9:12)) 
 !!$  call ghost_x(y_mod,1,req(13:16)); call ghost_y(y_mod,1,req(17:20)); call ghost_z(y_mod,1,req(21:24)) 
 !!$  call MPI_WAITALL(24,req(1:24),sta(:,1:24),ierr)
 !!$  call ghost_x(P_gz,1,req(1:4)); call ghost_y(P_gz,1,req(5:8)); call ghost_z(P_gz,1,req(9:12)) 
 !!$  call ghost_x(z_mod,1,req(13:16)); call ghost_y(z_mod,1,req(17:20)); call ghost_z(z_mod,1,req(21:24)) 
 !!$  call MPI_WAITALL(24,req(1:24),sta(:,1:24),ierr)
+!--Debugging
   if (debug .and. mod(iout,no)==0) then
      Open(unit=52,file=TRIM(out_path)//'/P_int1-'//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout/no,padding))//'.txt')
      Open(unit=53,file=TRIM(out_path)//'/P_int2-'//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout/no,padding))//'.txt')
@@ -515,7 +520,7 @@ debug = .false.
      Open(unit=64,file=TRIM(out_path)//'/n3-'//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout/no,padding))//'.txt') 
      j=(js+je)/2
      !k=(ks+ke)/2
-     do k=ks-1,ke+1; do i=is-1,ie+1
+     do k=ks-1,ke; do i=is-1,ie
         write(52,313)x(i),z(k),P_gx(i,j,k)
         !write(53,313)x(i),y(j),P_gy(i,j,k)
         write(54,313)x(i),z(k),P_gz(i,j,k)
@@ -546,40 +551,40 @@ debug = .false.
      if (vof_phase(i,j,k)==0) then
         A(i,j,k,1) = dt/(dx(i)*x_mod(i-1,j,k)*(rhot(i,j,k)))
         if (A(i,j,k,1) /= A(i,j,k,1)) write(*,'("ERROR: A1 NaN :",2e14.5)')A(i,j,k,1),x_mod(i-1,j,k) 
-        if (A(i,j,k,1)>1d8) then
-           write(*,'("Large A1",2e14.5)')A(i,j,k,1),x_mod(i-1,j,k)
-           !A(i,j,k,1) = 1d8
-        endif
+!!$        if (A(i,j,k,1)>1d8) then
+!!$           write(*,'("Large A1",2e14.5)')A(i,j,k,1),x_mod(i-1,j,k)
+!!$           !A(i,j,k,1) = 1d8
+!!$        endif
         A(i,j,k,2) = dt/(dx(i)*x_mod(i,j,k)*(rhot(i,j,k)))
         if (A(i,j,k,2) /= A(i,j,k,2)) write(*,'("ERROR: A2 NaN :",2e14.5)')A(i,j,k,2),x_mod(i,j,k)
-        if (A(i,j,k,2)>1d8) then
-           write(*,'("Large A2",2e14.5)')A(i,j,k,2),x_mod(i,j,k)
-           !A(i,j,k,2) = 1d8
-        endif
+!!$        if (A(i,j,k,2)>1d8) then
+!!$           write(*,'("Large A2",2e14.5)')A(i,j,k,2),x_mod(i,j,k)
+!!$           !A(i,j,k,2) = 1d8
+!!$        endif
         A(i,j,k,3) = dt/(dy(j)*y_mod(i,j-1,k)*(rhot(i,j,k)))
         if (A(i,j,k,3) /= A(i,j,k,3)) write(*,'("ERROR: A3 NaN :",2e14.5)')A(i,j,k,3),y_mod(i,j-1,k)
-        if (A(i,j,k,3)>1d8) then
-           write(*,'("Large A3",2e14.5)')A(i,j,k,3),y_mod(i,j-1,k)
-           !A(i,j,k,3) = 1d8
-        endif
+!!$        if (A(i,j,k,3)>1d8) then
+!!$           write(*,'("Large A3",2e14.5)')A(i,j,k,3),y_mod(i,j-1,k)
+!!$           !A(i,j,k,3) = 1d8
+!!$        endif
         A(i,j,k,4) = dt/(dy(j)*y_mod(i,j,k)*(rhot(i,j,k)))
         if (A(i,j,k,4) /= A(i,j,k,4)) write(*,'("ERROR: A4 NaN :",2e14.5)')A(i,j,k,4),y_mod(i,j,k)
-        if (A(i,j,k,4)>1d8) then
-           write(*,'("Large A4",2e14.5)')A(i,j,k,4),y_mod(i,j,k)
-           !A(i,j,k,4) = 1d8
-        endif
+!!$        if (A(i,j,k,4)>1d8) then
+!!$           write(*,'("Large A4",2e14.5)')A(i,j,k,4),y_mod(i,j,k)
+!!$           !A(i,j,k,4) = 1d8
+!!$        endif
         A(i,j,k,5) = dt/(dz(k)*z_mod(i,j,k-1)*(rhot(i,j,k)))
         if (A(i,j,k,5) /= A(i,j,k,5)) write(*,'("ERROR: A5 NaN :",2e14.5)')A(i,j,k,5),z_mod(i,j,k-1)
-        if (A(i,j,k,5)>1d8) then
-           write(*,'("Large A5",2e14.5)')A(i,j,k,5),z_mod(i,j,k-1)
-           !A(i,j,k,5) = 1d8
-        endif
+!!$        if (A(i,j,k,5)>1d8) then
+!!$           write(*,'("Large A5",2e14.5)')A(i,j,k,5),z_mod(i,j,k-1)
+!!$           !A(i,j,k,5) = 1d8
+!!$        endif
         A(i,j,k,6) = dt/(dz(k)*z_mod(i,j,k)*(rhot(i,j,k)))
         if (A(i,j,k,6) /= A(i,j,k,6)) write(*,'("ERROR: A6 NaN :",2e14.5)')A(i,j,k,6),z_mod(i,j,k)
-        if (A(i,j,k,6)>1d8) then
-           write(*,'("Large A6",2e14.5)')A(i,j,k,6),z_mod(i,j,k)
-           !A(i,j,k,6) = 1d8
-        endif
+!!$        if (A(i,j,k,6)>1d8) then
+!!$           write(*,'("Large A6",2e14.5)')A(i,j,k,6),z_mod(i,j,k)
+!!$           !A(i,j,k,6) = 1d8
+!!$        endif
         A(i,j,k,7) = sum(A(i,j,k,1:6))
         A(i,j,k,8) = A(i,j,k,8) + dt/rhot(i,j,k)*&
              (P_gx(i+1,j,k)/(dx(i)*x_mod(i,j,k))+P_gx(i-1,j,k)/(dx(i)*x_mod(i-1,j,k))&

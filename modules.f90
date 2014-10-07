@@ -338,6 +338,7 @@ module module_freesurface
   integer, dimension(:,:,:), allocatable :: u_cmask,v_cmask,w_cmask,pcmask
   integer :: X_level, solver_flag=0
   logical :: FreeSurface, debug=.false., initialize_fs = .false.
+  logical :: div_opened
 end module module_freesurface
 !=================================================================================================
 !=================================================================================================

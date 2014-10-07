@@ -58,11 +58,10 @@ subroutine NewSolver(A,p,maxError,beta,maxit,it,ierr)
   itime=itime+1
   if (FreeSurface) then
      if (solver_flag == 0) call pariserror("Free Surface solver flag needs to be 1 or 2")
-     if (solver_flag == 1) then
-        do k=ks,ke; do j=js,je; do i=is,ie !assign zero pressure to all non-liquid cells
-           if (pcmask(i,j,k)>0) p(i,j,k) = 0d0 
-        enddo; enddo; enddo
-     endif
+     do k=ks,ke; do j=js,je; do i=is,ie !assign zero pressure to all non-liquid cells
+        if (solver_flag == 1 .and. pcmask(i,j,k)/=0) p(i,j,k) = 0d0 
+        if (solver_flag == 2 .and. (pcmask(i,j,k)==0 .or. pcmask(i,j,k)==3)) p(i,j,k) = 0d0
+     enddo; enddo; enddo
   endif
   !--------------------------------------ITERATION LOOP--------------------------------------------  
   do it=1,maxit
