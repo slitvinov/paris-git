@@ -78,7 +78,7 @@ contains
 !=================================================================================================
   subroutine initialize_surface_tension()
     implicit none
-    if(recomputenormals .or. FreeSurface) then
+    if(.not.recomputenormals .or. FreeSurface) then
        allocate(n1(imin:imax,jmin:jmax,kmin:kmax), n2(imin:imax,jmin:jmax,kmin:kmax),  &
                n3(imin:imax,jmin:jmax,kmin:kmax), kappa_fs(imin:imax,jmin:jmax,kmin:kmax))
        recomputenormals = .false.
@@ -687,6 +687,7 @@ contains
         endif
      enddo;enddo;enddo
 
+
      call ghost_x(kapparray(:,:,:),2,req(1:4))
      call ghost_y(kapparray(:,:,:),2,req(5:8))
      call ghost_z(kapparray(:,:,:),2,req(9:12))
@@ -753,16 +754,6 @@ contains
       real(8) :: xfit(NPOS),yfit(NPOS),hfit(NPOS),fit(NPOS,3)
       real(8) :: centroid(3),mxyz(3),stencil3x3(-1:1,-1:1,-1:1)
 
-! TEMPORARY - Stanley: avoid finding curvature for debry cells 
-      if ( n1(i0,j0,k0)==0.d0 .and. n2(i0,j0,k0)==0.d0 .and. n3(i0,j0,k0)==0.d0 ) then
-         kappa = 0.d0 
-         nfound = 0 
-         nposit = 0 
-         a      = 0.d0
-         return 
-      end if ! n1,n2,n3
-! END TEMPORARY 
-
       central=vof_flag(i0,j0,k0)
       call map3x3in2x2(i1,j1,k1,i0,j0,k0)
 !   define in which order directions will be tried 
@@ -779,6 +770,16 @@ contains
       endif
       call orientation(mxyz,try)
       call get_local_heights(i1,j1,k1,mxyz,try,nfound,h,points,nposit)
+
+! TEMPORARY - Stanley: avoid finding curvature for debry cells 
+      if ( mxyz(1)==0.d0 .and. mxyz(2)==0.d0 .and. mxyz(3)==0.d0 ) then
+         kappa = 0.d0 
+         nfound = 0 
+         nposit = 0 
+         a      = 0.d0
+         return 
+      end if ! n1,n2,n3
+! END TEMPORARY 
 
       kappa = 0.d0
       ! if all nine heights found 
