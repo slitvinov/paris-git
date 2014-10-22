@@ -315,8 +315,12 @@ Program paris
               call ghost_z(p,1,req(9:12)) 
               call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
            else
-              if (FreeSurface) solver_flag = 1
-              call NewSolver(A,p,maxError/dt,beta,maxit,it,ierr)
+              if (FreeSurface) then
+                 solver_flag = 1
+                 call FreeSolver(A,p,maxError/dt,beta,maxit,it,ierr,itimestep)
+              else
+                 call NewSolver(A,p,maxError/dt,beta,maxit,it,ierr)
+              endif
            endif
            if(mod(itimestep,termout)==0) then
               call calcresidual(A,p,residual)
@@ -396,12 +400,11 @@ Program paris
               call extrapolate_velocities()
               call setuppoisson_fs2(u,v,w,dt,A,vof_phase,itimestep)
               ! Solve for an intermediate pressure in gas
-              !p_ext = 0d0
               solver_flag = 2
               if(HYPRE)then !HYPRE will not work with removed nodes from domain.
                  call pariserror("HYPRE solver not yet available for Free Surfaces")
               else
-                 call NewSolver(A,p_ext,maxError/dt,beta,maxit,it,ierr)
+                 call FreeSolver(A,p_ext,maxError/dt,beta,maxit,it,ierr,itimestep)
               endif
               ! Correct ONLY masked gas velocities at level 1 and 2
               do k=ks,ke;  do j=js,je; do i=is,ieu    ! CORRECT THE u-velocity 

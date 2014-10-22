@@ -694,3 +694,197 @@ close(unit=21)
 15 format(I8,4e14.5)
 end subroutine discrete_divergence
 !--------------------------------------------------------------------------------------------------------------------
+! This is a straight copy of NewSolver. The idea is to not clutter NewSolver with all the FreeSurface flags and tests, 
+! therefore it was copied here and named FreeSolver.
+!Solves the following linear equiation:
+! A7*Pijk = A1*Pi-1jk + A2*Pi+1jk + A3*Pij-1k + 
+!           A4*Pij+1k + A5*Pijk-1 + A6*Pijk+1 + A8
+!-------------------------------------------------------------------------------------------------
+subroutine FreeSolver(A,p,maxError,beta,maxit,it,ierr,iout)
+  use module_grid
+  use module_BC
+  use module_IO
+  use module_freesurface
+  implicit none
+  include 'mpif.h'
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: p
+  real(8), dimension(is:ie,js:je,ks:ke,8), intent(in) :: A
+  real(8), intent(in) :: beta, maxError
+  integer, intent(in) :: maxit
+  integer, intent(out) :: it, ierr
+  real(8) :: res1,res2,resinf,intvol
+  real(8) :: tres2, cells
+  integer :: i,j,k, iout
+  integer :: req(12),sta(MPI_STATUS_SIZE,12)
+  logical :: mask(imin:imax,jmin:jmax,kmin:kmax)
+  integer, parameter :: norm=2, relaxtype=1
+  logical, parameter :: recordconvergence=.false.
+  integer, save :: itime=0
+! Open file for convergence history
+  if(rank==0.and.recordconvergence) then
+     OPEN(UNIT=89,FILE=TRIM(out_path)//'/convergence_history-'//TRIM(int2text(itime,padding))//'.txt')
+  endif
+  itime=itime+1
+  if (solver_flag == 0) call pariserror("Free Surface solver flag needs to be 1 or 2")
+  do k=ks,ke; do j=js,je; do i=is,ie !assign zero pressure to all non-liquid cells
+     if (solver_flag == 1 .and. pcmask(i,j,k)/=0) p(i,j,k) = 0d0 
+     if (solver_flag == 2 .and. (pcmask(i,j,k)==0 .or. pcmask(i,j,k)==3)) p(i,j,k) = 0d0
+  enddo; enddo; enddo
+  !--------------------------------------ITERATION LOOP--------------------------------------------  
+  do it=1,maxit
+     if(relaxtype==2) then 
+        call LineRelax_fs(A,p,beta)
+     elseif(relaxtype==1) then
+        call RedBlackRelax_fs(A,p,beta)
+     endif
+!---------------------------------CHECK FOR CONVERGENCE-------------------------------------------
+    res1 = 0d0; res2=0.d0; resinf=0.d0; intvol=0.d0; cells = 0d0
+    call ghost_x(p,1,req( 1: 4)); call ghost_y(p,1,req( 5: 8)); call ghost_z(p,1,req( 9:12))
+    do k=ks+1,ke-1; do j=js+1,je-1; do i=is+1,ie-1
+       if ((pcmask(i,j,k)==0 .and. solver_flag==1)&
+            .or.((pcmask(i,j,k)==1 .or. pcmask(i,j,k)==2) .and. solver_flag==2)) then
+          res2=res2+abs(-p(i,j,k) * A(i,j,k,7) +                           &
+               A(i,j,k,1) * p(i-1,j,k) + A(i,j,k,2) * p(i+1,j,k) +            &
+               A(i,j,k,3) * p(i,j-1,k) + A(i,j,k,4) * p(i,j+1,k) +            &
+               A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8) )**norm
+          cells = cells + 1d0
+       endif
+    enddo; enddo; enddo
+    call MPI_WAITALL(12,req,sta,ierr)
+    mask=.true.
+    mask(is+1:ie-1,js+1:je-1,ks+1:ke-1)=.false.
+    do k=ks,ke; do j=js,je; do i=is,ie
+       if(mask(i,j,k) .and. ((pcmask(i,j,k)==0 .and. solver_flag==1) .or. &
+            ((pcmask(i,j,k)==1 .or. pcmask(i,j,k)==2) .and. solver_flag==2))) then
+          res2=res2+abs(-p(i,j,k) * A(i,j,k,7) +&
+               A(i,j,k,1) * p(i-1,j,k) + A(i,j,k,2) * p(i+1,j,k) +            &
+               A(i,j,k,3) * p(i,j-1,k) + A(i,j,k,4) * p(i,j+1,k) +            &
+               A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8) )**norm
+          cells = cells + 1d0
+       endif
+    enddo; enddo; enddo
+    if (cells > 1d-10) then
+       res2 = res2/cells
+    else
+       write(*,*)'No cells for this topology present in this processor'
+    endif
+    call catch_divergence_fs(res2,ierr)
+    call MPI_ALLREDUCE(res2, tres2, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr)
+    if(norm==2) tres2=sqrt(tres2)
+    if(rank==0.and.mod(it,10) == 0.and.recordconvergence) write(89,310) it, tres2
+310 format(I6,'  ',(e14.5))
+    if (tres2<maxError) then 
+       if(rank==0.and.recordconvergence) close(89)
+       if (mod(iout,nout)==0) write(*,'("Solver flag and nr. of cells: ",I8,e14.5)')solver_flag,cells
+       exit
+    endif
+  enddo
+  if(rank==0.and.recordconvergence) close(89)
+  if(it==maxit+1 .and. rank==0) then
+     write(*,*) 'Warning: LinearSolver reached maxit: ||res||: ',tres2
+     write(*,'("Solver flag:",I8)')solver_flag
+  endif
+contains
+  subroutine catch_divergence_fs(res2,ierr)
+    real(8), intent(in) :: res2
+    integer, intent(out) :: ierr
+    logical :: diverged=.false.
+    logical :: extended=.true.
+    integer :: l
+    if(extended) then
+       do k=ks,ke; do j=js,je; do i=is,ie
+          do l=1,8
+             if(A(i,j,k,l)/=A(i,j,k,l).or.p(i,j,k)/=p(i,j,k)) then
+                diverged=.true.
+             endif
+          enddo
+          if(diverged) then
+             OPEN(UNIT=88,FILE=TRIM(out_path)//'/message-rank-'//TRIM(int2text(rank,padding))//'.txt')
+             write(88,*) "ijk rank",i,j,k,rank
+             write(88,*) "A",  A(i,j,k,:)
+             write(88,*) "p",  p(i,j,k)
+             write(88,*) 'A or p is NaN after',it,'iterations at rank ',rank
+             close(88)
+             if(rank<=30) print*,'A or p is NaN after',it,'iterations at rank ',rank
+             call pariserror("A or p is NaN")
+             exit
+          endif
+       end do; end do; end do
+    endif
+    if ((res2*npx*npy*npz)>1.d16 ) then
+       if(rank<=30) print*,'Pressure solver diverged after',it,'iterations at rank ',rank
+       call pariserror("freesolver error")
+    else if (res2 .ne. res2) then 
+       if(rank<=30) print*, 'it:',it,'Pressure residual value is invalid at rank', rank
+       call pariserror("freesolver error")
+    else
+       ierr=0
+    endif
+  end subroutine catch_divergence_fs
+end subroutine FreeSolver
+!--------------------------------------ONE RELAXATION ITERATION (SMOOTHER)----------------------------------
+subroutine RedBlackRelax_fs(A,p,beta)
+  use module_grid
+  use module_BC
+  use module_IO
+  use module_freesurface
+  implicit none
+  include 'mpif.h'
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: p
+  real(8), dimension(is:ie,js:je,ks:ke,8), intent(in) :: A
+  real(8), intent(in) :: beta
+  integer :: req(12),sta(MPI_STATUS_SIZE,12)
+  integer :: i,j,k,ierr
+  integer :: isw,jsw,ksw,ipass
+  ksw=1
+  do ipass=1,2
+     jsw=ksw
+     do k=ks,ke
+        isw=jsw
+        do j=js,je
+           do i=isw+is-1,ie,2
+              if (FreeSurface) then
+                 if ((pcmask(i,j,k)==0 .and. solver_flag==1) &
+                      .or.((pcmask(i,j,k)==1 .or. pcmask(i,j,k)==2) .and. solver_flag==2)) then
+                    p(i,j,k)=(1d0-beta)*p(i,j,k) + (beta/A(i,j,k,7))*(              &
+                         A(i,j,k,1) * p(i-1,j,k) + A(i,j,k,2) * p(i+1,j,k) +        &
+                         A(i,j,k,3) * p(i,j-1,k) + A(i,j,k,4) * p(i,j+1,k) +        &
+                         A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8))   
+                 endif
+              else
+                 p(i,j,k)=(1d0-beta)*p(i,j,k) + (beta/A(i,j,k,7))*(             &
+                      A(i,j,k,1) * p(i-1,j,k) + A(i,j,k,2) * p(i+1,j,k) +       &
+                      A(i,j,k,3) * p(i,j-1,k) + A(i,j,k,4) * p(i,j+1,k) +       &
+                      A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8))
+              endif
+           enddo
+           isw=3-isw
+        enddo
+        jsw=3-jsw
+     enddo
+     ksw=3-ksw
+     if(ipass==1) then
+        call ghost_x(p,1,req( 1: 4)); call ghost_y(p,1,req( 5: 8)); call ghost_z(p,1,req( 9:12))
+        call MPI_WAITALL(12,req,sta,ierr)
+     endif
+  enddo
+end subroutine RedBlackRelax_fs
+!--------------------------------------ONE RELAXATION ITERATION (SMOOTHER)----------------------------------
+subroutine LineRelax_fs(A,p,beta)
+  use module_grid
+  use module_freesurface
+  implicit none
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: p
+  real(8), dimension(is:ie,js:je,ks:ke,8), intent(in) :: A
+  real(8), intent(in) :: beta
+  integer :: i,j,k
+!--------------------------------------ITERATION LOOP--------------------------------------------  
+  do k=ks,ke; do j=js,je; do i=is,ie
+     if ((pcmask(i,j,k)==0 .and. solver_flag==1).or.((pcmask(i,j,k)==1 .or. pcmask(i,j,k)==2) .and. solver_flag==2)) then
+        p(i,j,k)=(1d0-beta)*p(i,j,k) + (beta/A(i,j,k,7))*(              &
+             A(i,j,k,1) * p(i-1,j,k) + A(i,j,k,2) * p(i+1,j,k) +        &
+             A(i,j,k,3) * p(i,j-1,k) + A(i,j,k,4) * p(i,j+1,k) +        &
+             A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8))
+     endif
+  enddo; enddo; enddo
+end subroutine LineRelax_fs

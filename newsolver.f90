@@ -56,13 +56,6 @@ subroutine NewSolver(A,p,maxError,beta,maxit,it,ierr)
      OPEN(UNIT=89,FILE=TRIM(out_path)//'/convergence_history-'//TRIM(int2text(itime,padding))//'.txt')
   endif
   itime=itime+1
-  if (FreeSurface) then
-     if (solver_flag == 0) call pariserror("Free Surface solver flag needs to be 1 or 2")
-     do k=ks,ke; do j=js,je; do i=is,ie !assign zero pressure to all non-liquid cells
-        if (solver_flag == 1 .and. pcmask(i,j,k)/=0) p(i,j,k) = 0d0 
-        if (solver_flag == 2 .and. (pcmask(i,j,k)==0 .or. pcmask(i,j,k)==3)) p(i,j,k) = 0d0
-     enddo; enddo; enddo
-  endif
   !--------------------------------------ITERATION LOOP--------------------------------------------  
   do it=1,maxit
      if(relaxtype==2) then 
@@ -71,42 +64,22 @@ subroutine NewSolver(A,p,maxError,beta,maxit,it,ierr)
         call RedBlackRelax(A,p,beta)
      endif
 !---------------------------------CHECK FOR CONVERGENCE-------------------------------------------
-    res1 = 0d0; res2=0.d0; resinf=0.d0; intvol=0.d0
-    call ghost_x(p,1,req( 1: 4)); call ghost_y(p,1,req( 5: 8)); call ghost_z(p,1,req( 9:12))
-    do k=ks+1,ke-1; do j=js+1,je-1; do i=is+1,ie-1
-      if (FreeSurface) then
-          if ((pcmask(i,j,k)==0 .and. solver_flag==1)&
-               .or.((pcmask(i,j,k)==1 .or. pcmask(i,j,k)==2) .and. solver_flag==2)) then
-             res2=res2+abs(-p(i,j,k) * A(i,j,k,7) +                           &
-                  A(i,j,k,1) * p(i-1,j,k) + A(i,j,k,2) * p(i+1,j,k) +            &
-                  A(i,j,k,3) * p(i,j-1,k) + A(i,j,k,4) * p(i,j+1,k) +            &
-                  A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8) )**norm
-          endif
-       else
-          res2=res2+abs(-p(i,j,k) * A(i,j,k,7) +                           &
-               A(i,j,k,1) * p(i-1,j,k) + A(i,j,k,2) * p(i+1,j,k) +            &
-               A(i,j,k,3) * p(i,j-1,k) + A(i,j,k,4) * p(i,j+1,k) +            &
-               A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8) )**norm 
-       endif
-    enddo; enddo; enddo
-    call MPI_WAITALL(12,req,sta,ierr)
+     res1 = 0d0; res2=0.d0; resinf=0.d0; intvol=0.d0
+     call ghost_x(p,1,req( 1: 4)); call ghost_y(p,1,req( 5: 8)); call ghost_z(p,1,req( 9:12))
+     do k=ks+1,ke-1; do j=js+1,je-1; do i=is+1,ie-1
+        res2=res2+abs(-p(i,j,k) * A(i,j,k,7) +                           &
+             A(i,j,k,1) * p(i-1,j,k) + A(i,j,k,2) * p(i+1,j,k) +            &
+             A(i,j,k,3) * p(i,j-1,k) + A(i,j,k,4) * p(i,j+1,k) +            &
+             A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8) )**norm 
+     enddo; enddo; enddo
+     call MPI_WAITALL(12,req,sta,ierr)
     mask=.true.
     mask(is+1:ie-1,js+1:je-1,ks+1:ke-1)=.false.
     do k=ks,ke; do j=js,je; do i=is,ie
-       if (FreeSurface) then
-          if(mask(i,j,k) .and. ((pcmask(i,j,k)==0 .and. solver_flag==1) .or. &
-               ((pcmask(i,j,k)==1 .or. pcmask(i,j,k)==2) .and. solver_flag==2))) then
-          res2=res2+abs(-p(i,j,k) * A(i,j,k,7) +&
-               A(i,j,k,1) * p(i-1,j,k) + A(i,j,k,2) * p(i+1,j,k) +            &
-               A(i,j,k,3) * p(i,j-1,k) + A(i,j,k,4) * p(i,j+1,k) +            &
-               A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8) )**norm
-          endif
-       else
-          if(mask(i,j,k)) res2=res2+abs(-p(i,j,k) * A(i,j,k,7) +            &
-               A(i,j,k,1) * p(i-1,j,k) + A(i,j,k,2) * p(i+1,j,k) +            &
-               A(i,j,k,3) * p(i,j-1,k) + A(i,j,k,4) * p(i,j+1,k) +            &
-               A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8) )**norm
-       endif
+       if(mask(i,j,k)) res2=res2+abs(-p(i,j,k) * A(i,j,k,7) +            &
+            A(i,j,k,1) * p(i-1,j,k) + A(i,j,k,2) * p(i+1,j,k) +            &
+            A(i,j,k,3) * p(i,j-1,k) + A(i,j,k,4) * p(i,j+1,k) +            &
+            A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8) )**norm
     enddo; enddo; enddo
     res2 = res2/dble(Nx*Ny*Nz)
     call catch_divergence(res2,ierr)
@@ -120,10 +93,7 @@ subroutine NewSolver(A,p,maxError,beta,maxit,it,ierr)
     endif
   enddo
   if(rank==0.and.recordconvergence) close(89)
-  if(it==maxit+1 .and. rank==0) then
-     write(*,*) 'Warning: LinearSolver reached maxit: ||res||: ',tres2
-     if (FreeSurface) write(*,'("Solver flag:",I8)')solver_flag
-  endif
+  if(it==maxit+1 .and. rank==0) write(*,*) 'Warning: LinearSolver reached maxit: ||res||: ',tres2
 contains
   subroutine catch_divergence(res2,ierr)
     real(8), intent(in) :: res2
@@ -183,20 +153,10 @@ subroutine RedBlackRelax(A,p,beta)
         isw=jsw
         do j=js,je
            do i=isw+is-1,ie,2
-              if (FreeSurface) then
-                 if ((pcmask(i,j,k)==0 .and. solver_flag==1) &
-                      .or.((pcmask(i,j,k)==1 .or. pcmask(i,j,k)==2) .and. solver_flag==2)) then
-                    p(i,j,k)=(1d0-beta)*p(i,j,k) + (beta/A(i,j,k,7))*(              &
-                         A(i,j,k,1) * p(i-1,j,k) + A(i,j,k,2) * p(i+1,j,k) +        &
-                         A(i,j,k,3) * p(i,j-1,k) + A(i,j,k,4) * p(i,j+1,k) +        &
-                         A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8))   
-                 endif
-              else
-                 p(i,j,k)=(1d0-beta)*p(i,j,k) + (beta/A(i,j,k,7))*(             &
-                      A(i,j,k,1) * p(i-1,j,k) + A(i,j,k,2) * p(i+1,j,k) +       &
-                      A(i,j,k,3) * p(i,j-1,k) + A(i,j,k,4) * p(i,j+1,k) +       &
-                      A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8))
-              endif
+              p(i,j,k)=(1d0-beta)*p(i,j,k) + (beta/A(i,j,k,7))*(             &
+                   A(i,j,k,1) * p(i-1,j,k) + A(i,j,k,2) * p(i+1,j,k) +       &
+                   A(i,j,k,3) * p(i,j-1,k) + A(i,j,k,4) * p(i,j+1,k) +       &
+                   A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8))
            enddo
            isw=3-isw
         enddo
@@ -220,19 +180,10 @@ subroutine LineRelax(A,p,beta)
   integer :: i,j,k
 !--------------------------------------ITERATION LOOP--------------------------------------------  
   do k=ks,ke; do j=js,je; do i=is,ie
-     if (FreeSurface) then
-        if ((pcmask(i,j,k)==0 .and. solver_flag==1).or.((pcmask(i,j,k)==1 .or. pcmask(i,j,k)==2) .and. solver_flag==2)) then
-           p(i,j,k)=(1d0-beta)*p(i,j,k) + (beta/A(i,j,k,7))*(              &
-                A(i,j,k,1) * p(i-1,j,k) + A(i,j,k,2) * p(i+1,j,k) +        &
-                A(i,j,k,3) * p(i,j-1,k) + A(i,j,k,4) * p(i,j+1,k) +        &
-                A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8))
-        endif
-     else
-        p(i,j,k)=(1d0-beta)*p(i,j,k) + (beta/A(i,j,k,7))*(              &
-             A(i,j,k,1) * p(i-1,j,k) + A(i,j,k,2) * p(i+1,j,k) +        &
-             A(i,j,k,3) * p(i,j-1,k) + A(i,j,k,4) * p(i,j+1,k) +        &
-             A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8))
-     endif
+     p(i,j,k)=(1d0-beta)*p(i,j,k) + (beta/A(i,j,k,7))*(              &
+          A(i,j,k,1) * p(i-1,j,k) + A(i,j,k,2) * p(i+1,j,k) +        &
+          A(i,j,k,3) * p(i,j-1,k) + A(i,j,k,4) * p(i,j+1,k) +        &
+          A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8))
   enddo; enddo; enddo
 end subroutine LineRelax
 !=================================================================================================
