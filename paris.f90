@@ -424,6 +424,8 @@ Program paris
                     w(i,j,k)=w(i,j,k)-dt/rho(i,j,k)*(p_ext(i,j,k+1)-p_ext(i,j,k))/dzh(k)
                  endif
               enddo; enddo; enddo
+              call SetVelocityBC(u,v,w,umask,vmask,wmask,time)
+              call do_ghost_vector(u,v,w)
               if (mod(itimestep,nout)==0 .and. mod(ii,itime_scheme)==0) call discrete_divergence(u,v,w,itimestep/nout)
            endif !Extrapolation
 !------------------------------------------------------------------------------------------------

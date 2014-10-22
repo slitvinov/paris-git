@@ -119,6 +119,7 @@
      Open(unit=26,FILE=TRIM(out_path)//'/P1-'//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout/no,padding))//'.txt')
      Open(unit=27,FILE=TRIM(out_path)//'/P2-'//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout/no,padding))//'.txt')
      Open(unit=28,FILE=TRIM(out_path)//'/P3-'//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout/no,padding))//'.txt') 
+     Open(unit=29,FILE=TRIM(out_path)//'/P0-'//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout/no,padding))//'.txt') 
      !j=(js+je)/2
      k=(ks+ke)/2
      !do k=kmin,kmax; do i=imin,imax
@@ -127,6 +128,7 @@
         if (u_cmask(i,j,k)==0) write(20,13)xh(i),y(j),z(k)
         if (v_cmask(i,j,k)==0) write(20,13)x(i),yh(j),z(k)
         !if (w_cmask(i,j,k)==0) write(20,13)x(i),y(j),zh(k)
+        if (pcmask(i,j,k)==0) write(29,13)x(i),y(j),z(k)
         if (u_cmask(i,j,k)==1) write(21,13)xh(i),y(j),z(k)
         if (v_cmask(i,j,k)==1) write(21,13)x(i),yh(j),z(k)
         !if (w_cmask(i,j,k)==1) write(21,13)x(i),y(j),zh(k)
@@ -168,7 +170,7 @@ subroutine setuppoisson_fs(vof_phase,rhot,dt,A,cvof,n1,n2,n3,kap,iout)
 
   x_mod=dxh((is+ie)/2); y_mod=dyh((js+je)/2); z_mod=dzh((ks+ke)/2) !assumes an unstretched grid
   P_gx = 0d0; P_gy = 0d0; P_gz = 0d0
-  limit = 1d-7/dx((is+ie)/2)
+  limit = 1d-8/dx((is+ie)/2)
 !Debugging
 debug = .false.
   no=1
@@ -217,10 +219,10 @@ debug = .false.
            c1 = FL3DNEW(nr,alpha2,x0,dc)
            if (debug .and. k==(ks+ke)/2 .and. mod(iout,no)==0) write(55,314)x(i),y(j),c1,cvof(i,j,k)
            c_stag = c1+c0
-           if (c0>1d-6) then ! use weighted average if liq VOF is not small, otherwise use cav normals
-              n_avg(1)=n1(i,j,k)*c1/c_stag + n1(i+1,j,k)*c0/c_stag
-              n_avg(2)=n2(i,j,k)*c1/c_stag + n2(i+1,j,k)*c0/c_stag
-              n_avg(3)=n3(i,j,k)*c1/c_stag + n3(i+1,j,k)*c0/c_stag
+           if (c0>2d-1) then
+              n_avg(1)=n1(i+1,j,k)
+              n_avg(2)=n2(i+1,j,k)
+              n_avg(3)=n3(i+1,j,k)
            else
               n_avg(1)= n1(i,j,k)
               n_avg(2)= n2(i,j,k)
@@ -232,14 +234,16 @@ debug = .false.
               x_mod(i,j,k) = dxh(i)*(1d0-x_test2)
               if (x_mod(i,j,k)>dxh(i)) x_mod(i,j,k) = dxh(i)
               if (x_mod(i,j,k)<limit*dxh(i)) x_mod(i,j,k) = limit*dxh(i)
-              if (x_mod(i,j,k) /= x_mod(i,j,k)) write(*,'("x_mod NaN. c_st, n, vofs, phases:",4e14.5,5I8)')&
-                   c_stag,n_avg(1),cvof(i,j,k),cvof(i+1,j,k),vof_phase(i,j,k),vof_phase(i+1,j,k),i,j,k
+              if (x_mod(i,j,k) /= x_mod(i,j,k)) then
+                 write(*,'("x_mod NaN. c_st, n, vofs, phases:",6e14.5,5I8)')&
+                      c_stag,n_avg(1),n_avg(2),n_avg(3),cvof(i,j,k),cvof(i+1,j,k),vof_phase(i,j,k),vof_phase(i+1,j,k),i,j,k
+              endif
 !!$           else
 !!$              write(*,'("WARNING: x-branch tiny normal",5e14.5,2I8)')&
 !!$                   c_stag,x_mod(i,j,k),cvof(i,j,k),cvof(i+1,j,k),n_avg(1),vof_phase(i,j,k),vof_phase(i+1,j,k)
-           endif
-           if (debug .and. j==(js+je)/2 .and. mod(iout,no)==0) then
-              write(50,314)x(i+1)-x_mod(i,j,k),z(k) 
+              if (debug .and. k==(ks+ke)/2 .and. mod(iout,no)==0) then
+                 write(50,314)x(i+1)-x_mod(i,j,k),y(j)
+              endif
            endif
         endif
         !-------Check y-neighbour
@@ -264,15 +268,15 @@ debug = .false.
            c1 = FL3DNEW(nr,alpha2,x0,dc)
            if (debug .and. k==(ks+ke)/2 .and. mod(iout,no)==0) write(55,314)x(i),y(j),c1,cvof(i,j,k)
            c_stag = c1+c0
-           if (c0>1d-6) then 
-              n_avg(1)=n1(i,j,k)*c1/c_stag + n1(i,j+1,k)*c0/c_stag
-              n_avg(2)=n2(i,j,k)*c1/c_stag + n2(i,j+1,k)*c0/c_stag
-              n_avg(3)=n3(i,j,k)*c1/c_stag + n3(i,j+1,k)*c0/c_stag 
+           if (c0>2d-1) then 
+              n_avg(1)=n1(i,j+1,k)
+              n_avg(2)=n2(i,j+1,k)
+              n_avg(3)=n3(i,j+1,k) 
            else
               n_avg(1)= n1(i,j,k)
               n_avg(2)= n2(i,j,k)
               n_avg(3)= n3(i,j,k)
-           endif 
+           endif
            alpha2=al3dnew(n_avg,c_stag)
            if (ABS(n_avg(2))>1d-12) then
               y_test2 = (alpha2 - (n_avg(1)+n_avg(3))/2d0)/n_avg(2)
@@ -283,7 +287,10 @@ debug = .false.
                    c_stag,n_avg(2),cvof(i,j,k),cvof(i,j+1,k),vof_phase(i,j,k),vof_phase(i,j+1,k)
 !!$              else
 !!$                 write(*,'("WARNING: y-branch tiny normal",5e14.5,2I8)')&
-!!$                      c_stag,y_mod(i,j,k),cvof(i,j,k),cvof(i,j+1,k),n_avg(2),vof_phase(i,j,k),vof_phase(i,j+1,k)             
+!!$                      c_stag,y_mod(i,j,k),cvof(i,j,k),cvof(i,j+1,k),n_avg(2),vof_phase(i,j,k),vof_phase(i,j+1,k)   
+              if (debug .and. k==(ks+ke)/2 .and. mod(iout,no)==0) then
+                 write(50,314)x(i),y(j+1)-y_mod(i,j,k)
+              endif
            endif
 !!$              if (debug .and. k==(ks+ke)/2 .and. mod(iout,no)==0) then
 !!$                 write(50,314)x(i),y(j)+nrl*y_mod(i,j+(1-1)/2,k) 
@@ -310,10 +317,10 @@ debug = .false.
            dc(1) = 1d0; dc(2) = 1d0
            c1 = FL3DNEW(nr,alpha2,x0,dc)
            c_stag = c1+c0
-           if (c0>1d-6) then 
-              n_avg(1)=n1(i,j,k)*c1/c_stag + n1(i,j,k+1)*c0/c_stag
-              n_avg(2)=n2(i,j,k)*c1/c_stag + n2(i,j,k+1)*c0/c_stag
-              n_avg(3)=n3(i,j,k)*c1/c_stag + n3(i,j,k+1)*c0/c_stag
+           if (c0>2d-1) then 
+              n_avg(1)=n1(i,j,k+1)
+              n_avg(2)=n2(i,j,k+1)
+              n_avg(3)=n3(i,j,k+1)
            else
               n_avg(1)= n1(i,j,k)
               n_avg(2)= n2(i,j,k)
@@ -330,10 +337,9 @@ debug = .false.
 !!$              else
 !!$                 write(*,'("WARNING: z-branch tiny normal",5e14.5,2I8)')&
 !!$                      c_stag,z_mod(i,j,k),cvof(i,j,k),cvof(i,j,k+1),n_avg(3),vof_phase(i,j,k),vof_phase(i,j,k+1)
-           endif
-           if (debug .and. j==(js+je)/2 .and. mod(iout,no)==0) then
-              write(50,314)x(i),z(k+1)-z_mod(i,j,k) 
-              !write(51,314)x(i),z(k+1),0d0,-z_mod(i,j,k)
+!!$              if (debug .and. k==(ks+ke)/2 .and. mod(iout,no)==0) then
+!!$                 write(50,314)x(i)x(i+1)-x_mod(i,j,k),y(j)
+!!$              endif
            endif
         endif
      endif
@@ -374,10 +380,10 @@ debug = .false.
            c0 = FL3DNEW(nr,alpha2,x0,dc)
            if (debug .and. k==(ks+ke)/2 .and. mod(iout,no)==0) write(55,314)x(i),y(j),c0,cvof(i,j,k)
            c_stag = c1+c0
-           if (c0>1d-6) then ! use weighted average if liq VOF is not small, otherwise use cav normals
-              n_avg(1)=n1(i,j,k)*c0/c_stag + n1(i+1,j,k)*c1/c_stag
-              n_avg(2)=n2(i,j,k)*c0/c_stag + n2(i+1,j,k)*c1/c_stag
-              n_avg(3)=n3(i,j,k)*c0/c_stag + n3(i+1,j,k)*c1/c_stag
+           if (c0>2d-1) then ! use weighted average if liq VOF is not small, otherwise use cav normals
+              n_avg(1)=n1(i,j,k)
+              n_avg(2)=n2(i,j,k)
+              n_avg(3)=n3(i,j,k)
            else
               n_avg(1)= n1(i+1,j,k)
               n_avg(2)= n2(i+1,j,k)
@@ -394,10 +400,9 @@ debug = .false.
 !!$           else
 !!$              write(*,'("WARNING: x-branch tiny normal",5e14.5,2I8)')&
 !!$                   c_stag,x_mod(i,j,k),cvof(i,j,k),cvof(i+1,j,k),n_avg(1),vof_phase(i,j,k),vof_phase(i+1,j,k)
-           endif
-           if (debug .and. j==(js+je)/2 .and. mod(iout,no)==0) then
-              write(50,314)x(i)+x_mod(i,j,k),z(k) 
-              !write(51,314)x(i),z(k),x_mod(i,j,k),0d0
+              if (debug .and. k==(ks+ke)/2 .and. mod(iout,no)==0) then
+                 write(50,314)x(i)+x_mod(i,j,k),y(j) 
+              endif
            endif
         endif
         !-------Check y-neighbours in both directions 
@@ -422,10 +427,10 @@ debug = .false.
            c0 = FL3DNEW(nr,alpha2,x0,dc)
            if (debug .and. k==(ks+ke)/2 .and. mod(iout,no)==0) write(55,314)x(i),y(j),c0,cvof(i,j,k)
            c_stag = c1+c0
-           if (c0>1d-6) then 
-              n_avg(1)=n1(i,j,k)*c0/c_stag + n1(i,j+1,k)*c1/c_stag
-              n_avg(2)=n2(i,j,k)*c0/c_stag + n2(i,j+1,k)*c1/c_stag
-              n_avg(3)=n3(i,j,k)*c0/c_stag + n3(i,j+1,k)*c1/c_stag 
+           if (c0>2d-1) then 
+              n_avg(1)=n1(i,j,k)
+              n_avg(2)=n2(i,j,k)
+              n_avg(3)=n3(i,j,k) 
            else
               n_avg(1)= n1(i,j+1,k)
               n_avg(2)= n2(i,j+1,k)
@@ -442,6 +447,9 @@ debug = .false.
 !!$              else 
 !!$                 write(*,'("WARNING: y-branch tiny normal",5e14.5,2I8)')&
 !!$                      c_stag,y_mod(i,j,k),cvof(i,j,k),cvof(i,j+1,k),n_avg(2),vof_phase(i,j,k),vof_phase(i,j+1,k)
+              if (debug .and. k==(ks+ke)/2 .and. mod(iout,no)==0) then
+                 write(50,314)x(i),y(j)+y_mod(i,j,k) 
+              endif
            endif
 !!$              if (debug .and. k==(ks+ke)/2 .and. mod(iout,no)==0) then
 !!$                 write(50,314)x(i),y(j)+nrl*y_mod(i,j+(1-1)/2,k) 
@@ -468,10 +476,10 @@ debug = .false.
            dc(1) = 1d0; dc(2) = 1d0
            c0 = FL3DNEW(nr,alpha2,x0,dc)
            c_stag = c1+c0
-           if (c0>1d-6) then 
-              n_avg(1)=n1(i,j,k)*c0/c_stag + n1(i,j,k+1)*c1/c_stag
-              n_avg(2)=n2(i,j,k)*c0/c_stag + n2(i,j,k+1)*c1/c_stag
-              n_avg(3)=n3(i,j,k)*c0/c_stag + n3(i,j,k+1)*c1/c_stag
+           if (c0>2d-1) then 
+              n_avg(1)=n1(i,j,k)
+              n_avg(2)=n2(i,j,k)
+              n_avg(3)=n3(i,j,k)
            else
               n_avg(1)= n1(i,j,k+1)
               n_avg(2)= n2(i,j,k+1)
@@ -637,22 +645,32 @@ subroutine setuppoisson_fs2(utmp,vtmp,wtmp,dt,A,vof_phase,istep)
         A(i,j,k,6) = dt/(dz(k)*dzh(k))
         if (A(i,j,k,6) /= A(i,j,k,6)) write(*,'("ERROR: A6 NaN in fs2:",e14.5)')A(i,j,k,6)
 
-!!$     if (vof_phase(i,j,k)==1) then
-!!$        do nbr=-1,1,2
-!!$           if (vof_phase(i+nbr,j,k) == 0) then
-!!$              h_mod = dxh(i+(nbr-1)/2)-x_mod(i+(nbr-1)/2,j,k)
-!!$              if (h_mod > (1d-10)) A(i,j,k,2+(nbr-1)/2) = dt/(dx(i)*h_mod)
-!!$           endif
-!!$           if (vof_phase(i,j+nbr,k) == 0) then
-!!$              h_mod = dyh(j+(nbr-1)/2)-y_mod(i,j+(nbr-1)/2,k)
-!!$              if (h_mod > (1d-10)) A(i,j,k,4+(nbr-1)/2) = dt/(dy(j)*h_mod)
-!!$           endif
-!!$           if (vof_phase(i,j,k+nbr) == 0) then
-!!$              h_mod = dzh(k+(nbr-1)/2)-z_mod(i,j,k+(nbr-1)/2)
-!!$              if (h_mod > (1d-10)) A(i,j,k,6+(nbr-1)/2) = dt/(dz(k)*h_mod)
-!!$           endif
-!!$        enddo
-!!$     endif
+        if (vof_phase(i,j,k)==1) then
+           do nbr=-1,1,2
+              if (vof_phase(i+nbr,j,k) == 0) then
+                 A(i,j,k,2+(nbr-1)/2) = 0d0
+              endif
+              if (vof_phase(i,j+nbr,k) == 0) then
+                 A(i,j,k,4+(nbr-1)/2) = 0d0
+              endif
+              if (vof_phase(i,j,k+nbr) == 0) then
+                 A(i,j,k,6+(nbr-1)/2) = 0d0
+              endif
+           enddo
+        endif
+        if (vof_phase(i,j,k)==2) then
+           do nbr=-1,1,2
+              if (vof_phase(i+nbr,j,k) == 3) then
+                 A(i,j,k,2+(nbr-1)/2) = 0d0
+              endif
+              if (vof_phase(i,j+nbr,k) == 3) then
+                 A(i,j,k,4+(nbr-1)/2) = 0d0
+              endif
+              if (vof_phase(i,j,k+nbr) == 3) then
+                 A(i,j,k,6+(nbr-1)/2) = 0d0
+              endif
+           enddo
+        endif
         A(i,j,k,7) = sum(A(i,j,k,1:6))
         A(i,j,k,8) =  -((utmp(i,j,k)-utmp(i-1,j,k))/dx(i) &
              +  (vtmp(i,j,k)-vtmp(i,j-1,k))/dy(j) &
@@ -662,6 +680,7 @@ subroutine setuppoisson_fs2(utmp,vtmp,wtmp,dt,A,vof_phase,istep)
   enddo; enddo; enddo
 end subroutine setuppoisson_fs2
 !--------------------------------------------------------------------------------------------------------------------
+
 subroutine discrete_divergence(u,v,w,iout)
   use module_grid
   use module_freesurface
@@ -670,22 +689,27 @@ subroutine discrete_divergence(u,v,w,iout)
   include 'mpif.h'
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: u,v,w 
   real(8), dimension(is:ie,js:je,ks:ke) :: div, t
-  real(8), dimension(0:3) :: divtot, domain
+  real(8), dimension(0:3) :: divtot, domain, n_level
   integer :: i,j,k,l,iout,ierr
 
 !OPEN(unit=20,file=TRIM(out_path)//'/divergence-'//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout,padding))//'.txt')
 OPEN(unit=21,file='div_type.txt',access='append')
 
-divtot = 0d0
+divtot = 0d0; n_level = 0d0
 
 do k=ks,ke; do j=js,je; do i=is,ie
    div(i,j,k)=(u(i-1,j,k)-u(i,j,k))*dy(j)*dz(k)+(v(i,j-1,k)-v(i,j,k))*dx(i)*dz(k)+(w(i,j,k-1)-w(i,j,k))*dx(i)*dy(j)
    !write(20,14)x(i),y(j),z(k),div(i,j,k)
    do l=0,3
-      if (pcmask(i,j,k)==l) divtot(l)=divtot(l)+ABS(div(i,j,k))
+      if (pcmask(i,j,k)==l) then
+         divtot(l)=divtot(l)+ABS(div(i,j,k))
+         n_level(l) = n_level(l) + 1d0
+      endif
    enddo
 enddo; enddo; enddo
-divtot=divtot/(Nx*Ny*Nz)
+do l=0,3
+   if (n_level(l) > 1d-10) divtot(l)=divtot(l)/n_level(l)
+enddo
 call MPI_ALLREDUCE(divtot,domain,4, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_Cart, ierr)
 write(21,15)iout,domain(0),domain(1),domain(2),domain(3)
 !close(unit=20)
