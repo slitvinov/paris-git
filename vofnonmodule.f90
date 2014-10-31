@@ -31,7 +31,7 @@ subroutine swp(us,c,f,d,vof1,vof2,vof3)
   real (8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: us
   real (8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: c,vof1,vof2,vof3
   integer, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: f
-  if (VOF_advect=='Dick_Yue') then  ! Yue-Weymouth = Eulerian Implicit + central cell stuff
+  if (VOF_advect=='Dick_Yue') then  ! Weymouth-Yue = Eulerian Implicit + central cell stuff
      call swpr(us,c,f,d,vof1,vof2,vof3)  
   elseif (VOF_advect=='CIAM') then  ! CIAM == Lagrangian Explicit
      call swpz(us,c,f,d,vof1,vof2,vof3)

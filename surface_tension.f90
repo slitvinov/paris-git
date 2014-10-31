@@ -30,20 +30,26 @@
 !
 !     You should have received a copy of the GNU General Public License
 !     along with PARIS.  If not, see <http://www.gnu.org/licenses/>.
-!
 !-------------------------------------------------------------------------------------------------
 module module_surface_tension
   use module_grid
   use module_BC
   use module_IO
-!  use module_tmpvar
   use module_2phase
   use module_freesurface
   use module_VOF
   implicit none
-  real(8), parameter :: kappamax = 2.d0
-  integer, parameter :: nfound_min= 6 ! DO NOT Bypass the mixed height step as tests show it is less accurate
 
+! choice of method  
+  logical :: recomputenormals = .true.
+  logical :: debug_curvature = .false.
+  logical :: debug_23 = .false.
+  logical :: bypass_mixed_heights = .true.
+
+! initial state
+  logical :: st_initialized = .false.
+  real(8), parameter :: kappamax = 2.d0
+  integer, parameter :: nfound_min= 6
   integer, parameter :: NDEPTH=3
   integer, parameter :: BIGINT=100
   real(8), parameter :: D_HALF_BIGINT = DBLE(BIGINT/2)
@@ -60,10 +66,6 @@ module module_surface_tension
   ! 3 for positive height in y, 4 for negative height in y, 
   !  etc... 
   integer, dimension(:,:,:,:), allocatable :: ixheight ! HF flags for rph (Ruben-Phil) routines
-  logical :: st_initialized = .false.
-  logical :: recomputenormals = .true.
-  logical :: debug_curvature = .false.
-  logical :: debug_23 = .false.
   integer :: method_count(3)
   integer, parameter :: ngc=20
   integer :: geom_case_count(ngc)
@@ -281,7 +283,6 @@ contains
         call get_heights_pass1(direction)
      enddo
      call my_timer(5)
-
      do i=1,6
         call ghost_x(height(:,:,:,i),2,req(4*(i-1)+1:4*i))
      enddo
@@ -751,8 +752,9 @@ contains
       integer :: s,c(3),d,central,neighbor,esign
       
       real(8) :: points(NPOS,3),origin(3)
-      real(8) :: xfit(NPOS),yfit(NPOS),hfit(NPOS),fit(NPOS,3)
+      real(8) :: xfit(NPOS),yfit(NPOS),hfit(NPOS),fit(NPOS,3),weights(NPOS)
       real(8) :: centroid(3),mxyz(3),stencil3x3(-1:1,-1:1,-1:1)
+      real(8) :: wg
 
       central=vof_flag(i0,j0,k0)
       call map3x3in2x2(i1,j1,k1,i0,j0,k0)
@@ -771,7 +773,7 @@ contains
       call orientation(mxyz,try)
       call get_local_heights(i1,j1,k1,mxyz,try,nfound,h,points,nposit)
 
-! TEMPORARY - Stanley: avoid finding curvature for debry cells 
+! TEMPORARY - Stanley: avoid finding curvature for debris cells 
       if ( mxyz(1)==0.d0 .and. mxyz(2)==0.d0 .and. mxyz(3)==0.d0 ) then
          kappa = 0.d0 
          nfound = 0 
@@ -811,27 +813,29 @@ contains
          origin(n) = centroid(n)
       enddo
       ! *** determine curvature from mixed heights 
-      if ( (-nfound) > nfound_min )  then  ! more than 6 points to avoid special 2D degeneracy. 
-         xfit=points(:,try(2)) - origin(try(2))
-         yfit=points(:,try(3)) - origin(try(3))
-         hfit=points(:,try(1)) - origin(try(1))
-         ! fit over all positions, not only independent ones. 
-         call parabola_fit(xfit,yfit,hfit,nposit,a,fit_success) 
-         if(fit_success) then
+      if(.not.bypass_mixed_heights) then
+         if ( (-nfound) > nfound_min )  then  ! more than 6 points to avoid special 2D degeneracy. 
+            xfit=points(:,try(2)) - origin(try(2))
+            yfit=points(:,try(3)) - origin(try(3))
+            hfit=points(:,try(1)) - origin(try(1))
+            ! fit over all positions, not only independent ones. 
+            weights=1d0
+            call parabola_fit(xfit,yfit,hfit,weights,nposit,a,fit_success) 
+            if(fit_success) then
 #ifdef COUNT
-            method_count(2) = method_count(2) + 1
+               method_count(2) = method_count(2) + 1
 #endif
-            kappa = 2.d0*(a(1)*(1.d0+a(5)*a(5)) + a(2)*(1.d0+a(4)*a(4)) - a(3)*a(4)*a(5)) &
-                 /(1.d0+a(4)*a(4)+a(5)*a(5))**(1.5d0)
-            kappa = sign(1.d0,mxyz(try(1)))*kappa
-            return
-         else
-            geom_case_count(16) = geom_case_count(16) + 1
-!            print *, "WARNING: no curvature"
-            return
-         endif
-      endif !  (-nfound) > nfound_min  
-
+               kappa = 2.d0*(a(1)*(1.d0+a(5)*a(5)) + a(2)*(1.d0+a(4)*a(4)) - a(3)*a(4)*a(5)) &
+                    /(1.d0+a(4)*a(4)+a(5)*a(5))**(1.5d0)
+               kappa = sign(1.d0,mxyz(try(1)))*kappa
+               return
+            else
+               geom_case_count(16) = geom_case_count(16) + 1
+               !            print *, "WARNING: no curvature"
+               return
+            endif
+         endif !  (-nfound) > nfound_min  
+      endif ! .not.bypass_mixed_heights
       ! *** determine curvature from centroids
       ! Find all centroids in 3**3
       ! use direction closest to normal
@@ -849,6 +853,9 @@ contains
             do s=1,3 
                fit(nposit,s) = centroid(s) + c(s)
             end do
+            wg = cvof(i,j,k)*(1-cvof(i,j,k))
+            if(wg.lt.0d0) call pariserror("w<0")
+            weights(nposit) = wg  ! sqrt(wg)
          endif ! vof_flag
       enddo; enddo; enddo ! do m,n,l
       ! arrange coordinates so height direction is closest to normal
@@ -908,7 +915,7 @@ contains
          geom_case_count(nposit+10) = geom_case_count(nposit+10) + 1
          return
       else
-         call parabola_fit(xfit,yfit,hfit,nposit,a,fit_success)
+         call parabola_fit(xfit,yfit,hfit,weights,nposit,a,fit_success)
          if(.not.fit_success) then
             !            call print_cvof_3x3x3(i0,j0,k0)
             geom_case_count(16) = geom_case_count(16) + 1
@@ -922,16 +929,17 @@ contains
       endif
    end subroutine get_curvature
 
-   subroutine parabola_fit(xfit,yfit,hfit,nposit,a,fit_success)
+   subroutine parabola_fit(xfit,yfit,hfit,weights,nposit,a,fit_success)
       implicit none
       real(8), intent(in)  :: xfit(nposit),yfit(nposit),hfit(nposit)
+      real(8), intent(in)  :: weights(nposit)
       real(8), intent(out) :: a(6)
       logical, intent(out) :: fit_success
       real(8) :: m(6,6), invm(6,6)
       real(8) :: rhs(6)
       integer :: ifit, im,jm, nposit
       logical :: inv_success
-      real(8) :: x1,x2,x3,x4,y1,y2,y3,y4
+      real(8) :: x1,x2,x3,x4,y1,y2,y3,y4,wg
 
       fit_success=.false.
       a = 0.d0
@@ -948,35 +956,36 @@ contains
             y2 = y1*yfit(ifit)
             y3 = y2*yfit(ifit)
             y4 = y3*yfit(ifit)
+            wg = weights(ifit)
             
       ! The matrix is m_ij = sum_n alpha^n_i alpha^n_j
       ! and the "alpha_i" are the factors of the a_i coefficients:
       ! 
       !   x^2, y^2, xy, x^2, y^2, 1
 
-            m(1,1) = m(1,1) + x4
-            m(2,2) = m(2,2) + y4
-            m(3,3) = m(3,3) + x2*y2
-            m(4,4) = m(4,4) + x2
-            m(5,5) = m(5,5) + y2
-            m(6,6) = m(6,6) + 1.d0
+            m(1,1) = m(1,1) + x4*wg
+            m(2,2) = m(2,2) + y4*wg
+            m(3,3) = m(3,3) + x2*y2*wg
+            m(4,4) = m(4,4) + x2*wg
+            m(5,5) = m(5,5) + y2*wg
+            m(6,6) = m(6,6) + wg
 
-            m(1,3) = m(1,3) + x3*y1
-            m(1,4) = m(1,4) + x3
-            m(1,5) = m(1,5) + x2*y1
-            m(2,3) = m(2,3) + x1*y3
-            m(2,4) = m(2,4) + x1*y2
-            m(2,5) = m(2,5) + y3
-            m(3,6) = m(3,6) + x1*y1
-            m(4,6) = m(4,6) + x1
-            m(5,6) = m(5,6) + y1
+            m(1,3) = m(1,3) + x3*y1*wg
+            m(1,4) = m(1,4) + x3*wg
+            m(1,5) = m(1,5) + x2*y1*wg
+            m(2,3) = m(2,3) + x1*y3*wg
+            m(2,4) = m(2,4) + x1*y2*wg
+            m(2,5) = m(2,5) + y3*wg
+            m(3,6) = m(3,6) + x1*y1*wg
+            m(4,6) = m(4,6) + x1*wg
+            m(5,6) = m(5,6) + y1*wg
 
-            rhs(1) = rhs(1) + x2   *hfit(ifit)
-            rhs(2) = rhs(2) + y2   *hfit(ifit)
-            rhs(3) = rhs(3) + x1*y1*hfit(ifit)
-            rhs(4) = rhs(4) + x1   *hfit(ifit)
-            rhs(5) = rhs(5) + y1   *hfit(ifit)
-            rhs(6) = rhs(6) +       hfit(ifit)
+            rhs(1) = rhs(1) + x2   *hfit(ifit)*wg
+            rhs(2) = rhs(2) + y2   *hfit(ifit)*wg
+            rhs(3) = rhs(3) + x1*y1*hfit(ifit)*wg
+            rhs(4) = rhs(4) + x1   *hfit(ifit)*wg
+            rhs(5) = rhs(5) + y1   *hfit(ifit)*wg
+            rhs(6) = rhs(6) +       hfit(ifit)*wg
       end do ! ifit
       m(1,2) = m(3,3)
       m(1,6) = m(4,4)

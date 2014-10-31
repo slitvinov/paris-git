@@ -15,7 +15,7 @@ dim=$3'D'
 list="3 4 5 6 7"
 echo $list
 
-ndepth=`head -50  ../../surface_tension.f90 |  awk -F '=' ' /NDEPTH/ {print $2}' | tr -d ' '`
+ndepth=`head -60  ../../surface_tension.f90 |  awk -F '=' ' /NDEPTH/ {print $2}' | tr -d ' '`
 /bin/rm -f paris-$dim-$ndepth.tmp
 
 for level in $list; do
