@@ -300,7 +300,21 @@ contains
         call get_heights_pass2(direction)
         call get_heights_pass3(direction)
      enddo
-   end subroutine get_all_heights
+     call my_timer(5)
+     do i=1,6
+        call ghost_x(height(:,:,:,i),2,req(4*(i-1)+1:4*i))
+     enddo
+     call MPI_WAITALL(24,req(1:24),sta(:,1:24),ierr)
+     do i=1,6
+        call ghost_y(height(:,:,:,i),2,req(4*(i-1)+1:4*i))
+     enddo
+     call MPI_WAITALL(24,req(1:24),sta(:,1:24),ierr)
+     do i=1,6
+        call ghost_z(height(:,:,:,i),2,req(4*(i-1)+1:4*i))
+     enddo
+     call MPI_WAITALL(24,req(1:24),sta(:,1:24),ierr)
+     call my_timer(6)
+  end subroutine get_all_heights
 !=================================================================================================
 ! 
 !   the actual HF
@@ -321,7 +335,7 @@ contains
 
      do k=ks,ke; do j=js,je; do i=is,ie
         if(vof_flag(i,j,k)/2==0) then ! flag is 0 or 1
-           ! loop over search directions
+           ! loop over search directions. sign = -1 search down. sign = +1 search up. 
            do sign=-1,1,2
               c(1)=i; c(2)=j; c(3)=k
               !  vof_flag=1 and sign = +  positive normal orientation 
@@ -337,7 +351,7 @@ contains
               height_p = 0.d0
               s = 0
               c0 = c(d) ! start of stack
-              c1 = c0 + sign*ndepth ! middle of stack starting at c0 in direction sign
+              c1 = c0 + sign*ndepth ! middle of stack starting at c0 in direction sign and having maximum extent
               limit_not_found=.true.
               !call verify_indices(c(1),c(2),c(3),index,0)
               height_found  = height(c(1),c(2),c(3),index)<D_HALF_BIGINT
@@ -359,7 +373,8 @@ contains
                        ! height already found, do nothing
                        continue
                     else if(vof_flag(c(1),c(2),c(3))==flag_other_end) then ! *found the full height* !
-                       ! there may be missing terms in the sum since the top (s=2*ndepth) of the stack was not
+                       ! there may be missing terms in the sum since the maximum extent
+                       !  (s=2*ndepth) of the stack was not
                        ! necessarily reached. Add these terms. Here s = c(d) - c0
                        height_p = height_p + (2*ndepth-s)*(cvof(c(1),c(2),c(3))-0.5d0)*normalsign
                        do while (c(d)/=(c0-sign))
@@ -440,7 +455,7 @@ contains
                      ha = height(c(1),c(2),c(3),index)
                      c(d) = cb
                      if(ha<D_HALF_BIGINT) then ! height already found above
-                        height(c(1),c(2),c(3),index) = ha + sign
+                        height(c(1),c(2),c(3),index) = ha + sign   ! set height below accordingly
                      else if(ha>D_HALF_BIGINT.and.ha<1d6) then ! try to match
                         sbelow = FLOOR(REAL(hb + D_HALF_BIGINT)/REAL(BIGINT)) 
                         hb = hb - BIGINT*sbelow  ! above, below in direction of sign
@@ -468,6 +483,8 @@ contains
                         endif ! not over stack height
                      endif ! partial height above
                   endif ! partial height in cell below: if not, either full height or no-height, leave as is
+                  ! need to correct cell above accordingly if full height below and if correct height wanted in the 
+                  ! first ghost layer.
                enddo ! index
             enddo ! sign
          enddo ! l
