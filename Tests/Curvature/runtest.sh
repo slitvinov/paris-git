@@ -31,4 +31,3 @@ done
 radius=0.4
 echo $level
 run_stats.sh $nx $init $radius $nstats $d
-

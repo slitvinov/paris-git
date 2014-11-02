@@ -11,6 +11,7 @@ cd ../../Devel/Curvature-test
 ./compare-inf.sh $ndepth $d
 cd $here
 
+
 d=3
 ndepth=3
 

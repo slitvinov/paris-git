@@ -17,7 +17,7 @@ d=$5
 
 let np=$npx*$npy*$npz
 
-ndepth=`head -50  ../../surface_tension.f90 |  awk -F '=' ' /NDEPTH/ {print $2}' | tr -d ' '`
+ndepth=`head -60  ../../surface_tension.f90 |  awk -F '=' ' /NDEPTH/ {print $2}' | tr -d ' '`
 dim=$d'D'
 
 /bin/rm -rf errors.tmp
