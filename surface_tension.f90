@@ -42,9 +42,8 @@ module module_surface_tension
 
 ! choice of method  
   logical :: recomputenormals = .true.
-  logical :: debug_curvature = .false.
-  logical :: debug_23 = .false.
   logical :: bypass_mixed_heights = .true.
+  logical :: do_rotation = .false.
 
 ! initial state
   logical :: st_initialized = .false.
@@ -777,6 +776,7 @@ contains
       call map3x3in2x2(i1,j1,k1,i0,j0,k0)
 !   define in which order directions will be tried 
 !   direction closest to normal first
+!   a) first determine normal
       if(recomputenormals) then
          do m=-1,1; do n=-1,1; do l=-1,1
             stencil3x3(m,n,l) = cvof(i0+m,j0+n,k0+l)
@@ -787,6 +787,7 @@ contains
          mxyz(2) = n2(i0,j0,k0)      
          mxyz(3) = n3(i0,j0,k0)
       endif
+!   b) order the orientations
       call orientation(mxyz,try)
       call get_local_heights(i1,j1,k1,mxyz,try,nfound,h,points,nposit)
 
@@ -837,7 +838,7 @@ contains
             hfit=points(:,try(1)) - origin(try(1))
             ! fit over all positions, not only independent ones. 
             weights=1d0
-            call parabola_fit(xfit,yfit,hfit,weights,nposit,a,fit_success) 
+            call parabola_fit_with_rotation(xfit,yfit,hfit,fit,weights,mxyz,try,nposit,a,fit_success) 
             if(fit_success) then
 #ifdef COUNT
                method_count(2) = method_count(2) + 1
@@ -932,7 +933,7 @@ contains
          geom_case_count(nposit+10) = geom_case_count(nposit+10) + 1
          return
       else
-         call parabola_fit(xfit,yfit,hfit,weights,nposit,a,fit_success)
+         call parabola_fit_with_rotation(xfit,yfit,hfit,fit,weights,mxyz,try,nposit,a,fit_success) 
          if(.not.fit_success) then
             !            call print_cvof_3x3x3(i0,j0,k0)
             geom_case_count(16) = geom_case_count(16) + 1
@@ -945,6 +946,83 @@ contains
          endif
       endif
    end subroutine get_curvature
+
+   ! Performs a rotation to align z axis with normal, then calls fit
+
+   subroutine parabola_fit_with_rotation(xfit,yfit,hfit,bfit,weights,mv,try,nposit,a,fit_success)
+      implicit none
+      real(8), intent(out) :: xfit(nposit),yfit(nposit),hfit(nposit)
+      real(8), intent(in)  :: weights(nposit), mv(3)
+      integer, intent(in)  :: try(3), nposit
+      real(8), intent(out) :: a(6),bfit(nposit,3)
+      logical, intent(out) :: fit_success
+      logical :: inv_success
+      real(8) :: invm(3,3), rhs(3), norm(3), mv1(3)
+      real(8) :: ev(3,3)   ! New basis : ev(coord i, basis vector j) = ev(i,j)
+                           ! x_old_i = e_ij x_new_j
+                           ! x_new_i = e_ji x_old_j
+      real(8) :: testm(3,3), id(3,3), error
+      integer :: i,j
+
+      if(do_rotation) then
+      ! normal = direction z
+      ev(:,3) = mv
+      ! let mv1 be basis vector furthest from normal 
+      do i = 1,3
+         mv1(i) = 0d0    
+         if(i==try(3)) mv1(i) = 1d0
+      enddo
+
+      ! direction 1 orthogonal to normal and mv1
+      ev(1,1) =  mv1(2)*mv(3) - mv1(3)*mv(2)
+      ev(2,1) = -mv1(1)*mv(3) + mv1(3)*mv(1)
+      ev(3,1) =  mv1(1)*mv(2) - mv1(2)*mv(1)
+      
+      ev(1,2) =  ev(2,1)*ev(3,3) - ev(3,1)*ev(2,3)
+      ev(2,2) = -ev(1,1)*ev(3,3) + ev(3,1)*ev(1,3)
+      ev(3,2) =  ev(1,1)*ev(2,3) - ev(2,1)*ev(1,3)
+ 
+      norm = sqrt(ev(1,:)**2 + ev(2,:)**2 + ev(3,:)**2)
+      if(min(norm(1),norm(2),norm(3)) < TINY_DOUBLE) call pariserror("zero rotation matrix in curvature")
+      do i=1,3
+         ev(i,:) = ev(i,:)/norm
+      enddo
+      invm = transpose(ev)
+!      print *, '-------------'
+!       do i=1,3
+!          print *, i,invm(i,:)
+!       enddo
+!       print *, '-------------'
+      testm = matmul(invm,ev)
+!      do i=1,3
+!         print *, i,testm(i,:)
+!     enddo
+      id=0d0
+      do i=1,3
+         id(i,i) = 1d0
+      enddo
+      invm = testm - id
+      error =  0d0
+      do i=1,3
+         do j=1,3
+            error = error + abs(invm(i,j))
+         enddo
+      enddo
+      if(error>1d-15) then
+         print *, "error = ",error
+         call pariserror("non orthogonal rotation matrix")
+      end if
+      
+      bfit(:,1) = xfit
+      bfit(:,2) = yfit
+      bfit(:,3) = hfit
+ 
+      xfit = ev(1,1)*bfit(:,1) + ev(2,1)*bfit(:,2) + ev(3,1)*bfit(:,3)
+      yfit = ev(1,2)*bfit(:,1) + ev(2,2)*bfit(:,2) + ev(3,2)*bfit(:,3)
+      hfit = ev(1,3)*bfit(:,1) + ev(2,3)*bfit(:,2) + ev(3,3)*bfit(:,3)
+      endif ! do_rotation
+      call parabola_fit(xfit,yfit,hfit,weights,nposit,a,fit_success)
+   end subroutine parabola_fit_with_rotation
 
    subroutine parabola_fit(xfit,yfit,hfit,weights,nposit,a,fit_success)
       implicit none
@@ -1029,7 +1107,7 @@ contains
       end if ! inv_success
    end subroutine parabola_fit
 !
-!  Subroutine to find the inverse of a square matrix
+!  Subroutine to find the inverse of a square matrix with non-zero diagonal coeeficients. 
 !  From Stanley's previous code
 !
    SUBROUTINE FindInverseMatrix(matrix,inverse,n,inverse_success)
