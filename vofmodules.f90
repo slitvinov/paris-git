@@ -80,8 +80,9 @@ module module_VOF
   logical :: DoMOMCONS = .false.
   logical :: use_Vofi
 !   logical :: oldvof
+  logical :: do_rotation
 
-  real(8) :: b1,b2,b3,b4
+  real(8) :: b1,b2,b3,b4,hshift
   integer :: nfilter
 
   logical :: DoLPP = .false.
@@ -243,7 +244,8 @@ contains
        cylinder_dir, normal_up, DoLPP, &
        FreeSurface, ViscMeanIsArith, DensMeanIsArith, &
        output_filtered_VOF, DoMOMCONS, use_vofi,nfilter, &
-       X_level! ,oldvof
+       X_level, hshift, do_rotation
+! ,oldvof
     
 !     vofbdry_cond=['periodic','periodic','periodic','periodic','periodic','periodic']
     vofbdry_cond=['undefined','undefined','undefined','undefined','undefined','undefined']
@@ -258,7 +260,9 @@ contains
     output_filtered_VOF=.false. ! redundant
     DoMOMCONS = .false.
     use_vofi = .false.
-    nfilter = 0 
+    nfilter = 0
+    hshift =0d0
+    do_rotation = .false.
     ! oldvof = .false.  ! .true.
     
     in=31
@@ -653,9 +657,9 @@ or none at all")
 
     wave2ls = vdir(3)*(- zz + zLength/2.d0) + vdir(2)*(-yy + yLength/2.d0) &
          + vdir(1)*(-xx + xLength/2.d0) &
-         + A_h*dx(nx/2+2)*cos(2.*PI*(hdir(1)*xx/xLength &
+         + 0.5*A_h*dx(nx/2+2)*cos(2.*PI*(hdir(1)*xx/xLength &
          + hdir(2)*yy/yLength + hdir(3)*zz/zLength))
-    wave2ls = wave2ls*dble(normalsign)
+    wave2ls = wave2ls*dble(normalsign) + hshift*dx(nx/2+2)
   end function wave2ls
   !=================================================================================================
   !   Converts a level-set field into a VOF field

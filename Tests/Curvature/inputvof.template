@@ -2,7 +2,9 @@
 
 VOFBDRY_COND = 'periodic' 'periodic' 'periodic' 
 
-                   ! Type of VOF boundary condition in x,y,z direction: 'wet', '90deg','periodic'
+! Type of VOF boundary condition in x,y,z direction: 'wet', '90deg','periodic'
+
+! Only write parameters defined in the namelist in the source code.
 
 TEST_TYPE = 'TYPETEMP'
 VOF_ADVECT = 'Dick_Yue'

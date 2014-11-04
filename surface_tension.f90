@@ -43,7 +43,6 @@ module module_surface_tension
 ! choice of method  
   logical :: recomputenormals = .true.
   logical :: bypass_mixed_heights = .true.
-  logical :: do_rotation = .false.
 
 ! initial state
   logical :: st_initialized = .false.
@@ -376,8 +375,10 @@ contains
                        !  (s=2*ndepth) of the stack was not
                        ! necessarily reached. Add these terms. Here s = c(d) - c0
                        height_p = height_p + (2*ndepth-s)*(cvof(c(1),c(2),c(3))-0.5d0)*normalsign
+                       ! height is now computed with respect to c1
                        do while (c(d)/=(c0-sign))
                           !call verify_indices(c(1),c(2),c(3),index,3)
+                          ! correct the height to give it with respect to current position c(d)
                           height(c(1),c(2),c(3),index) = height_p + c1 - c(d)
                           !                    call check_all(c(1),c(2),c(3),index)
                           c(d) = c(d) - sign ! go back down
@@ -426,8 +427,8 @@ contains
      implicit none
      integer, intent(in) :: d
      integer :: index,i,j,k
-     real(8) :: ha,hb
-     integer :: l,m,n,c0,c1,cb,c(3),try(3)
+     real(8) :: ha,hb,cmiddle
+     integer :: l,m,n,c0,cb,c(3),try(3)
      integer :: sign, sabove, sbelow
      ! NDEPTH is the depth of layers tested above or below the reference cell. 
      try(1)=d 
@@ -460,23 +461,23 @@ contains
                         hb = hb - BIGINT*sbelow  ! above, below in direction of sign
                         sabove = FLOOR(REAL(ha + D_HALF_BIGINT)/REAL(BIGINT))
                         ha = ha - BIGINT*sabove
-                        ! c(d) = c0 bottom of stack
-                        !        c2 top of stack
-                        !        c2-c0+1 = length of stack
+                        ! c(d) = c0          index of bottom of stack
+                        !        cmiddle     index of center of stack (for this stack, can be half integer)
+                        !        ctop        index of top of this stack
+                        !        ctop-c0+1 = length of stack
                         ! see (**) in pass 1 :
                         !            |cb-c0|=sbelow-1
-                        !            |ca-c0|=sabove-1
+                        !            |ca-ctop|=sabove-1
                         ! hence
-                        ! c2-c0+1 = 2*ndepth+1
-                        ! hence
-                        !  |cb-c0| +  |ca-c0| + 1 = c2-c0 + 1 = sabove + sbelow - 1
+                        !  |cb-c0| +  |ca-ctop| + 2 = ctop-c0 + 1 = sabove + sbelow
+                        !  cmiddle = c0 + (ctop-c0)/2
                         if(sabove + sbelow - 1 <= 2*ndepth+1) then  ! 
                            ! bottom is at 
                            c0   = cb - (sbelow-1)*sign  
-                           c1   = c0 + ndepth*sign
+                           cmiddle   = dble(c0) + (sabove+sbelow-1)*0.5d0
                            c(d) = cb + 2*sign 
                            do while (c(d)/=(c0-sign)) 
-                              height(c(1),c(2),c(3),index) = ha + hb + c1 - c(d)
+                              height(c(1),c(2),c(3),index) = ha + hb + cmiddle - c(d)
                               c(d) = c(d) - sign ! go back to c0 
                            enddo
                         endif ! not over stack height
@@ -977,7 +978,7 @@ contains
       ev(1,1) =  mv1(2)*mv(3) - mv1(3)*mv(2)
       ev(2,1) = -mv1(1)*mv(3) + mv1(3)*mv(1)
       ev(3,1) =  mv1(1)*mv(2) - mv1(2)*mv(1)
-      
+      ! e_y = e_x x e_z  (non direct , but does not matter since curvature does not depend on orientation)
       ev(1,2) =  ev(2,1)*ev(3,3) - ev(3,1)*ev(2,3)
       ev(2,2) = -ev(1,1)*ev(3,3) + ev(3,1)*ev(1,3)
       ev(3,2) =  ev(1,1)*ev(2,3) - ev(2,1)*ev(1,3)
@@ -988,19 +989,8 @@ contains
          ev(i,:) = ev(i,:)/norm
       enddo
       invm = transpose(ev)
-!      print *, '-------------'
-!       do i=1,3
-!          print *, i,invm(i,:)
-!       enddo
-!       print *, '-------------'
       testm = matmul(invm,ev)
-!      do i=1,3
-!         print *, i,testm(i,:)
-!     enddo
-      id=0d0
-      do i=1,3
-         id(i,i) = 1d0
-      enddo
+      id=0d0; do i=1,3; id(i,i) = 1d0; enddo  ! define identity matrix
       invm = testm - id
       error =  0d0
       do i=1,3

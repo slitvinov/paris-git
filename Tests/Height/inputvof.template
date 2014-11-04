@@ -9,6 +9,7 @@ REFINEMENT = REFINEMENTTEMP
 CYLINDER_DIR = CYLDIRTEMP
 NORMAL_UP = NORMUPTEMP
 use_vofi = F
+hshift=-0.1
 !=================================================================================================
 
 &end
