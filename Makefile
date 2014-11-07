@@ -15,7 +15,7 @@ FC = mpif90
 #FLAGS = -g -cpp  -ffpe-trap=invalid,zero,overflow # -g -gstabs # -O3 #
 #FOPTS = -g -cpp -ffpe-trap=invalid,zero,overflow # -g -gstabs # -O3 #
 
- FLAGS = -O2 -cpp # -fimplicit-none -fbounds-check # -g 
+FLAGS = -O2 -cpp # -fimplicit-none -fbounds-check # -g 
 
 
 ifdef HAVE_VOFI

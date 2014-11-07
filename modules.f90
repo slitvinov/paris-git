@@ -38,9 +38,9 @@ module module_grid
 #if defined(__GFORTRAN__) 
 #elif defined(__INTEL_COMPILER)
 #else 
-#error "Name-mangling macro not set for your compiler, which thus has not been tested. Remove this line if you want to try it anyway"
+#error "Compiler version macro not set for your compiler, which thus has not been tested. Remove this line if you want to try it anyway"
 ! If you succesfuly compile on another compiler, please notify the authors
-! and add the name-mangling macro for it above. 
+! and add the compiler version macro for it above. 
 #endif
 
   implicit none

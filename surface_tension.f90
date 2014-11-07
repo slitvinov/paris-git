@@ -969,10 +969,8 @@ contains
       ! normal = direction z
       ev(:,3) = mv
       ! let mv1 be basis vector furthest from normal 
-      do i = 1,3
-         mv1(i) = 0d0    
-         if(i==try(3)) mv1(i) = 1d0
-      enddo
+      mv1 = 0d0    
+      mv1(try(3)) = 1d0
 
       ! direction 1 orthogonal to normal and mv1
       ev(1,1) =  mv1(2)*mv(3) - mv1(3)*mv(2)
@@ -1011,7 +1009,7 @@ contains
       yfit = ev(1,2)*bfit(:,1) + ev(2,2)*bfit(:,2) + ev(3,2)*bfit(:,3)
       hfit = ev(1,3)*bfit(:,1) + ev(2,3)*bfit(:,2) + ev(3,3)*bfit(:,3)
       endif ! do_rotation
-      call parabola_fit(xfit,yfit,hfit,weights,nposit,a,fit_success)
+      call    parabola_fit(xfit,yfit,hfit,weights,nposit,a,fit_success)
    end subroutine parabola_fit_with_rotation
 
    subroutine parabola_fit(xfit,yfit,hfit,weights,nposit,a,fit_success)
