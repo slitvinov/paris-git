@@ -244,7 +244,7 @@ contains
        cylinder_dir, normal_up, DoLPP, &
        FreeSurface, ViscMeanIsArith, DensMeanIsArith, &
        output_filtered_VOF, DoMOMCONS, use_vofi,nfilter, &
-       X_level, hshift, do_rotation
+       X_level, RP_test, hshift, do_rotation
 ! ,oldvof
     
 !     vofbdry_cond=['periodic','periodic','periodic','periodic','periodic','periodic']
@@ -255,7 +255,7 @@ contains
     cylinder_dir=0 ! redundant
     normal_up=.true. ! redundant
     DoLPP=.false.
-    FreeSurface=.false.; X_level = 0 
+    FreeSurface=.false.; X_level = 0; RP_test = .false.
     ViscMeanIsArith=.true.; DensMeanIsArith=.true.
     output_filtered_VOF=.false. ! redundant
     DoMOMCONS = .false.

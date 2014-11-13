@@ -335,9 +335,11 @@ module module_freesurface
   real(8), dimension(:,:,:), allocatable :: x_mod, y_mod, z_mod, p_ext
   real(8), dimension(:,:,:), allocatable :: P_gx, P_gy, P_gz
   integer, dimension(:,:,:), allocatable :: u_cmask,v_cmask,w_cmask,pcmask
+  real(8) :: p_0, gamma, V_0 !eq pressure and polytropic gas exponent
   integer :: X_level, solver_flag=0
   logical :: FreeSurface, debug=.false., initialize_fs = .false.
   logical :: div_opened
+  logical :: RP_test
 end module module_freesurface
 !=================================================================================================
 !=================================================================================================
@@ -2084,7 +2086,7 @@ subroutine SetupDensity(dIdx,dIdy,dIdz,A,color) !,mask)
   ! Anchor a point to 1
 !  if(coords(1)==0 .and. coords(2)==0 .and. coords(3)==0) then
 !    A(is,js,ks,:)=0d0
-!    A(is,js,ks,7:8)=1d0
+  !    A(is,js,ks,7:8)=1d0
 !  endif
 end subroutine SetupDensity
 !=================================================================================================

@@ -317,7 +317,7 @@ Program paris
            else
               if (FreeSurface) then
                  solver_flag = 1
-                 call FreeSolver(A,p,maxError/dt,beta,maxit,it,ierr,itimestep)
+                 call FreeSolver(A,p,maxError/dt,beta,maxit,it,ierr,itimestep,time)
               else
                  call NewSolver(A,p,maxError/dt,beta,maxit,it,ierr)
               endif
@@ -404,7 +404,7 @@ Program paris
               if(HYPRE)then !HYPRE will not work with removed nodes from domain.
                  call pariserror("HYPRE solver not yet available for Free Surfaces")
               else
-                 call FreeSolver(A,p_ext,maxError/dt,beta,maxit,it,ierr,itimestep)
+                 call FreeSolver(A,p_ext,maxError/dt,beta,maxit,it,ierr,itimestep,time)
               endif
               ! Correct ONLY masked gas velocities at level 1 and 2
               do k=ks,ke;  do j=js,je; do i=is,ieu    ! CORRECT THE u-velocity 
@@ -649,71 +649,71 @@ subroutine calcStats
   if(nstatarray > 100) call pariserror("nstatarray too large")
   mystats(1:nstatarray)=0d0
   do k=ks,ke;  do j=js,je;  do i=is,ie
-    vol = dx(i)*dy(j)*dz(k)
-! Average u component
-    mystats(2)=mystats(2)+u(i,j,k)*vol
-    mystats(3)=mystats(3)+fx(i,j,k)*dxh(i)*dy(j)*dz(k)
-    mystats(4)=mystats(4)+fy(i,j,k)*dx(i)*dyh(j)*dz(k)
-    mystats(5)=mystats(5)+fz(i,j,k)*dx(i)*dy(j)*dzh(k)
-    mystats(6)=mystats(6)+rho(i,j,k)*vol
-    mystats(7)=mystats(7)+p(i,j,k)*vol
-! average momentum
-    mystats(8)=mystats(8)+0.5*(rho(i,j,k)+rho(i+1,j,k))*u(i,j,k)*vol
-    mystats(9)=mystats(9)+0.5*(rho(i,j,k)+rho(i+1,j,k))*uold(i,j,k)*vol
-! Phase C=1 volume
-    if(DoVOF) CC=cvof(i,j,k) ;  mystats(10)=mystats(10)+CC*vol
-! Phase C=1 center of mass
-    if(DoVOF) CC=cvof(i,j,k) ;  mystats(11)=mystats(11)+CC*vol*x(i)
-! kinetic energy
-    kenergy = 0.5d0*( (0.5d0*(u(i,j,k)+u(i+1,j,k)))**2.d0 & 
-                     +(0.5d0*(v(i,j,k)+v(i,j+1,k)))**2.d0 & 
-                     +(0.5d0*(w(i,j,k)+w(i,j,k+1)))**2.d0)
-    if(DoVOF) then
-       mystats(12)=mystats(12)+rho(i,j,k)*kenergy*vol*      cvof(i,j,k)
-       mystats(13)=mystats(13)+rho(i,j,k)*kenergy*vol*(1.d0-cvof(i,j,k))
-    else 
-       mystats(13)=mystats(13)+rho(i,j,k)*kenergy*vol
-    end if ! DoVOF
-! y-momentum 
-    if(DoVOF) then
-      mystats(14)=mystats(14)+rho(i,j,k)*0.5d0*(v(i,j,k)+v(i,j+1,k))*vol*(     cvof(i,j,k))
-      mystats(15)=mystats(15)+rho(i,j,k)*0.5d0*(v(i,j,k)+v(i,j+1,k))*vol*(1.d0-cvof(i,j,k))
-    end if ! (DoVOF)
-! interfacial area
-   if (DoVOF .and. test_PhaseInversion) then
-      if (     max((cvof(i+1,j,k)-0.5d0)/abs(cvof(i+1,j,k)-0.5d0),0.d0) & 
+     vol = dx(i)*dy(j)*dz(k)
+     ! Average u component
+     mystats(2)=mystats(2)+u(i,j,k)*vol
+     mystats(3)=mystats(3)+fx(i,j,k)*dxh(i)*dy(j)*dz(k)
+     mystats(4)=mystats(4)+fy(i,j,k)*dx(i)*dyh(j)*dz(k)
+     mystats(5)=mystats(5)+fz(i,j,k)*dx(i)*dy(j)*dzh(k)
+     mystats(6)=mystats(6)+rho(i,j,k)*vol
+     mystats(7)=mystats(7)+p(i,j,k)*vol
+     ! average momentum
+     mystats(8)=mystats(8)+0.5*(rho(i,j,k)+rho(i+1,j,k))*u(i,j,k)*vol
+     mystats(9)=mystats(9)+0.5*(rho(i,j,k)+rho(i+1,j,k))*uold(i,j,k)*vol
+     ! Phase C=1 volume
+     if(DoVOF) CC=cvof(i,j,k) ;  mystats(10)=mystats(10)+CC*vol
+     ! Phase C=1 center of mass
+     if(DoVOF) CC=cvof(i,j,k) ;  mystats(11)=mystats(11)+CC*vol*x(i)
+     ! kinetic energy
+     kenergy = 0.5d0*( (0.5d0*(u(i,j,k)+u(i+1,j,k)))**2.d0 & 
+          +(0.5d0*(v(i,j,k)+v(i,j+1,k)))**2.d0 & 
+          +(0.5d0*(w(i,j,k)+w(i,j,k+1)))**2.d0)
+     if(DoVOF) then
+        mystats(12)=mystats(12)+rho(i,j,k)*kenergy*vol*      cvof(i,j,k)
+        mystats(13)=mystats(13)+rho(i,j,k)*kenergy*vol*(1.d0-cvof(i,j,k))
+     else 
+        mystats(13)=mystats(13)+rho(i,j,k)*kenergy*vol
+     end if ! DoVOF
+     ! y-momentum 
+     if(DoVOF) then
+        mystats(14)=mystats(14)+rho(i,j,k)*0.5d0*(v(i,j,k)+v(i,j+1,k))*vol*(     cvof(i,j,k))
+        mystats(15)=mystats(15)+rho(i,j,k)*0.5d0*(v(i,j,k)+v(i,j+1,k))*vol*(1.d0-cvof(i,j,k))
+     end if ! (DoVOF)
+     ! interfacial area
+     if (DoVOF .and. test_PhaseInversion) then
+        if (     max((cvof(i+1,j,k)-0.5d0)/abs(cvof(i+1,j,k)-0.5d0),0.d0) & 
              - max((cvof(i-1,j,k)-0.5d0)/abs(cvof(i-1,j,k)-0.5d0),0.d0) /= 0.d0 &
-          .or. max((cvof(i,j+1,k)-0.5d0)/abs(cvof(i,j+1,k)-0.5d0),0.d0) & 
+             .or. max((cvof(i,j+1,k)-0.5d0)/abs(cvof(i,j+1,k)-0.5d0),0.d0) & 
              - max((cvof(i,j-1,k)-0.5d0)/abs(cvof(i,j-1,k)-0.5d0),0.d0) /= 0.d0 &
-          .or. max((cvof(i,j,k+1)-0.5d0)/abs(cvof(i,j,k+1)-0.5d0),0.d0) & 
+             .or. max((cvof(i,j,k+1)-0.5d0)/abs(cvof(i,j,k+1)-0.5d0),0.d0) & 
              - max((cvof(i,j,k-1)-0.5d0)/abs(cvof(i,j,k-1)-0.5d0),0.d0) /= 0.d0 & 
-         ) then
-         if ( vof_flag(i,j,k) == 2 ) & 
-            mystats(19) = mystats(19) + dx(i)*dy(j)
-      end if ! cvof
-   end if ! DoVOF
-! potential energy (considering gravity in y direction)  
-   if(DoVOF .and. test_PhaseInversion) then
-      mystats(20)=mystats(20)+rho(i,j,k)*Gy*y(j)*vol*      cvof(i,j,k)
-      mystats(21)=mystats(21)+rho(i,j,k)*Gy*y(j)*vol*(1.d0-cvof(i,j,k))
-   end if ! DoVOF
-! enstrophy
-   if(DoVOF .and. test_PhaseInversion) then
-      vort2 = (0.5d0*(w(i,j+1,k)+w(i,j+1,k+1)-w(i,j-1,k)-w(i,j-1,k+1))/(y(j+1)-y(j-1)) & 
-              -0.5d0*(v(i,j,k+1)+v(i,j+1,k+1)-v(i,j,k-1)-v(i,j+1,k-1))/(z(k+1)-z(k-1)))**2.d0 & 
-            + (0.5d0*(u(i,j,k+1)+u(i+1,j,k+1)-u(i,j,k-1)-u(i+1,j,k-1))/(z(k+1)-z(k-1)) & 
-              -0.5d0*(w(i+1,j,k)+w(i+1,j,k+1)-w(i-1,j,k)-w(i-1,j,k+1))/(x(i+1)-x(i-1)))**2.d0 & 
-            + (0.5d0*(v(i+1,j,k)+v(i+1,j+1,k)-v(i-1,j,k)-v(i-1,j+1,k))/(x(i+1)-x(i-1)) & 
-              -0.5d0*(u(i,j+1,k)+u(i+1,j+1,k)-u(i,j-1,k)-u(i+1,j-1,k))/(y(j+1)-y(j-1)))**2.d0 
-      enstrophy = 0.5*vort2
-      mystats(22)=mystats(22)+enstrophy*vol*      cvof(i,j,k)
-      mystats(23)=mystats(23)+enstrophy*vol*(1.d0-cvof(i,j,k))
-   end if ! DoVOF
-! volume fraction of top layer
-   if(DoVOF .and. test_PhaseInversion) then
-      if ( y(j) > height4Stats ) & 
-         mystats(24)=mystats(24)+vol*cvof(i,j,k)/(xLength*zLength*(yLength-height4Stats))
-   end if ! DoVOF
+             ) then
+           if ( vof_flag(i,j,k) == 2 ) & 
+                mystats(19) = mystats(19) + dx(i)*dy(j)
+        end if ! cvof
+     end if ! DoVOF
+     ! potential energy (considering gravity in y direction)  
+     if(DoVOF .and. test_PhaseInversion) then
+        mystats(20)=mystats(20)+rho(i,j,k)*Gy*y(j)*vol*      cvof(i,j,k)
+        mystats(21)=mystats(21)+rho(i,j,k)*Gy*y(j)*vol*(1.d0-cvof(i,j,k))
+     end if ! DoVOF
+     ! enstrophy
+     if(DoVOF .and. test_PhaseInversion) then
+        vort2 = (0.5d0*(w(i,j+1,k)+w(i,j+1,k+1)-w(i,j-1,k)-w(i,j-1,k+1))/(y(j+1)-y(j-1)) & 
+             -0.5d0*(v(i,j,k+1)+v(i,j+1,k+1)-v(i,j,k-1)-v(i,j+1,k-1))/(z(k+1)-z(k-1)))**2.d0 & 
+             + (0.5d0*(u(i,j,k+1)+u(i+1,j,k+1)-u(i,j,k-1)-u(i+1,j,k-1))/(z(k+1)-z(k-1)) & 
+             -0.5d0*(w(i+1,j,k)+w(i+1,j,k+1)-w(i-1,j,k)-w(i-1,j,k+1))/(x(i+1)-x(i-1)))**2.d0 & 
+             + (0.5d0*(v(i+1,j,k)+v(i+1,j+1,k)-v(i-1,j,k)-v(i-1,j+1,k))/(x(i+1)-x(i-1)) & 
+             -0.5d0*(u(i,j+1,k)+u(i+1,j+1,k)-u(i,j-1,k)-u(i+1,j-1,k))/(y(j+1)-y(j-1)))**2.d0 
+        enstrophy = 0.5*vort2
+        mystats(22)=mystats(22)+enstrophy*vol*      cvof(i,j,k)
+        mystats(23)=mystats(23)+enstrophy*vol*(1.d0-cvof(i,j,k))
+     end if ! DoVOF
+     ! volume fraction of top layer
+     if(DoVOF .and. test_PhaseInversion) then
+        if ( y(j) > height4Stats ) & 
+             mystats(24)=mystats(24)+vol*cvof(i,j,k)/(xLength*zLength*(yLength-height4Stats))
+     end if ! DoVOF
   enddo;  enddo;  enddo
 
 ! Shear stress on y=0,Ly
@@ -1839,6 +1839,7 @@ subroutine InitCondition
   use module_lag_part
   use module_output_lpp
   use module_output_vof
+  use module_freesurface
   implicit none
   include 'mpif.h'
   integer :: i,j,k, ierr, irank, req(12),sta(MPI_STATUS_SIZE,12)
@@ -1887,6 +1888,8 @@ subroutine InitCondition
               call set_topology(vof_phase,itimestep) !vof_phases are updated in initconditions_VOF called above
               call get_normals()
               call get_all_curvatures(kappa_fs)
+              !if (RP_test) call get_initial_volume
+              V_0 = 4d0/3d0*pi*(0.16**3d0)
            endif
            call get_all_heights()
         endif

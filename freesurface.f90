@@ -166,13 +166,14 @@ subroutine setuppoisson_fs(vof_phase,rhot,dt,A,cvof,n1,n2,n3,kap,iout)
   real(8) :: nr(3),al3dnew,x0(3),dc(3),FL3DNEW,n_avg(3)
   real(8) :: dt, limit
   integer :: i,j,k,l,iout,nbr,ierr,no
-  real(8) :: c1, c0, c_stag
+  real(8) :: c1, c0, c_stag, c_min
 
   x_mod=dxh((is+ie)/2); y_mod=dyh((js+je)/2); z_mod=dzh((ks+ke)/2) !assumes an unstretched grid
   P_gx = 0d0; P_gy = 0d0; P_gz = 0d0
-  limit = 1d-8/dx((is+ie)/2)
-!Debugging
-debug = .false.
+  limit = 1d-7/dx((is+ie)/2)
+  c_min = 1d-3
+  !Debugging
+  debug = .false.
   no=1
   if (debug .and. mod(iout,no)==0) then
      Open(unit=50,file=TRIM(out_path)//'/C_int-'//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout/no,padding))//'.txt')
@@ -180,10 +181,9 @@ debug = .false.
      Open(unit=55,file=TRIM(out_path)//'/C0-'//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout/no,padding))//'.txt')
      Open(unit=56,file=TRIM(out_path)//'/C1-'//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout/no,padding))//'.txt')
   endif
-  do k=ks-1,ke; do j=js-1,je; do i=is-1,ie
+  do k=ks,ke; do j=js,je; do i=is,ie
      !----Cav-liquid neighbours, set P_g in cavity cells
      if(vof_phase(i,j,k)==1) then
-        !if (cvof(i,j,k)<0.49d0) write(*,'("Vof phase error. Phase test 1, cvof: ",e14.5)')cvof(i,j,k) !debugging
         if (vof_phase(i+1,j,k)==0) then
            P_gx(i,j,k) = sigma*kap(i,j,k)/dx(i) !!filaments and droplets of one cell will be an issue here
            if (P_gx(i,j,k) /= P_gx(i,j,k)) write(*,*)'WARNING, P_g NaN x-dir'
@@ -199,7 +199,6 @@ debug = .false.
 
         !Check x-neighbour         
         if (vof_phase(i+1,j,k) == 0) then
-           !if (cvof(i+1,j,k)>0.499d0) write(*,'("Vof phase error. Phase test 0, cvof: ",e14.5)')cvof(i+1,j,k) !debugging
            !get_intersection for liq cell
            nr(1)=n1(i+1,j,k); nr(2)=n2(i+1,j,k); nr(3)=n3(i+1,j,k)
            alpha2 = al3dnew(nr,cvof(i+1,j,k))
@@ -219,15 +218,19 @@ debug = .false.
            c1 = FL3DNEW(nr,alpha2,x0,dc)
            if (debug .and. k==(ks+ke)/2 .and. mod(iout,no)==0) write(55,314)x(i),y(j),c1,cvof(i,j,k)
            c_stag = c1+c0
-           if (c0>2d-1) then
-              n_avg(1)=n1(i+1,j,k)
-              n_avg(2)=n2(i+1,j,k)
-              n_avg(3)=n3(i+1,j,k)
+           if (c0>c_min) then ! use weighted average if liq VOF is not small, otherwise use cav normals
+              nr(1)=n1(i+1,j,k)*c0/c_stag + n1(i,j,k)*c1/c_stag
+              nr(2)=n2(i+1,j,k)*c0/c_stag + n2(i,j,k)*c1/c_stag
+              nr(3)=n3(i+1,j,k)*c0/c_stag + n3(i,j,k)*c1/c_stag
+              n_avg(1) = nr(1)/(ABS(nr(1))+ABS(nr(2))+ABS(nr(3)))
+              n_avg(2) = nr(2)/(ABS(nr(1))+ABS(nr(2))+ABS(nr(3)))
+              n_avg(3) = nr(3)/(ABS(nr(1))+ABS(nr(2))+ABS(nr(3)))
            else
               n_avg(1)= n1(i,j,k)
               n_avg(2)= n2(i,j,k)
               n_avg(3)= n3(i,j,k)
            endif
+           if (ABS((ABS(n_avg(1))+ABS(n_avg(2))+ABS(n_avg(3)))-1d0) > 1d-12) call pariserror('Normals not normalised')
            alpha2=al3dnew(n_avg,c_stag)
            if (ABS(n_avg(1))>1d-12) then
               x_test2 = (alpha2 - (n_avg(2)+n_avg(3))/2d0)/n_avg(1)
@@ -238,9 +241,6 @@ debug = .false.
                  write(*,'("x_mod NaN. c_st, n, vofs, phases:",6e14.5,5I8)')&
                       c_stag,n_avg(1),n_avg(2),n_avg(3),cvof(i,j,k),cvof(i+1,j,k),vof_phase(i,j,k),vof_phase(i+1,j,k),i,j,k
               endif
-!!$           else
-!!$              write(*,'("WARNING: x-branch tiny normal",5e14.5,2I8)')&
-!!$                   c_stag,x_mod(i,j,k),cvof(i,j,k),cvof(i+1,j,k),n_avg(1),vof_phase(i,j,k),vof_phase(i+1,j,k)
               if (debug .and. k==(ks+ke)/2 .and. mod(iout,no)==0) then
                  write(50,314)x(i+1)-x_mod(i,j,k),y(j)
               endif
@@ -248,7 +248,6 @@ debug = .false.
         endif
         !-------Check y-neighbour
         if (vof_phase(i,j+1,k) == 0) then
-           !if (cvof(i,j+1,k)>0.499d0) write(*,'("Vof phase error. Phase test 0, cvof: ",e14.5)')cvof(i,j+1,k) !debugging
            !get_intersection for liq cell
            nr(1) = n1(i,j+1,k); nr(2) = n2(i,j+1,k); nr(3) = n3(i,j+1,k)
            alpha2 = al3dnew(nr,cvof(i,j+1,k))
@@ -268,15 +267,19 @@ debug = .false.
            c1 = FL3DNEW(nr,alpha2,x0,dc)
            if (debug .and. k==(ks+ke)/2 .and. mod(iout,no)==0) write(55,314)x(i),y(j),c1,cvof(i,j,k)
            c_stag = c1+c0
-           if (c0>2d-1) then 
-              n_avg(1)=n1(i,j+1,k)
-              n_avg(2)=n2(i,j+1,k)
-              n_avg(3)=n3(i,j+1,k) 
+           if (c0>c_min) then ! use weighted average if liq VOF is not small, otherwise use cav normals
+              nr(1)=n1(i,j+1,k)*c0/c_stag + n1(i,j,k)*c1/c_stag
+              nr(2)=n2(i,j+1,k)*c0/c_stag + n2(i,j,k)*c1/c_stag
+              nr(3)=n3(i,j+1,k)*c0/c_stag + n3(i,j,k)*c1/c_stag
+              n_avg(1) = nr(1)/(ABS(nr(1))+ABS(nr(2))+ABS(nr(3)))
+              n_avg(2) = nr(2)/(ABS(nr(1))+ABS(nr(2))+ABS(nr(3)))
+              n_avg(3) = nr(3)/(ABS(nr(1))+ABS(nr(2))+ABS(nr(3)))
            else
               n_avg(1)= n1(i,j,k)
               n_avg(2)= n2(i,j,k)
               n_avg(3)= n3(i,j,k)
            endif
+           if (ABS((ABS(n_avg(1))+ABS(n_avg(2))+ABS(n_avg(3)))-1d0) > 1d-12) call pariserror('Normals not normalised')
            alpha2=al3dnew(n_avg,c_stag)
            if (ABS(n_avg(2))>1d-12) then
               y_test2 = (alpha2 - (n_avg(1)+n_avg(3))/2d0)/n_avg(2)
@@ -285,21 +288,13 @@ debug = .false.
               if (y_mod(i,j,k)<limit*dyh(j)) y_mod(i,j,k) = limit*dyh(j)
               if (y_mod(i,j,k) /= y_mod(i,j,k)) write(*,'("y_mod NaN. c_st, n, vofs, phases:",4e14.5,2I8)')&
                    c_stag,n_avg(2),cvof(i,j,k),cvof(i,j+1,k),vof_phase(i,j,k),vof_phase(i,j+1,k)
-!!$              else
-!!$                 write(*,'("WARNING: y-branch tiny normal",5e14.5,2I8)')&
-!!$                      c_stag,y_mod(i,j,k),cvof(i,j,k),cvof(i,j+1,k),n_avg(2),vof_phase(i,j,k),vof_phase(i,j+1,k)   
               if (debug .and. k==(ks+ke)/2 .and. mod(iout,no)==0) then
                  write(50,314)x(i),y(j+1)-y_mod(i,j,k)
               endif
            endif
-!!$              if (debug .and. k==(ks+ke)/2 .and. mod(iout,no)==0) then
-!!$                 write(50,314)x(i),y(j)+nrl*y_mod(i,j+(1-1)/2,k) 
-!!$                 write(51,314)x(i),y(j),0d0,nrl*y_mod(i,j+(1-1)/2,k)
-!!$              endif
         endif
         !-------Check z-neighbours
         if (vof_phase(i,j,k+1) == 0) then
-           !if (cvof(i,j,k+1)>0.499d0) write(*,'("Vof phase error. Phase test 0, cvof: ",e14.5)')cvof(i,j,k+1) !debugging
            !vof fraction in half of liq cell
            nr(1) = n1(i,j,k+1); nr(2) = n2(i,j,k+1); nr(3) = n3(i,j,k+1)
            alpha2 = al3dnew(nr,cvof(i,j,k+1))
@@ -317,15 +312,19 @@ debug = .false.
            dc(1) = 1d0; dc(2) = 1d0
            c1 = FL3DNEW(nr,alpha2,x0,dc)
            c_stag = c1+c0
-           if (c0>2d-1) then 
-              n_avg(1)=n1(i,j,k+1)
-              n_avg(2)=n2(i,j,k+1)
-              n_avg(3)=n3(i,j,k+1)
+           if (c0>c_min) then ! use weighted average if liq VOF is not small, otherwise use cav normals
+              nr(1)=n1(i,j,k+1)*c0/c_stag + n1(i,j,k)*c1/c_stag
+              nr(2)=n2(i,j,k+1)*c0/c_stag + n2(i,j,k)*c1/c_stag
+              nr(3)=n3(i,j,k+1)*c0/c_stag + n3(i,j,k)*c1/c_stag
+              n_avg(1) = nr(1)/(ABS(nr(1))+ABS(nr(2))+ABS(nr(3)))
+              n_avg(2) = nr(2)/(ABS(nr(1))+ABS(nr(2))+ABS(nr(3)))
+              n_avg(3) = nr(3)/(ABS(nr(1))+ABS(nr(2))+ABS(nr(3)))
            else
               n_avg(1)= n1(i,j,k)
               n_avg(2)= n2(i,j,k)
               n_avg(3)= n3(i,j,k)
            endif
+           if (ABS((ABS(n_avg(1))+ABS(n_avg(2))+ABS(n_avg(3)))-1d0) > 1d-12) call pariserror('Normals not normalised')
            alpha2=al3dnew(n_avg,c_stag)
            if (ABS(n_avg(3))>1d-12) then
               z_test2 = (alpha2 - (n_avg(1)+n_avg(2))/2d0)/n_avg(3)
@@ -334,16 +333,10 @@ debug = .false.
               if (z_mod(i,j,k)<limit*dzh(k)) z_mod(i,j,k) = limit*dzh(k)
               if (z_mod(i,j,k) /= z_mod(i,j,k)) write(*,'("z_mod NaN. c_st, n, vofs, phases:",4e14.5,2I8)')&
                    c_stag,n_avg(3),cvof(i,j,k),cvof(i,j,k+1),vof_phase(i,j,k),vof_phase(i,j,k+1)
-!!$              else
-!!$                 write(*,'("WARNING: z-branch tiny normal",5e14.5,2I8)')&
-!!$                      c_stag,z_mod(i,j,k),cvof(i,j,k),cvof(i,j,k+1),n_avg(3),vof_phase(i,j,k),vof_phase(i,j,k+1)
-!!$              if (debug .and. k==(ks+ke)/2 .and. mod(iout,no)==0) then
-!!$                 write(50,314)x(i)x(i+1)-x_mod(i,j,k),y(j)
-!!$              endif
            endif
         endif
      endif
-!----Liquid-cavity neighbours
+!----Liquid-cavity neighbours-----------------------------------------------------
      if (vof_phase(i,j,k)==0) then
         if (vof_phase(i+1,j,k)==1) then
            P_gx(i+1,j,k) = sigma*kap(i+1,j,k)/dx(i) !!filaments and droplets of one cell will be an issue here
@@ -357,7 +350,6 @@ debug = .false.
            P_gz(i,j,k+1) = sigma*kap(i,j,k+1)/dz(k)
            if (P_gz(i,j,k+1) /= P_gz(i,j,k+1)) write(*,*)'WARNING, P_g NaN z-dir'
         endif
-        !if (cvof(i,j,k)>=0.499d0) write(*,'("Vof phase error. Phase test 0, cvof: ",e14.5)')cvof(i,j,k) !debugging check
         !Check x-neighbour
         if (vof_phase(i+1,j,k) == 1) then
            !if (cvof(i+1,j,k)<0.499d0) write(*,'("Vof phase error. Phase test 1, cvof: ",e14.5)')cvof(i+1,j,k) !debugging
@@ -380,15 +372,19 @@ debug = .false.
            c0 = FL3DNEW(nr,alpha2,x0,dc)
            if (debug .and. k==(ks+ke)/2 .and. mod(iout,no)==0) write(55,314)x(i),y(j),c0,cvof(i,j,k)
            c_stag = c1+c0
-           if (c0>2d-1) then ! use weighted average if liq VOF is not small, otherwise use cav normals
-              n_avg(1)=n1(i,j,k)
-              n_avg(2)=n2(i,j,k)
-              n_avg(3)=n3(i,j,k)
+           if (c0>c_min) then ! use weighted average if liq VOF is not small, otherwise use cav normals
+              nr(1)=n1(i,j,k)*c0/c_stag + n1(i+1,j,k)*c1/c_stag
+              nr(2)=n2(i,j,k)*c0/c_stag + n2(i+1,j,k)*c1/c_stag
+              nr(3)=n3(i,j,k)*c0/c_stag + n3(i+1,j,k)*c1/c_stag
+              n_avg(1) = nr(1)/(ABS(nr(1))+ABS(nr(2))+ABS(nr(3)))
+              n_avg(2) = nr(2)/(ABS(nr(1))+ABS(nr(2))+ABS(nr(3)))
+              n_avg(3) = nr(3)/(ABS(nr(1))+ABS(nr(2))+ABS(nr(3)))
            else
               n_avg(1)= n1(i+1,j,k)
               n_avg(2)= n2(i+1,j,k)
               n_avg(3)= n3(i+1,j,k)
            endif
+           if (ABS((ABS(n_avg(1))+ABS(n_avg(2))+ABS(n_avg(3)))-1d0) > 1d-12) call pariserror('Normals not normalised')
            alpha2=al3dnew(n_avg,c_stag)
            if (ABS(n_avg(1))>1d-12) then
               x_test2 = (alpha2 - (n_avg(2)+n_avg(3))/2d0)/n_avg(1)
@@ -397,9 +393,6 @@ debug = .false.
               if (x_mod(i,j,k)<limit*dxh(i)) x_mod(i,j,k) = limit*dxh(i)
               if (x_mod(i,j,k) /= x_mod(i,j,k)) write(*,'("x_mod NaN. c_st, n, vofs, phases:",4e14.5,2I8)')&
                    c_stag,n_avg(1),cvof(i,j,k),cvof(i+1,j,k),vof_phase(i,j,k),vof_phase(i+1,j,k)
-!!$           else
-!!$              write(*,'("WARNING: x-branch tiny normal",5e14.5,2I8)')&
-!!$                   c_stag,x_mod(i,j,k),cvof(i,j,k),cvof(i+1,j,k),n_avg(1),vof_phase(i,j,k),vof_phase(i+1,j,k)
               if (debug .and. k==(ks+ke)/2 .and. mod(iout,no)==0) then
                  write(50,314)x(i)+x_mod(i,j,k),y(j) 
               endif
@@ -407,7 +400,6 @@ debug = .false.
         endif
         !-------Check y-neighbours in both directions 
         if (vof_phase(i,j+1,k) == 1) then
-           !if (cvof(i,j+1,k)<0.499d0) write(*,'("Vof phase error. Phase test 1, cvof: ",e14.5)')cvof(i,j+1,k) !debugging
            !vof fraction in half of cav cell
            nr(1) = n1(i,j+1,k); nr(2) = n2(i,j+1,k); nr(3) = n3(i,j+1,k)
            alpha2 = al3dnew(nr,cvof(i,j+1,k))
@@ -427,15 +419,19 @@ debug = .false.
            c0 = FL3DNEW(nr,alpha2,x0,dc)
            if (debug .and. k==(ks+ke)/2 .and. mod(iout,no)==0) write(55,314)x(i),y(j),c0,cvof(i,j,k)
            c_stag = c1+c0
-           if (c0>2d-1) then 
-              n_avg(1)=n1(i,j,k)
-              n_avg(2)=n2(i,j,k)
-              n_avg(3)=n3(i,j,k) 
+           if (c0>c_min) then ! use weighted average if liq VOF is not small, otherwise use cav normals
+              nr(1)=n1(i,j,k)*c0/c_stag + n1(i,j+1,k)*c1/c_stag
+              nr(2)=n2(i,j,k)*c0/c_stag + n2(i,j+1,k)*c1/c_stag
+              nr(3)=n3(i,j,k)*c0/c_stag + n3(i,j+1,k)*c1/c_stag
+              n_avg(1) = nr(1)/(ABS(nr(1))+ABS(nr(2))+ABS(nr(3)))
+              n_avg(2) = nr(2)/(ABS(nr(1))+ABS(nr(2))+ABS(nr(3)))
+              n_avg(3) = nr(3)/(ABS(nr(1))+ABS(nr(2))+ABS(nr(3)))
            else
               n_avg(1)= n1(i,j+1,k)
               n_avg(2)= n2(i,j+1,k)
               n_avg(3)= n3(i,j+1,k)
            endif
+           if (ABS((ABS(n_avg(1))+ABS(n_avg(2))+ABS(n_avg(3)))-1d0) > 1d-12) call pariserror('Normals not normalised')
            alpha2=al3dnew(n_avg,c_stag)
            if (ABS(n_avg(2))>1d-12) then
               y_test2 = (alpha2 - (n_avg(1)+n_avg(3))/2d0)/n_avg(2)
@@ -444,21 +440,13 @@ debug = .false.
               if (y_mod(i,j,k)<limit*dyh(j)) y_mod(i,j,k) = limit*dyh(j)
               if (y_mod(i,j,k) /= y_mod(i,j,k)) write(*,'("y_mod NaN. c_st, n, vofs, phases:",4e14.5,2I8)')&
                    c_stag,n_avg(2),cvof(i,j,k),cvof(i,j+1,k),vof_phase(i,j,k),vof_phase(i,j+1,k)
-!!$              else 
-!!$                 write(*,'("WARNING: y-branch tiny normal",5e14.5,2I8)')&
-!!$                      c_stag,y_mod(i,j,k),cvof(i,j,k),cvof(i,j+1,k),n_avg(2),vof_phase(i,j,k),vof_phase(i,j+1,k)
               if (debug .and. k==(ks+ke)/2 .and. mod(iout,no)==0) then
                  write(50,314)x(i),y(j)+y_mod(i,j,k) 
               endif
            endif
-!!$              if (debug .and. k==(ks+ke)/2 .and. mod(iout,no)==0) then
-!!$                 write(50,314)x(i),y(j)+nrl*y_mod(i,j+(1-1)/2,k) 
-!!$                 write(51,314)x(i),y(j),0d0,nrl*y_mod(i,j+(1-1)/2,k)
-!!$              endif
         endif
         !-------Check z-neighbours
         if (vof_phase(i,j,k+1) == 1) then
-           !if (cvof(i,j,k+1)<0.499d0) write(*,'("Vof phase error. Phase test 1, cvof: ",e14.5)')cvof(i,j,k+1) !debugging
            !vof fraction in half of cav cell
            nr(1) = n1(i,j,k+1); nr(2) = n2(i,j,k+1); nr(3) = n3(i,j,k+1)
            alpha2 = al3dnew(nr,cvof(i,j,k+1))
@@ -476,15 +464,19 @@ debug = .false.
            dc(1) = 1d0; dc(2) = 1d0
            c0 = FL3DNEW(nr,alpha2,x0,dc)
            c_stag = c1+c0
-           if (c0>2d-1) then 
-              n_avg(1)=n1(i,j,k)
-              n_avg(2)=n2(i,j,k)
-              n_avg(3)=n3(i,j,k)
+           if (c0>c_min) then ! use weighted average if liq VOF is not small, otherwise use cav normals
+              nr(1)=n1(i,j,k)*c0/c_stag + n1(i,j,k+1)*c1/c_stag
+              nr(2)=n2(i,j,k)*c0/c_stag + n2(i,j,k+1)*c1/c_stag
+              nr(3)=n3(i,j,k)*c0/c_stag + n3(i,j,k+1)*c1/c_stag
+              n_avg(1) = nr(1)/(ABS(nr(1))+ABS(nr(2))+ABS(nr(3)))
+              n_avg(2) = nr(2)/(ABS(nr(1))+ABS(nr(2))+ABS(nr(3)))
+              n_avg(3) = nr(3)/(ABS(nr(1))+ABS(nr(2))+ABS(nr(3)))
            else
               n_avg(1)= n1(i,j,k+1)
               n_avg(2)= n2(i,j,k+1)
               n_avg(3)= n3(i,j,k+1)
            endif
+           if (ABS((ABS(n_avg(1))+ABS(n_avg(2))+ABS(n_avg(3)))-1d0) > 1d-12) call pariserror('Normals not normalised')
            alpha2=al3dnew(n_avg,c_stag)
            if (ABS(n_avg(3))>1d-12) then
               z_test2 = (alpha2 - (n_avg(1)+n_avg(2))/2d0)/n_avg(3)
@@ -493,9 +485,6 @@ debug = .false.
               if (z_mod(i,j,k)<limit*dzh(k)) z_mod(i,j,k) = limit*dzh(k)
               if (z_mod(i,j,k) /= z_mod(i,j,k)) write(*,'("z_mod NaN. c_st, n, vofs, phases:",4e14.5,2I8)')&
                    c_stag,n_avg(3),cvof(i,j,k),cvof(i,j,k+1),vof_phase(i,j,k),vof_phase(i,j,k+1)
-!!$           else
-!!$              write(*,'("WARNING: z-branch tiny normal",5e14.5,2I8)')&
-!!$                   c_stag,z_mod(i,j,k),cvof(i,j,k),cvof(i,j,k+1),n_avg(3),vof_phase(i,j,k),vof_phase(i,j,k+1)
            endif
            if (debug .and. j==(js+je)/2 .and. mod(iout,no)==0) then
               write(50,314)x(i),z(k)+z_mod(i,j,k) 
@@ -504,15 +493,9 @@ debug = .false.
         endif
      endif
   enddo;enddo;enddo
-!!$  call ghost_x(P_gx,1,req(1:4)); call ghost_y(P_gy,1,req(5:8)); call ghost_z(P_gz,1,req(9:12)) 
-!!$  call ghost_x(x_mod,1,req(13:16)); call ghost_y(y_mod,1,req(17:20)); call ghost_z(z_mod,1,req(21:24)) 
-!!$  call MPI_WAITALL(24,req(1:24),sta(:,1:24),ierr)
-!!$  call ghost_x(P_gy,1,req(1:4)); call ghost_y(P_gy,1,req(5:8)); call ghost_z(P_gy,1,req(9:12)) 
-!!$  call ghost_x(y_mod,1,req(13:16)); call ghost_y(y_mod,1,req(17:20)); call ghost_z(y_mod,1,req(21:24)) 
-!!$  call MPI_WAITALL(24,req(1:24),sta(:,1:24),ierr)
-!!$  call ghost_x(P_gz,1,req(1:4)); call ghost_y(P_gz,1,req(5:8)); call ghost_z(P_gz,1,req(9:12)) 
-!!$  call ghost_x(z_mod,1,req(13:16)); call ghost_y(z_mod,1,req(17:20)); call ghost_z(z_mod,1,req(21:24)) 
-!!$  call MPI_WAITALL(24,req(1:24),sta(:,1:24),ierr)
+  call ghost_x(P_gx,1,req(1:4)); call ghost_y(P_gy,1,req(5:8)); call ghost_z(P_gz,1,req(9:12)) 
+  call ghost_x(x_mod,1,req(13:16)); call ghost_y(y_mod,1,req(17:20)); call ghost_z(z_mod,1,req(21:24)) 
+  call MPI_WAITALL(24,req(1:24),sta(:,1:24),ierr)
 !--Debugging
   if (debug .and. mod(iout,no)==0) then
      Open(unit=52,file=TRIM(out_path)//'/P_int1-'//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout/no,padding))//'.txt')
@@ -559,40 +542,16 @@ debug = .false.
      if (vof_phase(i,j,k)==0) then
         A(i,j,k,1) = dt/(dx(i)*x_mod(i-1,j,k)*(rhot(i,j,k)))
         if (A(i,j,k,1) /= A(i,j,k,1)) write(*,'("ERROR: A1 NaN :",2e14.5)')A(i,j,k,1),x_mod(i-1,j,k) 
-!!$        if (A(i,j,k,1)>1d8) then
-!!$           write(*,'("Large A1",2e14.5)')A(i,j,k,1),x_mod(i-1,j,k)
-!!$           !A(i,j,k,1) = 1d8
-!!$        endif
         A(i,j,k,2) = dt/(dx(i)*x_mod(i,j,k)*(rhot(i,j,k)))
         if (A(i,j,k,2) /= A(i,j,k,2)) write(*,'("ERROR: A2 NaN :",2e14.5)')A(i,j,k,2),x_mod(i,j,k)
-!!$        if (A(i,j,k,2)>1d8) then
-!!$           write(*,'("Large A2",2e14.5)')A(i,j,k,2),x_mod(i,j,k)
-!!$           !A(i,j,k,2) = 1d8
-!!$        endif
         A(i,j,k,3) = dt/(dy(j)*y_mod(i,j-1,k)*(rhot(i,j,k)))
         if (A(i,j,k,3) /= A(i,j,k,3)) write(*,'("ERROR: A3 NaN :",2e14.5)')A(i,j,k,3),y_mod(i,j-1,k)
-!!$        if (A(i,j,k,3)>1d8) then
-!!$           write(*,'("Large A3",2e14.5)')A(i,j,k,3),y_mod(i,j-1,k)
-!!$           !A(i,j,k,3) = 1d8
-!!$        endif
         A(i,j,k,4) = dt/(dy(j)*y_mod(i,j,k)*(rhot(i,j,k)))
         if (A(i,j,k,4) /= A(i,j,k,4)) write(*,'("ERROR: A4 NaN :",2e14.5)')A(i,j,k,4),y_mod(i,j,k)
-!!$        if (A(i,j,k,4)>1d8) then
-!!$           write(*,'("Large A4",2e14.5)')A(i,j,k,4),y_mod(i,j,k)
-!!$           !A(i,j,k,4) = 1d8
-!!$        endif
         A(i,j,k,5) = dt/(dz(k)*z_mod(i,j,k-1)*(rhot(i,j,k)))
         if (A(i,j,k,5) /= A(i,j,k,5)) write(*,'("ERROR: A5 NaN :",2e14.5)')A(i,j,k,5),z_mod(i,j,k-1)
-!!$        if (A(i,j,k,5)>1d8) then
-!!$           write(*,'("Large A5",2e14.5)')A(i,j,k,5),z_mod(i,j,k-1)
-!!$           !A(i,j,k,5) = 1d8
-!!$        endif
         A(i,j,k,6) = dt/(dz(k)*z_mod(i,j,k)*(rhot(i,j,k)))
         if (A(i,j,k,6) /= A(i,j,k,6)) write(*,'("ERROR: A6 NaN :",2e14.5)')A(i,j,k,6),z_mod(i,j,k)
-!!$        if (A(i,j,k,6)>1d8) then
-!!$           write(*,'("Large A6",2e14.5)')A(i,j,k,6),z_mod(i,j,k)
-!!$           !A(i,j,k,6) = 1d8
-!!$        endif
         A(i,j,k,7) = sum(A(i,j,k,1:6))
         A(i,j,k,8) = A(i,j,k,8) + dt/rhot(i,j,k)*&
              (P_gx(i+1,j,k)/(dx(i)*x_mod(i,j,k))+P_gx(i-1,j,k)/(dx(i)*x_mod(i-1,j,k))&
@@ -607,10 +566,12 @@ debug = .false.
         endif
         if (debug .and. mod(iout,no)==0 .and. j==(js+je)/2) then
            Open(unit=51,file=TRIM(out_path)//'/COEFFS-'//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout/no,padding))//'.txt')
+           Open(unit=52,file=TRIM(out_path)//'/A-'//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout/no,padding))//'.txt')
            write(51,314)x(i),z(k),-x_mod(i-1,j,k),0d0
            write(51,314)x(i),z(k),x_mod(i,j,k),0d0
            write(51,314)x(i),z(k),0d0,-z_mod(i,j,k-1)
            write(51,314)x(i),z(k),0d0,z_mod(i,j,k)
+           if (cvof(i,j,k)>1d-20) write(52,'(10e14.5)')x(i),z(k),A(i,j,k,1:8)
         endif
      endif
   enddo;enddo;enddo
@@ -680,7 +641,6 @@ subroutine setuppoisson_fs2(utmp,vtmp,wtmp,dt,A,vof_phase,istep)
   enddo; enddo; enddo
 end subroutine setuppoisson_fs2
 !--------------------------------------------------------------------------------------------------------------------
-
 subroutine discrete_divergence(u,v,w,iout)
   use module_grid
   use module_freesurface
@@ -689,17 +649,13 @@ subroutine discrete_divergence(u,v,w,iout)
   include 'mpif.h'
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: u,v,w 
   real(8), dimension(is:ie,js:je,ks:ke) :: div, t
-  real(8), dimension(0:3) :: divtot, domain, n_level
+  real(8), dimension(0:3) :: divtot, domain, n_level, n_total
   integer :: i,j,k,l,iout,ierr
-
-!OPEN(unit=20,file=TRIM(out_path)//'/divergence-'//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout,padding))//'.txt')
-OPEN(unit=21,file='div_type.txt',access='append')
 
 divtot = 0d0; n_level = 0d0
 
 do k=ks,ke; do j=js,je; do i=is,ie
    div(i,j,k)=(u(i-1,j,k)-u(i,j,k))*dy(j)*dz(k)+(v(i,j-1,k)-v(i,j,k))*dx(i)*dz(k)+(w(i,j,k-1)-w(i,j,k))*dx(i)*dy(j)
-   !write(20,14)x(i),y(j),z(k),div(i,j,k)
    do l=0,3
       if (pcmask(i,j,k)==l) then
          divtot(l)=divtot(l)+ABS(div(i,j,k))
@@ -707,16 +663,29 @@ do k=ks,ke; do j=js,je; do i=is,ie
       endif
    enddo
 enddo; enddo; enddo
-do l=0,3
-   if (n_level(l) > 1d-10) divtot(l)=divtot(l)/n_level(l)
-enddo
 call MPI_ALLREDUCE(divtot,domain,4, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_Cart, ierr)
-write(21,15)iout,domain(0),domain(1),domain(2),domain(3)
-!close(unit=20)
-close(unit=21)
-14 format(4e14.5)
+call MPI_ALLREDUCE(n_level,n_total,4, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_Cart, ierr)
+do l=0,3
+   if (n_total(l) > 1d-10) domain(l)=domain(l)/n_total(l)
+enddo
+if (rank==0) then
+   OPEN(unit=21,file='div_type.txt',access='append')
+   write(21,15)iout,domain(0),domain(1),domain(2),domain(3)
+   close(unit=21)
+endif
 15 format(I8,4e14.5)
 end subroutine discrete_divergence
+!--------------------------------------------------------------------------------------------------------------------
+subroutine get_initial_volume
+  use module_2phase
+  use module_freesurface
+  implicit none
+  real(8), parameter :: pi=3.141592653
+
+  if (NumBubble /= 1) call pariserror('For the Rayleigh-Plesset test, one bubble is needed')
+  V_0 = 4d0/3d0*pi*rad(1)**3d0 !theoretical value, check error on VOF initialisation
+  !if (rank==0) write(*,'("RP test initial bubble volume:",e14.5)')V_0
+end subroutine get_initial_volume
 !--------------------------------------------------------------------------------------------------------------------
 ! This is a straight copy of NewSolver. The idea is to not clutter NewSolver with all the FreeSurface flags and tests, 
 ! therefore it was copied here and named FreeSolver.
@@ -724,7 +693,7 @@ end subroutine discrete_divergence
 ! A7*Pijk = A1*Pi-1jk + A2*Pi+1jk + A3*Pij-1k + 
 !           A4*Pij+1k + A5*Pijk-1 + A6*Pijk+1 + A8
 !-------------------------------------------------------------------------------------------------
-subroutine FreeSolver(A,p,maxError,beta,maxit,it,ierr,iout)
+subroutine FreeSolver(A,p,maxError,beta,maxit,it,ierr,iout,time)
   use module_grid
   use module_BC
   use module_IO
@@ -737,7 +706,7 @@ subroutine FreeSolver(A,p,maxError,beta,maxit,it,ierr,iout)
   integer, intent(in) :: maxit
   integer, intent(out) :: it, ierr
   real(8) :: res1,res2,resinf,intvol
-  real(8) :: tres2, cells
+  real(8) :: tres2, cells, p_c, Vol, time
   integer :: i,j,k, iout
   integer :: req(12),sta(MPI_STATUS_SIZE,12)
   logical :: mask(imin:imax,jmin:jmax,kmin:kmax)
@@ -749,9 +718,21 @@ subroutine FreeSolver(A,p,maxError,beta,maxit,it,ierr,iout)
      OPEN(UNIT=89,FILE=TRIM(out_path)//'/convergence_history-'//TRIM(int2text(itime,padding))//'.txt')
   endif
   itime=itime+1
+  if (RP_test) then
+     p_0 = 1d0; gamma = 1.4d0
+     call get_vol(Vol)
+     p_c = p_0*(V_0/Vol)**gamma
+     if(mod(iout,10)==0 .and. rank==0) then
+        OPEN(unit=11,file='RP_volume')
+        write(11,2)time,Vol
+     endif
+  else
+     p_c = 0d0
+  endif
+2 format(2e14.5)
   if (solver_flag == 0) call pariserror("Free Surface solver flag needs to be 1 or 2")
-  do k=ks,ke; do j=js,je; do i=is,ie !assign zero pressure to all non-liquid cells
-     if (solver_flag == 1 .and. pcmask(i,j,k)/=0) p(i,j,k) = 0d0 
+  do k=ks,ke; do j=js,je; do i=is,ie
+     if (solver_flag == 1 .and. pcmask(i,j,k) /= 0) p(i,j,k) = p_c !0d0 
      if (solver_flag == 2 .and. (pcmask(i,j,k)==0 .or. pcmask(i,j,k)==3)) p(i,j,k) = 0d0
   enddo; enddo; enddo
   !--------------------------------------ITERATION LOOP--------------------------------------------  
@@ -789,8 +770,8 @@ subroutine FreeSolver(A,p,maxError,beta,maxit,it,ierr,iout)
     enddo; enddo; enddo
     if (cells > 1d-10) then
        res2 = res2/cells
-    else
-       write(*,*)'No cells for this topology present in this processor'
+    !else
+    !   write(*,*)'No cells for this topology present in this processor'
     endif
     call catch_divergence_fs(res2,ierr)
     call MPI_ALLREDUCE(res2, tres2, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr)
@@ -799,7 +780,7 @@ subroutine FreeSolver(A,p,maxError,beta,maxit,it,ierr,iout)
 310 format(I6,'  ',(e14.5))
     if (tres2<maxError) then 
        if(rank==0.and.recordconvergence) close(89)
-       if (mod(iout,nout)==0) write(*,'("Solver flag and nr. of cells: ",I8,e14.5)')solver_flag,cells
+       !if (mod(iout,nout)==0) write(*,'("Solver flag and nr. of cells: ",I8,e14.5)')solver_flag,cells
        exit
     endif
   enddo
@@ -845,6 +826,22 @@ contains
        ierr=0
     endif
   end subroutine catch_divergence_fs
+  subroutine get_vol(Vol_RP)
+    !use module_grid
+    use module_VOF
+    !use module_2phase
+    !implicit none
+    !include 'mpif.h'
+    real(8) :: Vol_RP, bub_vol, vol_tot
+    integer :: i,j,k,ierr
+    bub_vol = 0d0
+    do k=ks,ke; do j=js,je; do i=is,ie
+       bub_vol = bub_vol + cvof(i,j,k)*dx(i)*dy(j)*dz(k)
+    enddo; enddo; enddo
+    call MPI_ALLREDUCE(bub_vol,vol_tot,1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr)
+    Vol_RP = vol_tot/(xLength*yLength*zLength)
+    !get_vol = sum(cvof(i=is:ie,j=js:je,k=ks:ke))
+  end subroutine get_vol
 end subroutine FreeSolver
 !--------------------------------------ONE RELAXATION ITERATION (SMOOTHER)----------------------------------
 subroutine RedBlackRelax_fs(A,p,beta)
