@@ -264,7 +264,7 @@ contains
     nfilter = 0
     hshift =0d0
     do_rotation = .false.
-    debug_curvature=.true.
+    debug_curvature=.false.
     ! oldvof = .false.  ! .true.
     
     in=31

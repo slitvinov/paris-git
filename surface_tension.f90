@@ -963,8 +963,9 @@ contains
    subroutine parabola_fit_with_rotation(xfit,yfit,hfit,bfit,weights,mv,nposit,a,fit_success)
       implicit none
       real(8), intent(out) :: xfit(nposit),yfit(nposit),hfit(nposit)
-      real(8), intent(in)  :: weights(nposit), mv(3)
+      real(8), intent(in)  :: weights(nposit)
       integer, intent(in)  :: nposit
+      real(8), intent(inout) :: mv(3)
       real(8), intent(out) :: a(6),bfit(NPOS,3)
       logical, intent(out) :: fit_success
       logical :: inv_success
