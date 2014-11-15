@@ -25,36 +25,29 @@
             <Field name="defaultStyle" type="string">macintosh</Field>
             <Field name="defaultOrientation" type="int">0</Field>
         </Object>
-        <Object name="Animation">
-            <Field name="x" type="int">1</Field>
-            <Field name="y" type="int">6</Field>
-            <Field name="width" type="int">330</Field>
-            <Field name="height" type="int">261</Field>
+        <Object name="Annotation">
+            <Field name="x" type="int">0</Field>
+            <Field name="y" type="int">97</Field>
+            <Field name="width" type="int">577</Field>
+            <Field name="height" type="int">704</Field>
             <Field name="visible" type="bool">false</Field>
             <Field name="posted" type="bool">false</Field>
+            <Field name="activeTab" type="int">5</Field>
         </Object>
         <Field name="postWhenShown" type="bool">false</Field>
         <Object name="File open">
             <Field name="x" type="int">0</Field>
-            <Field name="y" type="int">214</Field>
+            <Field name="y" type="int">212</Field>
             <Field name="width" type="int">660</Field>
             <Field name="height" type="int">467</Field>
             <Field name="visible" type="bool">false</Field>
         </Object>
         <Object name="Information">
-            <Field name="x" type="int">1</Field>
-            <Field name="y" type="int">46</Field>
+            <Field name="x" type="int">48</Field>
+            <Field name="y" type="int">464</Field>
             <Field name="width" type="int">536</Field>
             <Field name="height" type="int">304</Field>
             <Field name="visible" type="bool">false</Field>
-        </Object>
-        <Object name="Partie">
-            <Field name="x" type="int">0</Field>
-            <Field name="y" type="int">260</Field>
-            <Field name="width" type="int">488</Field>
-            <Field name="height" type="int">374</Field>
-            <Field name="visible" type="bool">false</Field>
-            <Field name="posted" type="bool">false</Field>
         </Object>
         <Object name="MainWin">
             <Field name="x" type="int">0</Field>
@@ -65,9 +58,25 @@
         </Object>
         <Object name="Contour plot attributes">
             <Field name="x" type="int">1</Field>
-            <Field name="y" type="int">24</Field>
+            <Field name="y" type="int">22</Field>
             <Field name="width" type="int">521</Field>
             <Field name="height" type="int">600</Field>
+            <Field name="visible" type="bool">false</Field>
+            <Field name="posted" type="bool">false</Field>
+        </Object>
+        <Object name="Couleur Faux plot attributes">
+            <Field name="x" type="int">0</Field>
+            <Field name="y" type="int">144</Field>
+            <Field name="width" type="int">521</Field>
+            <Field name="height" type="int">610</Field>
+            <Field name="visible" type="bool">false</Field>
+            <Field name="posted" type="bool">false</Field>
+        </Object>
+        <Object name="Isosurface operator attributes">
+            <Field name="x" type="int">0</Field>
+            <Field name="y" type="int">328</Field>
+            <Field name="width" type="int">558</Field>
+            <Field name="height" type="int">243</Field>
             <Field name="visible" type="bool">false</Field>
             <Field name="posted" type="bool">false</Field>
         </Object>

@@ -770,7 +770,7 @@ contains
       
       real(8) :: points(NPOS,3),origin(3)
       real(8) :: xfit(NPOS),yfit(NPOS),hfit(NPOS),fit(NPOS,3),weights(NPOS)
-      real(8) :: centroid(3),mxyz(3),stencil3x3(-1:1,-1:1,-1:1)
+      real(8) :: centroid(3),mxyz(3),mv(3),stencil3x3(-1:1,-1:1,-1:1)
       real(8) :: wg
 
       central=vof_flag(i0,j0,k0)
@@ -821,11 +821,15 @@ contains
          kappa = sign(1.d0,mxyz(try(1)))*kappa
          return
       else 
-!          nfound = - 10   ! encode the fact that less than 9 heights in same direction were found. 
-!          ! ind_pos(points,nposit) 
-!       endif ! nfound == 9
          nfound = - ind_pos(points,nposit) 
       endif ! nfound == 9
+      ! Determine the curvature from fits. 
+      ! Rotate coordinate sytems by permutation of x,y,z
+      !  x_i' = x_k(i)
+      !  m'_i = m_k(i)
+      mv(1) = mxyz(try(2))
+      mv(2) = mxyz(try(3))
+      mv(3) = mxyz(try(1))
       ! *** determine the origin. 
       call NewFindCutAreaCentroid(i0,j0,k0,centroid)
       do n=1,3
@@ -834,12 +838,15 @@ contains
       ! *** determine curvature from mixed heights 
       if(.not.bypass_mixed_heights) then
          if ( (-nfound) > nfound_min )  then  ! more than 6 points to avoid special 2D degeneracy. 
+            ! rotate and shift origin
+            !  x_i' = x_k(i)
+            !  m'_i = m_k(i)
             xfit=points(:,try(2)) - origin(try(2))
             yfit=points(:,try(3)) - origin(try(3))
-            hfit=points(:,try(1)) - origin(try(1))
+            hfit=points(:,try(1)) - origin(try(1))   
             ! fit over all positions, not only independent ones. 
             weights=1d0
-            call parabola_fit_with_rotation(xfit,yfit,hfit,fit,weights,mxyz,try,nposit,a,fit_success) 
+            call parabola_fit_with_rotation(xfit,yfit,hfit,fit,weights,mv,nposit,a,fit_success) 
             if(fit_success) then
 #ifdef COUNT
                method_count(2) = method_count(2) + 1
@@ -892,7 +899,9 @@ contains
             endif
             geom_case_count(2) = geom_case_count(2) + 1
          else !  pure non-bulk cell with less than 6 control points found. 
+            ! Test that the cell us pure
             if(central/2/=0) call pariserror("unexpected central flag")
+            ! The cell is pure, place the centroids on the pure faces. 
             n_pure_faces = 0
             c(1)=i0
             c(2)=j0
@@ -930,11 +939,12 @@ contains
             endif
          endif
       endif
+      nfound = nposit
       if(nposit < 6) then
          geom_case_count(nposit+10) = geom_case_count(nposit+10) + 1
          return
       else
-         call parabola_fit_with_rotation(xfit,yfit,hfit,fit,weights,mxyz,try,nposit,a,fit_success) 
+         call parabola_fit_with_rotation(xfit,yfit,hfit,fit,weights,mv,nposit,a,fit_success) 
          if(.not.fit_success) then
             !            call print_cvof_3x3x3(i0,j0,k0)
             geom_case_count(16) = geom_case_count(16) + 1
@@ -950,64 +960,82 @@ contains
 
    ! Performs a rotation to align z axis with normal, then calls fit
 
-   subroutine parabola_fit_with_rotation(xfit,yfit,hfit,bfit,weights,mv,try,nposit,a,fit_success)
+   subroutine parabola_fit_with_rotation(xfit,yfit,hfit,bfit,weights,mv,nposit,a,fit_success)
       implicit none
       real(8), intent(out) :: xfit(nposit),yfit(nposit),hfit(nposit)
       real(8), intent(in)  :: weights(nposit), mv(3)
-      integer, intent(in)  :: try(3), nposit
-      real(8), intent(out) :: a(6),bfit(nposit,3)
+      integer, intent(in)  :: nposit
+      real(8), intent(out) :: a(6),bfit(NPOS,3)
       logical, intent(out) :: fit_success
       logical :: inv_success
       real(8) :: invm(3,3), rhs(3), norm(3), mv1(3)
-      real(8) :: ev(3,3)   ! New basis : ev(coord i, basis vector j) = ev(i,j)
+      real(8) :: ev(3,3)   ! New basis vector expressed in old (canonical) basis: 
+                           ! ev(coord i, basis vector j) = ev(i,j) = e_ij
                            ! x_old_i = e_ij x_new_j
                            ! x_new_i = e_ji x_old_j
       real(8) :: testm(3,3), id(3,3), error
       integer :: i,j
 
-      if(do_rotation) then
-      ! normal = direction z
-      ev(:,3) = mv
-      ! let mv1 be basis vector furthest from normal 
-      mv1 = 0d0    
-      mv1(try(3)) = 1d0
+!
+!      mv(1) = mxyz(try(2))
+!      mv(2) = mxyz(try(3))
+!      mv(3) = mxyz(try(1))
 
-      ! direction 1 orthogonal to normal and mv1
-      ev(1,1) =  mv1(2)*mv(3) - mv1(3)*mv(2)
-      ev(2,1) = -mv1(1)*mv(3) + mv1(3)*mv(1)
-      ev(3,1) =  mv1(1)*mv(2) - mv1(2)*mv(1)
-      ! e_y = e_x x e_z  (non direct , but does not matter since curvature does not depend on orientation)
-      ev(1,2) =  ev(2,1)*ev(3,3) - ev(3,1)*ev(2,3)
-      ev(2,2) = -ev(1,1)*ev(3,3) + ev(3,1)*ev(1,3)
-      ev(3,2) =  ev(1,1)*ev(2,3) - ev(2,1)*ev(1,3)
- 
-      norm = sqrt(ev(1,:)**2 + ev(2,:)**2 + ev(3,:)**2)
-      if(min(norm(1),norm(2),norm(3)) < TINY_DOUBLE) call pariserror("zero rotation matrix in curvature")
-      do i=1,3
-         ev(i,:) = ev(i,:)/norm
-      enddo
-      invm = transpose(ev)
-      testm = matmul(invm,ev)
-      id=0d0; do i=1,3; id(i,i) = 1d0; enddo  ! define identity matrix
-      invm = testm - id
-      error =  0d0
-      do i=1,3
-         do j=1,3
-            error = error + abs(invm(i,j))
+      mv=0d0
+      mv(3) = 1d0
+      ! *** determine the origin. 
+
+      if(do_rotation) then
+         ! normal = direction z
+         ! e_z' = m
+         ev(:,3) = mv
+         ! let mv1 == m1  be the canonical basis vector furthest from normal 
+         mv1 = 0d0    
+         mv1(2) = 1d0
+         ! direction 1 orthogonal to normal and mv1
+         ! e_x' = m1 x m
+         ! full expression:
+         ! ev(1,1) =  mv1(2)*mv(3) - mv1(3)*mv(2)
+         ! ev(2,1) = -mv1(1)*mv(3) + mv1(3)*mv(1)
+         ! ev(3,1) =  mv1(1)*mv(2) - mv1(2)*mv(1)
+         ev(1,1) =   mv(3)
+         ev(2,1) =   0d0
+         ev(3,1) =  -mv(1)
+         ! e_y' = e_x' x e_z'  (non direct, but does not matter since curvature does not depend on orientation)
+         ! full expression:
+         ! ev(1,2) =  ev(2,1)*ev(3,3) - ev(3,1)*ev(2,3) =   m1 m2
+         ! ev(2,2) = -ev(1,1)*ev(3,3) + ev(3,1)*ev(1,3) = - m3^2  - m1^2
+         ! ev(3,2) =  ev(1,1)*ev(2,3) - ev(2,1)*ev(1,3) =   m3 m2 
+
+         ev(1,2) =  ev(2,1)*ev(3,3) - ev(3,1)*ev(2,3)
+         ev(2,2) = -ev(1,1)*ev(3,3) + ev(3,1)*ev(1,3)
+         ev(3,2) =  ev(1,1)*ev(2,3) - ev(2,1)*ev(1,3)
+         norm = sqrt(ev(1,:)**2 + ev(2,:)**2 + ev(3,:)**2)
+         do i=1,3
+            ev(i,:) = ev(i,:)/norm
          enddo
-      enddo
-      if(error>1d-15) then
-         print *, "error = ",error
-         call pariserror("non orthogonal rotation matrix")
-      end if
-      
-      bfit(:,1) = xfit
-      bfit(:,2) = yfit
-      bfit(:,3) = hfit
- 
-      xfit = ev(1,1)*bfit(:,1) + ev(2,1)*bfit(:,2) + ev(3,1)*bfit(:,3)
-      yfit = ev(1,2)*bfit(:,1) + ev(2,2)*bfit(:,2) + ev(3,2)*bfit(:,3)
-      hfit = ev(1,3)*bfit(:,1) + ev(2,3)*bfit(:,2) + ev(3,3)*bfit(:,3)
+         if(debug_curvature) then
+            if(min(norm(1),norm(2),norm(3)) < 1d-12) call pariserror("small rotation matrix in curvature")
+            invm = transpose(ev)
+            testm = matmul(invm,ev)
+            id=0d0; do i=1,3; id(i,i) = 1d0; enddo  ! define identity matrix
+            invm = testm - id
+            error =  0d0
+            do i=1,3
+               do j=1,3
+                  error = error + abs(invm(i,j))
+               enddo
+            enddo
+            if(error>1d-14) then
+               call pariserror("non orthogonal rotation matrix")
+            end if
+         endif
+         bfit(:,1) = xfit
+         bfit(:,2) = yfit
+         bfit(:,3) = hfit
+         xfit = ev(1,1)*bfit(:,1) + ev(2,1)*bfit(:,2) + ev(3,1)*bfit(:,3)
+         yfit = ev(1,2)*bfit(:,1) + ev(2,2)*bfit(:,2) + ev(3,2)*bfit(:,3)
+         hfit = ev(1,3)*bfit(:,1) + ev(2,3)*bfit(:,2) + ev(3,3)*bfit(:,3)
       endif ! do_rotation
       call    parabola_fit(xfit,yfit,hfit,weights,nposit,a,fit_success)
    end subroutine parabola_fit_with_rotation

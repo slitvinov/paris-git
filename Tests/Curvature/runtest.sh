@@ -22,7 +22,7 @@ for level in $list; do
     echo $level
     nx=`awk -v level=$level 'BEGIN {print 2**level}'`
     for radius in 0.2 0.25 0.32; do 
-	run_stats.sh $nx $init $radius $nstats $d
+	run_stats.sh $nx $init $radius $nstats $d || exit 1
     done
 done
 
@@ -30,4 +30,6 @@ done
 
 radius=0.4
 echo $level
-run_stats.sh $nx $init $radius $nstats $d
+run_stats.sh $nx $init $radius $nstats $d || exit 1
+
+exit 0 

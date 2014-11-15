@@ -81,6 +81,10 @@ sed s/REFINEMENTTEMP/$refinement/g inputvof.template | sed s/TYPETEMP/$type/g  |
 
 mpirun -np $npstart paris > tmpout 2>&1
 
+success=`tail -1 tmpout | grep -c "Paris exits succesfully after HF"`
+if [ $success -ne 1 ]; then
+    exit 1
+fi
 if [ -d out ]; then
     cd out
     cat curvature-0000?.txt >> curvature.txt
@@ -99,3 +103,4 @@ if [ $setmono == mono ] && [ $cyldir == 3 ] && [ $nx -le 16 ] && [ d==2 ]; then
 call "../grid.gp"
 EOF
 fi
+exit 0

@@ -81,6 +81,7 @@ module module_VOF
   logical :: use_Vofi
 !   logical :: oldvof
   logical :: do_rotation
+  logical :: debug_curvature
 
   real(8) :: b1,b2,b3,b4,hshift
   integer :: nfilter
@@ -244,7 +245,7 @@ contains
        cylinder_dir, normal_up, DoLPP, &
        FreeSurface, ViscMeanIsArith, DensMeanIsArith, &
        output_filtered_VOF, DoMOMCONS, use_vofi,nfilter, &
-       X_level, RP_test, hshift, do_rotation
+       X_level, hshift, do_rotation
 ! ,oldvof
     
 !     vofbdry_cond=['periodic','periodic','periodic','periodic','periodic','periodic']
@@ -263,6 +264,7 @@ contains
     nfilter = 0
     hshift =0d0
     do_rotation = .false.
+    debug_curvature=.true.
     ! oldvof = .false.  ! .true.
     
     in=31

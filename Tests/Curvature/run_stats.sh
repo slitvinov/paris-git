@@ -29,7 +29,7 @@ xc=`awk -v nx=$nx -v random=$RANDOM 'BEGIN {print (0.5 + (random / nx)/32767)}'`
 yc=`awk -v nx=$nx -v random=$RANDOM 'BEGIN {print (0.5 + (random / nx)/32767)}'`
 zc=`awk -v nx=$nx -v random=$RANDOM 'BEGIN {print (0.5 + (random / nx)/32767)}'`
 
-run_one_test.sh F Curvature_test F 2 $radius 1e20 $init $nx $xc $yc $zc $d
+run_one_test.sh F Curvature_test F 2 $radius 1e20 $init $nx $xc $yc $zc $d || exit 1
 
 cd out
 echo `awk -v nx=$nx -v radius=$radius 'BEGIN {print nx * radius }'`  `compare curvature.txt reference.txt 0.1 1 2 `  >> ../errors.tmp
@@ -42,3 +42,4 @@ echo " "
 cat errors.tmp | awk 'BEGIN {err=0.; a=0.} { if ($3 > err) {err = $3}; a = a +$2}; END {print $1, a/NR,  err, NR}' 
 cat errors.tmp | awk 'BEGIN {err=0.; a=0.} { if ($3 > err) {err = $3}; a = a +$2}; END {print $1, a/NR,  err}'  >> paris-$dim-$ndepth.tmp
 
+exit 0

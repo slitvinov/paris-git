@@ -167,8 +167,9 @@ Program paris
      if(test_HF.or.test_LP) then
         ! Exit MPI gracefully
         close(out)
+        call print_st_stats()
         call MPI_BARRIER(MPI_COMM_WORLD, ierr)
-        if(rank==0) write(*,'("Paris exits succesfully")')
+        if(rank==0) write(*,'("Paris exits succesfully after HF, curvature or LP test")')
         call MPI_finalize(ierr)
         stop
      endif
