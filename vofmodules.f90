@@ -245,7 +245,7 @@ contains
        cylinder_dir, normal_up, DoLPP, &
        FreeSurface, ViscMeanIsArith, DensMeanIsArith, &
        output_filtered_VOF, DoMOMCONS, use_vofi,nfilter, &
-       X_level, RP_test, hshift, do_rotation, debug_curvature
+       hshift, do_rotation, debug_curvature
 ! ,oldvof
     ! Free Surface parameters to be read from a parameter file called "inputFS"
     namelist /FSparameters/ X_level, RP_test, gamma, R_ref, P_ref
