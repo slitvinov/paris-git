@@ -42,7 +42,7 @@ module module_surface_tension
 
 ! choice of method  
   logical :: recomputenormals = .true.
-  logical :: bypass_mixed_heights = .true.
+  logical :: bypass_mixed_heights = .false.
 
 ! initial state
   logical :: st_initialized = .false.
@@ -939,7 +939,7 @@ contains
             endif
          endif
       endif
-      nfound = nposit
+      nfound = - nposit - 50  ! encode the fact that centroids were used 
       if(nposit < 6) then
          geom_case_count(nposit+10) = geom_case_count(nposit+10) + 1
          return

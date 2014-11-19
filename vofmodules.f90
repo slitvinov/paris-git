@@ -245,7 +245,7 @@ contains
        cylinder_dir, normal_up, DoLPP, &
        FreeSurface, ViscMeanIsArith, DensMeanIsArith, &
        output_filtered_VOF, DoMOMCONS, use_vofi,nfilter, &
-       X_level, hshift, do_rotation
+       X_level, RP_test, hshift, do_rotation, debug_curvature
 ! ,oldvof
     
 !     vofbdry_cond=['periodic','periodic','periodic','periodic','periodic','periodic']

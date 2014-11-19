@@ -68,7 +68,7 @@ fi
 
 /bin/rm -fr out input
 
-ndepth=`head -50  ../../surface_tension.f90 |  awk -F '=' ' /NDEPTH/ {print $2}' | tr -d ' '`
+ndepth=`head -60  ../../surface_tension.f90 |  awk -F '=' ' /NDEPTH/ {print $2}' | tr -d ' '`
 dim=$d'D'
 
 let npstart=$npx*$npy*$npz
@@ -91,7 +91,7 @@ if [ -d out ]; then
     cat reference-0000?.txt >> reference.txt
     echo `awk -v nx=$nx -v radius=$radius 'BEGIN {print nx * radius }'`  `compare curvature.txt reference.txt 0.1 1 2 `  >> ../paris-$nx-$ndepth.tmp
     cd ..
-    awk -v nx=$nx  -v radius=$radius '{print nx * radius, $1, $2, $3 }' mcount.tmp >> method_count-$nx-$ndepth.tmp
+    awk -v nx=$nx  -v radius=$radius '{print nx * radius, $1, $2, $3 }' mcount.tmp >> mcount_one_test-$nx-$ndepth.tmp
 else
     RED="\\033[1;31m"
     NORMAL="\\033[0m"

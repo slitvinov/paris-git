@@ -16,7 +16,7 @@ list="3 4"
 echo $list
 
 ndepth=`head -60  ../../surface_tension.f90 |  awk -F '=' ' /NDEPTH/ {print $2}' | tr -d ' '`
-/bin/rm -f paris-$dim-$ndepth.tmp
+/bin/rm -f paris-$dim-$ndepth.tmp method*.tmp
 
 for level in $list; do
     echo $level

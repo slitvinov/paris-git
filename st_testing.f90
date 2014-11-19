@@ -180,11 +180,11 @@ contains
             if (vof_flag(i,j,k) == 2 ) then 
                call get_curvature(i,j,k,kappa,nfound,nposit,a,.false.)
                if(nfound > 0) then
-                  method_count(1) = method_count(1) + 1
-               else if( -nfound < 50) then
-                  method_count(2) = method_count(2) + 1
+                  method_count(1) = method_count(1) + 1  ! nine heights
+               else if( -nfound < 50) then 
+                  method_count(2) = method_count(2) + 1  ! mixed heights
                else if (-nfound > 50) then
-                  method_count(3) = method_count(3) + 1
+                  method_count(3) = method_count(3) + 1  ! centroids
                else
                   call pariserror("OC: unknown method_count") 
                endif
@@ -207,11 +207,11 @@ contains
             if (vof_flag(i,j,k) == 2) then 
                call get_curvature(i,j,k,kappa,nfound,nposit,a,.false.)
                if(nfound > 0) then
-                  method_count(1) = method_count(1) + 1
-               else if( -nfound < 50) then
-                  method_count(2) = method_count(2) + 1
+                  method_count(1) = method_count(1) + 1  ! nine heights
+               else if( -nfound < 50) then 
+                  method_count(2) = method_count(2) + 1  ! mixed heights
                else if (-nfound > 50) then
-                  method_count(3) = method_count(3) + 1
+                  method_count(3) = method_count(3) + 1  ! centroids
                endif
                ! This stops the code in case kappa becomes NaN.
                if(kappa.ne.kappa) call pariserror("OC: Invalid Curvature")  
@@ -230,7 +230,7 @@ contains
                   Lm_err_K    = MAX(Lm_err_K,   err_K) 
                   sumCount = sumCount + 1
                endif ! valid curvature
-            end if ! cvof(i,j,k)
+             end if ! cvof(i,j,k)
          end do; end do
 
          L2_err_K    = sqrt(S2_err_K/dble(sumCount))
