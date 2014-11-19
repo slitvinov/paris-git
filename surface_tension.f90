@@ -1026,8 +1026,8 @@ contains
       real(8) :: testm(3,3), id(3,3), error
       integer :: i,j
       
-      mv=0d0
-      mv(3) = 1d0
+!       mv=0d0
+!      mv(3) = 1d0
       if(do_rotation) then
          ! normal = direction z
          ! e_z' = m

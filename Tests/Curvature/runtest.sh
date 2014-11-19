@@ -1,10 +1,10 @@
 #! /bin/bash
 #set -x
 
-if [ $# -lt 3 ]; then
+if [ $# -lt 4 ]; then
     echo "missing arguments"
-    echo usage $0 initialisation-over-refinement-level nstats dim
-    exit
+    echo usage $0 initialisation-over-refinement-level nstats dim levelmax
+    exit 1
 fi
 
 init=$1
@@ -12,7 +12,7 @@ nstats=$2
 d=$3
 dim=$3'D'
 
-list="3 4"
+list=`seq 3 $levelmax`
 echo $list
 
 ndepth=`head -60  ../../surface_tension.f90 |  awk -F '=' ' /NDEPTH/ {print $2}' | tr -d ' '`
