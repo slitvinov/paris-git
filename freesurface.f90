@@ -170,7 +170,7 @@ subroutine setuppoisson_fs(vof_phase,rhot,dt,A,cvof,n1,n2,n3,kap,iout)
 
   x_mod=dxh((is+ie)/2); y_mod=dyh((js+je)/2); z_mod=dzh((ks+ke)/2) !assumes an unstretched grid
   P_gx = 0d0; P_gy = 0d0; P_gz = 0d0
-  limit = 1d-7/dx((is+ie)/2)
+  limit = 1d-6/dx((is+ie)/2)
   c_min = 1d-3
   !Debugging
   debug = .false.
@@ -493,8 +493,14 @@ subroutine setuppoisson_fs(vof_phase,rhot,dt,A,cvof,n1,n2,n3,kap,iout)
         endif
      endif
   enddo;enddo;enddo
-  call ghost_x(P_gx,1,req(1:4)); call ghost_y(P_gy,1,req(5:8)); call ghost_z(P_gz,1,req(9:12)) 
-  call ghost_x(x_mod,1,req(13:16)); call ghost_y(y_mod,1,req(17:20)); call ghost_z(z_mod,1,req(21:24)) 
+  call ghost_x(P_gx,1,req(1:4)); call ghost_x(P_gy,1,req(5:8)); call ghost_x(P_gz,1,req(9:12)) 
+  call ghost_x(x_mod,1,req(13:16)); call ghost_x(y_mod,1,req(17:20)); call ghost_x(z_mod,1,req(21:24)) 
+  call MPI_WAITALL(24,req(1:24),sta(:,1:24),ierr)
+  call ghost_y(P_gx,1,req(1:4)); call ghost_y(P_gy,1,req(5:8)); call ghost_y(P_gz,1,req(9:12)) 
+  call ghost_y(x_mod,1,req(13:16)); call ghost_y(y_mod,1,req(17:20)); call ghost_y(z_mod,1,req(21:24)) 
+  call MPI_WAITALL(24,req(1:24),sta(:,1:24),ierr)
+  call ghost_z(P_gx,1,req(1:4)); call ghost_z(P_gy,1,req(5:8)); call ghost_z(P_gz,1,req(9:12)) 
+  call ghost_z(x_mod,1,req(13:16)); call ghost_z(y_mod,1,req(17:20)); call ghost_z(z_mod,1,req(21:24)) 
   call MPI_WAITALL(24,req(1:24),sta(:,1:24),ierr)
 !--Debugging
   if (debug .and. mod(iout,no)==0) then
@@ -609,31 +615,37 @@ subroutine setuppoisson_fs2(utmp,vtmp,wtmp,dt,A,vof_phase,istep)
         if (vof_phase(i,j,k)==1) then
            do nbr=-1,1,2
               if (vof_phase(i+nbr,j,k) == 0) then
-                 A(i,j,k,2+(nbr-1)/2) = 0d0
+                 !if ((dxh(i)-x_mod(i+(nbr-1)/2,j,k)) > 1d-6/dx((is+ie)/2)) then
+                 A(i,j,k,2+(nbr-1)/2) = 0d0!dt/(dx(i)*(dxh(i)-x_mod(i+(nbr-1)/2,j,k)))
+                 !endif
               endif
               if (vof_phase(i,j+nbr,k) == 0) then
-                 A(i,j,k,4+(nbr-1)/2) = 0d0
+                 !if ((dyh(j)-y_mod(i,j+(nbr-1)/2,k)) > 1d-6/dx((is+ie)/2)) then
+                 A(i,j,k,4+(nbr-1)/2) = 0d0!dt/(dy(j)*(dyh(j)-y_mod(i,j+(nbr-1)/2,k)))
+                 !endif
               endif
               if (vof_phase(i,j,k+nbr) == 0) then
-                 A(i,j,k,6+(nbr-1)/2) = 0d0
+                 !if ((dzh(k)-z_mod(i,j,k+(nbr-1)/2)) > 1d-6/dx((is+ie)/2)) then
+                 A(i,j,k,6+(nbr-1)/2) = 0d0!dt/(dz(k)*(dzh(k)-z_mod(i,j,k+(nbr-1)/2)))
+                 !endif
               endif
            enddo
         endif
-        if (vof_phase(i,j,k)==2) then
-           do nbr=-1,1,2
-              if (vof_phase(i+nbr,j,k) == 3) then
-                 A(i,j,k,2+(nbr-1)/2) = 0d0
-              endif
-              if (vof_phase(i,j+nbr,k) == 3) then
-                 A(i,j,k,4+(nbr-1)/2) = 0d0
-              endif
-              if (vof_phase(i,j,k+nbr) == 3) then
-                 A(i,j,k,6+(nbr-1)/2) = 0d0
-              endif
-           enddo
-        endif
+!!$        if (vof_phase(i,j,k)==2) then
+!!$           do nbr=-1,1,2
+!!$              if (vof_phase(i+nbr,j,k) == 3) then
+!!$                 A(i,j,k,2+(nbr-1)/2) = 0d0
+!!$              endif
+!!$              if (vof_phase(i,j+nbr,k) == 3) then
+!!$                 A(i,j,k,4+(nbr-1)/2) = 0d0
+!!$              endif
+!!$              if (vof_phase(i,j,k+nbr) == 3) then
+!!$                 A(i,j,k,6+(nbr-1)/2) = 0d0
+!!$              endif
+!!$           enddo
+!!$        endif
         A(i,j,k,7) = sum(A(i,j,k,1:6))
-        A(i,j,k,8) =  -((utmp(i,j,k)-utmp(i-1,j,k))/dx(i) &
+        A(i,j,k,8) =  -1d0*((utmp(i,j,k)-utmp(i-1,j,k))/dx(i) &
              +  (vtmp(i,j,k)-vtmp(i,j-1,k))/dy(j) &
              +  (wtmp(i,j,k)-wtmp(i,j,k-1))/dz(k))
         if (A(i,j,k,8) /= A(i,j,k,8)) write(*,'("ERROR: A8 NaN in fs2:",e14.5)')A(i,j,k,8) 
@@ -650,11 +662,13 @@ subroutine discrete_divergence(u,v,w,iout)
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: u,v,w 
   real(8), dimension(is:ie,js:je,ks:ke) :: div, t
   real(8), dimension(0:3) :: divtot, domain, n_level, n_total
+  real(8) :: avg2
   integer :: i,j,k,l,iout,ierr
 
 divtot = 0d0; n_level = 0d0
 
 do k=ks,ke; do j=js,je; do i=is,ie
+   !div(i,j,k)=(u(i-1,j,k)-u(i,j,k))/dx(i)+(v(i,j-1,k)-v(i,j,k))/dy(j)+(w(i,j,k-1)-w(i,j,k))/dz(k)
    div(i,j,k)=(u(i-1,j,k)-u(i,j,k))*dy(j)*dz(k)+(v(i,j-1,k)-v(i,j,k))*dx(i)*dz(k)+(w(i,j,k-1)-w(i,j,k))*dx(i)*dy(j)
    do l=0,3
       if (pcmask(i,j,k)==l) then
@@ -668,24 +682,25 @@ call MPI_ALLREDUCE(n_level,n_total,4, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_Ca
 do l=0,3
    if (n_total(l) > 1d-10) domain(l)=domain(l)/n_total(l)
 enddo
+avg2 = (domain(1)+domain(2))/(n_total(1)+n_total(2))
 if (rank==0) then
    OPEN(unit=21,file='div_type.txt',access='append')
-   write(21,15)iout,domain(0),domain(1),domain(2),domain(3)
+   write(21,15)iout,domain(0),domain(1),domain(2),domain(3),avg2
    close(unit=21)
 endif
-15 format(I8,4e14.5)
+15 format(I8,5e14.5)
 end subroutine discrete_divergence
 !--------------------------------------------------------------------------------------------------------------------
-subroutine get_initial_volume
+subroutine get_ref_volume
   use module_2phase
   use module_freesurface
   implicit none
   real(8), parameter :: pi=3.141592653
 
-  if (NumBubble /= 1) call pariserror('For the Rayleigh-Plesset test, one bubble is needed')
-  V_0 = 4d0/3d0*pi*rad(1)**3d0 !theoretical value, check error on VOF initialisation
+  if (NumBubble /= 1) call pariserror('For the Rayleigh-Plesset test, only a single bubble is allowed')
+  V_0 = 4d0/3d0*pi*(R_ref**3d0)
   !if (rank==0) write(*,'("RP test initial bubble volume:",e14.5)')V_0
-end subroutine get_initial_volume
+end subroutine get_ref_volume
 !--------------------------------------------------------------------------------------------------------------------
 ! This is a straight copy of NewSolver. The idea is to not clutter NewSolver with all the FreeSurface flags and tests, 
 ! therefore it was copied here and named FreeSolver.
@@ -719,9 +734,8 @@ subroutine FreeSolver(A,p,maxError,beta,maxit,it,ierr,iout,time)
   endif
   itime=itime+1
   if (RP_test) then
-     p_0 = 1d0; gamma = 1.4d0
      call get_vol(Vol)
-     p_c = p_0*(V_0/Vol)**gamma
+     p_c = P_ref*(V_0/Vol)**gamma
      if(mod(iout,10)==0 .and. rank==0) then
         OPEN(unit=11,file='RP_volume')
         write(11,2)time,Vol
@@ -733,7 +747,7 @@ subroutine FreeSolver(A,p,maxError,beta,maxit,it,ierr,iout,time)
   if (solver_flag == 0) call pariserror("Free Surface solver flag needs to be 1 or 2")
   do k=ks,ke; do j=js,je; do i=is,ie
      if (solver_flag == 1 .and. pcmask(i,j,k) /= 0) p(i,j,k) = p_c !0d0 
-     if (solver_flag == 2 .and. (pcmask(i,j,k)==0 .or. pcmask(i,j,k)==3)) p(i,j,k) = 0d0
+     if (solver_flag == 2 .and. pcmask(i,j,k)==3) p(i,j,k) = p_c
   enddo; enddo; enddo
   !--------------------------------------ITERATION LOOP--------------------------------------------  
   do it=1,maxit
@@ -776,8 +790,8 @@ subroutine FreeSolver(A,p,maxError,beta,maxit,it,ierr,iout,time)
     call catch_divergence_fs(res2,ierr)
     call MPI_ALLREDUCE(res2, tres2, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr)
     if(norm==2) tres2=sqrt(tres2)
-    if(rank==0.and.mod(it,10) == 0.and.recordconvergence) write(89,310) it, tres2
-310 format(I6,'  ',(e14.5))
+    if(rank==0.and.mod(it,10) == 0.and.recordconvergence) write(89,310) it, solver_flag, tres2
+310 format(2I6,'  ',(e14.5))
     if (tres2<maxError) then 
        if(rank==0.and.recordconvergence) close(89)
        !if (mod(iout,nout)==0) write(*,'("Solver flag and nr. of cells: ",I8,e14.5)')solver_flag,cells
@@ -864,19 +878,12 @@ subroutine RedBlackRelax_fs(A,p,beta)
         isw=jsw
         do j=js,je
            do i=isw+is-1,ie,2
-              if (FreeSurface) then
-                 if ((pcmask(i,j,k)==0 .and. solver_flag==1) &
-                      .or.((pcmask(i,j,k)==1 .or. pcmask(i,j,k)==2) .and. solver_flag==2)) then
-                    p(i,j,k)=(1d0-beta)*p(i,j,k) + (beta/A(i,j,k,7))*(              &
-                         A(i,j,k,1) * p(i-1,j,k) + A(i,j,k,2) * p(i+1,j,k) +        &
-                         A(i,j,k,3) * p(i,j-1,k) + A(i,j,k,4) * p(i,j+1,k) +        &
-                         A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8))   
-                 endif
-              else
-                 p(i,j,k)=(1d0-beta)*p(i,j,k) + (beta/A(i,j,k,7))*(             &
-                      A(i,j,k,1) * p(i-1,j,k) + A(i,j,k,2) * p(i+1,j,k) +       &
-                      A(i,j,k,3) * p(i,j-1,k) + A(i,j,k,4) * p(i,j+1,k) +       &
-                      A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8))
+              if ((pcmask(i,j,k)==0 .and. solver_flag==1) &
+                   .or.((pcmask(i,j,k)==1 .or. pcmask(i,j,k)==2) .and. solver_flag==2)) then
+                 p(i,j,k)=(1d0-beta)*p(i,j,k) + (beta/A(i,j,k,7))*(              &
+                      A(i,j,k,1) * p(i-1,j,k) + A(i,j,k,2) * p(i+1,j,k) +        &
+                      A(i,j,k,3) * p(i,j-1,k) + A(i,j,k,4) * p(i,j+1,k) +        &
+                      A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8))   
               endif
            enddo
            isw=3-isw

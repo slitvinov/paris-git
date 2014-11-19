@@ -425,7 +425,7 @@ Program paris
                     w(i,j,k)=w(i,j,k)-dt/rho(i,j,k)*(p_ext(i,j,k+1)-p_ext(i,j,k))/dzh(k)
                  endif
               enddo; enddo; enddo
-              call SetVelocityBC(u,v,w,umask,vmask,wmask,time)
+              call SetVelocityBC(u,v,w,umask,vmask,wmask,time) !check this
               call do_ghost_vector(u,v,w)
               if (mod(itimestep,nout)==0 .and. mod(ii,itime_scheme)==0) call discrete_divergence(u,v,w,itimestep/nout)
            endif !Extrapolation
@@ -1889,8 +1889,9 @@ subroutine InitCondition
               call set_topology(vof_phase,itimestep) !vof_phases are updated in initconditions_VOF called above
               call get_normals()
               call get_all_curvatures(kappa_fs)
-              !if (RP_test) call get_initial_volume
-              V_0 = 4d0/3d0*pi*(0.16**3d0)
+              if (RP_test) then
+                 call get_ref_volume
+              endif
            endif
            call get_all_heights()
         endif

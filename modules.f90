@@ -335,7 +335,7 @@ module module_freesurface
   real(8), dimension(:,:,:), allocatable :: x_mod, y_mod, z_mod, p_ext
   real(8), dimension(:,:,:), allocatable :: P_gx, P_gy, P_gz
   integer, dimension(:,:,:), allocatable :: u_cmask,v_cmask,w_cmask,pcmask
-  real(8) :: p_0, gamma, V_0 !eq pressure and polytropic gas exponent
+  real(8) :: P_ref, gamma, R_ref, V_0 !eq pressure and polytropic gas exponent
   integer :: X_level, solver_flag=0
   logical :: FreeSurface, debug=.false., initialize_fs = .false.
   logical :: div_opened
