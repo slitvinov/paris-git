@@ -7,7 +7,6 @@ TEST_TYPE = 'droplet'
 VOF_ADVECT = 'Dick_Yue'
 
 FreeSurface = T
-X_level = 2
 
 DoLPP = F
 CYLINDER_DIR = 3
