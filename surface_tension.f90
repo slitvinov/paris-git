@@ -1025,16 +1025,9 @@ contains
                            ! x_new_i = e_ji x_old_j
       real(8) :: testm(3,3), id(3,3), error
       integer :: i,j
-
-!
-!      mv(1) = mxyz(try(2))
-!      mv(2) = mxyz(try(3))
-!      mv(3) = mxyz(try(1))
-
+      
       mv=0d0
       mv(3) = 1d0
-      ! *** determine the origin. 
-
       if(do_rotation) then
          ! normal = direction z
          ! e_z' = m
