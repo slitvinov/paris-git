@@ -68,6 +68,9 @@ module module_surface_tension
   integer, parameter :: ngc=20
   integer :: geom_case_count(ngc)
 
+  !Debug section
+  logical :: letsdebug = .false.
+
 !  type geom_case
 !     character(10) :: name
 !     integer :: count
@@ -272,15 +275,29 @@ contains
      include 'mpif.h'
      integer :: direction, ierr, i
      integer :: req(24),sta(MPI_STATUS_SIZE,24)
+     character*128 :: file_name1
+     integer, save :: counter = 0
      if(.not.st_initialized) call initialize_surface_tension()
 
      !*** Initialize
      height=2d6
+     file_name1 ='test_steps_height'
 
      do direction=1,3
         call get_heights_pass1(direction)
      enddo
+     IF((rank==1.or.rank==2).and.letsdebug) then
      call my_timer(5)
+     OPEN(UNIT=86,FILE=TRIM(out_path)//'/'//TRIM(file_name1)//TRIM(int2text(rank,padding)) &
+           //'-'//TRIM(int2text(counter,padding))//'.txt')
+        write(86,*) 'Pass 1 before comunications'
+        do i=is,ie 
+           write(86,19) height(i,65,3,4), height(i,66,3,4), height(i,67,3,4), height(i,68,3,4)
+           19     format(E14.6,E14.6,E14.6,E14.6)       
+        enddo
+     endif
+
+
      do i=1,6
         call ghost_x(height(:,:,:,i),2,req(4*(i-1)+1:4*i))
      enddo
@@ -294,9 +311,33 @@ contains
      enddo
      call MPI_WAITALL(24,req(1:24),sta(:,1:24),ierr)
      call my_timer(6)
+
+     IF((rank==1.or.rank==2).and.letsdebug) then
+        write(86,*) 'Pass 1 after comunications'
+        do i=is,ie 
+           write(86,19) height(i,65,3,4), height(i,66,3,4), height(i,67,3,4), height(i,68,3,4)
+        enddo
+     endif
+
      do direction=1,3
         call get_heights_pass2(direction)
+        IF(direction ==2) THEN
+           if((rank==1.or.rank==2).and.letsdebug) then
+              write(86,*) 'Pass 2'
+              do i=is,ie 
+                 write(86,19) height(i,65,3,4), height(i,66,3,4), height(i,67,3,4), height(i,68,3,4)
+              enddo
+           endif
+        ENDIF
         call get_heights_pass3(direction)
+         IF(direction ==2) THEN
+            if((rank==1.or.rank==2).and.letsdebug) then
+               write(86,*) 'Pass 3 BC'
+               do i=is,ie 
+                 write(86,19) height(i,65,3,4), height(i,66,3,4), height(i,67,3,4), height(i,68,3,4)
+               enddo
+            endif
+         ENDIF
      enddo
      call my_timer(5)
      do i=1,6
@@ -312,6 +353,14 @@ contains
      enddo
      call MPI_WAITALL(24,req(1:24),sta(:,1:24),ierr)
      call my_timer(6)
+     IF((rank==1.or.rank==2).and.letsdebug) then
+       write(86,*) 'Pass 3 AC'
+       do i=is,ie 
+          write(86,19) height(i,65,3,4), height(i,66,3,4), height(i,67,3,4), height(i,68,3,4) 
+       enddo
+       CLOSE(86)
+     ENDIF
+     counter = counter + 1
   end subroutine get_all_heights
 !=================================================================================================
 ! 
