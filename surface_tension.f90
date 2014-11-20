@@ -42,13 +42,12 @@ module module_surface_tension
 
 ! choice of method  
   logical :: recomputenormals = .true.
-  logical :: bypass_mixed_heights = .false.
 
 ! initial state
   logical :: st_initialized = .false.
   real(8), parameter :: kappamax = 2.d0
   integer, parameter :: nfound_min= 6
-  integer, parameter :: NDEPTH=3
+  integer, parameter :: NDEPTH=4
   integer, parameter :: BIGINT=100
   real(8), parameter :: D_HALF_BIGINT = DBLE(BIGINT/2)
   integer, parameter :: MAX_EXT_H = 0
@@ -885,7 +884,7 @@ contains
          origin(n) = centroid(n)
       enddo
       ! *** determine curvature from mixed heights 
-      if(.not.bypass_mixed_heights) then
+      if(mixed_heights) then
          if ( (-nfound) > nfound_min )  then  ! more than 6 points to avoid special 2D degeneracy. 
             ! rotate and shift origin
             !  x_i' = x_k(i)
@@ -910,7 +909,7 @@ contains
                return
             endif
          endif !  (-nfound) > nfound_min  
-      endif ! .not.bypass_mixed_heights
+      endif ! mixed_heights
       ! *** determine curvature from centroids
       ! Find all centroids in 3**3
       ! use direction closest to normal
@@ -1026,8 +1025,6 @@ contains
       real(8) :: testm(3,3), id(3,3), error
       integer :: i,j
       
-!       mv=0d0
-!      mv(3) = 1d0
       if(do_rotation) then
          ! normal = direction z
          ! e_z' = m

@@ -10,8 +10,9 @@ fi
 init=$1
 nstats=$2
 d=$3
-dim=$3'D'
+levelmax=$4
 
+dim=$3'D'
 list=`seq 3 $levelmax`
 echo $list
 

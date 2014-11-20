@@ -82,6 +82,8 @@ module module_VOF
 !   logical :: oldvof
   logical :: do_rotation
   logical :: debug_curvature
+  logical :: mixed_heights
+
 
   real(8) :: b1,b2,b3,b4,hshift
   integer :: nfilter
@@ -245,13 +247,8 @@ contains
        cylinder_dir, normal_up, DoLPP, &
        FreeSurface, ViscMeanIsArith, DensMeanIsArith, &
        output_filtered_VOF, DoMOMCONS, use_vofi,nfilter, &
-       hshift, do_rotation, debug_curvature
+       X_level, RP_test, hshift, do_rotation, debug_curvature
 ! ,oldvof
-    ! Free Surface parameters to be read from a parameter file called "inputFS"
-    namelist /FSparameters/ X_level, RP_test, gamma, R_ref, P_ref,&
-         VTK_OUT, NOUT_VTK
-       X_level = 2; RP_test = .false.; gamma = 1.4d0; R_ref = 1.d0; P_ref = 1.d0; 
-       VTK_OUT = .false.; NOUT_VTK = 100000; vtk_open = .false.
     
 !     vofbdry_cond=['periodic','periodic','periodic','periodic','periodic','periodic']
     vofbdry_cond=['undefined','undefined','undefined','undefined','undefined','undefined']
@@ -271,6 +268,7 @@ contains
     do_rotation = .false.
     debug_curvature=.false.
     ! oldvof = .false.  ! .true.
+    mixed_heights = .true.
     
     in=31
 

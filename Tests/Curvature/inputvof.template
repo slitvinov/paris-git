@@ -13,6 +13,7 @@ CYLINDER_DIR = CYLDIRTEMP
 NORMAL_UP = NORMUPTEMP
 USE_VOFI = T
 DO_ROTATION = T
+MIXED_HEIGHTS = F
 
 !=================================================================================================
 
