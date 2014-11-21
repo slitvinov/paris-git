@@ -993,9 +993,9 @@ subroutine append_visit_fs(index,iout)
      OPEN(UNIT=100,FILE=TRIM(file)//'.visit',access='append')
   endif
 
-  file_root = TRIM(out_path)//'/VTK/'//TRIM(file_short(index))//TRIM(int2text(iout,padding))//'-'
+  file_root = TRIM(out_path)//'/VTK/'//TRIM(file_short(index))
   do prank=0,NpDomain-1
-     write(100,11) TRIM(file_root)//TRIM(int2text(prank,padding))//'.vtk'
+     write(100,11) TRIM(file_root)//TRIM(int2text(prank,padding))//'-'//TRIM(int2text(iout,padding))//'.vtk'
 11   format(A)
   enddo
   close(100)
@@ -1011,9 +1011,9 @@ subroutine VTK_scalar_struct(index,iout,var)
   character(len=40) :: file_root
   integer index, iout, i,j,k
 
-  file_root = TRIM(out_path)//'/VTK/'//TRIM(file_short(index))//TRIM(int2text(iout,padding))//'-'
+  file_root = TRIM(out_path)//'/VTK/'//TRIM(file_short(index))
   !Write to VTK file
-  OPEN(UNIT=8,FILE=TRIM(file_root)//TRIM(int2text(rank,padding))//'.vtk')
+  OPEN(UNIT=8,FILE=TRIM(file_root)//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout,padding))//'.vtk')
   write(8,10)
   write(8,11) time
   write(8,12)

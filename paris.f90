@@ -145,6 +145,25 @@ Program paris
         if (.not.restart) call output(0,is,ie+1,js,je+1,ks,ke+1)
         if(DoVOF .and. .not.restart) then
            call output_VOF(0,is,ie+1,js,je+1,ks,ke+1)
+           if (FreeSurface) then
+              do out_fs = 1,3
+                 if (VTK_OUT(out_fs)) then
+                    if (rank==0) call append_visit_fs(out_fs,0)
+                    SELECT CASE (out_fs)
+                    case (1) 
+                       tmp = 0d0
+                       do k=ks,ke+1; do j=js,je+1; do i=is,ie+1
+                          tmp(i,j,k)=ABS((u(i-1,j,k)-u(i,j,k))/dx(i)+(v(i,j-1,k)-v(i,j,k))/dy(j)+(w(i,j,k-1)-w(i,j,k))/dz(k))
+                          call VTK_scalar_struct(out_fs,0,tmp)
+                       enddo; enddo; enddo
+                    case (2)
+                       call VTK_scalar_struct(out_fs,0,kappa_fs)
+                    case(3)
+                       call VTK_scalar_struct(out_fs,0,P_gx)
+                    end SELECT
+                 endif
+              enddo
+           endif
         endif
         if(DoLPP .and. .not.restart) call output_LPP(0,is,ie+1,js,je+1,ks,ke+1)
         if(test_droplet) call output_droplet(w,time)
@@ -441,6 +460,7 @@ Program paris
               enddo; enddo; enddo
               call SetVelocityBC(u,v,w,umask,vmask,wmask,time) !check this
               call do_ghost_vector(u,v,w)
+              !if (mod(itimestep,nout)==0 .and. mod(ii,itime_scheme)==0) call discrete_divergence(u,v,w,itimestep/nout)
            endif !Extrapolation
 !------------------------------------------------------------------------------------------------
 
