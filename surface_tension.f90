@@ -869,7 +869,8 @@ contains
          kappa = sign(1.d0,mxyz(try(1)))*kappa
          return
       else 
-         nfound = ind_pos_sorted(points,bpoints,nposit)   ! - ind_pos(points,nposit) 
+         nfound = ind_pos(points,nposit) !  ind_pos_sorted(points,bpoints,nposit) 
+         bpoints = points
       endif ! nfound == 9
       ! Determine the curvature from fits. 
       ! Rotate coordinate sytems by permutation of x,y,z
