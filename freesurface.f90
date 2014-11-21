@@ -159,7 +159,7 @@ subroutine setuppoisson_fs(vof_phase,rhot,dt,A,cvof,n1,n2,n3,kap,iout)
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: rhot
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: kap
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: cvof,n1,n2,n3
-  real(8), dimension(is:ie,js:je,ks:ke,8), intent(out) :: A
+  real(8), dimension(is:ie,js:je,ks:ke,8), intent(inout) :: A
   integer, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: vof_phase
   integer :: req(24),sta(MPI_STATUS_SIZE,24)
   real(8) :: alpha2, x_test2, y_test2, z_test2
@@ -230,7 +230,10 @@ subroutine setuppoisson_fs(vof_phase,rhot,dt,A,cvof,n1,n2,n3,kap,iout)
               n_avg(2)= n2(i,j,k)
               n_avg(3)= n3(i,j,k)
            endif
-           if (ABS((ABS(n_avg(1))+ABS(n_avg(2))+ABS(n_avg(3)))-1d0) > 1d-12) call pariserror('Normals not normalised')
+           if (ABS((ABS(n_avg(1))+ABS(n_avg(2))+ABS(n_avg(3)))-1d0) > 1d-12) then
+              write(*,*)'Normals not normalised'
+              call pariserror('Normals not normalised')
+           endif
            alpha2=al3dnew(n_avg,c_stag)
            if (ABS(n_avg(1))>1d-12) then
               x_test2 = (alpha2 - (n_avg(2)+n_avg(3))/2d0)/n_avg(1)
@@ -279,7 +282,10 @@ subroutine setuppoisson_fs(vof_phase,rhot,dt,A,cvof,n1,n2,n3,kap,iout)
               n_avg(2)= n2(i,j,k)
               n_avg(3)= n3(i,j,k)
            endif
-           if (ABS((ABS(n_avg(1))+ABS(n_avg(2))+ABS(n_avg(3)))-1d0) > 1d-12) call pariserror('Normals not normalised')
+           if (ABS((ABS(n_avg(1))+ABS(n_avg(2))+ABS(n_avg(3)))-1d0) > 1d-12) then
+              write(*,*)'Normals not normalised'
+              call pariserror('Normals not normalised')
+           endif
            alpha2=al3dnew(n_avg,c_stag)
            if (ABS(n_avg(2))>1d-12) then
               y_test2 = (alpha2 - (n_avg(1)+n_avg(3))/2d0)/n_avg(2)
@@ -324,7 +330,10 @@ subroutine setuppoisson_fs(vof_phase,rhot,dt,A,cvof,n1,n2,n3,kap,iout)
               n_avg(2)= n2(i,j,k)
               n_avg(3)= n3(i,j,k)
            endif
-           if (ABS((ABS(n_avg(1))+ABS(n_avg(2))+ABS(n_avg(3)))-1d0) > 1d-12) call pariserror('Normals not normalised')
+           if (ABS((ABS(n_avg(1))+ABS(n_avg(2))+ABS(n_avg(3)))-1d0) > 1d-12) then
+              write(*,*)'Normals not normalised'
+              call pariserror('Normals not normalised')
+           endif
            alpha2=al3dnew(n_avg,c_stag)
            if (ABS(n_avg(3))>1d-12) then
               z_test2 = (alpha2 - (n_avg(1)+n_avg(2))/2d0)/n_avg(3)
@@ -338,6 +347,7 @@ subroutine setuppoisson_fs(vof_phase,rhot,dt,A,cvof,n1,n2,n3,kap,iout)
      endif
 !----Liquid-cavity neighbours-----------------------------------------------------
      if (vof_phase(i,j,k)==0) then
+        ! set Laplace pressure jumps
         if (vof_phase(i+1,j,k)==1) then
            P_gx(i+1,j,k) = sigma*kap(i+1,j,k)/dx(i) !!filaments and droplets of one cell will be an issue here
            if (P_gx(i+1,j,k) /= P_gx(i+1,j,k)) write(*,*)'WARNING, P_g NaN x-dir'
@@ -384,7 +394,10 @@ subroutine setuppoisson_fs(vof_phase,rhot,dt,A,cvof,n1,n2,n3,kap,iout)
               n_avg(2)= n2(i+1,j,k)
               n_avg(3)= n3(i+1,j,k)
            endif
-           if (ABS((ABS(n_avg(1))+ABS(n_avg(2))+ABS(n_avg(3)))-1d0) > 1d-12) call pariserror('Normals not normalised')
+           if (ABS((ABS(n_avg(1))+ABS(n_avg(2))+ABS(n_avg(3)))-1d0) > 1d-12) then
+              write(*,*)'Normals not normalised'
+              call pariserror('Normals not normalised')
+           endif
            alpha2=al3dnew(n_avg,c_stag)
            if (ABS(n_avg(1))>1d-12) then
               x_test2 = (alpha2 - (n_avg(2)+n_avg(3))/2d0)/n_avg(1)
@@ -431,7 +444,10 @@ subroutine setuppoisson_fs(vof_phase,rhot,dt,A,cvof,n1,n2,n3,kap,iout)
               n_avg(2)= n2(i,j+1,k)
               n_avg(3)= n3(i,j+1,k)
            endif
-           if (ABS((ABS(n_avg(1))+ABS(n_avg(2))+ABS(n_avg(3)))-1d0) > 1d-12) call pariserror('Normals not normalised')
+           if (ABS((ABS(n_avg(1))+ABS(n_avg(2))+ABS(n_avg(3)))-1d0) > 1d-12) then
+              write(*,*)'Normals not normalised'
+              call pariserror('Normals not normalised')
+           endif
            alpha2=al3dnew(n_avg,c_stag)
            if (ABS(n_avg(2))>1d-12) then
               y_test2 = (alpha2 - (n_avg(1)+n_avg(3))/2d0)/n_avg(2)
@@ -476,7 +492,10 @@ subroutine setuppoisson_fs(vof_phase,rhot,dt,A,cvof,n1,n2,n3,kap,iout)
               n_avg(2)= n2(i,j,k+1)
               n_avg(3)= n3(i,j,k+1)
            endif
-           if (ABS((ABS(n_avg(1))+ABS(n_avg(2))+ABS(n_avg(3)))-1d0) > 1d-12) call pariserror('Normals not normalised')
+           if (ABS((ABS(n_avg(1))+ABS(n_avg(2))+ABS(n_avg(3)))-1d0) > 1d-12) then
+              write(*,*)'Normals not normalised'
+              call pariserror('Normals not normalised')
+           endif
            alpha2=al3dnew(n_avg,c_stag)
            if (ABS(n_avg(3))>1d-12) then
               z_test2 = (alpha2 - (n_avg(1)+n_avg(2))/2d0)/n_avg(3)
@@ -493,15 +512,15 @@ subroutine setuppoisson_fs(vof_phase,rhot,dt,A,cvof,n1,n2,n3,kap,iout)
         endif
      endif
   enddo;enddo;enddo
-  call ghost_x(P_gx,1,req(1:4)); call ghost_x(P_gy,1,req(5:8)); call ghost_x(P_gz,1,req(9:12)) 
-  call ghost_x(x_mod,1,req(13:16)); call ghost_x(y_mod,1,req(17:20)); call ghost_x(z_mod,1,req(21:24)) 
+  call ghost_x(P_gx,1,req(1:4)); call ghost_y(P_gy,1,req(5:8)); call ghost_z(P_gz,1,req(9:12)) 
+  call ghost_x(x_mod,1,req(13:16)); call ghost_y(y_mod,1,req(17:20)); call ghost_z(z_mod,1,req(21:24)) 
   call MPI_WAITALL(24,req(1:24),sta(:,1:24),ierr)
-  call ghost_y(P_gx,1,req(1:4)); call ghost_y(P_gy,1,req(5:8)); call ghost_y(P_gz,1,req(9:12)) 
-  call ghost_y(x_mod,1,req(13:16)); call ghost_y(y_mod,1,req(17:20)); call ghost_y(z_mod,1,req(21:24)) 
-  call MPI_WAITALL(24,req(1:24),sta(:,1:24),ierr)
-  call ghost_z(P_gx,1,req(1:4)); call ghost_z(P_gy,1,req(5:8)); call ghost_z(P_gz,1,req(9:12)) 
-  call ghost_z(x_mod,1,req(13:16)); call ghost_z(y_mod,1,req(17:20)); call ghost_z(z_mod,1,req(21:24)) 
-  call MPI_WAITALL(24,req(1:24),sta(:,1:24),ierr)
+!!$  call ghost_y(P_gx,1,req(1:4)); call ghost_y(P_gy,1,req(5:8)); call ghost_y(P_gz,1,req(9:12)) 
+!!$  call ghost_y(x_mod,1,req(13:16)); call ghost_y(y_mod,1,req(17:20)); call ghost_y(z_mod,1,req(21:24)) 
+!!$  call MPI_WAITALL(24,req(1:24),sta(:,1:24),ierr)
+!!$  call ghost_z(P_gx,1,req(1:4)); call ghost_z(P_gy,1,req(5:8)); call ghost_z(P_gz,1,req(9:12)) 
+!!$  call ghost_z(x_mod,1,req(13:16)); call ghost_z(y_mod,1,req(17:20)); call ghost_z(z_mod,1,req(21:24)) 
+!!$  call MPI_WAITALL(24,req(1:24),sta(:,1:24),ierr)
 !--Debugging
   if (debug .and. mod(iout,no)==0) then
      Open(unit=52,file=TRIM(out_path)//'/P_int1-'//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout/no,padding))//'.txt')
@@ -546,17 +565,17 @@ subroutine setuppoisson_fs(vof_phase,rhot,dt,A,cvof,n1,n2,n3,kap,iout)
 !--------------------------------------------------------------------------------------------------------
   do k=ks,ke; do j=js,je; do i=is,ie
      if (vof_phase(i,j,k)==0) then
-        A(i,j,k,1) = dt/(dx(i)*x_mod(i-1,j,k)*(rhot(i,j,k)))
+        A(i,j,k,1) = 2d0*dt/(dx(i)*x_mod(i-1,j,k)*(rhot(i-1,j,k)+rhot(i,j,k)))
         if (A(i,j,k,1) /= A(i,j,k,1)) write(*,'("ERROR: A1 NaN :",2e14.5)')A(i,j,k,1),x_mod(i-1,j,k) 
-        A(i,j,k,2) = dt/(dx(i)*x_mod(i,j,k)*(rhot(i,j,k)))
+        A(i,j,k,2) = 2d0*dt/(dx(i)*x_mod(i,j,k)*(rhot(i+1,j,k)+rhot(i,j,k)))
         if (A(i,j,k,2) /= A(i,j,k,2)) write(*,'("ERROR: A2 NaN :",2e14.5)')A(i,j,k,2),x_mod(i,j,k)
-        A(i,j,k,3) = dt/(dy(j)*y_mod(i,j-1,k)*(rhot(i,j,k)))
+        A(i,j,k,3) = 2d0*dt/(dy(j)*y_mod(i,j-1,k)*(rhot(i,j-1,k)+rhot(i,j,k)))
         if (A(i,j,k,3) /= A(i,j,k,3)) write(*,'("ERROR: A3 NaN :",2e14.5)')A(i,j,k,3),y_mod(i,j-1,k)
-        A(i,j,k,4) = dt/(dy(j)*y_mod(i,j,k)*(rhot(i,j,k)))
+        A(i,j,k,4) = 2d0*dt/(dy(j)*y_mod(i,j,k)*(rhot(i,j+1,k)+rhot(i,j,k)))
         if (A(i,j,k,4) /= A(i,j,k,4)) write(*,'("ERROR: A4 NaN :",2e14.5)')A(i,j,k,4),y_mod(i,j,k)
-        A(i,j,k,5) = dt/(dz(k)*z_mod(i,j,k-1)*(rhot(i,j,k)))
+        A(i,j,k,5) = 2d0*dt/(dz(k)*z_mod(i,j,k-1)*(rhot(i,j,k-1)+rhot(i,j,k)))
         if (A(i,j,k,5) /= A(i,j,k,5)) write(*,'("ERROR: A5 NaN :",2e14.5)')A(i,j,k,5),z_mod(i,j,k-1)
-        A(i,j,k,6) = dt/(dz(k)*z_mod(i,j,k)*(rhot(i,j,k)))
+        A(i,j,k,6) = 2d0*dt/(dz(k)*z_mod(i,j,k)*(rhot(i,j,k+1)+rhot(i,j,k)))
         if (A(i,j,k,6) /= A(i,j,k,6)) write(*,'("ERROR: A6 NaN :",2e14.5)')A(i,j,k,6),z_mod(i,j,k)
         A(i,j,k,7) = sum(A(i,j,k,1:6))
         A(i,j,k,8) = A(i,j,k,8) + dt/rhot(i,j,k)*&
@@ -615,35 +634,16 @@ subroutine setuppoisson_fs2(utmp,vtmp,wtmp,dt,A,vof_phase,istep)
         if (vof_phase(i,j,k)==1) then
            do nbr=-1,1,2
               if (vof_phase(i+nbr,j,k) == 0) then
-                 !if ((dxh(i)-x_mod(i+(nbr-1)/2,j,k)) > 1d-6/dx((is+ie)/2)) then
-                 A(i,j,k,2+(nbr-1)/2) = 0d0!dt/(dx(i)*(dxh(i)-x_mod(i+(nbr-1)/2,j,k)))
-                 !endif
+                 A(i,j,k,2+(nbr-1)/2) = 0d0
               endif
               if (vof_phase(i,j+nbr,k) == 0) then
-                 !if ((dyh(j)-y_mod(i,j+(nbr-1)/2,k)) > 1d-6/dx((is+ie)/2)) then
-                 A(i,j,k,4+(nbr-1)/2) = 0d0!dt/(dy(j)*(dyh(j)-y_mod(i,j+(nbr-1)/2,k)))
-                 !endif
+                 A(i,j,k,4+(nbr-1)/2) = 0d0
               endif
               if (vof_phase(i,j,k+nbr) == 0) then
-                 !if ((dzh(k)-z_mod(i,j,k+(nbr-1)/2)) > 1d-6/dx((is+ie)/2)) then
-                 A(i,j,k,6+(nbr-1)/2) = 0d0!dt/(dz(k)*(dzh(k)-z_mod(i,j,k+(nbr-1)/2)))
-                 !endif
+                 A(i,j,k,6+(nbr-1)/2) = 0d0
               endif
            enddo
         endif
-!!$        if (vof_phase(i,j,k)==2) then
-!!$           do nbr=-1,1,2
-!!$              if (vof_phase(i+nbr,j,k) == 3) then
-!!$                 A(i,j,k,2+(nbr-1)/2) = 0d0
-!!$              endif
-!!$              if (vof_phase(i,j+nbr,k) == 3) then
-!!$                 A(i,j,k,4+(nbr-1)/2) = 0d0
-!!$              endif
-!!$              if (vof_phase(i,j,k+nbr) == 3) then
-!!$                 A(i,j,k,6+(nbr-1)/2) = 0d0
-!!$              endif
-!!$           enddo
-!!$        endif
         A(i,j,k,7) = sum(A(i,j,k,1:6))
         A(i,j,k,8) =  -1d0*((utmp(i,j,k)-utmp(i-1,j,k))/dx(i) &
              +  (vtmp(i,j,k)-vtmp(i,j-1,k))/dy(j) &
@@ -653,43 +653,90 @@ subroutine setuppoisson_fs2(utmp,vtmp,wtmp,dt,A,vof_phase,istep)
   enddo; enddo; enddo
 end subroutine setuppoisson_fs2
 !--------------------------------------------------------------------------------------------------------------------
-subroutine discrete_divergence(u,v,w,iout)
-  use module_grid
-  use module_freesurface
-  use module_IO
-  implicit none
-  include 'mpif.h'
-  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: u,v,w 
-  real(8), dimension(is:ie,js:je,ks:ke) :: div, t
-  real(8), dimension(0:3) :: divtot, domain, n_level, n_total
-  real(8) :: avg2
-  integer :: i,j,k,l,iout,ierr
-
-divtot = 0d0; n_level = 0d0
-
-do k=ks,ke; do j=js,je; do i=is,ie
-   !div(i,j,k)=(u(i-1,j,k)-u(i,j,k))/dx(i)+(v(i,j-1,k)-v(i,j,k))/dy(j)+(w(i,j,k-1)-w(i,j,k))/dz(k)
-   div(i,j,k)=(u(i-1,j,k)-u(i,j,k))*dy(j)*dz(k)+(v(i,j-1,k)-v(i,j,k))*dx(i)*dz(k)+(w(i,j,k-1)-w(i,j,k))*dx(i)*dy(j)
-   do l=0,3
-      if (pcmask(i,j,k)==l) then
-         divtot(l)=divtot(l)+ABS(div(i,j,k))
-         n_level(l) = n_level(l) + 1d0
-      endif
-   enddo
-enddo; enddo; enddo
-call MPI_ALLREDUCE(divtot,domain,4, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_Cart, ierr)
-call MPI_ALLREDUCE(n_level,n_total,4, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_Cart, ierr)
-do l=0,3
-   if (n_total(l) > 1d-10) domain(l)=domain(l)/n_total(l)
-enddo
-avg2 = (domain(1)+domain(2))/(n_total(1)+n_total(2))
-if (rank==0) then
-   OPEN(unit=21,file='div_type.txt',access='append')
-   write(21,15)iout,domain(0),domain(1),domain(2),domain(3),avg2
-   close(unit=21)
-endif
-15 format(I8,5e14.5)
-end subroutine discrete_divergence
+!!$subroutine discrete_divergence(iout)
+!!$  use module_grid
+!!$  use module_flow
+!!$  use module_freesurface
+!!$  use module_IO
+!!$  implicit none
+!!$  include 'mpif.h'
+!!$  !real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: u,v,w 
+!!$  real(8), dimension(is:ie+1,js:je+1,ks:ke+1) :: div
+!!$  real(8), dimension(0:3) :: divtot, domain, n_level, n_total
+!!$  real(8) :: avg2
+!!$  integer :: i,j,k,l,iout,ierr,prank
+!!$  character(len=30) :: filename
+!!$
+!!$  divtot = 0d0; n_level = 0d0
+!!$  ! Open and/or append visit file
+!!$  filename = TRIM(out_path)//'/VTK/DIV'//TRIM(int2text(iout,padding))//'-'
+!!$  if (rank==0) then
+!!$     if (.not.vtk_open) then
+!!$        OPEN(unit=51,file='div.visit')
+!!$        write(51,'("!NBLOCKS ",I4)')npdomain
+!!$        vtk_open = .true.
+!!$     else
+!!$        OPEN(unit=51,file='div.visit',access='append')
+!!$     endif
+!!$     do prank=0,npdomain-1
+!!$        write(51,'(A)')TRIM(filename)//TRIM(int2text(prank,padding))//'.vtk'
+!!$     enddo
+!!$     close(unit=51)
+!!$  endif
+!!$
+!!$  do k=ks,ke+1; do j=js,je+1; do i=is,ie+1
+!!$     div(i,j,k)=ABS((u(i-1,j,k)-u(i,j,k))/dx(i)+(v(i,j-1,k)-v(i,j,k))/dy(j)+(w(i,j,k-1)-w(i,j,k))/dz(k))
+!!$     !div(i,j,k)=(u(i-1,j,k)-u(i,j,k))*dy(j)*dz(k)+(v(i,j-1,k)-v(i,j,k))*dx(i)*dz(k)+(w(i,j,k-1)-w(i,j,k))*dx(i)*dy(j)
+!!$     do l=0,3
+!!$        if (pcmask(i,j,k)==l) then
+!!$           divtot(l)=divtot(l)+div(i,j,k)
+!!$           n_level(l) = n_level(l) + 1d0
+!!$        endif
+!!$     enddo
+!!$  enddo; enddo; enddo
+!!$  call MPI_ALLREDUCE(divtot,domain,4, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_Cart, ierr)
+!!$  call MPI_ALLREDUCE(n_level,n_total,4, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_Cart, ierr)
+!!$  avg2 = (domain(1)+domain(2))/(n_total(1)+n_total(2))
+!!$  do l=0,3
+!!$     if (n_total(l) > 1d-10) domain(l)=domain(l)/n_total(l)
+!!$  enddo
+!!$  if (rank==0) then
+!!$     OPEN(unit=21,file='div_type.txt',access='append')
+!!$     write(21,115)iout,domain(0),domain(1),domain(2),domain(3),avg2
+!!$     close(unit=21)
+!!$  endif
+!!$115 format(I8,5e14.5)
+!!$  !Write div to VTK file
+!!$  OPEN(UNIT=8,FILE=TRIM(filename)//TRIM(int2text(rank,padding))//'.vtk')
+!!$  !write(*,'(I4)')rank
+!!$  write(8,10)
+!!$  write(8,11) time
+!!$  write(8,12)
+!!$  write(8,13)
+!!$  write(8,14)ie+1-is+1,je+1-js+1,ke+1-ks+1
+!!$  write(8,15) x(is),y(js),z(ks)
+!!$  write(8,16) x(is+1)-x(is),y(js+1)-y(js),z(ks+1)-z(ks)
+!!$10 format('# vtk DataFile Version 2.0')
+!!$11 format('grid, time ',F16.8)
+!!$12 format('ASCII')
+!!$13 format('DATASET STRUCTURED_POINTS')
+!!$14 format('DIMENSIONS ',I5,I5,I5)
+!!$15 format('ORIGIN ',F16.8,F16.8,F16.8)
+!!$16 format('SPACING ',F16.8,F16.8,F16.8)
+!!$
+!!$  write(8,19)(ie+1-is+1)*(je+1-js+1)*(ke+1-ks+1)
+!!$  write(8,17)'DIV'
+!!$  write(8,18)
+!!$19 format('POINT_DATA ',I17)
+!!$17 format('SCALARS ',A20,' float 1')
+!!$18 format('LOOKUP_TABLE default')
+!!$
+!!$  do k=ks,ke+1; do j=js,je+1; do i=is,ie+1
+!!$     write(8,210) div(i,j,k)
+!!$  enddo; enddo; enddo
+!!$210 format(e14.5)
+!!$  close(8)
+!!$end subroutine discrete_divergence
 !--------------------------------------------------------------------------------------------------------------------
 subroutine get_ref_volume
   use module_2phase
@@ -708,7 +755,7 @@ end subroutine get_ref_volume
 ! A7*Pijk = A1*Pi-1jk + A2*Pi+1jk + A3*Pij-1k + 
 !           A4*Pij+1k + A5*Pijk-1 + A6*Pijk+1 + A8
 !-------------------------------------------------------------------------------------------------
-subroutine FreeSolver(A,p,maxError,beta,maxit,it,ierr,iout,time)
+subroutine FreeSolver(A,p,maxError,beta,maxit,it,ierr,iout,time,tres2)
   use module_grid
   use module_BC
   use module_IO
@@ -721,7 +768,7 @@ subroutine FreeSolver(A,p,maxError,beta,maxit,it,ierr,iout,time)
   integer, intent(in) :: maxit
   integer, intent(out) :: it, ierr
   real(8) :: res1,res2,resinf,intvol
-  real(8) :: tres2, cells, p_c, Vol, time
+  real(8) :: tres2, cells, p_c, Vol, time, tcells
   integer :: i,j,k, iout
   integer :: req(12),sta(MPI_STATUS_SIZE,12)
   logical :: mask(imin:imax,jmin:jmax,kmin:kmax)
@@ -782,14 +829,16 @@ subroutine FreeSolver(A,p,maxError,beta,maxit,it,ierr,iout,time)
           cells = cells + 1d0
        endif
     enddo; enddo; enddo
-    if (cells > 1d-10) then
-       res2 = res2/cells
+    !if (cells > 1d-10) then
+    !   res2 = res2/cells
     !else
     !   write(*,*)'No cells for this topology present in this processor'
-    endif
+    !endif
     call catch_divergence_fs(res2,ierr)
     call MPI_ALLREDUCE(res2, tres2, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr)
+    call MPI_ALLREDUCE(cells, tcells, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr)
     if(norm==2) tres2=sqrt(tres2)
+    tres2 = tres2/tcells
     if(rank==0.and.mod(it,10) == 0.and.recordconvergence) write(89,310) it, solver_flag, tres2
 310 format(2I6,'  ',(e14.5))
     if (tres2<maxError) then 
@@ -916,3 +965,81 @@ subroutine LineRelax_fs(A,p,beta)
      endif
   enddo; enddo; enddo
 end subroutine LineRelax_fs
+!-------------------------------------------------------------------------------------------------
+!-------------------------------------------------------------------------------------------------
+!------------VTK output routines------------------------------------------------------------------
+!
+! These routines output data used to debug and/or display variables in the free surface part of the
+! code.
+!
+!-------------------------------------------------------------------------------------------------
+subroutine append_visit_fs(index,iout)
+  use module_flow
+  use module_grid
+  use module_IO
+  use module_freesurface
+  implicit none
+  character(len=10) :: file
+  character(len=40) :: file_root
+  integer index, iout, prank
+  if(rank.ne.0) call pariserror("rank.ne.0 in append")
+  file = TRIM(visit_file(index))
+  if(.not.vtk_open(index)) then
+     OPEN(UNIT=100,FILE=TRIM(file)//'.visit')
+     write(100,10) nPdomain
+10   format('!NBLOCKS ',I4)
+     vtk_open(index) = .true.
+  else
+     OPEN(UNIT=100,FILE=TRIM(file)//'.visit',access='append')
+  endif
+
+  file_root = TRIM(out_path)//'/VTK/'//TRIM(file_short(index))//TRIM(int2text(iout,padding))//'-'
+  do prank=0,NpDomain-1
+     write(100,11) TRIM(file_root)//TRIM(int2text(prank,padding))//'.vtk'
+11   format(A)
+  enddo
+  close(100)
+end subroutine  append_visit_fs
+!-------------------------------------------------------------------------------------------------
+subroutine VTK_scalar_struct(index,iout,var)
+  use module_flow
+  use module_grid
+  use module_IO
+  use module_freesurface
+  implicit none
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax) :: var 
+  character(len=40) :: file_root
+  integer index, iout, i,j,k
+
+  file_root = TRIM(out_path)//'/VTK/'//TRIM(file_short(index))//TRIM(int2text(iout,padding))//'-'
+  !Write to VTK file
+  OPEN(UNIT=8,FILE=TRIM(file_root)//TRIM(int2text(rank,padding))//'.vtk')
+  write(8,10)
+  write(8,11) time
+  write(8,12)
+  write(8,13)
+  write(8,14)ie+1-is+1,je+1-js+1,ke+1-ks+1
+  write(8,15) x(is),y(js),z(ks)
+  write(8,16) x(is+1)-x(is),y(js+1)-y(js),z(ks+1)-z(ks)
+10 format('# vtk DataFile Version 2.0')
+11 format('grid, time ',F16.8)
+12 format('ASCII')
+13 format('DATASET STRUCTURED_POINTS')
+14 format('DIMENSIONS ',I5,I5,I5)
+15 format('ORIGIN ',F16.8,F16.8,F16.8)
+16 format('SPACING ',F16.8,F16.8,F16.8)
+
+  write(8,19)(ie+1-is+1)*(je+1-js+1)*(ke+1-ks+1)
+  write(8,17)file_short(index)
+  write(8,18)
+19 format('POINT_DATA ',I17)
+17 format('SCALARS ',A20,' float 1')
+18 format('LOOKUP_TABLE default')
+
+  do k=ks,ke+1; do j=js,je+1; do i=is,ie+1
+     write(8,210) var(i,j,k)
+  enddo; enddo; enddo
+210 format(e14.5)
+  close(8)
+end subroutine VTK_scalar_struct
+!--------------------------------------------------------------------------------------------------

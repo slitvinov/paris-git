@@ -69,7 +69,7 @@ Program paris
   include 'mpif.h'
   integer :: ierr, icolor
   integer :: req(48),sta(MPI_STATUS_SIZE,48)
-  INTEGER :: irank, ii, i, j, k
+  INTEGER :: irank, ii, i, j, k, out_fs
   real(8) :: residual,cflmax,get_cfl_and_check,residualu,residualv,residualw
   integer :: itu,itv,itw
 
@@ -143,7 +143,9 @@ Program paris
      ! if(rank==0) start_time = MPI_WTIME()
      if(ICOut .and. rank<nPdomain) then
         if (.not.restart) call output(0,is,ie+1,js,je+1,ks,ke+1)
-        if(DoVOF .and. .not.restart) call output_VOF(0,is,ie+1,js,je+1,ks,ke+1)
+        if(DoVOF .and. .not.restart) then
+           call output_VOF(0,is,ie+1,js,je+1,ks,ke+1)
+        endif
         if(DoLPP .and. .not.restart) call output_LPP(0,is,ie+1,js,je+1,ks,ke+1)
         if(test_droplet) call output_droplet(w,time)
         call setvelocityBC(u,v,w,umask,vmask,wmask,time)
@@ -222,6 +224,7 @@ Program paris
                  call vofsweeps(itimestep)
               endif
               if (FreeSurface) then
+              
                  call get_normals()
                  call get_all_curvatures(kappa_fs)
                  call set_topology(vof_phase,itimestep) !vof_phase updated in vofsweeps
@@ -318,13 +321,13 @@ Program paris
            else
               if (FreeSurface) then
                  solver_flag = 1
-                 call FreeSolver(A,p,maxError/dt,beta,maxit,it,ierr,itimestep,time)
+                 call FreeSolver(A,p,maxError/dt,beta,maxit,it,ierr,itimestep,time,residual)
               else
                  call NewSolver(A,p,maxError/dt,beta,maxit,it,ierr)
               endif
            endif
            if(mod(itimestep,termout)==0) then
-              call calcresidual(A,p,residual)
+              !call calcresidual(A,p,residual)
               if(rank==0) then
                  write(*,'("              pressure residual*dt:   ",e7.1,&
                    &" maxerror: ",e7.1)') residual*dt,maxerror
@@ -346,21 +349,24 @@ Program paris
            else
               do k=ks,ke;  do j=js,je; do i=is,ieu    ! CORRECT THE u-velocity 
                  if (u_cmask(i,j,k)==0) then
-                    u(i,j,k)=u(i,j,k)-dt/rho(i,j,k)*(p(i+1,j,k)+P_gx(i+1,j,k)-p(i,j,k)-P_gx(i,j,k))/x_mod(i,j,k)
+                    u(i,j,k)=u(i,j,k)-dt*2d0/(rho(i,j,k)+rho(i+1,j,k))&
+                         *(p(i+1,j,k)+P_gx(i+1,j,k)-p(i,j,k)-P_gx(i,j,k))/x_mod(i,j,k)
                     if (u(i,j,k) /= u(i,j,k)) write(*,'("WARNING u NaN :",2e14.5)')u(i,j,k), x_mod(i,j,k)
                  endif
               enddo; enddo; enddo
 
               do k=ks,ke;  do j=js,jev; do i=is,ie    ! CORRECT THE v-velocity
                  if (v_cmask(i,j,k)==0) then
-                    v(i,j,k)=v(i,j,k)-dt/rho(i,j,k)*(p(i,j+1,k)+P_gy(i,j+1,k)-p(i,j,k)-P_gy(i,j,k))/y_mod(i,j,k)
+                    v(i,j,k)=v(i,j,k)-dt*2d0/(rho(i,j,k)+rho(i,j+1,k))&
+                         *(p(i,j+1,k)+P_gy(i,j+1,k)-p(i,j,k)-P_gy(i,j,k))/y_mod(i,j,k)
                     if (v(i,j,k) /= v(i,j,k)) write(*,'("WARNING v NaN :",2e14.5)')v(i,j,k), y_mod(i,j,k)
                  endif
               enddo; enddo; enddo
 
               do k=ks,kew;  do j=js,je; do i=is,ie   ! CORRECT THE w-velocity
                  if (w_cmask(i,j,k)==0) then
-                    w(i,j,k)=w(i,j,k)-dt/rho(i,j,k)*(p(i,j,k+1)+P_gz(i,j,k+1)-p(i,j,k)-P_gz(i,j,k))/z_mod(i,j,k)
+                    w(i,j,k)=w(i,j,k)-dt*2d0/(rho(i,j,k)+rho(i,j,k+1))&
+                         *(p(i,j,k+1)+P_gz(i,j,k+1)-p(i,j,k)-P_gz(i,j,k))/z_mod(i,j,k)
                     if (w(i,j,k) /= w(i,j,k)) write(*,'("WARNING w NaN :",2e14.5)')w(i,j,k), z_mod(i,j,k)
                  endif
               enddo; enddo; enddo
@@ -405,29 +411,36 @@ Program paris
               if(HYPRE)then !HYPRE will not work with removed nodes from domain.
                  call pariserror("HYPRE solver not yet available for Free Surfaces")
               else
-                 call FreeSolver(A,p_ext,maxError/dt,beta,maxit,it,ierr,itimestep,time)
+                 call FreeSolver(A,p_ext,maxError,beta,maxit,it,ierr,itimestep,time)
+              endif
+              if(mod(itimestep,termout)==0) then
+                 !call calcresidual(A,p,residual)
+                 if(rank==0) then
+                    write(*,'("FS2:          pressure residual:   ",e7.1,&
+                         &" maxerror: ",e7.1)') residual,maxerror
+                    write(*,'("              pressure iterations :",I9)')it
+                 endif
               endif
               ! Correct ONLY masked gas velocities at level 1 and 2
               do k=ks,ke;  do j=js,je; do i=is,ieu    ! CORRECT THE u-velocity 
                  if (u_cmask(i,j,k)==1 .or. u_cmask(i,j,k)==2) then
-                    u(i,j,k)=u(i,j,k)-dt/rho(i,j,k)*(p_ext(i+1,j,k)-p_ext(i,j,k))/dxh(i)
+                    u(i,j,k)=u(i,j,k)-dt*(p_ext(i+1,j,k)-p_ext(i,j,k))/dxh(i)
                  endif
               enddo; enddo; enddo
 
               do k=ks,ke;  do j=js,jev; do i=is,ie    ! CORRECT THE v-velocity
                  if (v_cmask(i,j,k)==1 .or. v_cmask(i,j,k)==2) then
-                    v(i,j,k)=v(i,j,k)-dt/rho(i,j,k)*(p_ext(i,j+1,k)-p_ext(i,j,k))/dyh(j)
+                    v(i,j,k)=v(i,j,k)-dt*(p_ext(i,j+1,k)-p_ext(i,j,k))/dyh(j)
                  endif
               enddo; enddo; enddo
 
               do k=ks,kew;  do j=js,je; do i=is,ie   ! CORRECT THE w-velocity
                  if (w_cmask(i,j,k)==1 .or. w_cmask(i,j,k)==2) then
-                    w(i,j,k)=w(i,j,k)-dt/rho(i,j,k)*(p_ext(i,j,k+1)-p_ext(i,j,k))/dzh(k)
+                    w(i,j,k)=w(i,j,k)-dt*(p_ext(i,j,k+1)-p_ext(i,j,k))/dzh(k)
                  endif
               enddo; enddo; enddo
               call SetVelocityBC(u,v,w,umask,vmask,wmask,time) !check this
               call do_ghost_vector(u,v,w)
-              if (mod(itimestep,nout)==0 .and. mod(ii,itime_scheme)==0) call discrete_divergence(u,v,w,itimestep/nout)
            endif !Extrapolation
 !------------------------------------------------------------------------------------------------
 
@@ -470,13 +483,7 @@ Program paris
             call my_timer(14)
         end if ! DoLPP
 !--------------------------------------------OUTPUT-----------------------------------------------
-        if(mod(itimestep,nstats)==0) then
-           call calcStats
-           if ( test_KHI2D .or. test_HF) then 
-              ! Measuring KH amplitude
-              call h_of_KHI2D(itimestep,time)
-           endif
-        endif
+        if(mod(itimestep,nstats)==0) call calcStats
         call my_timer(2)
         if(mod(itimestep,nbackup)==0) then 
            if ( DoFront ) then 
@@ -525,6 +532,26 @@ Program paris
            close(121)
         endif
         call my_timer(11)
+        !output for scalar variables used in free surface
+        do out_fs = 1,3
+           if (VTK_OUT(out_fs)) then
+              if (mod(itimestep,NOUT_VTK(out_fs))==0) then
+                 if (rank==0) call append_visit_fs(out_fs,itimestep/NOUT_VTK(out_fs))
+                 SELECT CASE (out_fs)
+                 case (1) 
+                    tmp = 0d0
+                    do k=ks,ke+1; do j=js,je+1; do i=is,ie+1
+                       tmp(i,j,k)=ABS((u(i-1,j,k)-u(i,j,k))/dx(i)+(v(i,j-1,k)-v(i,j,k))/dy(j)+(w(i,j,k-1)-w(i,j,k))/dz(k))
+                       call VTK_scalar_struct(out_fs,itimestep/NOUT_VTK(out_fs),tmp)
+                    enddo; enddo; enddo
+                 case (2)
+                    call VTK_scalar_struct(out_fs,itimestep/NOUT_VTK(out_fs),kappa_fs)
+                 case(3)
+                    call VTK_scalar_struct(out_fs,itimestep/NOUT_VTK(out_fs),P_gx)
+                 end SELECT
+              endif
+           endif
+        enddo
      enddo
      !-------------------------------------------------------------------------------------------------
      !--------------------------------------------End domain-------------------------------------------

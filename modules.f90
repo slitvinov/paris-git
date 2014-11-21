@@ -335,11 +335,14 @@ module module_freesurface
   real(8), dimension(:,:,:), allocatable :: x_mod, y_mod, z_mod, p_ext
   real(8), dimension(:,:,:), allocatable :: P_gx, P_gy, P_gz
   integer, dimension(:,:,:), allocatable :: u_cmask,v_cmask,w_cmask,pcmask
+  integer, dimension(1:3) :: NOUT_VTK
   real(8) :: P_ref, gamma, R_ref, V_0 !eq pressure and polytropic gas exponent
   integer :: X_level, solver_flag=0
   logical :: FreeSurface, debug=.false., initialize_fs = .false.
-  logical :: div_opened
   logical :: RP_test
+  logical, dimension(1:3) :: VTK_OUT, vtk_open
+  character(len=10) :: visit_file(1:3) = (/ "divergence", "curvature ", "deltaPfs  " /)
+  character(len=3) :: file_short(1:3) = (/ "DIV", "KAP", "Pfs" /)
 end module module_freesurface
 !=================================================================================================
 !=================================================================================================
@@ -2111,23 +2114,38 @@ subroutine SetupPoisson(utmp,vtmp,wtmp,umask,vmask,wmask,vof_phase,rhot,dt,A,pma
   real(8), intent(in) :: dt, VolumeSource
   real(8), dimension(4) :: P_bc
   integer :: i,j,k,l,istep
-
-  do k=ks,ke; do j=js,je; do i=is,ie
-!    if(mask(i,j,k))then
-      A(i,j,k,1) = 2d0*dt*umask(i-1,j,k)/(dx(i)*dxh(i-1)*(rhot(i-1,j,k)+rhot(i,j,k)))
-      A(i,j,k,2) = 2d0*dt*umask(i,j,k)/(dx(i)*dxh(i  )*(rhot(i+1,j,k)+rhot(i,j,k)))
-      A(i,j,k,3) = 2d0*dt*vmask(i,j-1,k)/(dy(j)*dyh(j-1)*(rhot(i,j-1,k)+rhot(i,j,k)))
-      A(i,j,k,4) = 2d0*dt*vmask(i,j,k)/(dy(j)*dyh(j  )*(rhot(i,j+1,k)+rhot(i,j,k)))
-      A(i,j,k,5) = 2d0*dt*wmask(i,j,k-1)/(dz(k)*dzh(k-1)*(rhot(i,j,k-1)+rhot(i,j,k)))
-      A(i,j,k,6) = 2d0*dt*wmask(i,j,k)/(dz(k)*dzh(k  )*(rhot(i,j,k+1)+rhot(i,j,k)))
-      A(i,j,k,7) = sum(A(i,j,k,1:6))
-      A(i,j,k,8) =  -(  VolumeSource +(utmp(i,j,k)-utmp(i-1,j,k))/dx(i) &
-         +  (vtmp(i,j,k)-vtmp(i,j-1,k))/dy(j) &
-         +  (wtmp(i,j,k)-wtmp(i,j,k-1))/dz(k) )
-!    endif
-  enddo; enddo; enddo
-  if(FreeSurface) then
-   call setuppoisson_fs(vof_phase,rhot,dt,A,cvof,n1,n2,n3,kappa_fs,istep)
+  
+  if (.not.FreeSurface) then
+     do k=ks,ke; do j=js,je; do i=is,ie
+        !    if(mask(i,j,k))then
+        A(i,j,k,1) = 2d0*dt*umask(i-1,j,k)/(dx(i)*dxh(i-1)*(rhot(i-1,j,k)+rhot(i,j,k)))
+        A(i,j,k,2) = 2d0*dt*umask(i,j,k)/(dx(i)*dxh(i  )*(rhot(i+1,j,k)+rhot(i,j,k)))
+        A(i,j,k,3) = 2d0*dt*vmask(i,j-1,k)/(dy(j)*dyh(j-1)*(rhot(i,j-1,k)+rhot(i,j,k)))
+        A(i,j,k,4) = 2d0*dt*vmask(i,j,k)/(dy(j)*dyh(j  )*(rhot(i,j+1,k)+rhot(i,j,k)))
+        A(i,j,k,5) = 2d0*dt*wmask(i,j,k-1)/(dz(k)*dzh(k-1)*(rhot(i,j,k-1)+rhot(i,j,k)))
+        A(i,j,k,6) = 2d0*dt*wmask(i,j,k)/(dz(k)*dzh(k  )*(rhot(i,j,k+1)+rhot(i,j,k)))
+        A(i,j,k,7) = sum(A(i,j,k,1:6))
+        A(i,j,k,8) =  -(  VolumeSource +(utmp(i,j,k)-utmp(i-1,j,k))/dx(i) &
+             +  (vtmp(i,j,k)-vtmp(i,j-1,k))/dy(j) &
+             +  (wtmp(i,j,k)-wtmp(i,j,k-1))/dz(k) )
+        !    endif
+     enddo; enddo; enddo
+  else
+     do k=ks,ke; do j=js,je; do i=is,ie
+        if (vof_phase(i,j,k)==0) then
+           A(i,j,k,1) = 2d0*dt/(dx(i)*dxh(i-1)*(rhot(i-1,j,k)+rhot(i,j,k)))
+           A(i,j,k,2) = 2d0*dt/(dx(i)*dxh(i  )*(rhot(i+1,j,k)+rhot(i,j,k)))
+           A(i,j,k,3) = 2d0*dt/(dy(j)*dyh(j-1)*(rhot(i,j-1,k)+rhot(i,j,k)))
+           A(i,j,k,4) = 2d0*dt/(dy(j)*dyh(j  )*(rhot(i,j+1,k)+rhot(i,j,k)))
+           A(i,j,k,5) = 2d0*dt/(dz(k)*dzh(k-1)*(rhot(i,j,k-1)+rhot(i,j,k)))
+           A(i,j,k,6) = 2d0*dt/(dz(k)*dzh(k  )*(rhot(i,j,k+1)+rhot(i,j,k)))
+           A(i,j,k,7) = sum(A(i,j,k,1:6))
+           A(i,j,k,8) =  -( (utmp(i,j,k)-utmp(i-1,j,k))/dx(i) &
+                +  (vtmp(i,j,k)-vtmp(i,j-1,k))/dy(j) &
+                +  (wtmp(i,j,k)-wtmp(i,j,k-1))/dz(k) )
+        endif
+     enddo; enddo; enddo
+     call setuppoisson_fs(vof_phase,rhot,dt,A,cvof,n1,n2,n3,kappa_fs,istep)
   endif
   P_bc = 0d0
   ! dp/dn = 0 for inflow bc on face 1 == x- : do not correct u(is-1)

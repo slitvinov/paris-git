@@ -248,8 +248,10 @@ contains
        hshift, do_rotation, debug_curvature
 ! ,oldvof
     ! Free Surface parameters to be read from a parameter file called "inputFS"
-    namelist /FSparameters/ X_level, RP_test, gamma, R_ref, P_ref
-       X_level = 2; RP_test = .false.; gamma = 1.4d0; R_ref = 1.d0; P_ref = 1.d0
+    namelist /FSparameters/ X_level, RP_test, gamma, R_ref, P_ref,&
+         VTK_OUT, NOUT_VTK
+       X_level = 2; RP_test = .false.; gamma = 1.4d0; R_ref = 1.d0; P_ref = 1.d0; 
+       VTK_OUT = .false.; NOUT_VTK = 100000; vtk_open = .false.
     
 !     vofbdry_cond=['periodic','periodic','periodic','periodic','periodic','periodic']
     vofbdry_cond=['undefined','undefined','undefined','undefined','undefined','undefined']
@@ -380,7 +382,7 @@ contains
        P_gx = 0d0; P_gy = 0d0; P_gz = 0d0
        pcmask=3; p_ext=0d0
        initialize_fs = .true.
-       div_opened = .false.
+       vtk_open = .false.
     endif
     if ( itime_scheme == 2 ) then  
       allocate(cvofold(imin:imax,jmin:jmax,kmin:kmax))
