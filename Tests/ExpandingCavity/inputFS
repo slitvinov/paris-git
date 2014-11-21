@@ -1,7 +1,18 @@
 &FSPARAMETERS
 
-X_level = 2
-RP_test = F
+X_level = 2	! Layers inside gas bubbles filled with extrapolated velocities 
+
+RP_test = F	! RP test switch
+!Parameters for Rayleigh-Plesset test
+gamma = 1.4d0 	! coefficient for polytropic gas law
+P_ref = 1.d0	! gas phase reference pressure	
+R_ref = 1.4d-1	! gas bubble reference radius
+! Outputs
+VTK_out = F F F
+! Switches on output for the absolute value of the discrete divergence, the curvature and
+! the Laplace pressure jump in the x-direction 	
+NOUT_VTK = 50 50 50
+! Timestep intervals to write the outputs that are switched on
 
 !=================================================================================================
 
