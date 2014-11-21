@@ -12,7 +12,7 @@ REFINEMENT = REFINEMENTTEMP
 CYLINDER_DIR = CYLDIRTEMP
 NORMAL_UP = NORMUPTEMP
 USE_VOFI = T
-DO_ROTATION = T
+DO_ROTATION = F
 MIXED_HEIGHTS = F
 
 !=================================================================================================

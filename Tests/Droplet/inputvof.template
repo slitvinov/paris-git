@@ -10,6 +10,10 @@ refinement = 8
 DoMOMCONS = MOMCONSTEMP
 use_vofi = T
 nfilter = NFILTERTEMP
+MOMCONS = T
+DO_ROTATION = T
+MIXED_HEIGHTS = T
+
 !=================================================================================================
 
 &end

@@ -816,7 +816,7 @@ contains
       integer :: i1(-1:1,-1:1,3), j1(-1:1,-1:1,3), k1(-1:1,-1:1,3),try(3)
       integer :: s,c(3),d,central,neighbor,esign
       
-      real(8) :: points(NPOS,3),origin(3)
+      real(8) :: points(NPOS,3),bpoints(NPOS,3),origin(3)
       real(8) :: xfit(NPOS),yfit(NPOS),hfit(NPOS),fit(NPOS,3),weights(NPOS)
       real(8) :: centroid(3),mxyz(3),mv(3),stencil3x3(-1:1,-1:1,-1:1)
       real(8) :: wg
@@ -869,7 +869,7 @@ contains
          kappa = sign(1.d0,mxyz(try(1)))*kappa
          return
       else 
-         nfound = - ind_pos(points,nposit) 
+         nfound = ind_pos_sorted(points,bpoints,nposit)   ! - ind_pos(points,nposit) 
       endif ! nfound == 9
       ! Determine the curvature from fits. 
       ! Rotate coordinate sytems by permutation of x,y,z
@@ -885,16 +885,17 @@ contains
       enddo
       ! *** determine curvature from mixed heights 
       if(mixed_heights) then
-         if ( (-nfound) > nfound_min )  then  ! more than 6 points to avoid special 2D degeneracy. 
+         if ( nfound > nfound_min )  then  ! more than 6 points to avoid special 2D degeneracy. 
             ! rotate and shift origin
             !  x_i' = x_k(i)
             !  m'_i = m_k(i)
-            xfit=points(:,try(2)) - origin(try(2))
-            yfit=points(:,try(3)) - origin(try(3))
-            hfit=points(:,try(1)) - origin(try(1))   
+            xfit=bpoints(:,try(2)) - origin(try(2))
+            yfit=bpoints(:,try(3)) - origin(try(3))
+            hfit=bpoints(:,try(1)) - origin(try(1))   
             ! fit over all positions, not only independent ones. 
             weights=1d0
-            call parabola_fit_with_rotation(xfit,yfit,hfit,fit,weights,mv,nposit,a,fit_success) 
+            call parabola_fit_with_rotation(xfit,yfit,hfit,fit,weights,mv,nfound,a,fit_success) 
+            nfound = - nfound
             if(fit_success) then
 #ifdef COUNT
                method_count(2) = method_count(2) + 1
@@ -1582,6 +1583,40 @@ contains
      enddo
      ind_pos = ni
    end function ind_pos
+
+   function ind_pos_sorted (points, bpoints, n)
+     implicit none
+     integer :: ind_pos_sorted
+     integer, intent(in) :: n
+     real(8), intent(inout) :: points(NPOS,3), bpoints(NPOS,3)
+     integer :: i,j,ni,c
+     real(8) :: d2
+     logical :: depends
+     if (n < 2) then
+        ind_pos_sorted = n
+        return
+     endif
+     ni=1
+     bpoints(ni,:) = points(1,:)
+     do j=2,n
+        depends = .false.
+        do i=1,j-1
+           if(.not.depends) then
+              d2 = 0d0
+              do c=1,3
+                 d2 = d2 + (points(i,c) - points(j,c))**2
+              enddo
+              depends = (d2 < 0.5d0**2)
+           endif
+        enddo
+        if(.not.depends)  then
+           ni = ni + 1
+           bpoints(ni,:) = points(j,:)
+        endif
+     enddo
+     ind_pos_sorted = ni
+   end function ind_pos_sorted
+
   end module module_surface_tension
 
 

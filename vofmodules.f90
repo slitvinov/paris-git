@@ -247,10 +247,12 @@ contains
        cylinder_dir, normal_up, DoLPP, &
        FreeSurface, ViscMeanIsArith, DensMeanIsArith, &
        output_filtered_VOF, DoMOMCONS, use_vofi,nfilter, &
-       X_level, RP_test, hshift, do_rotation, debug_curvature
-! ,oldvof
-    
-!     vofbdry_cond=['periodic','periodic','periodic','periodic','periodic','periodic']
+       hshift, do_rotation, debug_curvature, mixed_heights
+    ! Free Surface parameters to be read from a parameter file called "inputFS"
+    namelist /FSparameters/ X_level, RP_test, gamma, R_ref, P_ref,&
+         VTK_OUT, NOUT_VTK
+    X_level = 2; RP_test = .false.; gamma = 1.4d0; R_ref = 1.d0; P_ref = 1.d0; 
+    VTK_OUT = .false.; NOUT_VTK = 100000; vtk_open = .false.
     vofbdry_cond=['undefined','undefined','undefined','undefined','undefined','undefined']
     test_type='droplet'
     VOF_advect='CIAM'
