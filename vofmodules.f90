@@ -512,7 +512,7 @@ or none at all")
     integer :: ipar
     integer, parameter :: root_rank = 0
     integer :: i,j,k
-    real(8) :: ryz
+    real(8) :: ryz, sine
     
     if( test_D2P .or. test_tag ) then 
        if ( rank == root_rank ) call random_bubbles
