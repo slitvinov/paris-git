@@ -470,10 +470,12 @@ contains
     if(rank.ne.0) call pariserror("rank.ne.0 in append")
     
     if(opened==0) then
-       OPEN(UNIT=90,FILE='parallel.visit')
+       OPEN(UNIT=90,FILE='velocity.visit')
        write(90,10) nPdomain
 10     format('!NBLOCKS ',I4)
        opened=1
+    else
+    	OPEN(UNIT=90,FILE='velocity.visit',access='append')
     endif
     
     do prank=0,NpDomain-1
