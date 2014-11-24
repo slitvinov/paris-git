@@ -1832,22 +1832,24 @@ module module_poisson
   private
   public :: poi_initialize, poi_solve, poi_finalize
   interface
-     integer FUNCTION GetNumIterations (isolver,inum) &
+     FUNCTION GetNumIterations (isolver,inum) &
           bind(C, name="HYPRE_StructSMGGetNumIterations")
+       integer :: GetNumIterations
        integer :: inum
-       integer*8 , VALUE :: isolver
+       integer (kind = 8) , VALUE :: isolver
      END FUNCTION GetNumIterations
   end interface
   interface
-     integer FUNCTION GetFinalRelative (isolver,rnum) &
+     FUNCTION GetFinalRelative (isolver,rnum) &
           bind(C, name="HYPRE_StructSMGGetFinalRelativeResidualNorm")
+       integer :: GetFinalRelative
        real(8) :: rnum
-       integer*8 , VALUE :: isolver
+       integer (kind = 8) , VALUE :: isolver
      END FUNCTION GetFinalRelative
   end interface
 
   integer :: nstencil
-  integer*8 :: grid_obj, stencil, Amat, Bvec, Xvec, solver
+  integer (kind = 8) :: grid_obj, stencil, Amat, Bvec, Xvec, solver
   integer, dimension(:), allocatable :: stencil_indices, ilower, iupper
   integer :: mpi_comm_poi,is,ie,js,je,ks,ke,Mx,My,Mz
   integer, parameter :: ndim=3
