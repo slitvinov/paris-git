@@ -242,18 +242,17 @@ Program paris
               else
                  call vofsweeps(itimestep)
               endif
-              if (FreeSurface) then
-              
-                 call get_normals()
-                 call get_all_curvatures(kappa_fs)
-                 call set_topology(vof_phase,itimestep) !vof_phase updated in vofsweeps
-              endif
               call my_timer(4)
               call get_all_heights()
               call my_timer(5)
               call linfunc(rho,rho1,rho2,DensMean)
               if (.not. FreeSurface) call surfaceForce(du,dv,dw,rho)
               call my_timer(8)
+              if (FreeSurface) then
+                 call get_normals()
+                 call get_all_curvatures(kappa_fs)
+                 call set_topology(vof_phase,itimestep) !vof_phase updated in vofsweeps
+              endif
            endif
            if (DoLPP) then
                 call lppsweeps(itimestep,time,ii)  
