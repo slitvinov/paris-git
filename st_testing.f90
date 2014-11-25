@@ -195,7 +195,7 @@ contains
                write(89,'(2(E15.8,1X))') angle,kappa
                write(92,'(2(E15.8,1X),I4)') angle,kappa,nfound
                write(90,*) angle,kappa_exact
-               err_K = ABS(ABS(kappa)-kappa_exact)/kappa_exact
+               err_K = ABS(kappa-kappa_exact)/kappa_exact
                if ( err_K > 0.1d0 ) &
                     write(91,'(3(I3,1X),2(E15.8,1X),I4)') i,j,k,kappa,kappa_exact,nfound
             end if ! cvof(i,j,k)

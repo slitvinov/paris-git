@@ -11,11 +11,9 @@ nx=$1
 init=$2
 radius=$3
 ny=$nx; nz=$nx
-npx=2; npy=$npx; npz=$npx
 nstats=$4
 d=$5
 
-let np=$npx*$npy*$npz
 RANDOM=$$
 ndepth=`head -60  ../../surface_tension.f90 |  awk -F '=' ' /NDEPTH/ {print $2}' | tr -d ' '`
 dim=$d'D'

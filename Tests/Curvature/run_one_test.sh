@@ -57,7 +57,6 @@ if [ $d == 2 ]; then
 	exit
     fi
 else
-    npx=2; npy=$npx; npz=$npx
     type="Curvature_test"
     cyldir=0
 fi

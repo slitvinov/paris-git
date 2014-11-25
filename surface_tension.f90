@@ -46,8 +46,10 @@ module module_surface_tension
 ! initial state
   logical :: st_initialized = .false.
   real(8), parameter :: kappamax = 2.d0
-  integer, parameter :: nfound_min= 6
-  integer, parameter :: NDEPTH=4
+  integer, parameter :: nfound_min =  6 ! @@@
+  ! Caution the line below is read by test scripts, do not move it below line 60. Do not 
+  ! write ndepth= elsewhere. Do not change case for ndepth. 
+  integer, parameter :: NDEPTH=4   
   integer, parameter :: BIGINT=100
   real(8), parameter :: D_HALF_BIGINT = DBLE(BIGINT/2)
   integer, parameter :: MAX_EXT_H = 0
@@ -62,7 +64,7 @@ module module_surface_tension
   ! 2 for "negative" height in x
   ! 3 for positive height in y, 4 for negative height in y, 
   !  etc... 
-  integer, dimension(:,:,:,:), allocatable :: ixheight ! HF flags for rph (Ruben-Phil) routines
+  integer, dimension(:,:,:,:), allocatable :: ixheight ! Height-Function flags for Ruben-Phil routines
   integer :: method_count(3)
   integer, parameter :: ngc=20
   integer :: geom_case_count(ngc)
@@ -732,23 +734,26 @@ contains
         is_bulk_cell=.false. 
         if (vof_flag(i,j,k) == 2 ) then  ! mixed cell
            call get_curvature(i,j,k,kappa,nfound,nposit,afit,.false.)
-           !if (kappa /= kappa) write(*,'("Kappa from mixed cell NaN, Kappa: ",e14.5,3I8)')kappa, i,j,k !debugging
+           !debugging
+           !if (kappa /= kappa) write(*,'("Kappa from mixed cell NaN, Kappa: ",e14.5,3I8)')kappa, i,j,k 
         else if (vof_flag(i,j,k) > 2 ) then
            call pariserror("inconsistent vof_flag > 3")
         else if(.not.bulk_cell(i,j,k)) then !  non-bulk pure cell
            call get_curvature(i,j,k,kappa,nfound,nposit,afit,.true.)
-           !if (kappa /= kappa) write(*,'("Kappa from non_bulk cell NaN, Kappa: ",e14.5,3I8)')kappa, i,j,k !debugging
+           !debugging
+           !if (kappa /= kappa) write(*,'("Kappa from non_bulk cell NaN, Kappa: ",e14.5,3I8)')kappa, i,j,k 
         else
            is_bulk_cell=.true.
         endif
         if(abs(kappa)>kappamax) then
            geom_case_count(17) = geom_case_count(17) + 1
            kappa = sign(1d0,kappa)*kappamax
-           !if (kappa /= kappa) write(*,'("Kappa limit NaN, Kappa: ",e14.5,3I8)')kappa, i,j,k !debugging
+           !debugging
+           !if (kappa /= kappa) write(*,'("Kappa limit NaN, Kappa: ",e14.5,3I8)')kappa, i,j,k 
         endif
         if(.not.is_bulk_cell) kapparray(i,j,k) = kappa
         if (kappa /= kappa) then !debugging
-           write(*,'("Kappa read into array is NaN, Kapparay, Kappa: ",2e14.5,3I8)')kapparray(i,j,k), kappa, i,j,k !debugging
+           write(*,'("Kappa read into array is NaN, Kapparay, Kappa: ",2e14.5,3I8)')kapparray(i,j,k), kappa, i,j,k 
            call pariserror("Kappa read into array is NaN") !debugging
         endif
      enddo;enddo;enddo
@@ -817,9 +822,9 @@ contains
       integer :: s,c(3),d,central,neighbor,esign
       
       real(8) :: points(NPOS,3),bpoints(NPOS,3),origin(3)
-      real(8) :: xfit(NPOS),yfit(NPOS),hfit(NPOS),fit(NPOS,3),weights(NPOS)
+      real(8) :: fit(NPOS,3),weights(NPOS)
       real(8) :: centroid(3),mxyz(3),mv(3),stencil3x3(-1:1,-1:1,-1:1)
-      real(8) :: wg
+      real(8) :: wg, kappasign
 
       central=vof_flag(i0,j0,k0)
       call map3x3in2x2(i1,j1,k1,i0,j0,k0)
@@ -868,7 +873,7 @@ contains
                /(1.d0+a(4)*a(4)+a(5)*a(5))**(1.5d0)
          kappa = sign(1.d0,mxyz(try(1)))*kappa
          return
-      else 
+      else if(nfound > nfound_min) then  !  fit only heights of the same kind. 
          nfound = ind_pos(points,nposit) !  ind_pos_sorted(points,bpoints,nposit) 
          bpoints = points
       endif ! nfound == 9
@@ -890,12 +895,12 @@ contains
             ! rotate and shift origin
             !  x_i' = x_k(i)
             !  m'_i = m_k(i)
-            xfit=bpoints(:,try(2)) - origin(try(2))
-            yfit=bpoints(:,try(3)) - origin(try(3))
-            hfit=bpoints(:,try(1)) - origin(try(1))   
+            points(:,1) = bpoints(:,try(2)) - origin(try(2))
+            points(:,2) = bpoints(:,try(3)) - origin(try(3))
+            points(:,3) = bpoints(:,try(1)) - origin(try(1))   
             ! fit over all positions, not only independent ones. 
             weights=1d0
-            call parabola_fit_with_rotation(xfit,yfit,hfit,fit,weights,mv,nfound,a,fit_success) 
+            call parabola_fit_with_rotation(points,fit,weights,mv,nfound,a,kappasign,fit_success) 
             nfound = - nfound
             if(fit_success) then
 #ifdef COUNT
@@ -903,7 +908,7 @@ contains
 #endif
                kappa = 2.d0*(a(1)*(1.d0+a(5)*a(5)) + a(2)*(1.d0+a(4)*a(4)) - a(3)*a(4)*a(5)) &
                     /(1.d0+a(4)*a(4)+a(5)*a(5))**(1.5d0)
-               kappa = sign(1.d0,mxyz(try(1)))*kappa
+               kappa = kappasign*kappa
                return
             else
                geom_case_count(16) = geom_case_count(16) + 1
@@ -937,10 +942,6 @@ contains
       ! arrange coordinates so height direction is closest to normal
       ! try(:) array contains direction closest to normal first
 
-      xfit=fit(:,try(2)) - origin(try(2))
-      yfit=fit(:,try(3)) - origin(try(3))
-      hfit=fit(:,try(1)) - origin(try(1))
-      if(nposit.gt.NPOS) call pariserror("GLH: nposit")
       if(nposit<6) then
          if(.not.pure_non_bulk) then ! mixed cell
             if(central/=2) call pariserror("unexpected non-mixed central flag")
@@ -989,12 +990,16 @@ contains
             endif
          endif
       endif
+      points(:,1) = fit(:,try(2)) - origin(try(2))
+      points(:,2) = fit(:,try(3)) - origin(try(3))
+      points(:,3) = fit(:,try(1)) - origin(try(1))
+      if(nposit.gt.NPOS) call pariserror("GLH: nposit")
       nfound = - nposit - 50  ! encode the fact that centroids were used 
       if(nposit < 6) then
          geom_case_count(nposit+10) = geom_case_count(nposit+10) + 1
          return
       else
-         call parabola_fit_with_rotation(xfit,yfit,hfit,fit,weights,mv,nposit,a,fit_success) 
+         call parabola_fit_with_rotation(points,fit,weights,mv,nposit,a,kappasign,fit_success) 
          if(.not.fit_success) then
             !            call print_cvof_3x3x3(i0,j0,k0)
             geom_case_count(16) = geom_case_count(16) + 1
@@ -1003,20 +1008,19 @@ contains
          else
             kappa = 2.d0*(a(1)*(1.d0+a(5)*a(5)) + a(2)*(1.d0+a(4)*a(4)) - a(3)*a(4)*a(5)) &
                  /sqrt(1.d0+a(4)*a(4)+a(5)*a(5))**3
-            kappa = sign(1.d0,mxyz(try(1)))*kappa
+            kappa = kappasign*kappa
          endif
       endif
    end subroutine get_curvature
 
    ! Performs a rotation to align z axis with normal, then calls fit
 
-   subroutine parabola_fit_with_rotation(xfit,yfit,hfit,bfit,weights,mv,nposit,a,fit_success)
+   subroutine parabola_fit_with_rotation(fit,bfit,weights,mv,nposit,a,kappasign,fit_success)
       implicit none
-      real(8), intent(out) :: xfit(nposit),yfit(nposit),hfit(nposit)
-      real(8), intent(in)  :: weights(nposit)
+      real(8), intent(in)  :: weights(NPOS)
       integer, intent(in)  :: nposit
-      real(8), intent(inout) :: mv(3)
-      real(8), intent(out) :: a(6),bfit(NPOS,3)
+      real(8), intent(inout) :: mv(3),fit(NPOS,3)
+      real(8), intent(out) :: a(6),bfit(NPOS,3),kappasign
       logical, intent(out) :: fit_success
       logical :: inv_success
       real(8) :: invm(3,3), rhs(3), norm(3), mv1(3)
@@ -1031,6 +1035,10 @@ contains
          ! normal = direction z
          ! e_z' = m
          ev(:,3) = mv
+         ! now the x'_3 = z' direction is aligned with the normal so 
+         kappasign = 1d0 
+            ! mv(3) is the component of the 
+
          ! let mv1 == m1  be the canonical basis vector furthest from normal 
          mv1 = 0d0    
          mv1(2) = 1d0
@@ -1043,15 +1051,15 @@ contains
          ev(1,1) =   mv(3)
          ev(2,1) =   0d0
          ev(3,1) =  -mv(1)
-         ! e_y' = e_x' x e_z'  (non direct, but does not matter since curvature does not depend on orientation)
+         ! e_y' = - e_x' x e_z' 
          ! full expression:
-         ! ev(1,2) =  ev(2,1)*ev(3,3) - ev(3,1)*ev(2,3) =   m1 m2
-         ! ev(2,2) = -ev(1,1)*ev(3,3) + ev(3,1)*ev(1,3) = - m3^2  - m1^2
-         ! ev(3,2) =  ev(1,1)*ev(2,3) - ev(2,1)*ev(1,3) =   m3 m2 
+         ! ev(1,2) =  - ev(2,1)*ev(3,3) + ev(3,1)*ev(2,3) =   - m1 m2
+         ! ev(2,2) =    ev(1,1)*ev(3,3) - ev(3,1)*ev(1,3) =  m3^2 + m1^2
+         ! ev(3,2) =  - ev(1,1)*ev(2,3) + ev(2,1)*ev(1,3) =   - m3 m2 
 
-         ev(1,2) =  ev(2,1)*ev(3,3) - ev(3,1)*ev(2,3)
-         ev(2,2) = -ev(1,1)*ev(3,3) + ev(3,1)*ev(1,3)
-         ev(3,2) =  ev(1,1)*ev(2,3) - ev(2,1)*ev(1,3)
+         ev(1,2) =  - ev(2,1)*ev(3,3) + ev(3,1)*ev(2,3)
+         ev(2,2) =    ev(1,1)*ev(3,3) - ev(3,1)*ev(1,3)
+         ev(3,2) =  - ev(1,1)*ev(2,3) + ev(2,1)*ev(1,3)
          norm = sqrt(ev(1,:)**2 + ev(2,:)**2 + ev(3,:)**2)
          do i=1,3
             ev(i,:) = ev(i,:)/norm
@@ -1072,20 +1080,21 @@ contains
                call pariserror("non orthogonal rotation matrix")
             end if
          endif
-         bfit(:,1) = xfit
-         bfit(:,2) = yfit
-         bfit(:,3) = hfit
-         xfit = ev(1,1)*bfit(:,1) + ev(2,1)*bfit(:,2) + ev(3,1)*bfit(:,3)
-         yfit = ev(1,2)*bfit(:,1) + ev(2,2)*bfit(:,2) + ev(3,2)*bfit(:,3)
-         hfit = ev(1,3)*bfit(:,1) + ev(2,3)*bfit(:,2) + ev(3,3)*bfit(:,3)
+         bfit = fit
+         do i=1,3
+            fit(:,i) = ev(1,i)*bfit(:,1) + ev(2,i)*bfit(:,2) + ev(3,i)*bfit(:,3)
+         enddo
+      else
+!      if no rotation then usual sign calculation
+         kappasign = sign(1.d0,mv(3))
       endif ! do_rotation
-      call    parabola_fit(xfit,yfit,hfit,weights,nposit,a,fit_success)
+      call    parabola_fit(fit,weights,nposit,a,fit_success)
    end subroutine parabola_fit_with_rotation
 
-   subroutine parabola_fit(xfit,yfit,hfit,weights,nposit,a,fit_success)
+   subroutine parabola_fit(fit,weights,nposit,a,fit_success)
       implicit none
-      real(8), intent(in)  :: xfit(nposit),yfit(nposit),hfit(nposit)
-      real(8), intent(in)  :: weights(nposit)
+      real(8), intent(in)  :: fit(NPOS,3)
+      real(8), intent(in)  :: weights(NPOS)
       real(8), intent(out) :: a(6)
       logical, intent(out) :: fit_success
       real(8) :: m(6,6), invm(6,6)
@@ -1101,14 +1110,14 @@ contains
       rhs = 0.d0
 
       do ifit = 1, nposit
-            x1 =    xfit(ifit)
-            x2 = x1*xfit(ifit)
-            x3 = x2*xfit(ifit)
-            x4 = x3*xfit(ifit)
-            y1 =    yfit(ifit)
-            y2 = y1*yfit(ifit)
-            y3 = y2*yfit(ifit)
-            y4 = y3*yfit(ifit)
+            x1 =    fit(ifit,1)
+            x2 = x1*fit(ifit,1)
+            x3 = x2*fit(ifit,1)
+            x4 = x3*fit(ifit,1)
+            y1 =    fit(ifit,2)
+            y2 = y1*fit(ifit,2)
+            y3 = y2*fit(ifit,2)
+            y4 = y3*fit(ifit,2)
             wg = weights(ifit)
             
       ! The matrix is m_ij = sum_n alpha^n_i alpha^n_j
@@ -1133,12 +1142,12 @@ contains
             m(4,6) = m(4,6) + x1*wg
             m(5,6) = m(5,6) + y1*wg
 
-            rhs(1) = rhs(1) + x2   *hfit(ifit)*wg
-            rhs(2) = rhs(2) + y2   *hfit(ifit)*wg
-            rhs(3) = rhs(3) + x1*y1*hfit(ifit)*wg
-            rhs(4) = rhs(4) + x1   *hfit(ifit)*wg
-            rhs(5) = rhs(5) + y1   *hfit(ifit)*wg
-            rhs(6) = rhs(6) +       hfit(ifit)*wg
+            rhs(1) = rhs(1) + x2   *fit(ifit,3)*wg
+            rhs(2) = rhs(2) + y2   *fit(ifit,3)*wg
+            rhs(3) = rhs(3) + x1*y1*fit(ifit,3)*wg
+            rhs(4) = rhs(4) + x1   *fit(ifit,3)*wg
+            rhs(5) = rhs(5) + y1   *fit(ifit,3)*wg
+            rhs(6) = rhs(6) +       fit(ifit,3)*wg
       end do ! ifit
       m(1,2) = m(3,3)
       m(1,6) = m(4,4)
