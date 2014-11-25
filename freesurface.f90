@@ -171,7 +171,7 @@ subroutine setuppoisson_fs(vof_phase,rhot,dt,A,cvof,n1,n2,n3,kap,iout)
   x_mod=dxh((is+ie)/2); y_mod=dyh((js+je)/2); z_mod=dzh((ks+ke)/2) !assumes an unstretched grid
   P_gx = 0d0; P_gy = 0d0; P_gz = 0d0
   limit = 1d-6/dx((is+ie)/2)
-  c_min = 1d-3
+  c_min = 1d-2
   !Debugging
   debug = .false.
   no=1
@@ -995,7 +995,7 @@ subroutine append_visit_fs(index,iout)
 
   file_root = TRIM(out_path)//'/VTK/'//TRIM(file_short(index))
   do prank=0,NpDomain-1
-     write(100,11) TRIM(file_root)//TRIM(int2text(prank,padding))//'-'//TRIM(int2text(iout,padding))//'.vtk'
+     write(100,11) TRIM(file_root)//TRIM(int2text(iout,padding))//'-'//TRIM(int2text(prank,padding))//'.vtk'
 11   format(A)
   enddo
   close(100)
@@ -1011,9 +1011,9 @@ subroutine VTK_scalar_struct(index,iout,var)
   character(len=40) :: file_root
   integer index, iout, i,j,k
 
-  file_root = TRIM(out_path)//'/VTK/'//TRIM(file_short(index))
+  file_root = TRIM(out_path)//'/VTK/'//TRIM(file_short(index))//TRIM(int2text(iout,padding))//'-'
   !Write to VTK file
-  OPEN(UNIT=8,FILE=TRIM(file_root)//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout,padding))//'.vtk')
+  OPEN(UNIT=8,FILE=TRIM(file_root)//TRIM(int2text(rank,padding))//'.vtk')
   write(8,10)
   write(8,11) time
   write(8,12)

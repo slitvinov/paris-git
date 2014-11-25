@@ -1938,6 +1938,7 @@ subroutine InitCondition
         end if ! DoLPP
         if(DoVOF) then
            call initconditions_VOF()
+           call get_all_heights()
            if (FreeSurface) then
               call set_topology(vof_phase,itimestep) !vof_phases are updated in initconditions_VOF called above
               call get_normals()
@@ -1946,7 +1947,6 @@ subroutine InitCondition
                  call get_ref_volume
               endif
            endif
-           call get_all_heights()
         endif
         du = 0d0
 
