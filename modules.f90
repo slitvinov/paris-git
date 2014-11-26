@@ -321,7 +321,7 @@ module module_2phase
   real(8) :: excentricity(3)
   real(8) :: ugas_inject,uliq_inject
   real(8) :: blayer_gas_inject, tdelay_gas_inject 
-  real(8) :: radius_gas_inject, radius_liq_inject 
+  real(8) :: radius_gas_inject, radius_liq_inject, radius_gap_liqgas
   real(8) :: jetcenter_yc2yLength, jetcenter_zc2zLength 
   real(8) :: jetcenter_yc,         jetcenter_zc
   real(8) :: sigma
@@ -1352,9 +1352,16 @@ module module_BC
       integer :: j,k
       real(8) :: t
       real(8) :: uinject
-      real(8) :: ryz
+      real(8) :: ryz, low_gas_radius
       real(8), parameter :: PI = 3.14159265359d0
       uinject=0d0
+
+      if(radius_gap_liqgas==0d0) then
+         low_gas_radius = radius_liq_inject
+      else
+         low_gas_radius = radius_gap_liqgas
+      endif
+
       if (inject_type==1) then      ! uniform inflow
          uinject = 1.d0
       elseif( inject_type==2 ) then ! pulsed round jet
@@ -1386,9 +1393,9 @@ module module_BC
          if ( ryz <= radius_liq_inject ) then 
             uinject = uliq_inject & 
                      *erf( (radius_liq_inject - ryz)/blayer_gas_inject )  
-         else if ( ryz > radius_liq_inject .and. ryz <= radius_gas_inject ) then
+         else if ( ryz > low_gas_radius .and. ryz <= radius_gas_inject ) then
             uinject = ugas_inject & 
-                     *erf( (ryz - radius_liq_inject)/blayer_gas_inject ) & 
+                     *erf( (ryz - low_gas_radius)/blayer_gas_inject ) & 
                      *erf( (radius_gas_inject - ryz)/blayer_gas_inject ) & 
                      *erf(time/tdelay_gas_inject) 
          else 

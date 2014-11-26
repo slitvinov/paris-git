@@ -502,7 +502,10 @@ Program paris
             call my_timer(14)
         end if ! DoLPP
 !--------------------------------------------OUTPUT-----------------------------------------------
-        if(mod(itimestep,nstats)==0) call calcStats
+        if(mod(itimestep,nstats)==0) then
+        	call calcStats
+        	if( test_KHI2D .or. test_HF ) call h_of_KHI2D(itimestep,time)
+        endif
         call my_timer(2)
         if(mod(itimestep,nbackup)==0) then 
            if ( DoFront ) then 
@@ -1993,29 +1996,30 @@ subroutine InitCondition
          if (test_LP) then 
             call test_Lag_part(itimestep)
          end if ! test_LP
-        ! Test: Test height function (TOMAS)
-         if ( test_KHI2D .or. test_HF) then 
-            call h_of_KHI2D(itimestep,time)
-         endif
         ! -------------------------------------------------------------------
         ! Test: Test 2d (Quasi-2d) Kelvin-Helmoltz Instability
          if ( test_KHI2D ) then 
-            do i=imin,imax-1; do j=jmin,jmax-1; do k=kmin,kmax-1
+            do i=imin,imax; do j=jmin,jmax-1; do k=kmin,kmax-1
                !if( y(j) > yLength*0.5d0 + 0.005*yLength*sin(2.d0*PI*x(i)/xLength)) then 
                !   u(i,j,k) = 1.d1 !*erf( (y(j)-0.5d0*yLength)/(0.1d0*yLength*2.d0) )
                !else
                !   u(i,j,k) = 0.5d1
                !endif
                u(i,j,k) = -0.5d1+(0.5d1+0.5d1)*(1+erf((y(j)-0.5d0*yLength+0.001*yLength* &
-                    sin(2.d0*PI*x(i)/xLength))/(0.004d0*yLength*2.d0)))/2
+                    sin(2.d0*PI*xh(i)/xLength))/(0.004d0*yLength*2.d0)))/2
                ! 2D, only perturb x direction 
+            enddo; enddo; enddo
+            do i=imin,imax-1; do j=jmin,jmax; do k=kmin,kmax-1
                v(i,j,k) = 1.d0*sin(2.d0*PI*x(i)/xLength)& 
-                          *exp(-((y(j)-yLength*(0.5d0 + 1d0/REAL(2*Ny)))/(0.05d0*yLength))**2.d0)
+                          *exp(-((yh(j)-yLength*(0.5d0 + 1d0/REAL(2*Ny)))/(0.05d0*yLength))**2.d0)
                ! Nz
                ! perturbation thickness = 0.05*yLength, wavenum(x) = 1
             enddo; enddo; enddo
          end if ! test_KHI_2D 
-        
+        ! Test: Test height function (TOMAS)
+        !if ( test_KHI2D .or. test_HF) then 
+        !   call h_of_KHI2D(itimestep,time)
+        !endif
         ! -------------------------------------------------------------------
          if (test_jet ) then 
             ! Test: planar or cylindrical jet with finite length nozzle
@@ -2169,7 +2173,7 @@ subroutine ReadParameters
                         BoundaryPressure,             ZeroReynolds,  restartAverages,termout,    &  
                         excentricity,  tout,          zip_data,      ugas_inject,   uliq_inject, &  
                         blayer_gas_inject,            tdelay_gas_inject,            padding,     &
-                        radius_gas_inject,            radius_liq_inject,                         &
+                        radius_gas_inject,            radius_liq_inject,     radius_gap_liqgas,  &
                         jetcenter_yc2yLength,         jetcenter_zc2zLength,                      & 
                         cflmax_allowed,               out_P,         AdvectionScheme, out_mom
  
@@ -2195,7 +2199,7 @@ subroutine ReadParameters
   excentricity=0d0;   tout = -1.d0;          zip_data=.false.
   ugas_inject=0.d0;   uliq_inject=1.d0
   blayer_gas_inject=8.d-2; tdelay_gas_inject=1.d-2
-  radius_gas_inject=0.1d0; radius_liq_inject=0.1d0
+  radius_gas_inject=0.1d0; radius_liq_inject=0.1d0 ; radius_gap_liqgas=0d0
   jetcenter_yc2yLength=0.5d0;jetcenter_zc2zLength=0.5d0
   padding=5
   cflmax_allowed=0.5d0
@@ -2481,7 +2485,7 @@ subroutine h_of_KHI2D(timestep,output_time)
      b1_coef = 2*b1_coef/xLength
 
      OPEN(UNIT=87,FILE=TRIM(out_path)//TRIM(file_name)//TRIM(int2text(timestep,padding))//'.txt')
-        write(*,*) 'entering print succesfull ', rank
+        !write(*,*) 'entering print succesfull ', rank
         DO i=1,nx
            write(87,17) (REAL(i)-0.5)/REAL(nx), global_h(i)
            17     format(E14.6,E14.6)

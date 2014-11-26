@@ -566,18 +566,17 @@ or none at all")
     end if ! test_jet
 
     if ( test_KHI2D ) then 
-      do i = is,ie; do j=js,je; do k = ks,ke
+      do i = imin,imax; do j=jmin,jmax; do k = kmin,kmax
          sine = yLength*0.5d0 + 0.001*yLength*sin(2.d0*PI*x(i)/xLength) 
          !if ( y(j) > 0.5d0*yLength*(1.d0 + 0.1d0*sin(2.d0*PI*x(i)/xLength)) ) then 
-         if ( y(j) - yLength/REAL(2*Ny) > sine) then 
+         if ( y(j) - 0.5d0*dy(j) > sine) then 
             cvof(i,j,k) = 1.d0
-            vof_flag(i,j,k) = 1
-         endif 
-         if ((y(j) + yLength/REAL(2*Ny) > sine) .and. (y(j) - yLength/REAL(2*Ny) < sine)) then
+            !vof_flag(i,j,k) = 1 
+         else if ((y(j) + 0.5d0*dy(j) > sine) .and. (y(j) - 0.5d0*dy(j) < sine)) then
             sine=sine*Ny/yLength
             cvof(i,j,k) = 1d0 - (sine-REAL(INT(sine)))
             !write(*,*) 'Intermediate value', cvof(i,j,k)
-            vof_flag(i,j,k) = 0
+            !vof_flag(i,j,k) = 1
          endif 
          ! Note: initial pertrubation height = 0.05*yLength 
          ! (when boundary layer thickness delta =0.1*yLength)

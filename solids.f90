@@ -155,13 +155,24 @@ contains
              end if ! x(i),y(j)
           else if (solid_type == '3D_nozzle') then
              ryz = sqrt( (y(j) - jetcenter_yc)**2.d0 + (z(k) - jetcenter_zc)**2.d0 )
-             if ( x(i) < lnozzle .and. & 
-                  ryz < radius_liq_inject+h .and. & 
-                  ryz > radius_liq_inject-h ) then 
-               s1 = 1.d0 
+             if(radius_gap_liqgas==0d0) then
+	        h = xlength/dble(nx)*thickness2cell*0.5d0
+                if ( x(i) < lnozzle .and. & 
+                     ryz < radius_liq_inject+h .and. & 
+                     ryz > radius_liq_inject-h ) then 
+                  s1 = 1.d0 
+                else
+                  s1 =-1.d0
+                end if ! x(i),y(j)
              else
-               s1 =-1.d0
-             end if ! x(i),y(j)
+                if ( x(i) < lnozzle .and. & 
+                     ryz < radius_gap_liqgas .and. & 
+                     ryz > radius_liq_inject ) then 
+                  s1 = 1.d0 
+                else
+                  s1 =-1.d0
+                end if ! x(i),y(j)
+             endif
           else if (solid_type == 'pipe') then
              radius = 0.5d0*xLength
              s1 = ((x(i) - radius)*(x(i) -radius) + (z(k) - radius)*(z(k) - radius)) - radius*radius
