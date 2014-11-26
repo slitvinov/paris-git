@@ -758,7 +758,6 @@ contains
         endif
      enddo;enddo;enddo
 
-
      call ghost_x(kapparray(:,:,:),2,req(1:4))
      call ghost_y(kapparray(:,:,:),2,req(5:8))
      call ghost_z(kapparray(:,:,:),2,req(9:12))
@@ -873,8 +872,9 @@ contains
                /(1.d0+a(4)*a(4)+a(5)*a(5))**(1.5d0)
          kappa = sign(1.d0,mxyz(try(1)))*kappa
          return
-      else if(nfound > nfound_min) then  !  fit only heights of the same kind. 
-         nfound = ind_pos(points,nposit) !  ind_pos_sorted(points,bpoints,nposit) 
+      else !  if(nfound > nfound_min) then  !  *** possible improvement
+                                            !  consider fitting only heights of the same kind. 
+         nfound = ind_pos(points,nposit)    !  ind_pos_sorted(points,bpoints,nposit) 
          bpoints = points
       endif ! nfound == 9
       ! Determine the curvature from fits. 
@@ -885,10 +885,7 @@ contains
       mv(2) = mxyz(try(3))
       mv(3) = mxyz(try(1))
       ! *** determine the origin. 
-      call NewFindCutAreaCentroid(i0,j0,k0,centroid)
-      do n=1,3
-         origin(n) = centroid(n)
-      enddo
+      call NewFindCutAreaCentroid(i0,j0,k0,origin)
       ! *** determine curvature from mixed heights 
       if(mixed_heights) then
          if ( nfound > nfound_min )  then  ! more than 6 points to avoid special 2D degeneracy. 
@@ -901,8 +898,8 @@ contains
             ! fit over all positions, not only independent ones. 
             weights=1d0
             call parabola_fit_with_rotation(points,fit,weights,mv,nfound,a,kappasign,fit_success) 
-            nfound = - nfound
             if(fit_success) then
+            nfound = - nfound  ! encode the fact that mixed-heights were used 
 #ifdef COUNT
                method_count(2) = method_count(2) + 1
 #endif
@@ -912,7 +909,7 @@ contains
                return
             else
                geom_case_count(16) = geom_case_count(16) + 1
-               !            print *, "WARNING: no curvature"
+               nfound = 0
                return
             endif
          endif !  (-nfound) > nfound_min  
@@ -936,7 +933,7 @@ contains
             end do
             wg = cvof(i,j,k)*(1-cvof(i,j,k))
             if(wg.lt.0d0) call pariserror("w<0")
-            weights(nposit) = wg  ! sqrt(wg)
+            weights(nposit) = 1d0 ! wg  ! sqrt(wg)
          endif ! vof_flag
       enddo; enddo; enddo ! do m,n,l
       ! arrange coordinates so height direction is closest to normal
@@ -976,16 +973,9 @@ contains
                enddo
             enddo
             if(n_pure_faces >= 3) then
-               !                  print *, "Warning: ",n_pure_faces, " pure faces at x =",x(i0),&
-               !                       ", y = ",y(j0), ", z = ",z(k0)
                geom_case_count(3) = geom_case_count(3) + 1
             endif
             if(nposit <6) then
-               !        print *,"WARNING nposit = ",nposit," n_pure_faces = ",n_pure_faces," at",i0,j0,k0
-               !        if(nposit==0) then
-               !           call print_cvof_3x3x3(i0,j0,k0)
-               !           call pariserror("unsufficient nposit")
-               !        endif
                geom_case_count(nposit+4) = geom_case_count(nposit+4) + 1
             endif
          endif
@@ -1001,9 +991,7 @@ contains
       else
          call parabola_fit_with_rotation(points,fit,weights,mv,nposit,a,kappasign,fit_success) 
          if(.not.fit_success) then
-            !            call print_cvof_3x3x3(i0,j0,k0)
             geom_case_count(16) = geom_case_count(16) + 1
-!            print *, "WARNING: no curvature"
             return
          else
             kappa = 2.d0*(a(1)*(1.d0+a(5)*a(5)) + a(2)*(1.d0+a(4)*a(4)) - a(3)*a(4)*a(5)) &
