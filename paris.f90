@@ -252,6 +252,7 @@ Program paris
                  call get_normals()
                  call get_all_curvatures(kappa_fs)
                  call set_topology(vof_phase,itimestep) !vof_phase updated in vofsweeps
+                 if (RP_test) call Integrate_RP(dt,time)
               endif
            endif
            if (DoLPP) then
@@ -555,25 +556,28 @@ Program paris
         endif
         call my_timer(11)
         !output for scalar variables used in free surface
-        do out_fs = 1,3
-           if (VTK_OUT(out_fs)) then
-              if (mod(itimestep,NOUT_VTK(out_fs))==0) then
-                 if (rank==0) call append_visit_fs(out_fs,itimestep/NOUT_VTK(out_fs))
-                 SELECT CASE (out_fs)
-                 case (1) 
-                    tmp = 0d0
-                    do k=ks,ke+1; do j=js,je+1; do i=is,ie+1
-                       tmp(i,j,k)=ABS((u(i-1,j,k)-u(i,j,k))/dx(i)+(v(i,j-1,k)-v(i,j,k))/dy(j)+(w(i,j,k-1)-w(i,j,k))/dz(k))
-                       call VTK_scalar_struct(out_fs,itimestep/NOUT_VTK(out_fs),tmp)
-                    enddo; enddo; enddo
-                 case (2)
-                    call VTK_scalar_struct(out_fs,itimestep/NOUT_VTK(out_fs),kappa_fs)
-                 case(3)
-                    call VTK_scalar_struct(out_fs,itimestep/NOUT_VTK(out_fs),P_gx)
-                 end SELECT
+        if (FreeSurface) then
+           if (RP_test .and. (mod(itimestep,nstats)==0) .and. rank==0) call write_RP_test(time)
+           do out_fs = 1,3
+              if (VTK_OUT(out_fs)) then
+                 if (mod(itimestep,NOUT_VTK(out_fs))==0) then
+                    if (rank==0) call append_visit_fs(out_fs,itimestep/NOUT_VTK(out_fs))
+                    SELECT CASE (out_fs)
+                    case (1) 
+                       tmp = 0d0
+                       do k=ks,ke+1; do j=js,je+1; do i=is,ie+1
+                          tmp(i,j,k)=ABS((u(i-1,j,k)-u(i,j,k))/dx(i)+(v(i,j-1,k)-v(i,j,k))/dy(j)+(w(i,j,k-1)-w(i,j,k))/dz(k))
+                          call VTK_scalar_struct(out_fs,itimestep/NOUT_VTK(out_fs),tmp)
+                       enddo; enddo; enddo
+                    case (2)
+                       call VTK_scalar_struct(out_fs,itimestep/NOUT_VTK(out_fs),kappa_fs)
+                    case(3)
+                       call VTK_scalar_struct(out_fs,itimestep/NOUT_VTK(out_fs),P_gx)
+                    end SELECT
+                 endif
               endif
-           endif
-        enddo
+           enddo
+        endif
      enddo
      !-------------------------------------------------------------------------------------------------
      !--------------------------------------------End domain-------------------------------------------
@@ -1947,6 +1951,7 @@ subroutine InitCondition
               call get_all_curvatures(kappa_fs)
               if (RP_test) then
                  call get_ref_volume
+                 !initialize P field for RP test
               endif
            endif
         endif

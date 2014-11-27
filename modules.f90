@@ -336,7 +336,8 @@ module module_freesurface
   real(8), dimension(:,:,:), allocatable :: P_gx, P_gy, P_gz
   integer, dimension(:,:,:), allocatable :: u_cmask,v_cmask,w_cmask,pcmask
   integer, dimension(1:3) :: NOUT_VTK
-  real(8) :: P_ref, gamma, R_ref, V_0 !eq pressure and polytropic gas exponent
+  real(8) :: P_ref, gamma, R_ref, V_0, P_inf !eq pressure and polytropic gas exponent
+  real(8) :: R_RK, dR_RK, ddR_RK
   integer :: X_level, solver_flag=0
   logical :: FreeSurface, debug=.false., initialize_fs = .false.
   logical :: RP_test
@@ -843,7 +844,7 @@ module module_BC
   subroutine SetVelocityBC(u,v,w,umask,vmask,wmask,t)
     use module_grid
     use module_2phase
-    
+    use module_freesurface
     implicit none
     include 'mpif.h'
     real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: u, v, w
@@ -1052,7 +1053,9 @@ module module_BC
        u(:,:,ke+1)=u(:,:,ke-1)
        v(:,:,ke+1)=v(:,:,ke-1)    
     endif
-    
+
+    !Set zero radial velocity gradient for RP test in FreeSurface
+    !if (FreeSurface .and. RP_test) call set_radial_outflow_RP(u,v,w)    
   end subroutine SetVelocityBC
 
   !=================================================================================================

@@ -740,12 +740,16 @@ end subroutine setuppoisson_fs2
 !--------------------------------------------------------------------------------------------------------------------
 subroutine get_ref_volume
   use module_2phase
+  use module_BC
   use module_freesurface
   implicit none
   real(8), parameter :: pi=3.141592653
 
   if (NumBubble /= 1) call pariserror('For the Rayleigh-Plesset test, only a single bubble is allowed')
   V_0 = 4d0/3d0*pi*(R_ref**3d0)
+  R_RK = rad(1)
+  dR_RK = 0d0
+  P_inf = BoundaryPressure(1)
   !if (rank==0) write(*,'("RP test initial bubble volume:",e14.5)')V_0
 end subroutine get_ref_volume
 !--------------------------------------------------------------------------------------------------------------------
@@ -1043,3 +1047,103 @@ subroutine VTK_scalar_struct(index,iout,var)
   close(8)
 end subroutine VTK_scalar_struct
 !--------------------------------------------------------------------------------------------------
+subroutine set_radial_outflow_RP(u,v,w)
+  use module_grid
+  use module_2phase
+  use module_freesurface
+  implicit none
+  include 'mpif.h'
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: u, v, w
+  integer :: i,j,k
+  ! x- face
+!!$  if (coords(1)==0) then
+!!$
+!!$  endif
+!!$  ! x+ face
+!!$  if (coords(1)==nPx-1) then
+!!$
+!!$  endif
+!!$ ! y- face
+!!$  if (coords(2)==0) then
+!!$
+!!$  endif
+!!$  if (coords(2)==nPy-1) then
+!!$
+!!$  endif
+  
+end subroutine set_radial_outflow_RP
+!==============================================================================================================================
+! Routine to numerically integrate the Rayleigh-Plesset equation
+
+subroutine Integrate_RP(dt,t)
+  !use module_2phase
+  use module_freesurface
+  implicit none 
+  integer :: j
+  real(8) :: tRK, dt, t, Volume
+  real(8), parameter :: pi=3.141592653
+  integer, parameter :: nvar = 2
+  real(8) :: y(nvar), ytmp(nvar)
+  real(8) :: dydt1(nvar), dydt2(nvar),dydt3(nvar),dydt0(nvar)
+
+    ! start at previous RP values
+    y(1) = R_RK
+    y(2) = dR_RK
+    ! RK4
+    !1st step
+    tRK = 0d0
+    ytmp(:)  = y(:)
+    call func(ytmp,dydt0)
+    !2nd step
+    tRK = t + dt/2.d0
+    do j=1,nvar
+       ytmp(j) = y(j) + dydt0(j)*dt/2.d0
+    enddo
+    call func(ytmp,dydt1)
+    !3rd step
+    tRK = t + dt/2.d0
+    do j=1,nvar
+       ytmp(j) = y(j) + dydt1(j)*dt/2.d0
+    enddo
+    call func(ytmp,dydt2)
+    !4th step
+    tRK = t + dt
+    do j=1,nvar
+       ytmp(j) = y(j) + dydt2(j)*dt
+    enddo
+    call func(ytmp,dydt3)
+
+    do j=1,nvar
+       y(j) = y(j) + dt*(dydt0(j)/6d0 + dydt1(j)/3d0 + dydt2(j)/3d0 + dydt3(j)/6d0)
+    enddo
+    Volume = 4d0/3d0*pi*y(1)**3d0
+
+    R_RK = y(1); dR_RK = y(2); ddR_RK = dydt3(2)
+    
+contains
+subroutine func(y,dydt)
+  use module_2phase
+  use module_freesurface
+    real(8) :: P_c
+    real(8) :: y(2), dydt(2)
+    P_c = P_ref*(R_ref/y(1))**(3d0*gamma)-2d0*sigma/y(1)
+
+    dydt(2) = -3d0*(y(2)**2d0)/(2d0*y(1)) + (P_c - P_inf)/y(1)
+    dydt(1) = y(2)
+
+  end subroutine func
+end subroutine Integrate_RP
+!=======================================================================================================================================
+subroutine write_RP_test(t) 
+  use module_freesurface
+  implicit none
+  real(8) :: t, vol
+  real(8), parameter :: pi=3.141592653
+  vol = 4d0/3d0*pi*R_RK**3d0
+  OPEN(UNIT=2,FILE='RK_int_RP.txt',access='append')
+  write(*,*)'Skryf'
+  WRITE(2,2) t, R_RK, dR_RK, ddR_RK, vol
+
+  CLOSE(unit=2)
+2 format(5e14.5)
+end subroutine write_RP_test
