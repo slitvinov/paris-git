@@ -2423,6 +2423,7 @@ subroutine h_of_KHI2D(timestep,output_time)
   LOGICAL :: Found
   LOGICAL, SAVE :: first_access = .true.
   LOGICAL, SAVE :: first_open = .true.
+  logical :: letsdebug = .false.
  
   IF(first_access) then 
      allocate(local_h(nx), global_h(nx))
