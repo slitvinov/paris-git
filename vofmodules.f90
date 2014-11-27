@@ -567,7 +567,7 @@ or none at all")
 
     if ( test_KHI2D ) then 
       do i = imin,imax; do j=jmin,jmax; do k = kmin,kmax
-         sine = yLength*0.5d0 + 0.001*yLength*sin(2.d0*PI*x(i)/xLength) 
+         sine = yLength*0.5d0 + 0.002*xLength*sin(2.d0*PI*x(i)/xLength) 
          !if ( y(j) > 0.5d0*yLength*(1.d0 + 0.1d0*sin(2.d0*PI*x(i)/xLength)) ) then 
          if ( y(j) - 0.5d0*dy(j) > sine) then 
             cvof(i,j,k) = 1.d0

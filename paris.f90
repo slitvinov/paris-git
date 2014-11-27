@@ -2005,15 +2005,15 @@ subroutine InitCondition
                !else
                !   u(i,j,k) = 0.5d1
                !endif
-               u(i,j,k) = -0.5d1+(0.5d1+0.5d1)*(1+erf((y(j)-0.5d0*yLength+0.001*yLength* &
-                    sin(2.d0*PI*xh(i)/xLength))/(0.004d0*yLength*2.d0)))/2
+               u(i,j,k) = -0.5d1+(0.5d1+0.5d1)*(1+erf((y(j)-0.5d0*yLength+0.002*xLength* &
+                    sin(2.d0*PI*xh(i)/xLength))/(0.008d0*xLength*2.d0)))/2
                ! 2D, only perturb x direction 
             enddo; enddo; enddo
             do i=imin,imax-1; do j=jmin,jmax; do k=kmin,kmax-1
                v(i,j,k) = 1.d0*sin(2.d0*PI*x(i)/xLength)& 
-                          *exp(-((yh(j)-yLength*(0.5d0 + 1d0/REAL(2*Ny)))/(0.05d0*yLength))**2.d0)
+                          *exp(-((yh(j)-yLength*0.5d0)/(0.1d0*xLength))**2.d0)
                ! Nz
-               ! perturbation thickness = 0.05*yLength, wavenum(x) = 1
+               ! perturbation thickness = 0.1*xLength, wavenum(x) = 1
             enddo; enddo; enddo
          end if ! test_KHI_2D 
         ! Test: Test height function (TOMAS)
