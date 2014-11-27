@@ -46,15 +46,15 @@ module module_surface_tension
 ! initial state
   logical :: st_initialized = .false.
   real(8), parameter :: kappamax = 2.d0
-  integer, parameter :: nfound_min =  6 ! @@@
+  integer, parameter :: nfound_min =  6 
   ! Caution the line below is read by test scripts, do not move it below line 60. Do not 
   ! write ndepth= elsewhere. Do not change case for ndepth. 
-  integer, parameter :: NDEPTH=4   
+  integer, parameter :: NDEPTH=3  
   integer, parameter :: BIGINT=100
   real(8), parameter :: D_HALF_BIGINT = DBLE(BIGINT/2)
   integer, parameter :: MAX_EXT_H = 0
   integer, parameter :: NOR=6 ! number of orientations
-  integer, parameter :: NPOS=NOR*27
+  integer, parameter :: NPOS=27*NOR
   real(8), parameter :: EPS_GEOM = 1d-4
   real(8), dimension(:,:,:), allocatable :: n1,n2,n3 ! normals
   real(8), dimension(:,:,:), allocatable :: kappa_fs ! for surface tension on free surface
@@ -555,7 +555,6 @@ contains
       logical :: dirnotfound,heightnotfound
       integer :: si,sj,sk
 
-
       i = i1(0,0,1)
       j = j1(0,0,1)
       k = k1(0,0,1)
@@ -824,11 +823,11 @@ contains
                /(1.d0+a(4)*a(4)+a(5)*a(5))**(1.5d0)
          kappa = sign(1.d0,mxyz(try(1)))*kappa
          return
-      else !  if(nfound > nfound_min) then  !  *** possible improvement
-                                            !  consider fitting only heights of the same kind. 
-         nfound = ind_pos(points,nposit)    !  ind_pos_sorted(points,bpoints,nposit) 
-         bpoints = points
       endif ! nfound == 9
+         nfound = ind_pos(points,nposit) 
+         ! *** determine the origin. 
+         call FindCutAreaCentroid(i0,j0,k0,origin)
+         bpoints = points
       ! Determine the curvature from fits. 
       ! Rotate coordinate sytems by permutation of x,y,z
       !  x_i' = x_k(i)
@@ -836,24 +835,23 @@ contains
       mv(1) = mxyz(try(2))
       mv(2) = mxyz(try(3))
       mv(3) = mxyz(try(1))
-      ! *** determine the origin. 
-      call NewFindCutAreaCentroid(i0,j0,k0,origin)
       ! *** determine curvature from mixed heights 
       if(mixed_heights) then
          if ( nfound > nfound_min )  then  ! more than 6 points to avoid special 2D degeneracy. 
             ! rotate and shift origin
             !  x_i' = x_k(i)
             !  m'_i = m_k(i)
-            points(:,1) = bpoints(:,try(2)) - origin(try(2))
-            points(:,2) = bpoints(:,try(3)) - origin(try(3))
-            points(:,3) = bpoints(:,try(1)) - origin(try(1))   
-            ! fit over all positions, not only independent ones. 
+            points(:,1) = bpoints(:,try(2))  - origin(try(2))
+            points(:,2) = bpoints(:,try(3))  - origin(try(3))
+            points(:,3) = bpoints(:,try(1))  - origin(try(1))   
+            ! fit over all positions returned by ind_pos
             weights=1d0
-            call parabola_fit_with_rotation(points,fit,weights,mv,nfound,a,kappasign,fit_success) 
+            call parabola_fit_with_rotation(points,fit,weights,mv,nposit,a,kappasign,fit_success) 
+            ! call parabola_fit(points,weights,nposit,a,fit_success) 
             if(fit_success) then
-            nfound = - nfound  ! encode the fact that mixed-heights were used 
+               nfound = - nfound  ! encode the fact that mixed-heights were used 
 #ifdef COUNT
-               method_count(2) = method_count(2) + 1
+            method_count(2) = method_count(2) + 1
 #endif
                kappa = 2.d0*(a(1)*(1.d0+a(5)*a(5)) + a(2)*(1.d0+a(4)*a(4)) - a(3)*a(4)*a(5)) &
                     /(1.d0+a(4)*a(4)+a(5)*a(5))**(1.5d0)
@@ -863,7 +861,7 @@ contains
                geom_case_count(16) = geom_case_count(16) + 1
                nfound = 0
                return
-            endif
+            endif ! fit_success
          endif !  (-nfound) > nfound_min  
       endif ! mixed_heights
       ! *** determine curvature from centroids
@@ -955,12 +953,12 @@ contains
 
    ! Performs a rotation to align z axis with normal, then calls fit
 
-   subroutine parabola_fit_with_rotation(fit,bfit,weights,mv,nposit,a,kappasign,fit_success)
+   subroutine parabola_fit_with_rotation(bfit,fit,weights,mv,nposit,a,kappasign,fit_success)
       implicit none
       real(8), intent(in)  :: weights(NPOS)
       integer, intent(in)  :: nposit
-      real(8), intent(inout) :: mv(3),fit(NPOS,3)
-      real(8), intent(out) :: a(6),bfit(NPOS,3),kappasign
+      real(8), intent(inout) :: mv(3),bfit(NPOS,3)
+      real(8), intent(out) :: a(6),fit(NPOS,3),kappasign
       logical, intent(out) :: fit_success
       logical :: inv_success
       real(8) :: invm(3,3), rhs(3), norm(3), mv1(3)
@@ -1020,15 +1018,15 @@ contains
                call pariserror("non orthogonal rotation matrix")
             end if
          endif
-         bfit = fit
+         fit = bfit
          do i=1,3
-            fit(:,i) = ev(1,i)*bfit(:,1) + ev(2,i)*bfit(:,2) + ev(3,i)*bfit(:,3)
+            bfit(:,i) = ev(1,i)*fit(:,1) + ev(2,i)*fit(:,2) + ev(3,i)*fit(:,3)
          enddo
       else
 !      if no rotation then usual sign calculation
          kappasign = sign(1.d0,mv(3))
       endif ! do_rotation
-      call    parabola_fit(fit,weights,nposit,a,fit_success)
+      call parabola_fit(bfit,weights,nposit,a,fit_success)
    end subroutine parabola_fit_with_rotation
 
    subroutine parabola_fit(fit,weights,nposit,a,fit_success)
@@ -1540,31 +1538,33 @@ contains
      integer, intent(in) :: n
      real(8), intent(inout) :: points(NPOS,3), bpoints(NPOS,3)
      integer :: i,j,ni,c
-     real(8) :: d2
-     logical :: depends
+     real(8) :: d2,d1
+     logical :: reject
      if (n < 2) then
         ind_pos_sorted = n
         return
      endif
      ni=1
      bpoints(ni,:) = points(1,:)
-     do j=2,n
-        depends = .false.
-        do i=1,j-1
-           if(.not.depends) then
+     do j=2,n      ! j: new point
+        d1 =  sum(points(j,:)**2)                  ! distance (O,x_j)
+        ! reject = (d1>3d0)
+        reject=.false.
+        do i=1,j-1 ! i: old point
+           if(.not.reject) then
               d2 = 0d0
               do c=1,3
-                 d2 = d2 + (points(i,c) - points(j,c))**2
+                 d2 = d2 + (points(i,c) - points(j,c))**2  ! distance (x_i,x_j)
               enddo
-              depends = (d2 < 0.5d0**2)
+              reject = (d2 < 0.5d0**2)
            endif
         enddo
-        if(.not.depends)  then
+        if(.not.reject)  then ! add new point to list
            ni = ni + 1
-           bpoints(ni,:) = points(j,:)
-        endif
-     enddo
-     ind_pos_sorted = ni
+         endif
+      enddo
+      bpoints = points
+      ind_pos_sorted = ni
    end function ind_pos_sorted
 
   end module module_surface_tension
