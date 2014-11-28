@@ -352,8 +352,8 @@ subroutine h_of_KHI2D(timestep,output_time)
   implicit none
   include 'mpif.h'
   integer :: i,j,k,timestep
-  real(8) :: h, a1_coef, b1_coef, output_time, local_KE, global_KE
-  real(8), dimension(:), allocatable :: local_h, global_h, dv
+  real(8) :: h, a1_coef, b1_coef, output_time, local_KE, global_KE, diff_vol
+  real(8), dimension(:), allocatable :: local_h, global_h
   integer :: ierr
   character*128 :: file_name, file_name1, file_name2, file_name3
   LOGICAL :: Found
@@ -394,8 +394,8 @@ subroutine h_of_KHI2D(timestep,output_time)
         ENDIF
         
         DO j=js,je
-           dv = dx(i)*dy(j)*dz(k)
-           local_KE = local_KE + dv*(0.5d0*(v(i,j,k)+v(i,j+1,k)))**2
+           diff_vol = dx(i)*dy(j)*dz(k)
+           local_KE = local_KE + diff_vol*(0.5d0*(v(i,j,k)+v(i,j+1,k)))**2
            IF((found.eqv..false.).and.(height(i,j,k,4)<1d6)) THEN 
               !h = h + Y(j)*(Ny/yLength) + height(i,j,k,4) 
               h = h + Y(j) + height(i,j,k,4)*(yLength/Ny) 
