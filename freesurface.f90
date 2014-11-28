@@ -1080,7 +1080,7 @@ subroutine Integrate_RP(dt,t)
   use module_freesurface
   implicit none 
   integer :: j
-  real(8) :: tRK, dt, t, Volume
+  real(8) :: dt, t, Volume
   real(8), parameter :: pi=3.141592653
   integer, parameter :: nvar = 2
   real(8) :: y(nvar), ytmp(nvar)
@@ -1091,23 +1091,19 @@ subroutine Integrate_RP(dt,t)
     y(2) = dR_RK
     ! RK4
     !1st step
-    tRK = 0d0
     ytmp(:)  = y(:)
     call func(ytmp,dydt0)
     !2nd step
-    tRK = t + dt/2.d0
     do j=1,nvar
        ytmp(j) = y(j) + dydt0(j)*dt/2.d0
     enddo
     call func(ytmp,dydt1)
     !3rd step
-    tRK = t + dt/2.d0
     do j=1,nvar
        ytmp(j) = y(j) + dydt1(j)*dt/2.d0
     enddo
     call func(ytmp,dydt2)
     !4th step
-    tRK = t + dt
     do j=1,nvar
        ytmp(j) = y(j) + dydt2(j)*dt
     enddo
@@ -1130,7 +1126,6 @@ subroutine func(y,dydt)
 
     dydt(2) = -3d0*(y(2)**2d0)/(2d0*y(1)) + (P_c - P_inf)/y(1)
     dydt(1) = y(2)
-
   end subroutine func
 end subroutine Integrate_RP
 !=======================================================================================================================================
@@ -1141,9 +1136,8 @@ subroutine write_RP_test(t)
   real(8), parameter :: pi=3.141592653
   vol = 4d0/3d0*pi*R_RK**3d0
   OPEN(UNIT=2,FILE='RK_int_RP.txt',access='append')
-  write(*,*)'Skryf'
   WRITE(2,2) t, R_RK, dR_RK, ddR_RK, vol
-
   CLOSE(unit=2)
 2 format(5e14.5)
 end subroutine write_RP_test
+!======================================================================================================================================

@@ -221,6 +221,7 @@ Program paris
            if(DoVOF) cvofold  = cvof
            if ( DoLPP ) call StoreOldPartSol()
         endif
+        if (FreeSurface .and. RP_test .and. rank==0) call Integrate_RP(dt,time)
  !------------------------------------ADVECTION & DIFFUSION----------------------------------------
         du = 0d0; dv = 0d0; dw = 0d0
         do ii=1, itime_scheme
@@ -252,7 +253,6 @@ Program paris
                  call get_normals()
                  call get_all_curvatures(kappa_fs)
                  call set_topology(vof_phase,itimestep) !vof_phase updated in vofsweeps
-                 if (RP_test) call Integrate_RP(dt,time)
               endif
            endif
            if (DoLPP) then
