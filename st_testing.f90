@@ -346,6 +346,114 @@ subroutine PlotCutAreaCentroid(i,j,k,centroid,x1,y1)
 ! some stuff is missing here
    end subroutine PlotCutAreaCentroid
 
+subroutine h_of_KHI2D(timestep,output_time)
+  use module_surface_tension
+  use module_flow
+  implicit none
+  include 'mpif.h'
+  integer :: i,j,k,timestep
+  real(8) :: h, a1_coef, b1_coef, output_time, local_KE, global_KE
+  real(8), dimension(:), allocatable :: local_h, global_h, dv
+  integer :: ierr
+  character*128 :: file_name, file_name1, file_name2, file_name3
+  LOGICAL :: Found
+  LOGICAL, SAVE :: first_access = .true.
+  LOGICAL, SAVE :: first_open = .true.
+  logical :: letsdebug = .false.
+ 
+  IF(first_access) then 
+     allocate(local_h(nx), global_h(nx))
+  ENDIF
+  local_KE=0d0
+  global_KE=0d0
+  local_h=0d0
+  global_h=0d0
+  file_name = '/h_file_'
+  file_name1 = '/test_file_vof'
+  file_name2 = '/ab_coef_file_'
+  file_name3 = '/KE_file'
+  
+  
+  DO i=is,ie
+  !Debugg section*******************************************************************************
+  IF((rank==1.or.rank==2.or.rank==5.or.rank==6).and.letsdebug) THEN
+     OPEN(UNIT=86,FILE=TRIM(out_path)//'/'//TRIM(file_name1)// &
+   TRIM(int2text(rank,padding))//'-'//TRIM(int2text(timestep,padding))//'.txt', ACCESS='append')
+        write(86,19) cvof(i,65,3), cvof(i,66,3), cvof(i,67,3), cvof(i,68,3) 
+        19     format(E14.6,E14.6,E14.6,E14.6)       
+     CLOSE(86)
+  ENDIF
+  !**********************************************************************************************
+     h=0d0
+     DO k=ks,ke
+
+        IF(height(i,js-1,k,4)<1d6) THEN
+           found = .true.
+        ELSE
+           found = .false.
+        ENDIF
+        
+        DO j=js,je
+           dv = dx(i)*dy(j)*dz(k)
+           local_KE = local_KE + dv*(0.5d0*(v(i,j,k)+v(i,j+1,k)))**2
+           IF((found.eqv..false.).and.(height(i,j,k,4)<1d6)) THEN 
+              !h = h + Y(j)*(Ny/yLength) + height(i,j,k,4) 
+              h = h + Y(j) + height(i,j,k,4)*(yLength/Ny) 
+              found = .true.
+           ENDIF
+        ENDDO
+     ENDDO
+     local_h(i-Ng) = h 
+  ENDDO
+  
+  call MPI_ALLREDUCE(local_h, global_h, nx, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_Comm_Cart, ierr)
+  call MPI_ALLREDUCE(local_KE, global_KE,1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_Comm_Cart, ierr)
+
+  global_h = global_h / REAL(Nz) - yLength/2
+  global_KE = global_KE / (xLength*yLength*zLength)
+  if (rank==0) then
+
+     a1_coef=0d0
+     b1_coef=0d0
+        DO i=1,nx
+           a1_coef = a1_coef + global_h(i)*COS(2*PI*(X(i))/xLength)*xLength/REAL(nx)
+           b1_coef = b1_coef + global_h(i)*SIN(2*PI*(X(i))/xLength)*xLength/REAL(nx)
+        ENDDO
+     a1_coef = 2*a1_coef/xLength
+     b1_coef = 2*b1_coef/xLength
+
+     OPEN(UNIT=87,FILE=TRIM(out_path)//TRIM(file_name)//TRIM(int2text(timestep,padding))//'.txt')
+        !write(*,*) 'entering print succesfull ', rank
+        DO i=1,nx
+           write(87,17) (REAL(i)-0.5)/REAL(nx), global_h(i)
+           17     format(E14.6,E14.6)
+        ENDDO
+     CLOSE(87)
+ 
+     if(first_open) then
+        ! Write ab coefficients file
+        OPEN(UNIT=88,FILE=TRIM(out_path)//TRIM(file_name2)//'.txt')
+           write(88,18) output_time, a1_coef, b1_coef, SQRT(a1_coef**2 + b1_coef**2)
+        CLOSE(88)
+        ! Write v**2 file
+        OPEN(UNIT=89,FILE=TRIM(out_path)//TRIM(file_name3)//'.txt')
+           write(89,17) output_time, global_KE
+        CLOSE(89)
+        first_open = .false.
+     else
+        ! Write ab coefficients file
+        OPEN(UNIT=88,FILE=TRIM(out_path)//TRIM(file_name2)//'.txt',ACCESS='append')
+           write(88,18) output_time, a1_coef, b1_coef, SQRT(a1_coef**2 + b1_coef**2)
+        CLOSE(88)
+        ! Write v**2 file
+        OPEN(UNIT=89,FILE=TRIM(out_path)//TRIM(file_name3)//'.txt',ACCESS='append')
+           write(89,17) output_time, global_KE
+        CLOSE(89)
+     endif
+     18     format(E14.6,E14.6,E14.6,E14.6)
+     !write(*,*) 'exiting print succesfull ', rank
+  endif
+end subroutine
   end module module_st_testing
 
 
