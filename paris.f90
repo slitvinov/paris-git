@@ -221,7 +221,7 @@ Program paris
            if(DoVOF) cvofold  = cvof
            if ( DoLPP ) call StoreOldPartSol()
         endif
-        if (FreeSurface .and. RP_test .and. rank==0) call Integrate_RP(dt,time)
+        !if (FreeSurface .and. RP_test .and. rank==0) call Integrate_RP(dt,time)
  !------------------------------------ADVECTION & DIFFUSION----------------------------------------
         du = 0d0; dv = 0d0; dw = 0d0
         do ii=1, itime_scheme
@@ -340,6 +340,7 @@ Program paris
            else
               if (FreeSurface) then
                  solver_flag = 1
+                 if (RP_test) call set_RP_pressure(p)
                  call FreeSolver(A,p,maxError/dt,beta,maxit,it,ierr,itimestep,time,residual)
               else
                  call NewSolver(A,p,maxError/dt,beta,maxit,it,ierr)
@@ -430,7 +431,7 @@ Program paris
               if(HYPRE)then !HYPRE will not work with removed nodes from domain.
                  call pariserror("HYPRE solver not yet available for Free Surfaces")
               else
-                 call FreeSolver(A,p_ext,maxError,beta,maxit,it,ierr,itimestep,time)
+                 call FreeSolver(A,p_ext,maxError,beta,maxit,it,ierr,itimestep,time,residual)
               endif
               if(mod(itimestep,termout)==0) then
                  !call calcresidual(A,p,residual)
@@ -483,6 +484,7 @@ Program paris
            if(DoFront)call GetFront('wait')
            call my_timer(13)
         enddo !itime_scheme
+        if (FreeSurface .and. RP_test .and. rank==0) call Integrate_RP(dt,time)
         if(itime_scheme==2) then
            u = 0.5*(u+uold)
            v = 0.5*(v+vold)
@@ -1951,7 +1953,11 @@ subroutine InitCondition
               call get_all_curvatures(kappa_fs)
               if (RP_test) then
                  call get_ref_volume
-                 !initialize P field for RP test
+                 call initialize_P_RP(p)  !initialize P field for RP test
+                 call ghost_x(p,1,req( 1: 4))
+                 call ghost_y(p,1,req( 5: 8))
+                 call ghost_z(p,1,req( 9:12))
+                 call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr) 
               endif
            endif
         endif

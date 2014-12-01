@@ -750,7 +750,11 @@ subroutine get_ref_volume
   R_RK = rad(1)
   dR_RK = 0d0
   P_inf = BoundaryPressure(1)
-  !if (rank==0) write(*,'("RP test initial bubble volume:",e14.5)')V_0
+  ddR_RK = (P_ref*(R_ref/R_RK)**(3d0*gamma)-P_inf)/R_RK
+  !if (rank==0) then
+  !   write(*,'("RP test initial bubble volume:",e14.5)')V_0
+  !   write(*,'("Free surface ddR: ",e14.5)')ddR_RK
+  !endif
 end subroutine get_ref_volume
 !--------------------------------------------------------------------------------------------------------------------
 ! This is a straight copy of NewSolver. The idea is to not clutter NewSolver with all the FreeSurface flags and tests, 
@@ -787,8 +791,8 @@ subroutine FreeSolver(A,p,maxError,beta,maxit,it,ierr,iout,time,tres2)
   if (RP_test) then
      call get_vol(Vol)
      p_c = P_ref*(V_0/Vol)**gamma
-     if(mod(iout,10)==0 .and. rank==0) then
-        OPEN(unit=11,file='RP_volume')
+     if(mod(iout,10)==0 .and. rank==0 .and. solver_flag==2) then
+        OPEN(unit=11,file='RP_volume',access='append')
         write(11,2)time,Vol
      endif
   else
@@ -1084,7 +1088,7 @@ subroutine Integrate_RP(dt,t)
   real(8), parameter :: pi=3.141592653
   integer, parameter :: nvar = 2
   real(8) :: y(nvar), ytmp(nvar)
-  real(8) :: dydt1(nvar), dydt2(nvar),dydt3(nvar),dydt0(nvar)
+  real(8) :: dydt1(nvar), dydt2(nvar),dydt3(nvar),dydt0(nvar),dydt4(nvar)
 
     ! start at previous RP values
     y(1) = R_RK
@@ -1113,8 +1117,8 @@ subroutine Integrate_RP(dt,t)
        y(j) = y(j) + dt*(dydt0(j)/6d0 + dydt1(j)/3d0 + dydt2(j)/3d0 + dydt3(j)/6d0)
     enddo
     Volume = 4d0/3d0*pi*y(1)**3d0
-
-    R_RK = y(1); dR_RK = y(2); ddR_RK = dydt3(2)
+    call func(y,dydt4)
+    R_RK = y(1); dR_RK = y(2); ddR_RK = dydt4(2)
     
 contains
 subroutine func(y,dydt)
@@ -1141,3 +1145,269 @@ subroutine write_RP_test(t)
 2 format(5e14.5)
 end subroutine write_RP_test
 !======================================================================================================================================
+! Idea is to set free outflow in the radial direction for the RP test case. In combination with variable Pressure bx's, we can have more
+! accurate results on a truncated domain.
+!
+subroutine set_RP_radial_velocity(u,v,w)
+  use module_grid
+  use module_2phase
+  use module_freesurface
+  implicit none
+  include 'mpif.h'
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: u, v, w
+  real(8) :: di1, di2
+  integer :: ix1, ix2
+  integer :: i,j,k
+
+  !x- face
+  if (coords(1)==0) then
+     write(*,*)'x- face loop'
+     do j=js,je; do k=ks,ke
+        ! Components to be done independently, starting xith u on the boundary
+        if (y(j).ge.yc(1)) then 
+           ix1 = -1
+        else
+           ix1 = 1
+        endif
+        if (z(k).ge.zc(1)) then 
+           ix2 = -1
+        else
+           ix2 = 1
+        endif
+        !get cuts, will be non-dimensional if dx=dy=dz
+        di1 = ABS(yc(1)-y(j))/ABS(xc(1)-xh(is-1))
+        di2 = ABS(zc(1)-z(k))/ABS(xc(1)-xh(is-1))
+        !set
+        u(is-1,j,k)=u(is,j,k)*(1d0-di1)*(1d0-di2)+u(is,j+ix1,k)*di1*(1d0-di2)&
+             +u(is,j,k+ix2)*(1d0-di1)*di2+u(is,j+ix1,k+ix2)*di1*di2
+        !same for v
+        if (yh(j).ge.yc(1)) then 
+           ix1 = -1
+        else
+           ix1 = 1
+        endif
+        if (zh(k).ge.zc(1)) then 
+           ix2 = -1
+        else
+           ix2 = 1
+        endif
+        !get cuts, will be non-dimensional if dx=dy=dz
+        di1 = ABS(yc(1)-yh(j))/ABS(xc(1)-x(is-1))
+        di2 = ABS(zc(1)-zh(k))/ABS(xc(1)-x(is-1))
+        !set
+        v(is-1,j,k)=v(is,j,k)*(1d0-di1)*(1d0-di2)+v(is,j+ix1,k)*di1*(1d0-di2)&
+             +v(is,j,k+ix2)*(1d0-di1)*di2+v(is,j+ix1,k+ix2)*di1*di2
+        !same for w
+        w(is-1,j,k)=w(is,j,k)*(1d0-di1)*(1d0-di2)+w(is,j+ix1,k)*di1*(1d0-di2)&
+             +w(is,j,k+ix2)*(1d0-di1)*di2+w(is,j+ix1,k+ix2)*di1*di2
+        !set u(is-2) to allow cell is-1 to be divergence free
+     enddo; enddo
+  endif
+  !x+ face
+  if (coords(1)==nPx-1) then
+    write(*,*)'x+ face loop' 
+     do j=js,je; do k=ks,ke
+        ! Components to be done independently, starting xith u on the boundary
+        if (y(j).ge.yc(1)) then 
+           ix1 = -1
+        else
+           ix1 = 1
+        endif
+        if (z(k).ge.zc(1)) then 
+           ix2 = -1
+        else
+           ix2 = 1
+        endif
+        !get cuts, will be non-dimensional if dx=dy=dz
+        di1 = ABS(yc(1)-y(j))/ABS(xc(1)-xh(ie))
+        di2 = ABS(zc(1)-z(k))/ABS(xc(1)-xh(ie))
+        !set
+        u(ie,j,k)=u(ie-1,j,k)*(1d0-di1)*(1d0-di2)+u(ie-1,j+ix1,k)*di1*(1d0-di2)&
+             +u(ie-1,j,k+ix2)*(1d0-di1)*di2+u(ie-1,j+ix1,k+ix2)*di1*di2
+        !same for v
+        if (yh(j).ge.yc(1)) then 
+           ix1 = -1
+        else
+           ix1 = 1
+        endif
+        if (zh(k).ge.zc(1)) then 
+           ix2 = -1
+        else
+           ix2 = 1
+        endif
+        !get cuts, will be non-dimensional if dx=dy=dz
+        di1 = ABS(yc(1)-yh(j))/ABS(xc(1)-x(ie+1))
+        di2 = ABS(zc(1)-zh(k))/ABS(xc(1)-x(ie+1))
+        !set
+        v(ie,j,k)=v(ie-1,j,k)*(1d0-di1)*(1d0-di2)+v(ie-1,j+ix1,k)*di1*(1d0-di2)&
+             +v(ie-1,j,k+ix2)*(1d0-di1)*di2+v(ie-1,j+ix1,k+ix2)*di1*di2
+        !same for w
+        w(ie,j,k)=w(ie-1,j,k)*(1d0-di1)*(1d0-di2)+w(ie-1,j+ix1,k)*di1*(1d0-di2)&
+             +w(ie-1,j,k+ix2)*(1d0-di1)*di2+w(ie-1,j+ix1,k+ix2)*di1*di2
+        !set u(ie+2) to allow cell to be divergence free
+     enddo; enddo
+  endif
+
+  !y-face
+  if (coords(2)==0) then
+     write(*,*)'y- face loop'
+     do i=is,ie; do k=ks,ke
+        if (x(i).ge.xc(1)) then 
+           ix1 = -1
+        else
+           ix1 = 1
+        endif
+        if (z(k).ge.zc(1)) then 
+           ix2 = -1
+        else
+           ix2 = 1
+        endif
+        !get cuts, will be non-dimensional if dx=dy=dz
+        di1 = ABS(xc(1)-x(i))/ABS(yc(1)-yh(is-1))
+        di2 = ABS(zc(1)-z(k))/ABS(yc(1)-yh(is-1))
+        !set
+        v(i,js-1,k)=v(i,js,k)*(1d0-di1)*(1d0-di2)+v(is,js+ix1,k)*di1*(1d0-di2)&
+             +v(i,js,k+ix2)*(1d0-di1)*di2+v(i,js+ix1,k+ix2)*di1*di2
+        !same for v
+        if (xh(i).ge.xc(1)) then 
+           ix1 = -1
+        else
+           ix1 = 1
+        endif
+        if (zh(k).ge.zc(1)) then 
+           ix2 = -1
+        else
+           ix2 = 1
+        endif
+        !get cuts, will be non-dimensional if dx=dy=dz
+        di1 = ABS(xc(1)-xh(i))/ABS(yc(1)-y(is-1))
+        di2 = ABS(zc(1)-zh(k))/ABS(yc(1)-y(is-1))
+        !set
+        u(i,js-1,k)=u(i,js,k)*(1d0-di1)*(1d0-di2)+u(i+ix1,js,k)*di1*(1d0-di2)&
+             +u(i,js,k+ix2)*(1d0-di1)*di2+u(i+ix1,js,k+ix2)*di1*di2
+        !same for w
+        w(i,js-1,k)=w(i,js,k)*(1d0-di1)*(1d0-di2)+w(i+ix1,js,k)*di1*(1d0-di2)&
+             +w(i,js,k+ix2)*(1d0-di1)*di2+w(i+ix1,js,k+ix2)*di1*di2
+        !set u(is-2) to allow cell is-1 to be divergence free
+     enddo; enddo
+  endif
+  !y+ face
+  if (coords(2)==nPy-1) then
+     write(*,*)'y+ face loop'
+     do i=is,ie; do k=ks,ke
+        if (x(i).ge.xc(1)) then 
+           ix1 = -1
+        else
+           ix1 = 1
+        endif
+        if (z(k).ge.zc(1)) then 
+           ix2 = -1
+        else
+           ix2 = 1
+        endif
+        !get cuts, will be non-dimensional if dx=dy=dz
+        di1 = ABS(xc(1)-x(i))/ABS(yc(1)-yh(je))
+        di2 = ABS(zc(1)-z(k))/ABS(yc(1)-yh(je))
+        !set
+        v(i,je,k)=v(i,je-1,k)*(1d0-di1)*(1d0-di2)+v(i+ix1,je-1,k)*di1*(1d0-di2)&
+             +v(i,je-1,k+ix2)*(1d0-di1)*di2+v(i+ix1,je-1,k+ix2)*di1*di2
+        !same for u
+        if (xh(i).ge.xc(1)) then 
+           ix1 = -1
+        else
+           ix1 = 1
+        endif
+        if (zh(k).ge.zc(1)) then 
+           ix2 = -1
+        else
+           ix2 = 1
+        endif
+        !get cuts, will be non-dimensional if dx=dy=dz
+        di1 = ABS(xc(1)-xh(i))/ABS(yc(1)-y(je+1))
+        di2 = ABS(zc(1)-zh(k))/ABS(yc(1)-y(je+1))
+        !set
+        u(i,je+1,k)=u(i,je,k)*(1d0-di1)*(1d0-di2)+u(i+ix1,je,k)*di1*(1d0-di2)&
+             +u(i,je,k+ix2)*(1d0-di1)*di2+u(i+ix1,je,k+ix2)*di1*di2
+        !same for w
+        w(i,je+1,k)=w(i,je,k)*(1d0-di1)*(1d0-di2)+w(i+ix1,je,k)*di1*(1d0-di2)&
+             +w(i,je,k+ix2)*(1d0-di1)*di2+w(i+ix1,je,k+ix2)*di1*di2
+        !set u(ie+2) to allow cell to be divergence free
+     enddo; enddo
+  endif
+end subroutine set_RP_radial_velocity
+!====================================================================================================================================================
+subroutine set_RP_pressure(p)
+  use module_grid
+  use module_2phase
+  use module_freesurface
+  implicit none
+  include 'mpif.h'
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: p
+  real(8) :: r, P_l
+  integer :: i,j,k
+  P_l = P_ref*(R_ref/R_RK)**(3d0*gamma)-2d0*sigma/R_RK
+  if (coords(1)==0) then 
+     do k=ks,ke; do j=js,je
+        r = sqrt((x(is-1)-xc(1))**2d0 + (y(j)-yc(1))**2d0 + (z(k)-zc(1))**2d0)
+        p(is-1,j,k) = P_l - (dR_RK**2d0 * R_RK**4d0/(2d0*r**4d0) - (ddR_RK*R_RK**2d0 + 2d0*R_RK*dR_RK**2d0)/r +&
+             ddR_RK*R_RK + 3d0/2d0*dR_RK**2d0)
+     enddo; enddo
+  endif
+  if(coords(1)==Npx-1) then
+     do k=ks,ke; do j=js,je
+        r = sqrt((x(ie+1)-xc(1))**2d0 + (y(j)-yc(1))**2d0 + (z(k)-zc(1))**2d0)
+        p(ie+1,j,k) = P_l - (dR_RK**2d0 * R_RK**4d0/(2d0*r**4d0) - (ddR_RK*R_RK**2d0 + 2d0*R_RK*dR_RK**2d0)/r +&
+             ddR_RK*R_RK + 3d0/2d0*dR_RK**2d0)
+     enddo; enddo 
+  endif
+  if(coords(2)==0) then
+     do k=ks,ke; do i=is,ie
+        r = sqrt((x(i)-xc(1))**2d0 + (y(js-1)-yc(1))**2d0 + (z(k)-zc(1))**2d0)
+        p(i,js-1,k) = P_l - (dR_RK**2d0 * R_RK**4d0/(2d0*r**4d0) - (ddR_RK*R_RK**2d0 + 2d0*R_RK*dR_RK**2d0)/r +&
+             ddR_RK*R_RK + 3d0/2d0*dR_RK**2d0)
+     enddo; enddo 
+  endif
+  if(coords(2)==Npy-1) then
+    do k=ks,ke; do i=is,ie
+        r = sqrt((x(i)-xc(1))**2d0 + (y(je+1)-yc(1))**2d0 + (z(k)-zc(1))**2d0)
+        p(i,je+1,k) = P_l - (dR_RK**2d0 * R_RK**4d0/(2d0*r**4d0) - (ddR_RK*R_RK**2d0 + 2d0*R_RK*dR_RK**2d0)/r +&
+             ddR_RK*R_RK + 3d0/2d0*dR_RK**2d0)
+     enddo; enddo  
+  endif
+
+  ! Pressure BC for z-
+  if(coords(3)==0) then
+     do j=js,je; do i=is,ie
+        r = sqrt((x(i)-xc(1))**2d0 + (y(j)-yc(1))**2d0 + (z(ks-1)-zc(1))**2d0)
+        p(i,j,ks-1) = P_l - (dR_RK**2d0 * R_RK**4d0/(2d0*r**4d0) - (ddR_RK*R_RK**2d0 + 2d0*R_RK*dR_RK**2d0)/r +&
+             ddR_RK*R_RK + 3d0/2d0*dR_RK**2d0)
+     enddo; enddo 
+  endif
+  ! Pressure BC for z+
+  if(coords(3)==Npz-1) then
+     do j=js,je; do i=is,ie
+        r = sqrt((x(i)-xc(1))**2d0 + (y(j)-yc(1))**2d0 + (z(ke+1)-zc(1))**2d0)
+        p(i,j,ke+1) = P_l - (dR_RK**2d0 * R_RK**4d0/(2d0*r**4d0) - (ddR_RK*R_RK**2d0 + 2d0*R_RK*dR_RK**2d0)/r +&
+             ddR_RK*R_RK + 3d0/2d0*dR_RK**2d0)
+     enddo; enddo 
+  endif
+end subroutine set_RP_pressure
+!====================================================================================================================================================
+subroutine initialize_P_RP(p)
+  use module_grid
+  use module_2phase
+  use module_freesurface
+  implicit none
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: p
+  real(8) :: r, P_l
+  integer :: i,j,k,ierr
+  P_l = P_ref*(R_ref/R_RK)**(3d0*gamma)-2d0*sigma/R_RK
+  do k=ks,ke; do j=js,je; do i=is,ie
+     r = sqrt((x(i)-xc(1))**2d0 + (y(j)-yc(1))**2d0 + (z(k)-zc(1))**2d0)
+     if (r .ge. rad(1)) then
+        p(i,j,k) = P_l - (dR_RK**2d0 * R_RK**4d0/(2d0*r**4d0) - (ddR_RK*R_RK**2d0 + 2d0*R_RK*dR_RK**2d0)/r +&
+             ddR_RK*R_RK + 3d0/2d0*dR_RK**2d0)
+     endif
+  enddo; enddo; enddo
+end subroutine initialize_P_RP
+!====================================================================================================================================================

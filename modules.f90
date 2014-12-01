@@ -820,7 +820,6 @@ module module_BC
     include 'mpif.h'
     real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: umask,vmask,wmask
 
-
   ! for walls set the mask to zero  ! @@@ Aijk coefficients should be changed too. 
     if(bdry_cond(1)==0 .or. bdry_cond(1)==2) then
       if(coords(1)==0    ) umask(is-1,js-1:je+1,ks-1:ke+1)=0d0
@@ -1055,7 +1054,9 @@ module module_BC
     endif
 
     !Set zero radial velocity gradient for RP test in FreeSurface
-    !if (FreeSurface .and. RP_test) call set_radial_outflow_RP(u,v,w)    
+    !if (FreeSurface .and. RP_test) then
+    !   call set_RP_radial_velocity(u,v,w)
+    !endif    
   end subroutine SetVelocityBC
 
   !=================================================================================================
