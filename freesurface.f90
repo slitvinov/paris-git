@@ -618,28 +618,28 @@ subroutine setuppoisson_fs2(utmp,vtmp,wtmp,dt,A,vof_phase,istep)
 
   do k=ks,ke; do j=js,je; do i=is,ie
      if (pcmask(i,j,k)==1 .or. pcmask(i,j,k)==2) then !rho is 1d0
-        A(i,j,k,1) = dt/(dx(i)*dxh(i-1))
+        A(i,j,k,1) = 1d0/(dx(i)*dxh(i-1))
         if (A(i,j,k,1) /= A(i,j,k,1)) write(*,'("ERROR: A1 NaN in fs2:",e14.5)')A(i,j,k,1)
-        A(i,j,k,2) = dt/(dx(i)*dxh(i))
+        A(i,j,k,2) = 1d0/(dx(i)*dxh(i))
         if (A(i,j,k,2) /= A(i,j,k,2)) write(*,'("ERROR: A2 NaN in fs2:",e14.5)')A(i,j,k,2)
-        A(i,j,k,3) = dt/(dy(j)*dyh(j-1))
+        A(i,j,k,3) = 1d0/(dy(j)*dyh(j-1))
         if (A(i,j,k,3) /= A(i,j,k,3)) write(*,'("ERROR: A3 NaN in fs2:",e14.5)')A(i,j,k,3)
-        A(i,j,k,4) = dt/(dy(j)*dyh(j))
+        A(i,j,k,4) = 1d0/(dy(j)*dyh(j))
         if (A(i,j,k,4) /= A(i,j,k,4)) write(*,'("ERROR: A4 NaN in fs2:",e14.5)')A(i,j,k,4)
-        A(i,j,k,5) = dt/(dz(k)*dzh(k-1))
+        A(i,j,k,5) = 1d0/(dz(k)*dzh(k-1))
         if (A(i,j,k,5) /= A(i,j,k,5)) write(*,'("ERROR: A5 NaN in fs2:",e14.5)')A(i,j,k,5)
-        A(i,j,k,6) = dt/(dz(k)*dzh(k))
+        A(i,j,k,6) = 1d0/(dz(k)*dzh(k))
         if (A(i,j,k,6) /= A(i,j,k,6)) write(*,'("ERROR: A6 NaN in fs2:",e14.5)')A(i,j,k,6)
 
-        if (vof_phase(i,j,k)==1) then
+        if (pcmask(i,j,k)==1) then
            do nbr=-1,1,2
-              if (vof_phase(i+nbr,j,k) == 0) then
+              if (pcmask(i+nbr,j,k) == 0) then
                  A(i,j,k,2+(nbr-1)/2) = 0d0
               endif
-              if (vof_phase(i,j+nbr,k) == 0) then
+              if (pcmask(i,j+nbr,k) == 0) then
                  A(i,j,k,4+(nbr-1)/2) = 0d0
               endif
-              if (vof_phase(i,j,k+nbr) == 0) then
+              if (pcmask(i,j,k+nbr) == 0) then
                  A(i,j,k,6+(nbr-1)/2) = 0d0
               endif
            enddo
@@ -653,90 +653,44 @@ subroutine setuppoisson_fs2(utmp,vtmp,wtmp,dt,A,vof_phase,istep)
   enddo; enddo; enddo
 end subroutine setuppoisson_fs2
 !--------------------------------------------------------------------------------------------------------------------
-!!$subroutine discrete_divergence(iout)
-!!$  use module_grid
-!!$  use module_flow
-!!$  use module_freesurface
-!!$  use module_IO
-!!$  implicit none
-!!$  include 'mpif.h'
-!!$  !real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: u,v,w 
-!!$  real(8), dimension(is:ie+1,js:je+1,ks:ke+1) :: div
-!!$  real(8), dimension(0:3) :: divtot, domain, n_level, n_total
-!!$  real(8) :: avg2
-!!$  integer :: i,j,k,l,iout,ierr,prank
-!!$  character(len=30) :: filename
-!!$
-!!$  divtot = 0d0; n_level = 0d0
-!!$  ! Open and/or append visit file
-!!$  filename = TRIM(out_path)//'/VTK/DIV'//TRIM(int2text(iout,padding))//'-'
-!!$  if (rank==0) then
-!!$     if (.not.vtk_open) then
-!!$        OPEN(unit=51,file='div.visit')
-!!$        write(51,'("!NBLOCKS ",I4)')npdomain
-!!$        vtk_open = .true.
-!!$     else
-!!$        OPEN(unit=51,file='div.visit',access='append')
-!!$     endif
-!!$     do prank=0,npdomain-1
-!!$        write(51,'(A)')TRIM(filename)//TRIM(int2text(prank,padding))//'.vtk'
-!!$     enddo
-!!$     close(unit=51)
-!!$  endif
-!!$
-!!$  do k=ks,ke+1; do j=js,je+1; do i=is,ie+1
-!!$     div(i,j,k)=ABS((u(i-1,j,k)-u(i,j,k))/dx(i)+(v(i,j-1,k)-v(i,j,k))/dy(j)+(w(i,j,k-1)-w(i,j,k))/dz(k))
-!!$     !div(i,j,k)=(u(i-1,j,k)-u(i,j,k))*dy(j)*dz(k)+(v(i,j-1,k)-v(i,j,k))*dx(i)*dz(k)+(w(i,j,k-1)-w(i,j,k))*dx(i)*dy(j)
-!!$     do l=0,3
-!!$        if (pcmask(i,j,k)==l) then
-!!$           divtot(l)=divtot(l)+div(i,j,k)
-!!$           n_level(l) = n_level(l) + 1d0
-!!$        endif
-!!$     enddo
-!!$  enddo; enddo; enddo
-!!$  call MPI_ALLREDUCE(divtot,domain,4, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_Cart, ierr)
-!!$  call MPI_ALLREDUCE(n_level,n_total,4, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_Cart, ierr)
-!!$  avg2 = (domain(1)+domain(2))/(n_total(1)+n_total(2))
-!!$  do l=0,3
-!!$     if (n_total(l) > 1d-10) domain(l)=domain(l)/n_total(l)
-!!$  enddo
-!!$  if (rank==0) then
-!!$     OPEN(unit=21,file='div_type.txt',access='append')
-!!$     write(21,115)iout,domain(0),domain(1),domain(2),domain(3),avg2
-!!$     close(unit=21)
-!!$  endif
-!!$115 format(I8,5e14.5)
-!!$  !Write div to VTK file
-!!$  OPEN(UNIT=8,FILE=TRIM(filename)//TRIM(int2text(rank,padding))//'.vtk')
-!!$  !write(*,'(I4)')rank
-!!$  write(8,10)
-!!$  write(8,11) time
-!!$  write(8,12)
-!!$  write(8,13)
-!!$  write(8,14)ie+1-is+1,je+1-js+1,ke+1-ks+1
-!!$  write(8,15) x(is),y(js),z(ks)
-!!$  write(8,16) x(is+1)-x(is),y(js+1)-y(js),z(ks+1)-z(ks)
-!!$10 format('# vtk DataFile Version 2.0')
-!!$11 format('grid, time ',F16.8)
-!!$12 format('ASCII')
-!!$13 format('DATASET STRUCTURED_POINTS')
-!!$14 format('DIMENSIONS ',I5,I5,I5)
-!!$15 format('ORIGIN ',F16.8,F16.8,F16.8)
-!!$16 format('SPACING ',F16.8,F16.8,F16.8)
-!!$
-!!$  write(8,19)(ie+1-is+1)*(je+1-js+1)*(ke+1-ks+1)
-!!$  write(8,17)'DIV'
-!!$  write(8,18)
-!!$19 format('POINT_DATA ',I17)
-!!$17 format('SCALARS ',A20,' float 1')
-!!$18 format('LOOKUP_TABLE default')
-!!$
-!!$  do k=ks,ke+1; do j=js,je+1; do i=is,ie+1
-!!$     write(8,210) div(i,j,k)
-!!$  enddo; enddo; enddo
-!!$210 format(e14.5)
-!!$  close(8)
-!!$end subroutine discrete_divergence
+subroutine discrete_divergence(u,v,w,iout)
+  use module_grid
+  use module_freesurface
+  use module_IO
+  implicit none
+  include 'mpif.h'
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: u,v,w 
+  real(8), dimension(is:ie+1,js:je+1,ks:ke+1) :: div
+  real(8), dimension(0:3) :: divtot, domain, n_level, n_total
+  real(8) :: avg2
+  integer :: i,j,k,l,iout,ierr,prank
+  character(len=30) :: filename
+
+  divtot = 0d0; n_level = 0d0
+
+  do k=ks,ke+1; do j=js,je+1; do i=is,ie+1
+     div(i,j,k)=ABS((u(i-1,j,k)-u(i,j,k))/dx(i)+(v(i,j-1,k)-v(i,j,k))/dy(j)+(w(i,j,k-1)-w(i,j,k))/dz(k))
+     !div(i,j,k)=(u(i-1,j,k)-u(i,j,k))*dy(j)*dz(k)+(v(i,j-1,k)-v(i,j,k))*dx(i)*dz(k)+(w(i,j,k-1)-w(i,j,k))*dx(i)*dy(j)
+     do l=0,3
+        if (pcmask(i,j,k)==l) then
+           divtot(l)=divtot(l)+div(i,j,k)
+           n_level(l) = n_level(l) + 1d0
+        endif
+     enddo
+  enddo; enddo; enddo
+  call MPI_ALLREDUCE(divtot,domain,4, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_Cart, ierr)
+  call MPI_ALLREDUCE(n_level,n_total,4, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_Cart, ierr)
+  avg2 = (domain(1)+domain(2))/(n_total(1)+n_total(2))
+  do l=0,3
+     if (n_total(l) > 1d-10) domain(l)=domain(l)/n_total(l)
+  enddo
+  if (rank==0) then
+     OPEN(unit=21,file='div_type.txt',access='append')
+     write(21,115)iout,domain(0),domain(1),domain(2),domain(3),avg2
+     close(unit=21)
+  endif
+115 format(I8,5e14.5)
+end subroutine discrete_divergence
 !--------------------------------------------------------------------------------------------------------------------
 subroutine get_ref_volume
   use module_2phase
@@ -801,8 +755,8 @@ subroutine FreeSolver(A,p,maxError,beta,maxit,it,ierr,iout,time,tres2)
 2 format(2e14.5)
   if (solver_flag == 0) call pariserror("Free Surface solver flag needs to be 1 or 2")
   do k=ks,ke; do j=js,je; do i=is,ie
-     if (solver_flag == 1 .and. pcmask(i,j,k) /= 0) p(i,j,k) = p_c !0d0 
-     if (solver_flag == 2 .and. pcmask(i,j,k)==3) p(i,j,k) = p_c
+     if (solver_flag == 1 .and. pcmask(i,j,k) /= 0) p(i,j,k) = p_c
+     if (solver_flag == 2 .and. pcmask(i,j,k)==3) p(i,j,k) = 0d0
   enddo; enddo; enddo
   !--------------------------------------ITERATION LOOP--------------------------------------------  
   do it=1,maxit
@@ -1018,7 +972,6 @@ subroutine VTK_scalar_struct(index,iout,var)
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax) :: var 
   character(len=40) :: file_root
   integer index, iout, i,j,k
-
   file_root = TRIM(out_path)//'/VTK/'//TRIM(file_short(index))//TRIM(int2text(iout,padding))//'-'
   !Write to VTK file
   OPEN(UNIT=8,FILE=TRIM(file_root)//TRIM(int2text(rank,padding))//'.vtk')

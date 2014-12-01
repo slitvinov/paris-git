@@ -154,8 +154,8 @@ Program paris
                        tmp = 0d0
                        do k=ks,ke+1; do j=js,je+1; do i=is,ie+1
                           tmp(i,j,k)=ABS((u(i-1,j,k)-u(i,j,k))/dx(i)+(v(i,j-1,k)-v(i,j,k))/dy(j)+(w(i,j,k-1)-w(i,j,k))/dz(k))
-                          call VTK_scalar_struct(out_fs,0,tmp)
                        enddo; enddo; enddo
+                       call VTK_scalar_struct(out_fs,0,tmp)
                     case (2)
                        call VTK_scalar_struct(out_fs,0,kappa_fs)
                     case(3)
@@ -431,7 +431,7 @@ Program paris
               if(HYPRE)then !HYPRE will not work with removed nodes from domain.
                  call pariserror("HYPRE solver not yet available for Free Surfaces")
               else
-                 call FreeSolver(A,p_ext,maxError,beta,maxit,it,ierr,itimestep,time,residual)
+                 call FreeSolver(A,p_ext,maxError/dt,beta,maxit,it,ierr,itimestep,time,residual)
               endif
               if(mod(itimestep,termout)==0) then
                  !call calcresidual(A,p,residual)
@@ -444,24 +444,24 @@ Program paris
               ! Correct ONLY masked gas velocities at level 1 and 2
               do k=ks,ke;  do j=js,je; do i=is,ieu    ! CORRECT THE u-velocity 
                  if (u_cmask(i,j,k)==1 .or. u_cmask(i,j,k)==2) then
-                    u(i,j,k)=u(i,j,k)-dt*(p_ext(i+1,j,k)-p_ext(i,j,k))/dxh(i)
+                    u(i,j,k)=u(i,j,k)-(p_ext(i+1,j,k)-p_ext(i,j,k))/dxh(i)
                  endif
               enddo; enddo; enddo
 
               do k=ks,ke;  do j=js,jev; do i=is,ie    ! CORRECT THE v-velocity
                  if (v_cmask(i,j,k)==1 .or. v_cmask(i,j,k)==2) then
-                    v(i,j,k)=v(i,j,k)-dt*(p_ext(i,j+1,k)-p_ext(i,j,k))/dyh(j)
+                    v(i,j,k)=v(i,j,k)-(p_ext(i,j+1,k)-p_ext(i,j,k))/dyh(j)
                  endif
               enddo; enddo; enddo
 
               do k=ks,kew;  do j=js,je; do i=is,ie   ! CORRECT THE w-velocity
                  if (w_cmask(i,j,k)==1 .or. w_cmask(i,j,k)==2) then
-                    w(i,j,k)=w(i,j,k)-dt*(p_ext(i,j,k+1)-p_ext(i,j,k))/dzh(k)
+                    w(i,j,k)=w(i,j,k)-(p_ext(i,j,k+1)-p_ext(i,j,k))/dzh(k)
                  endif
               enddo; enddo; enddo
               call SetVelocityBC(u,v,w,umask,vmask,wmask,time) !check this
               call do_ghost_vector(u,v,w)
-              !if (mod(itimestep,nout)==0 .and. mod(ii,itime_scheme)==0) call discrete_divergence(u,v,w,itimestep/nout)
+              if (mod(itimestep,nstats)==0 .and. mod(ii,itime_scheme)==0) call discrete_divergence(u,v,w,itimestep/nstats)
            endif !Extrapolation
 !------------------------------------------------------------------------------------------------
 
@@ -569,8 +569,8 @@ Program paris
                        tmp = 0d0
                        do k=ks,ke+1; do j=js,je+1; do i=is,ie+1
                           tmp(i,j,k)=ABS((u(i-1,j,k)-u(i,j,k))/dx(i)+(v(i,j-1,k)-v(i,j,k))/dy(j)+(w(i,j,k-1)-w(i,j,k))/dz(k))
-                          call VTK_scalar_struct(out_fs,itimestep/NOUT_VTK(out_fs),tmp)
                        enddo; enddo; enddo
+                       call VTK_scalar_struct(out_fs,itimestep/NOUT_VTK(out_fs),tmp)
                     case (2)
                        call VTK_scalar_struct(out_fs,itimestep/NOUT_VTK(out_fs),kappa_fs)
                     case(3)
