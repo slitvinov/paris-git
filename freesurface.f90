@@ -172,7 +172,7 @@ subroutine setuppoisson_fs(utmp,vtmp,wtmp,vof_phase,rhot,dt,A,cvof,n1,n2,n3,kap,
 
   x_mod=dxh((is+ie)/2); y_mod=dyh((js+je)/2); z_mod=dzh((ks+ke)/2) !assumes an unstretched grid
   P_gx = 0d0; P_gy = 0d0; P_gz = 0d0
-  limit = 1d-6/dx((is+ie)/2)
+  limit = 1d-4/dx((is+ie)/2)
   c_min = 1d-2
   !Debugging
   debug = .false.
@@ -1183,9 +1183,9 @@ subroutine write_RP_test(t)
   real(8) :: t, vol
   real(8), parameter :: pi=3.141592653
   vol = 4d0/3d0*pi*R_RK**3d0
-  OPEN(UNIT=2,FILE='RK_int_RP.txt',access='append')
-  WRITE(2,2) t, R_RK, dR_RK, ddR_RK, vol
-  CLOSE(unit=2)
+  OPEN(UNIT=20,FILE='RK_int_RP.txt',access='append')
+  WRITE(20,2) t, R_RK, dR_RK, ddR_RK, vol
+  CLOSE(unit=20)
 2 format(5e14.5)
 end subroutine write_RP_test
 !======================================================================================================================================
@@ -1200,181 +1200,181 @@ subroutine set_RP_radial_velocity(u,v,w)
   include 'mpif.h'
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: u, v, w
   real(8) :: di1, di2
-  integer :: ix1, ix2
+  integer :: ih1, ih2
   integer :: i,j,k
 
   !x- face
   if (coords(1)==0) then
-     write(*,*)'x- face loop'
+     !write(*,*)'x- face loop'
      do j=js,je; do k=ks,ke
         ! Components to be done independently, starting xith u on the boundary
         if (y(j).ge.yc(1)) then 
-           ix1 = -1
+           ih1 = -1
         else
-           ix1 = 1
+           ih1 = 1
         endif
         if (z(k).ge.zc(1)) then 
-           ix2 = -1
+           ih2 = -1
         else
-           ix2 = 1
+           ih2 = 1
         endif
         !get cuts, will be non-dimensional if dx=dy=dz
         di1 = ABS(yc(1)-y(j))/ABS(xc(1)-xh(is-1))
         di2 = ABS(zc(1)-z(k))/ABS(xc(1)-xh(is-1))
         !set
-        u(is-1,j,k)=u(is,j,k)*(1d0-di1)*(1d0-di2)+u(is,j+ix1,k)*di1*(1d0-di2)&
-             +u(is,j,k+ix2)*(1d0-di1)*di2+u(is,j+ix1,k+ix2)*di1*di2
+        u(is-1,j,k)=u(is,j,k)*(1d0-di1)*(1d0-di2)+u(is,j+ih1,k)*di1*(1d0-di2)&
+             +u(is,j,k+ih2)*(1d0-di1)*di2+u(is,j+ih1,k+ih2)*di1*di2
         !same for v
         if (yh(j).ge.yc(1)) then 
-           ix1 = -1
+           ih1 = -1
         else
-           ix1 = 1
+           ih1 = 1
         endif
         if (zh(k).ge.zc(1)) then 
-           ix2 = -1
+           ih2 = -1
         else
-           ix2 = 1
+           ih2 = 1
         endif
         !get cuts, will be non-dimensional if dx=dy=dz
         di1 = ABS(yc(1)-yh(j))/ABS(xc(1)-x(is-1))
         di2 = ABS(zc(1)-zh(k))/ABS(xc(1)-x(is-1))
         !set
-        v(is-1,j,k)=v(is,j,k)*(1d0-di1)*(1d0-di2)+v(is,j+ix1,k)*di1*(1d0-di2)&
-             +v(is,j,k+ix2)*(1d0-di1)*di2+v(is,j+ix1,k+ix2)*di1*di2
+        v(is-1,j,k)=v(is,j,k)*(1d0-di1)*(1d0-di2)+v(is,j+ih1,k)*di1*(1d0-di2)&
+             +v(is,j,k+ih2)*(1d0-di1)*di2+v(is,j+ih1,k+ih2)*di1*di2
         !same for w
-        w(is-1,j,k)=w(is,j,k)*(1d0-di1)*(1d0-di2)+w(is,j+ix1,k)*di1*(1d0-di2)&
-             +w(is,j,k+ix2)*(1d0-di1)*di2+w(is,j+ix1,k+ix2)*di1*di2
+        w(is-1,j,k)=w(is,j,k)*(1d0-di1)*(1d0-di2)+w(is,j+ih1,k)*di1*(1d0-di2)&
+             +w(is,j,k+ih2)*(1d0-di1)*di2+w(is,j+ih1,k+ih2)*di1*di2
         !set u(is-2) to allow cell is-1 to be divergence free
      enddo; enddo
   endif
   !x+ face
   if (coords(1)==nPx-1) then
-    write(*,*)'x+ face loop' 
+    !write(*,*)'x+ face loop' 
      do j=js,je; do k=ks,ke
         ! Components to be done independently, starting xith u on the boundary
         if (y(j).ge.yc(1)) then 
-           ix1 = -1
+           ih1 = -1
         else
-           ix1 = 1
+           ih1 = 1
         endif
         if (z(k).ge.zc(1)) then 
-           ix2 = -1
+           ih2 = -1
         else
-           ix2 = 1
+           ih2 = 1
         endif
         !get cuts, will be non-dimensional if dx=dy=dz
         di1 = ABS(yc(1)-y(j))/ABS(xc(1)-xh(ie))
         di2 = ABS(zc(1)-z(k))/ABS(xc(1)-xh(ie))
         !set
-        u(ie,j,k)=u(ie-1,j,k)*(1d0-di1)*(1d0-di2)+u(ie-1,j+ix1,k)*di1*(1d0-di2)&
-             +u(ie-1,j,k+ix2)*(1d0-di1)*di2+u(ie-1,j+ix1,k+ix2)*di1*di2
+        u(ie,j,k)=u(ie-1,j,k)*(1d0-di1)*(1d0-di2)+u(ie-1,j+ih1,k)*di1*(1d0-di2)&
+             +u(ie-1,j,k+ih2)*(1d0-di1)*di2+u(ie-1,j+ih1,k+ih2)*di1*di2
         !same for v
         if (yh(j).ge.yc(1)) then 
-           ix1 = -1
+           ih1 = -1
         else
-           ix1 = 1
+           ih1 = 1
         endif
         if (zh(k).ge.zc(1)) then 
-           ix2 = -1
+           ih2 = -1
         else
-           ix2 = 1
+           ih2 = 1
         endif
         !get cuts, will be non-dimensional if dx=dy=dz
         di1 = ABS(yc(1)-yh(j))/ABS(xc(1)-x(ie+1))
         di2 = ABS(zc(1)-zh(k))/ABS(xc(1)-x(ie+1))
         !set
-        v(ie,j,k)=v(ie-1,j,k)*(1d0-di1)*(1d0-di2)+v(ie-1,j+ix1,k)*di1*(1d0-di2)&
-             +v(ie-1,j,k+ix2)*(1d0-di1)*di2+v(ie-1,j+ix1,k+ix2)*di1*di2
+        v(ie,j,k)=v(ie-1,j,k)*(1d0-di1)*(1d0-di2)+v(ie-1,j+ih1,k)*di1*(1d0-di2)&
+             +v(ie-1,j,k+ih2)*(1d0-di1)*di2+v(ie-1,j+ih1,k+ih2)*di1*di2
         !same for w
-        w(ie,j,k)=w(ie-1,j,k)*(1d0-di1)*(1d0-di2)+w(ie-1,j+ix1,k)*di1*(1d0-di2)&
-             +w(ie-1,j,k+ix2)*(1d0-di1)*di2+w(ie-1,j+ix1,k+ix2)*di1*di2
+        w(ie,j,k)=w(ie-1,j,k)*(1d0-di1)*(1d0-di2)+w(ie-1,j+ih1,k)*di1*(1d0-di2)&
+             +w(ie-1,j,k+ih2)*(1d0-di1)*di2+w(ie-1,j+ih1,k+ih2)*di1*di2
         !set u(ie+2) to allow cell to be divergence free
      enddo; enddo
   endif
 
   !y-face
   if (coords(2)==0) then
-     write(*,*)'y- face loop'
+     !write(*,*)'y- face loop'
      do i=is,ie; do k=ks,ke
         if (x(i).ge.xc(1)) then 
-           ix1 = -1
+           ih1 = -1
         else
-           ix1 = 1
+           ih1 = 1
         endif
         if (z(k).ge.zc(1)) then 
-           ix2 = -1
+           ih2 = -1
         else
-           ix2 = 1
+           ih2 = 1
         endif
         !get cuts, will be non-dimensional if dx=dy=dz
         di1 = ABS(xc(1)-x(i))/ABS(yc(1)-yh(is-1))
         di2 = ABS(zc(1)-z(k))/ABS(yc(1)-yh(is-1))
         !set
-        v(i,js-1,k)=v(i,js,k)*(1d0-di1)*(1d0-di2)+v(is,js+ix1,k)*di1*(1d0-di2)&
-             +v(i,js,k+ix2)*(1d0-di1)*di2+v(i,js+ix1,k+ix2)*di1*di2
+        v(i,js-1,k)=v(i,js,k)*(1d0-di1)*(1d0-di2)+v(is,js+ih1,k)*di1*(1d0-di2)&
+             +v(i,js,k+ih2)*(1d0-di1)*di2+v(i,js+ih1,k+ih2)*di1*di2
         !same for v
         if (xh(i).ge.xc(1)) then 
-           ix1 = -1
+           ih1 = -1
         else
-           ix1 = 1
+           ih1 = 1
         endif
         if (zh(k).ge.zc(1)) then 
-           ix2 = -1
+           ih2 = -1
         else
-           ix2 = 1
+           ih2 = 1
         endif
         !get cuts, will be non-dimensional if dx=dy=dz
         di1 = ABS(xc(1)-xh(i))/ABS(yc(1)-y(is-1))
         di2 = ABS(zc(1)-zh(k))/ABS(yc(1)-y(is-1))
         !set
-        u(i,js-1,k)=u(i,js,k)*(1d0-di1)*(1d0-di2)+u(i+ix1,js,k)*di1*(1d0-di2)&
-             +u(i,js,k+ix2)*(1d0-di1)*di2+u(i+ix1,js,k+ix2)*di1*di2
+        u(i,js-1,k)=u(i,js,k)*(1d0-di1)*(1d0-di2)+u(i+ih1,js,k)*di1*(1d0-di2)&
+             +u(i,js,k+ih2)*(1d0-di1)*di2+u(i+ih1,js,k+ih2)*di1*di2
         !same for w
-        w(i,js-1,k)=w(i,js,k)*(1d0-di1)*(1d0-di2)+w(i+ix1,js,k)*di1*(1d0-di2)&
-             +w(i,js,k+ix2)*(1d0-di1)*di2+w(i+ix1,js,k+ix2)*di1*di2
+        w(i,js-1,k)=w(i,js,k)*(1d0-di1)*(1d0-di2)+w(i+ih1,js,k)*di1*(1d0-di2)&
+             +w(i,js,k+ih2)*(1d0-di1)*di2+w(i+ih1,js,k+ih2)*di1*di2
         !set u(is-2) to allow cell is-1 to be divergence free
      enddo; enddo
   endif
   !y+ face
   if (coords(2)==nPy-1) then
-     write(*,*)'y+ face loop'
+     !write(*,*)'y+ face loop'
      do i=is,ie; do k=ks,ke
         if (x(i).ge.xc(1)) then 
-           ix1 = -1
+           ih1 = -1
         else
-           ix1 = 1
+           ih1 = 1
         endif
         if (z(k).ge.zc(1)) then 
-           ix2 = -1
+           ih2 = -1
         else
-           ix2 = 1
+           ih2 = 1
         endif
         !get cuts, will be non-dimensional if dx=dy=dz
         di1 = ABS(xc(1)-x(i))/ABS(yc(1)-yh(je))
         di2 = ABS(zc(1)-z(k))/ABS(yc(1)-yh(je))
         !set
-        v(i,je,k)=v(i,je-1,k)*(1d0-di1)*(1d0-di2)+v(i+ix1,je-1,k)*di1*(1d0-di2)&
-             +v(i,je-1,k+ix2)*(1d0-di1)*di2+v(i+ix1,je-1,k+ix2)*di1*di2
+        v(i,je,k)=v(i,je-1,k)*(1d0-di1)*(1d0-di2)+v(i+ih1,je-1,k)*di1*(1d0-di2)&
+             +v(i,je-1,k+ih2)*(1d0-di1)*di2+v(i+ih1,je-1,k+ih2)*di1*di2
         !same for u
         if (xh(i).ge.xc(1)) then 
-           ix1 = -1
+           ih1 = -1
         else
-           ix1 = 1
+           ih1 = 1
         endif
         if (zh(k).ge.zc(1)) then 
-           ix2 = -1
+           ih2 = -1
         else
-           ix2 = 1
+           ih2 = 1
         endif
         !get cuts, will be non-dimensional if dx=dy=dz
         di1 = ABS(xc(1)-xh(i))/ABS(yc(1)-y(je+1))
         di2 = ABS(zc(1)-zh(k))/ABS(yc(1)-y(je+1))
         !set
-        u(i,je+1,k)=u(i,je,k)*(1d0-di1)*(1d0-di2)+u(i+ix1,je,k)*di1*(1d0-di2)&
-             +u(i,je,k+ix2)*(1d0-di1)*di2+u(i+ix1,je,k+ix2)*di1*di2
+        u(i,je+1,k)=u(i,je,k)*(1d0-di1)*(1d0-di2)+u(i+ih1,je,k)*di1*(1d0-di2)&
+             +u(i,je,k+ih2)*(1d0-di1)*di2+u(i+ih1,je,k+ih2)*di1*di2
         !same for w
-        w(i,je+1,k)=w(i,je,k)*(1d0-di1)*(1d0-di2)+w(i+ix1,je,k)*di1*(1d0-di2)&
-             +w(i,je,k+ix2)*(1d0-di1)*di2+w(i+ix1,je,k+ix2)*di1*di2
+        w(i,je+1,k)=w(i,je,k)*(1d0-di1)*(1d0-di2)+w(i+ih1,je,k)*di1*(1d0-di2)&
+             +w(i,je,k+ih2)*(1d0-di1)*di2+w(i+ih1,je,k+ih2)*di1*di2
         !set u(ie+2) to allow cell to be divergence free
      enddo; enddo
   endif
