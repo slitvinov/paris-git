@@ -2113,55 +2113,35 @@ end subroutine SetupDensity
 ! A7*Pijk = A1*Pi-1jk + A2*Pi+1jk + A3*Pij-1k + 
 !           A4*Pij+1k + A5*Pijk-1 + A6*Pijk+1 + A8
 !-------------------------------------------------------------------------------------------------
-subroutine SetupPoisson(utmp,vtmp,wtmp,umask,vmask,wmask,vof_phase,rhot,dt,A,pmask,cvof,n1,n2,n3,VolumeSource,kappa_fs,istep) 
+subroutine SetupPoisson(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask,VolumeSource) 
   use module_grid
   use module_BC
   use module_2phase
-  use module_freesurface
   use module_IO
   implicit none
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: utmp,vtmp,wtmp,rhot
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: umask,vmask,wmask
   real(8), dimension(is:ie,js:je,ks:ke), intent(inout) :: pmask
-  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: cvof,n1,n2,n3,kappa_fs
-  integer, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: vof_phase
   real(8), dimension(is:ie,js:je,ks:ke,8), intent(out) :: A
   real(8), intent(in) :: dt, VolumeSource
   real(8), dimension(4) :: P_bc
   integer :: i,j,k,l,istep
   
-  if (.not.FreeSurface) then
-     do k=ks,ke; do j=js,je; do i=is,ie
-        !    if(mask(i,j,k))then
-        A(i,j,k,1) = 2d0*dt*umask(i-1,j,k)/(dx(i)*dxh(i-1)*(rhot(i-1,j,k)+rhot(i,j,k)))
-        A(i,j,k,2) = 2d0*dt*umask(i,j,k)/(dx(i)*dxh(i  )*(rhot(i+1,j,k)+rhot(i,j,k)))
-        A(i,j,k,3) = 2d0*dt*vmask(i,j-1,k)/(dy(j)*dyh(j-1)*(rhot(i,j-1,k)+rhot(i,j,k)))
-        A(i,j,k,4) = 2d0*dt*vmask(i,j,k)/(dy(j)*dyh(j  )*(rhot(i,j+1,k)+rhot(i,j,k)))
-        A(i,j,k,5) = 2d0*dt*wmask(i,j,k-1)/(dz(k)*dzh(k-1)*(rhot(i,j,k-1)+rhot(i,j,k)))
-        A(i,j,k,6) = 2d0*dt*wmask(i,j,k)/(dz(k)*dzh(k  )*(rhot(i,j,k+1)+rhot(i,j,k)))
-        A(i,j,k,7) = sum(A(i,j,k,1:6))
-        A(i,j,k,8) =  -(  VolumeSource +(utmp(i,j,k)-utmp(i-1,j,k))/dx(i) &
-             +  (vtmp(i,j,k)-vtmp(i,j-1,k))/dy(j) &
-             +  (wtmp(i,j,k)-wtmp(i,j,k-1))/dz(k) )
-        !    endif
-     enddo; enddo; enddo
-  else
-     do k=ks,ke; do j=js,je; do i=is,ie
-        if (vof_phase(i,j,k)==0) then
-           A(i,j,k,1) = 2d0*dt/(dx(i)*dxh(i-1)*(rhot(i-1,j,k)+rhot(i,j,k)))
-           A(i,j,k,2) = 2d0*dt/(dx(i)*dxh(i  )*(rhot(i+1,j,k)+rhot(i,j,k)))
-           A(i,j,k,3) = 2d0*dt/(dy(j)*dyh(j-1)*(rhot(i,j-1,k)+rhot(i,j,k)))
-           A(i,j,k,4) = 2d0*dt/(dy(j)*dyh(j  )*(rhot(i,j+1,k)+rhot(i,j,k)))
-           A(i,j,k,5) = 2d0*dt/(dz(k)*dzh(k-1)*(rhot(i,j,k-1)+rhot(i,j,k)))
-           A(i,j,k,6) = 2d0*dt/(dz(k)*dzh(k  )*(rhot(i,j,k+1)+rhot(i,j,k)))
-           A(i,j,k,7) = sum(A(i,j,k,1:6))
-           A(i,j,k,8) =  -( (utmp(i,j,k)-utmp(i-1,j,k))/dx(i) &
-                +  (vtmp(i,j,k)-vtmp(i,j-1,k))/dy(j) &
-                +  (wtmp(i,j,k)-wtmp(i,j,k-1))/dz(k) )
-        endif
-     enddo; enddo; enddo
-     call setuppoisson_fs(vof_phase,rhot,dt,A,cvof,n1,n2,n3,kappa_fs,istep)
-  endif
+  do k=ks,ke; do j=js,je; do i=is,ie
+     !    if(mask(i,j,k))then
+     A(i,j,k,1) = 2d0*dt*umask(i-1,j,k)/(dx(i)*dxh(i-1)*(rhot(i-1,j,k)+rhot(i,j,k)))
+     A(i,j,k,2) = 2d0*dt*umask(i,j,k)/(dx(i)*dxh(i  )*(rhot(i+1,j,k)+rhot(i,j,k)))
+     A(i,j,k,3) = 2d0*dt*vmask(i,j-1,k)/(dy(j)*dyh(j-1)*(rhot(i,j-1,k)+rhot(i,j,k)))
+     A(i,j,k,4) = 2d0*dt*vmask(i,j,k)/(dy(j)*dyh(j  )*(rhot(i,j+1,k)+rhot(i,j,k)))
+     A(i,j,k,5) = 2d0*dt*wmask(i,j,k-1)/(dz(k)*dzh(k-1)*(rhot(i,j,k-1)+rhot(i,j,k)))
+     A(i,j,k,6) = 2d0*dt*wmask(i,j,k)/(dz(k)*dzh(k  )*(rhot(i,j,k+1)+rhot(i,j,k)))
+     A(i,j,k,7) = sum(A(i,j,k,1:6))
+     A(i,j,k,8) =  -(  VolumeSource +(utmp(i,j,k)-utmp(i-1,j,k))/dx(i) &
+          +  (vtmp(i,j,k)-vtmp(i,j-1,k))/dy(j) &
+          +  (wtmp(i,j,k)-wtmp(i,j,k-1))/dz(k) )
+     !    endif
+  enddo; enddo; enddo
+ 
   P_bc = 0d0
   ! dp/dn = 0 for inflow bc on face 1 == x- : do not correct u(is-1)
   ! inflow bc on other faces not implemented yet.  !@@ generalize this ! 
@@ -2263,50 +2243,49 @@ subroutine SetupPoisson(utmp,vtmp,wtmp,umask,vmask,wmask,vof_phase,rhot,dt,A,pma
   endif
 
 ! What follows is a lot of debugging for small A7 values and checking the matrix 
-  if(.not.FreeSurface) then 
-     do k=ks,ke; do j=js,je; do i=is,ie
-        if(A(i,j,k,7) .lt. 1d-50)  then
-           ! check that we are in solid. Remember we can't have an isolated fluid cell exactly on the entrance. 
-           if(umask(i-1,j,k).lt.0.5d0.and.umask(i,j,k).lt.0.5d0.and.     &
-                vmask(i,j-1,k).lt.0.5d0.and.vmask(i,j,k).lt.0.5d0.and.   &
-                wmask(i,j,k-1).lt.0.5d0.and.wmask(i,j,k).lt.0.5d0 ) then ! we are in solid
-              if(A(i,j,k,8).gt.1d-50) then ! check A8 for debugging
-                 OPEN(UNIT=88,FILE=TRIM(out_path)//'/message-rank-'//TRIM(int2text(rank,padding))//'.txt')
-                 write(88,*) "A8 non zero in solid at ijk + minmax = ",i,j,k,imin,imax,jmin,jmax,kmin,kmax
-                 write(88,*) "VolumeSource",VolumeSource
-                 write(88,*) "umask(i-1,j,k),umask(i,j,k),vmask(i,j-1,k)",&
-                      "vmask(i,j,k),wmask(i,j,k-1),wmask(i,j,k)",         &
-                      umask(i-1,j,k),umask(i,j,k),vmask(i,j-1,k),         &
-                      vmask(i,j,k),wmask(i,j,k-1),wmask(i,j,k)
-                 write(88,*) "dx(i),dy(j),dz(k)",dx(i),dy(j),dz(k)
-                 close(88)
-                 call pariserror("A8 non zero in solid") 
-              endif
-              if(maxval(A(i,j,k,1:6)).gt.1d-50.or.minval(A(i,j,k,1:6)).lt.0d0) then
-                 call pariserror("inconsistency in A1-6")
-              endif
-              A(i,j,k,7) = 1d0
-           else ! we are not in solid: error.
+  do k=ks,ke; do j=js,je; do i=is,ie
+     if(A(i,j,k,7) .lt. 1d-50)  then
+        ! check that we are in solid. Remember we can't have an isolated fluid cell exactly on the entrance. 
+        if(umask(i-1,j,k).lt.0.5d0.and.umask(i,j,k).lt.0.5d0.and.     &
+             vmask(i,j-1,k).lt.0.5d0.and.vmask(i,j,k).lt.0.5d0.and.   &
+             wmask(i,j,k-1).lt.0.5d0.and.wmask(i,j,k).lt.0.5d0 ) then ! we are in solid
+           if(A(i,j,k,8).gt.1d-50) then ! check A8 for debugging
               OPEN(UNIT=88,FILE=TRIM(out_path)//'/message-rank-'//TRIM(int2text(rank,padding))//'.txt')
-              write(88,*) "A7 tiny outside of solid at ijk minmax = ",i,j,k,imin,imax,jmin,jmax,kmin,kmax
-              write(88,*) "dt",dt
+              write(88,*) "A8 non zero in solid at ijk + minmax = ",i,j,k,imin,imax,jmin,jmax,kmin,kmax
+              write(88,*) "VolumeSource",VolumeSource
               write(88,*) "umask(i-1,j,k),umask(i,j,k),vmask(i,j-1,k)",&
                    "vmask(i,j,k),wmask(i,j,k-1),wmask(i,j,k)",         &
                    umask(i-1,j,k),umask(i,j,k),vmask(i,j-1,k),         &
                    vmask(i,j,k),wmask(i,j,k-1),wmask(i,j,k)
-              write(88,*) "dx(i),dxh(i-1),dxh(i),rhot(i-1,j,k),rhot(i,j,k),rhot(i+1,j,k)",&
-                   dx(i),dxh(i-1),dxh(i),rhot(i-1,j,k),rhot(i,j,k),rhot(i+1,j,k)
-              write(88,*) "dy(j),dyh(j-1),dyh(j),rhot(i,j-1,k),rhot(i,j,k),rhot(i,j+1,k)",&
-                   dy(j),dyh(j-1),dyh(j),rhot(i,j-1,k),rhot(i,j,k),rhot(i,j+1,k)
-              write(88,*) "dz(k),dzh(k-1),dzh(k),rhot(i,j,k-1),rhot(i,j,k),rhot(i,j,k+1)",&
-                   dz(k),dzh(k-1),dzh(k),rhot(i,j,k-1),rhot(i,j,k),rhot(i,j,k+1)
+              write(88,*) "dx(i),dy(j),dz(k)",dx(i),dy(j),dz(k)
               close(88)
-              call pariserror("A7 tiny outside of solid. Debug me")
+              call pariserror("A8 non zero in solid") 
            endif
+           if(maxval(A(i,j,k,1:6)).gt.1d-50.or.minval(A(i,j,k,1:6)).lt.0d0) then
+              call pariserror("inconsistency in A1-6")
+           endif
+           A(i,j,k,7) = 1d0
+        else ! we are not in solid: error.
+           OPEN(UNIT=88,FILE=TRIM(out_path)//'/message-rank-'//TRIM(int2text(rank,padding))//'.txt')
+           write(88,*) "A7 tiny outside of solid at ijk minmax = ",i,j,k,imin,imax,jmin,jmax,kmin,kmax
+           write(88,*) "dt",dt
+           write(88,*) "umask(i-1,j,k),umask(i,j,k),vmask(i,j-1,k)",&
+                "vmask(i,j,k),wmask(i,j,k-1),wmask(i,j,k)",         &
+                umask(i-1,j,k),umask(i,j,k),vmask(i,j-1,k),         &
+                vmask(i,j,k),wmask(i,j,k-1),wmask(i,j,k)
+           write(88,*) "dx(i),dxh(i-1),dxh(i),rhot(i-1,j,k),rhot(i,j,k),rhot(i+1,j,k)",&
+                dx(i),dxh(i-1),dxh(i),rhot(i-1,j,k),rhot(i,j,k),rhot(i+1,j,k)
+           write(88,*) "dy(j),dyh(j-1),dyh(j),rhot(i,j-1,k),rhot(i,j,k),rhot(i,j+1,k)",&
+                dy(j),dyh(j-1),dyh(j),rhot(i,j-1,k),rhot(i,j,k),rhot(i,j+1,k)
+           write(88,*) "dz(k),dzh(k-1),dzh(k),rhot(i,j,k-1),rhot(i,j,k),rhot(i,j,k+1)",&
+                dz(k),dzh(k-1),dzh(k),rhot(i,j,k-1),rhot(i,j,k),rhot(i,j,k+1)
+           close(88)
+           call pariserror("A7 tiny outside of solid. Debug me")
         endif
-     enddo; enddo; enddo
-     if(check_setup) call check_poisson_setup(A,pmask,umask,vmask,wmask)
-  endif
+     endif
+  enddo; enddo; enddo
+  if(check_setup) call check_poisson_setup(A,pmask,umask,vmask,wmask)
+  
 ! End debugging and checking
 end subroutine SetupPoisson
 !=================================================================================================

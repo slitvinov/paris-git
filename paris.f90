@@ -328,7 +328,11 @@ Program paris
            call my_timer(1)
 !-----------------------------------------PROJECTION STEP-----------------------------------------
            call SetPressureBC(umask,vmask,wmask)
-           call SetupPoisson(u,v,w,umask,vmask,wmask,vof_phase,rho,dt,A,tmp,cvof,n1,n2,n3,VolumeSource,kappa_fs,itimestep)
+           if (.not.FreeSurface) then
+              call SetupPoisson(u,v,w,umask,vmask,wmask,rho,dt,A,tmp,VolumeSource)
+           else 
+              call Setuppoisson_fs(u,v,w,vof_phase,rho,dt,A,cvof,n1,n2,n3,kappa_fs,itimestep)
+           endif
            ! (div u)*dt < epsilon => div u < epsilon/dt => maxresidual : maxerror/dt 
            if(HYPRE)then
               if (FreeSurface) call pariserror("HYPRE not functional for Free Surface")
@@ -437,7 +441,7 @@ Program paris
                  !call calcresidual(A,p,residual)
                  if(rank==0) then
                     write(*,'("FS2:          pressure residual:   ",e7.1,&
-                         &" maxerror: ",e7.1)') residual,maxerror
+                         &" maxerror: ",e7.1)') residual*dt,maxerror
                     write(*,'("              pressure iterations :",I9)')it
                  endif
               endif

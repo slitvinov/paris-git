@@ -57,6 +57,7 @@
      endif
   enddo; enddo; enddo
   !fill ghost layers for zero masks
+  !call set_topology_bc
   call ighost_x(u_cmask,2,req(1:4)); call ighost_x(v_cmask,2,req(5:8)); call ighost_x(w_cmask,2,req(9:12))
   call ighost_x(pcmask,2,req(13:16)); call MPI_WAITALL(16,req(1:16),sta(:,1:16),ierr)
   call ighost_y(u_cmask,2,req(1:4)); call ighost_y(v_cmask,2,req(5:8)); call ighost_y(w_cmask,2,req(9:12))
@@ -148,7 +149,7 @@
 13 format(3e14.5)
 end subroutine set_topology
 !-------------------------------------------------------------------------------------------------
-subroutine setuppoisson_fs(vof_phase,rhot,dt,A,cvof,n1,n2,n3,kap,iout)    
+subroutine setuppoisson_fs(utmp,vtmp,wtmp,vof_phase,rhot,dt,A,cvof,n1,n2,n3,kap,iout)    
   use module_grid
   use module_BC
   use module_2phase
@@ -156,7 +157,7 @@ subroutine setuppoisson_fs(vof_phase,rhot,dt,A,cvof,n1,n2,n3,kap,iout)
   use module_IO
   implicit none
   include 'mpif.h'
-  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: rhot
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: utmp,vtmp,wtmp,rhot
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: kap
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: cvof,n1,n2,n3
   real(8), dimension(is:ie,js:je,ks:ke,8), intent(inout) :: A
@@ -167,6 +168,7 @@ subroutine setuppoisson_fs(vof_phase,rhot,dt,A,cvof,n1,n2,n3,kap,iout)
   real(8) :: dt, limit
   integer :: i,j,k,l,iout,nbr,ierr,no
   real(8) :: c1, c0, c_stag, c_min
+  real(8), dimension(4) :: P_bc
 
   x_mod=dxh((is+ie)/2); y_mod=dyh((js+je)/2); z_mod=dzh((ks+ke)/2) !assumes an unstretched grid
   P_gx = 0d0; P_gy = 0d0; P_gz = 0d0
@@ -347,6 +349,16 @@ subroutine setuppoisson_fs(vof_phase,rhot,dt,A,cvof,n1,n2,n3,kap,iout)
      endif
 !----Liquid-cavity neighbours-----------------------------------------------------
      if (vof_phase(i,j,k)==0) then
+        A(i,j,k,1) = 2d0*dt/(dx(i)*dxh(i-1)*(rhot(i-1,j,k)+rhot(i,j,k)))
+        A(i,j,k,2) = 2d0*dt/(dx(i)*dxh(i  )*(rhot(i+1,j,k)+rhot(i,j,k)))
+        A(i,j,k,3) = 2d0*dt/(dy(j)*dyh(j-1)*(rhot(i,j-1,k)+rhot(i,j,k)))
+        A(i,j,k,4) = 2d0*dt/(dy(j)*dyh(j  )*(rhot(i,j+1,k)+rhot(i,j,k)))
+        A(i,j,k,5) = 2d0*dt/(dz(k)*dzh(k-1)*(rhot(i,j,k-1)+rhot(i,j,k)))
+        A(i,j,k,6) = 2d0*dt/(dz(k)*dzh(k  )*(rhot(i,j,k+1)+rhot(i,j,k)))
+        A(i,j,k,7) = sum(A(i,j,k,1:6))
+        A(i,j,k,8) =  -( (utmp(i,j,k)-utmp(i-1,j,k))/dx(i) &
+             +  (vtmp(i,j,k)-vtmp(i,j-1,k))/dy(j) &
+             +  (wtmp(i,j,k)-wtmp(i,j,k-1))/dz(k) )
         ! set Laplace pressure jumps
         if (vof_phase(i+1,j,k)==1) then
            P_gx(i+1,j,k) = sigma*kap(i+1,j,k)/dx(i) !!filaments and droplets of one cell will be an issue here
@@ -598,8 +610,111 @@ subroutine setuppoisson_fs(vof_phase,rhot,dt,A,cvof,n1,n2,n3,kap,iout)
            write(51,314)x(i),z(k),0d0,z_mod(i,j,k)
            if (cvof(i,j,k)>1d-20) write(52,'(10e14.5)')x(i),z(k),A(i,j,k,1:8)
         endif
+        if (pcmask(i,j,k).ne.0) write(*,'("Error topology, phase 0, pcmask :",i8)')pcmask(i,j,k)
      endif
   enddo;enddo;enddo
+
+  P_bc = 0d0
+  ! dp/dn = 0 for inflow bc on face 1 == x- : do not correct u(is-1)
+  ! inflow bc on other faces not implemented yet.  !@@ generalize this ! 
+  if(coords(1)==0) then
+     if(bdry_cond(1)==3) then  
+        A(is,:,:,7) = A(is,:,:,7) - A(is,:,:,1)
+        A(is,:,:,1) = 0d0
+        ! pressure boundary condition
+     else if(bdry_cond(1)==5 .and. (.not.RP_test)) then 
+        A(is,:,:,8) = (2d0/3d0)*BoundaryPressure(1)  ! P_0 =  1/3 (Pinner - P_b) + P_b
+        A(is,:,:,7) = 1d0                      ! P_0  - 1/3 Pinner =  2/3 P_b
+        A(is,:,:,1:6) = 0d0                    ! A7 P_is + A2 P_is+1 = A8 
+        A(is,:,:,2) = 1d0/3d0 !sign due to definition in Poisson solver
+        P_bc(1) = 1d0
+     endif
+  endif
+  ! dp/dn = 0 for outflow/fixed velocity bc on face 4 == x+
+  ! outflow/fixed velocity bc on other faces not implemented yet.  
+  if(coords(1)==Npx-1) then
+     if(bdry_cond(4)==4) then
+        A(ie,:,:,7) = A(ie,:,:,7) - A(ie,:,:,2)
+        A(ie,:,:,2) = 0d0
+        ! pressure boundary condition
+     else if(bdry_cond(4)==5 .and. (.not.RP_test)) then
+        A(ie,:,:,8) = (2d0/3d0)*BoundaryPressure(2)
+        A(ie,:,:,7) = 1d0  
+        A(ie,:,:,2:6) = 0d0
+        A(ie,:,:,1) = 1d0/3d0
+        P_bc(2) = 1d0
+     endif
+  endif
+ 
+  if (.not. RP_test) then
+     ! Pressure BC for y-
+     if(coords(2)==0 .and. (bdry_cond(2)==5)) then
+        A(:,js,:,8) = (2d0/3d0)*BoundaryPressure(3)
+        A(is,js,:,8) = (2d0/3d0)*(BoundaryPressure(3)+BoundaryPressure(1)*P_bc(1))
+        A(ie,js,:,8) = (2d0/3d0)*(BoundaryPressure(3)+BoundaryPressure(2)*P_bc(2))
+        A(:,js,:,7) = 1d0
+        A(is,js,:,7) = 1d0 + P_bc(1)
+        A(ie,js,:,7) = 1d0 + P_bc(2)
+        A(:,js,:,1:6) = 0d0      
+        A(is,js,:,2) = 1d0/3d0*P_bc(1)
+        A(ie,js,:,1) = 1d0/3d0*P_bc(2)
+        A(:,js,:,4) = 1d0/3d0
+        P_bc(3) = 1d0
+     endif
+     ! Pressure BC for y+
+     if(coords(2)==Npy-1 .and. (bdry_cond(5)==5) ) then
+        A(:,je,:,8) = (2d0/3d0)*BoundaryPressure(4)
+        A(is,je,:,8) = (2d0/3d0)*(BoundaryPressure(4)+BoundaryPressure(1)*P_bc(1))
+        A(ie,je,:,8) = (2d0/3d0)*(BoundaryPressure(4)+BoundaryPressure(2)*P_bc(2))
+        A(:,je,:,7) = 1d0  
+        A(is,je,:,7) = 1d0 + P_bc(1)
+        A(ie,je,:,7) = 1d0 + P_bc(2)
+        A(:,je,:,1:6) = 0d0
+        A(is,je,:,2) = 1d0/3d0*P_bc(1)
+        A(ie,je,:,1) = 1d0/3d0*P_bc(2)
+        A(:,je,:,3) = 1d0/3d0
+        P_bc(4) = 1d0
+     endif
+
+     ! Pressure BC for z-
+     if(coords(3)==0 .and. (bdry_cond(3)==5)) then
+        A(:,:,ks,8) = (2d0/3d0)*BoundaryPressure(5)
+        A(is,js,ks,8) = (2d0/3d0)*(BoundaryPressure(5)+BoundaryPressure(1)*P_bc(1)+BoundaryPressure(3)*P_bc(3))
+        A(ie,js,ks,8) = (2d0/3d0)*(BoundaryPressure(5)+BoundaryPressure(2)*P_bc(2)+BoundaryPressure(3)*P_bc(3))
+        A(is,je,ks,8) = (2d0/3d0)*(BoundaryPressure(5)+BoundaryPressure(1)*P_bc(1)+BoundaryPressure(4)*P_bc(4))
+        A(ie,je,ks,8) = (2d0/3d0)*(BoundaryPressure(5)+BoundaryPressure(2)*P_bc(2)+BoundaryPressure(4)*P_bc(4))
+        A(:,:,ks,7) = 1d0
+        A(is,js,ks,7) = 1d0 + P_bc(1) + P_bc(3)
+        A(ie,js,ks,7) = 1d0 + P_bc(2) + P_bc(3)
+        A(is,je,ks,7) = 1d0 + P_bc(1) + P_bc(4)
+        A(ie,je,ks,7) = 1d0 + P_bc(2) + P_bc(4)
+        A(:,:,ks,1:6) = 0d0   
+        A(is,js,ks,2) = 1d0/3d0*P_bc(1); A(is,js,ks,4) = 1d0/3d0*P_bc(3)
+        A(ie,js,ks,1) = 1d0/3d0*P_bc(2); A(ie,js,ks,4) = 1d0/3d0*P_bc(3)
+        A(is,je,ks,2) = 1d0/3d0*P_bc(1); A(is,je,ks,3) = 1d0/3d0*P_bc(4)
+        A(ie,je,ks,1) = 1d0/3d0*P_bc(2); A(ie,je,ks,3) = 1d0/3d0*P_bc(4)
+        A(:,:,ks,6) = 1d0/3d0
+     endif
+     ! Pressure BC for z+
+     if(coords(3)==Npz-1 .and. (bdry_cond(6)==5) ) then
+        A(:,:,ke,8) = (2d0/3d0)*BoundaryPressure(6)
+        A(is,js,ke,8) = (2d0/3d0)*(BoundaryPressure(6)+BoundaryPressure(1)*P_bc(1)+BoundaryPressure(3)*P_bc(3))
+        A(ie,js,ke,8) = (2d0/3d0)*(BoundaryPressure(6)+BoundaryPressure(2)*P_bc(2)+BoundaryPressure(3)*P_bc(3))
+        A(is,je,ke,8) = (2d0/3d0)*(BoundaryPressure(6)+BoundaryPressure(1)*P_bc(1)+BoundaryPressure(4)*P_bc(4))
+        A(ie,je,ke,8) = (2d0/3d0)*(BoundaryPressure(6)+BoundaryPressure(2)*P_bc(2)+BoundaryPressure(4)*P_bc(4))
+        A(:,:,ke,7) = 1d0  
+        A(is,js,ke,7) = 1d0 + P_bc(1) + P_bc(3)
+        A(ie,js,ke,7) = 1d0 + P_bc(2) + P_bc(3)
+        A(is,je,ke,7) = 1d0 + P_bc(1) + P_bc(4)
+        A(ie,je,ke,7) = 1d0 + P_bc(2) + P_bc(4)
+        A(:,:,ke,1:6) = 0d0
+        A(is,js,ke,2) = 1d0/3d0*P_bc(1); A(is,js,ks,4) = 1d0/3d0*P_bc(3)
+        A(ie,js,ke,1) = 1d0/3d0*P_bc(2); A(ie,js,ks,4) = 1d0/3d0*P_bc(3)
+        A(is,je,ke,2) = 1d0/3d0*P_bc(1); A(is,je,ks,3) = 1d0/3d0*P_bc(4)
+        A(ie,je,ke,1) = 1d0/3d0*P_bc(2); A(ie,je,ks,3) = 1d0/3d0*P_bc(4)
+        A(:,:,ke,5) = 1d0/3d0
+     endif
+  endif
 end subroutine setuppoisson_fs
 !--------------------------------------------------------------------------------------------------------------------
 subroutine setuppoisson_fs2(utmp,vtmp,wtmp,dt,A,vof_phase,istep)
@@ -611,7 +726,7 @@ subroutine setuppoisson_fs2(utmp,vtmp,wtmp,dt,A,vof_phase,istep)
   implicit none
   real(8), dimension(is:ie,js:je,ks:ke,8), intent(out) :: A
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: utmp,vtmp,wtmp
-  integer(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: vof_phase
+  integer, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: vof_phase
   real(8) :: dt,h_mod
   integer :: i,j,k,nbr
   integer :: istep
@@ -631,7 +746,10 @@ subroutine setuppoisson_fs2(utmp,vtmp,wtmp,dt,A,vof_phase,istep)
         A(i,j,k,6) = 1d0/(dz(k)*dzh(k))
         if (A(i,j,k,6) /= A(i,j,k,6)) write(*,'("ERROR: A6 NaN in fs2:",e14.5)')A(i,j,k,6)
 
+        if (pcmask(i,j,k)==2 .and. vof_phase(i,j,k)/=1) call pariserror("Fatal topology error in FS 2nd projection")
+
         if (pcmask(i,j,k)==1) then
+           if (vof_phase(i,j,k)/=1) call pariserror("Fatal topology error in FS 2nd projection")
            do nbr=-1,1,2
               if (pcmask(i+nbr,j,k) == 0) then
                  A(i,j,k,2+(nbr-1)/2) = 0d0
@@ -702,7 +820,7 @@ subroutine get_ref_volume
   if (NumBubble /= 1) call pariserror('For the Rayleigh-Plesset test, only a single bubble is allowed')
   V_0 = 4d0/3d0*pi*(R_ref**3d0)
   R_RK = rad(1)
-  dR_RK = 0d0
+  dR_RK = 0d0 
   P_inf = BoundaryPressure(1)
   ddR_RK = (P_ref*(R_ref/R_RK)**(3d0*gamma)-P_inf)/R_RK
   !if (rank==0) then
@@ -1003,35 +1121,8 @@ subroutine VTK_scalar_struct(index,iout,var)
 210 format(e14.5)
   close(8)
 end subroutine VTK_scalar_struct
-!--------------------------------------------------------------------------------------------------
-subroutine set_radial_outflow_RP(u,v,w)
-  use module_grid
-  use module_2phase
-  use module_freesurface
-  implicit none
-  include 'mpif.h'
-  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: u, v, w
-  integer :: i,j,k
-  ! x- face
-!!$  if (coords(1)==0) then
-!!$
-!!$  endif
-!!$  ! x+ face
-!!$  if (coords(1)==nPx-1) then
-!!$
-!!$  endif
-!!$ ! y- face
-!!$  if (coords(2)==0) then
-!!$
-!!$  endif
-!!$  if (coords(2)==nPy-1) then
-!!$
-!!$  endif
-  
-end subroutine set_radial_outflow_RP
 !==============================================================================================================================
 ! Routine to numerically integrate the Rayleigh-Plesset equation
-
 subroutine Integrate_RP(dt,t)
   !use module_2phase
   use module_freesurface
