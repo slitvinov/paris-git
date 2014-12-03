@@ -1183,7 +1183,9 @@ subroutine write_RP_test(t)
   real(8) :: t, vol, p_mid, p_corner
   real(8), parameter :: pi=3.141592653589793238462643383
   vol = 4d0/3d0*pi*R_RK**3d0
-  OPEN(UNIT=20,FILE='RK_int_RP.txt',access='append')
+  p_mid = pressure(0.5d0)
+  p_corner = pressure(sqrt(2d0)/2d0)
+  OPEN(UNIT=20,FILE='RK_int_RP.txt',position='append')
   WRITE(20,2) t, R_RK, dR_RK, ddR_RK, vol, p_mid, p_corner
   CLOSE(unit=20)
 2 format(7e14.5)
