@@ -815,7 +815,7 @@ subroutine get_ref_volume
   use module_BC
   use module_freesurface
   implicit none
-  real(8), parameter :: pi=3.141592653
+  real(8), parameter :: pi=3.1415926535897932384626433833
 
   if (NumBubble /= 1) call pariserror('For the Rayleigh-Plesset test, only a single bubble is allowed')
   V_0 = 4d0/3d0*pi*(R_ref**3d0)
@@ -1129,7 +1129,7 @@ subroutine Integrate_RP(dt,t)
   implicit none 
   integer :: j
   real(8) :: dt, t, Volume
-  real(8), parameter :: pi=3.141592653
+  real(8), parameter :: pi=3.141592653589793238462643383
   integer, parameter :: nvar = 2
   real(8) :: y(nvar), ytmp(nvar)
   real(8) :: dydt1(nvar), dydt2(nvar),dydt3(nvar),dydt0(nvar),dydt4(nvar)
@@ -1180,13 +1180,24 @@ end subroutine Integrate_RP
 subroutine write_RP_test(t) 
   use module_freesurface
   implicit none
-  real(8) :: t, vol
-  real(8), parameter :: pi=3.141592653
+  real(8) :: t, vol, p_mid, p_corner
+  real(8), parameter :: pi=3.141592653589793238462643383
   vol = 4d0/3d0*pi*R_RK**3d0
+  p_mid = pressure(0.5d0)
+  p_corner = pressure(sqrt(2d0)/2d0)
   OPEN(UNIT=20,FILE='RK_int_RP.txt',access='append')
-  WRITE(20,2) t, R_RK, dR_RK, ddR_RK, vol
+  WRITE(20,2) t, R_RK, dR_RK, ddR_RK, vol, p_mid, p_corner
   CLOSE(unit=20)
-2 format(5e14.5)
+2 format(7e14.5)
+contains
+  function pressure(r)
+    use module_2phase
+    use module_freesurface
+    real(8) :: r, P_l, pressure
+    P_l = P_ref*(R_ref/R_RK)**(3d0*gamma)-2d0*sigma/R_RK
+    pressure = P_l - (dR_RK**2d0 * R_RK**4d0/(2d0*r**4d0) - (ddR_RK*R_RK**2d0 + 2d0*R_RK*dR_RK**2d0)/r +&
+         ddR_RK*R_RK + 3d0/2d0*dR_RK**2d0)
+  end function pressure
 end subroutine write_RP_test
 !======================================================================================================================================
 ! Idea is to set free outflow in the radial direction for the RP test case. In combination with variable Pressure bx's, we can have more

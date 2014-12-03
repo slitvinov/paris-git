@@ -1956,7 +1956,7 @@ subroutine InitCondition
               call get_normals()
               call get_all_curvatures(kappa_fs)
               if (RP_test) then
-                 call get_ref_volume
+                 call get_ref_volume !!! can rather call this init_RP_test
                  call initialize_P_RP(p)  !initialize P field for RP test
                  call ghost_x(p,1,req( 1: 4))
                  call ghost_y(p,1,req( 5: 8))
