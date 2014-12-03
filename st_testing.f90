@@ -149,6 +149,7 @@ contains
 !==================================================================================================
    subroutine output_curvature()
       implicit none      
+      include "mpif.h"
       integer :: i,j,k! ,l,m,n
       integer :: ib 
       real(8) :: kappa,a(6)
@@ -160,7 +161,7 @@ contains
       real(8) :: S2_err_K
       real(8) :: Lm_err_K
       integer :: sumCount,nfound,nindepend
-      integer :: nposit
+      integer :: nposit, ntests
 
       OPEN(UNIT=89,FILE=TRIM(out_path)//'/curvature-'//TRIM(int2text(rank,padding))//'.txt')
       OPEN(UNIT=90,FILE=TRIM(out_path)//'/reference-'//TRIM(int2text(rank,padding))//'.txt')
@@ -173,12 +174,18 @@ contains
       S2_err_K=0.d0
       Lm_err_K=0.d0
       method_count=0
+      ntests=0
       if ( test_curvature ) then 
          kappa_exact = - 2.d0/rad(ib)
          do i=is,ie; do j=js,je; do k=ks,ke
             ! find curvature only for cut cells
             if (vof_flag(i,j,k) == 2 ) then 
+               ntests=ntests+1
                call get_curvature(i,j,k,kappa,nfound,nposit,a,.false.)
+!               if(kappa > 0.5e20.and.rank==0) then
+!                  print *, i,j,k,kappa,nfound,nposit,a
+!                  stop
+!               endif
                if(nfound > 0) then
                   method_count(1) = method_count(1) + 1  ! nine heights
                else if( -nfound < 50) then 
@@ -239,8 +246,12 @@ contains
          write(*,*) 'Linfty Norm:'
          write(*,'(I5,I5,1X,(E15.8,1X))') Nx,rank,Lm_err_K
       end if ! test_curvature
-      write(*,*) 'max, min, and exact ABS(kappa)', kappamax, kappamin,kappa_exact
-      write(*,*) 'max relative error', MAX(ABS(kappamax-kappa_exact), ABS(kappamin-kappa_exact))/kappa_exact
+      if(ntests>0) then
+         write(*,*) 'rank,max, min, and exact ABS(kappa)', rank, kappamax, kappamin,kappa_exact
+         write(*,*) '     max relative error', MAX(ABS(kappamax-kappa_exact), ABS(kappamin-kappa_exact))/kappa_exact
+      else
+         print *, 'rank = ', rank, 'ntests =', ntests
+      endif
       CLOSE(89)
       CLOSE(90)
       CLOSE(91)

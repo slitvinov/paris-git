@@ -2,9 +2,9 @@
 #set -x
 export LANG=en_EN
 
-if [ $# -lt 3 ]; then
+if [ $# -lt 4 ]; then
     echo "missing arguments"
-    echo usage $0 dt nx Implicit:T/F 
+    echo usage $0 dt nx npx Implicit:T/F 
     exit
 fi
 

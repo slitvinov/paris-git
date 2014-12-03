@@ -69,12 +69,6 @@ module module_surface_tension
   integer, parameter :: ngc=20
   integer :: geom_case_count(ngc)
 
-!  type geom_case
-!     character(10) :: name
-!     integer :: count
-!  end type geom_case
-!  type (geom_case) :: geom_case_list(10) = (/ ("mixed",0),("full",0),("empty",1) /)
-
 contains
 !=================================================================================================
   subroutine initialize_surface_tension()
@@ -347,7 +341,7 @@ contains
 !  index: 2*(d-1) + 2 for normal pointing down
               index = 2*(d-1) + 1 + (-normalsign+1)/2
               flag_other_end = 1 - vof_flag(i,j,k)
-              climitp1 = coordlimit(d,sign) + sign
+              climitp1 = coordlimit(d,sign) + sign   ! first ghost layer
               height_p = 0.d0
               s = 0
               c0 = c(d) ! start of stack
@@ -360,33 +354,39 @@ contains
                  !call verify_indices(i,j,k,1,2)
                  same_flag = s>0.and.vof_flag(c(1),c(2),c(3))==vof_flag(i,j,k)
                  height_p = height_p + (cvof(c(1),c(2),c(3)) - 0.5d0)*normalsign
-                 limit_not_found = .not.(vof_flag(c(1),c(2),c(3))==flag_other_end &
-                      .or.c(d)==climitp1.or.s==2*ndepth.or.same_flag.or.height_found)
+                 limit_not_found = .not. &
+                      (vof_flag(c(1),c(2),c(3))==flag_other_end & ! case (3) 
+                      .or.c(d)==climitp1 & ! case (4) 
+                      .or.s==2*ndepth    & ! case (5) stack too long
+                      .or.same_flag      & ! case (1) 
+                      .or.height_found)    ! case (2)
                  if(limit_not_found) then
                     s = s + 1
                     c(d) = c(d) + sign ! go forward
                  else
                     if(same_flag) then
-                       ! no height, do nothing
+                       ! (1) no height, do nothing
                        continue
                     else if(height_found) then
-                       ! height already found, do nothing
+                       ! (2) height already found, do nothing
                        continue
-                    else if(vof_flag(c(1),c(2),c(3))==flag_other_end) then ! *found the full height* !
+                    else if(vof_flag(c(1),c(2),c(3))==flag_other_end) then 
+                       ! (3) *found the full height* !
                        ! there may be missing terms in the sum since the maximum extent
-                       !  (s=2*ndepth) of the stack was not
+                       ! (s=2*ndepth) of the stack was not
                        ! necessarily reached. Add these terms. Here s = c(d) - c0
                        height_p = height_p + (2*ndepth-s)*(cvof(c(1),c(2),c(3))-0.5d0)*normalsign
                        ! height is now computed with respect to c1
                        do while (c(d)/=(c0-sign))
-                          !call verify_indices(c(1),c(2),c(3),index,3)
+                          ! call verify_indices(c(1),c(2),c(3),index,3)
                           ! correct the height to give it with respect to current position c(d)
                           height(c(1),c(2),c(3),index) = height_p + c1 - c(d)
                           !                    call check_all(c(1),c(2),c(3),index)
                           c(d) = c(d) - sign ! go back down
                        enddo
                        ! reached boundary, save partial height at boundary
-                    else if(c(d)==climitp1) then ! reached top but : not full height since checked above
+                    else if(c(d)==climitp1) then 
+                       ! (4) reached top but : not full height since checked above in (3)
                        height_p = height_p + (- cvof(c(1),c(2),c(3)) + 0.5d0)*normalsign ! remove last addition
                        c(d) = c(d) - sign ! go back one step to climit
                        ! (**) here s = c(d) - c0 + 1 and s=1 for c(d)=c0=climit
@@ -457,7 +457,7 @@ contains
                      ha = height(c(1),c(2),c(3),index)
                      c(d) = cb
                      if(ha<D_HALF_BIGINT) then ! height already found above
-                        height(c(1),c(2),c(3),index) = ha + sign   ! set height below accordingly
+                        height(c(1),c(2),c(3),index) = ha + sign   ! set height below accordingly  @@@ check no logical issues
                      else if(ha>D_HALF_BIGINT.and.ha<1d6) then ! try to match
                         sbelow = FLOOR(REAL(hb + D_HALF_BIGINT)/REAL(BIGINT)) 
                         hb = hb - BIGINT*sbelow  ! above, below in direction of sign
