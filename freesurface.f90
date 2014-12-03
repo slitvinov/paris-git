@@ -1402,28 +1402,28 @@ subroutine set_RP_pressure(p)
   integer :: i,j,k
   P_l = P_ref*(R_ref/R_RK)**(3d0*gamma)-2d0*sigma/R_RK
   if (coords(1)==0) then 
-     do k=ks,ke; do j=js,je
+     do k=ks-1,ke+1; do j=js-1,je+1
         r = sqrt((x(is-1)-xc(1))**2d0 + (y(j)-yc(1))**2d0 + (z(k)-zc(1))**2d0)
         p(is-1,j,k) = P_l - (dR_RK**2d0 * R_RK**4d0/(2d0*r**4d0) - (ddR_RK*R_RK**2d0 + 2d0*R_RK*dR_RK**2d0)/r +&
              ddR_RK*R_RK + 3d0/2d0*dR_RK**2d0)
      enddo; enddo
   endif
   if(coords(1)==Npx-1) then
-     do k=ks,ke; do j=js,je
+     do k=ks-1,ke+1; do j=js-1,je+1
         r = sqrt((x(ie+1)-xc(1))**2d0 + (y(j)-yc(1))**2d0 + (z(k)-zc(1))**2d0)
         p(ie+1,j,k) = P_l - (dR_RK**2d0 * R_RK**4d0/(2d0*r**4d0) - (ddR_RK*R_RK**2d0 + 2d0*R_RK*dR_RK**2d0)/r +&
              ddR_RK*R_RK + 3d0/2d0*dR_RK**2d0)
      enddo; enddo 
   endif
   if(coords(2)==0) then
-     do k=ks,ke; do i=is,ie
+     do k=ks-1,ke+1; do i=is-1,ie+1
         r = sqrt((x(i)-xc(1))**2d0 + (y(js-1)-yc(1))**2d0 + (z(k)-zc(1))**2d0)
         p(i,js-1,k) = P_l - (dR_RK**2d0 * R_RK**4d0/(2d0*r**4d0) - (ddR_RK*R_RK**2d0 + 2d0*R_RK*dR_RK**2d0)/r +&
              ddR_RK*R_RK + 3d0/2d0*dR_RK**2d0)
      enddo; enddo 
   endif
   if(coords(2)==Npy-1) then
-    do k=ks,ke; do i=is,ie
+    do k=ks-1,ke+1; do i=is-1,ie+1
         r = sqrt((x(i)-xc(1))**2d0 + (y(je+1)-yc(1))**2d0 + (z(k)-zc(1))**2d0)
         p(i,je+1,k) = P_l - (dR_RK**2d0 * R_RK**4d0/(2d0*r**4d0) - (ddR_RK*R_RK**2d0 + 2d0*R_RK*dR_RK**2d0)/r +&
              ddR_RK*R_RK + 3d0/2d0*dR_RK**2d0)
@@ -1432,7 +1432,7 @@ subroutine set_RP_pressure(p)
 
   ! Pressure BC for z-
   if(coords(3)==0) then
-     do j=js,je; do i=is,ie
+     do j=js-1,je+1; do i=is-1,ie+1
         r = sqrt((x(i)-xc(1))**2d0 + (y(j)-yc(1))**2d0 + (z(ks-1)-zc(1))**2d0)
         p(i,j,ks-1) = P_l - (dR_RK**2d0 * R_RK**4d0/(2d0*r**4d0) - (ddR_RK*R_RK**2d0 + 2d0*R_RK*dR_RK**2d0)/r +&
              ddR_RK*R_RK + 3d0/2d0*dR_RK**2d0)
@@ -1440,7 +1440,7 @@ subroutine set_RP_pressure(p)
   endif
   ! Pressure BC for z+
   if(coords(3)==Npz-1) then
-     do j=js,je; do i=is,ie
+     do j=js-1,je+1; do i=is-1,ie+1
         r = sqrt((x(i)-xc(1))**2d0 + (y(j)-yc(1))**2d0 + (z(ke+1)-zc(1))**2d0)
         p(i,j,ke+1) = P_l - (dR_RK**2d0 * R_RK**4d0/(2d0*r**4d0) - (ddR_RK*R_RK**2d0 + 2d0*R_RK*dR_RK**2d0)/r +&
              ddR_RK*R_RK + 3d0/2d0*dR_RK**2d0)

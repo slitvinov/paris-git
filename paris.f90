@@ -488,7 +488,7 @@ Program paris
            if(DoFront)call GetFront('wait')
            call my_timer(13)
         enddo !itime_scheme
-        if (FreeSurface .and. RP_test .and. rank==0) call Integrate_RP(dt,time)
+        if (FreeSurface .and. RP_test) call Integrate_RP(dt,time)
         if(itime_scheme==2) then
            u = 0.5*(u+uold)
            v = 0.5*(v+vold)
