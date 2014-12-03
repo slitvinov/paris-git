@@ -318,9 +318,9 @@ contains
      implicit none
      integer, intent(in) :: d
      integer :: index
-     logical :: same_flag, limit_not_found, height_found
+     logical :: same_flag, abandon_search, height_found_at_start
      real(8) :: height_p     !  partial height 
-     integer :: i,j,k,s,c0,c1,c(3)
+     integer :: i,j,k,s,c0,c1,c(3),ctop
      integer :: sign, flag_other_end, climitp1, normalsign
      ! NDEPTH is the depth of layers tested above or below the reference cell. 
      ! including the central layer and the empty/full cells
@@ -346,56 +346,49 @@ contains
               s = 0
               c0 = c(d) ! start of stack
               c1 = c0 + sign*ndepth ! middle of stack starting at c0 in direction sign and having maximum extent
-              limit_not_found=.true.
+              abandon_search=.false.
               !call verify_indices(c(1),c(2),c(3),index,0)
-              height_found  = height(c(1),c(2),c(3),index)<D_HALF_BIGINT
-              do while (limit_not_found) 
+              height_found_at_start  = height(c(1),c(2),c(3),index)<D_HALF_BIGINT
+              do while (.not.abandon_search) 
                  !call verify_indices(c(1),c(2),c(3),index,1)
                  !call verify_indices(i,j,k,1,2)
                  same_flag = s>0.and.vof_flag(c(1),c(2),c(3))==vof_flag(i,j,k)
                  height_p = height_p + (cvof(c(1),c(2),c(3)) - 0.5d0)*normalsign
-                 limit_not_found = .not. &
-                      (vof_flag(c(1),c(2),c(3))==flag_other_end & ! case (3) 
-                      .or.c(d)==climitp1 & ! case (4) 
-                      .or.s==2*ndepth    & ! case (5) stack too long
-                      .or.same_flag      & ! case (1) 
-                      .or.height_found)    ! case (2)
-                 if(limit_not_found) then
+                 abandon_search =        &
+                      same_flag          & ! case (1) no height, do nothing
+                      .or.height_found_at_start                    & ! case (2) height already found, do nothing
+                      .or.vof_flag(c(1),c(2),c(3))==flag_other_end & ! case (3) found the full height in previous pass
+                      .or.c(d)==climitp1 & ! case (4) reached top but : not full height since checked above in (3)
+                      .or.s==2*ndepth      ! case (5) stack too long : now c(d) = c0 + 2*ndepth
+                 if(.not.abandon_search) then
                     s = s + 1
-                    c(d) = c(d) + sign ! go forward
-                 else
-                    if(same_flag) then
-                       ! (1) no height, do nothing
-                       continue
-                    else if(height_found) then
-                       ! (2) height already found, do nothing
-                       continue
-                    else if(vof_flag(c(1),c(2),c(3))==flag_other_end) then 
-                       ! (3) *found the full height* !
-                       ! there may be missing terms in the sum since the maximum extent
-                       ! (s=2*ndepth) of the stack was not
-                       ! necessarily reached. Add these terms. Here s = c(d) - c0
-                       height_p = height_p + (2*ndepth-s)*(cvof(c(1),c(2),c(3))-0.5d0)*normalsign
-                       ! height is now computed with respect to c1
-                       do while (c(d)/=(c0-sign))
-                          ! call verify_indices(c(1),c(2),c(3),index,3)
-                          ! correct the height to give it with respect to current position c(d)
-                          height(c(1),c(2),c(3),index) = height_p + c1 - c(d)
-                          !                    call check_all(c(1),c(2),c(3),index)
-                          c(d) = c(d) - sign ! go back down
-                       enddo
-                       ! reached boundary, save partial height at boundary
-                    else if(c(d)==climitp1) then 
-                       ! (4) reached top but : not full height since checked above in (3)
-                       height_p = height_p + (- cvof(c(1),c(2),c(3)) + 0.5d0)*normalsign ! remove last addition
-                       c(d) = c(d) - sign ! go back one step to climit
-                       ! (**) here s = c(d) - c0 + 1 and s=1 for c(d)=c0=climit
-                       !call verify_indices(c(1),c(2),c(3),index,4)
-                       height(c(1),c(2),c(3),index) = height_p + BIGINT*s 
-                       !                call check_all(c(1),c(2),c(3),index)
-                    endif        ! last possible case: reached ndepth and no proper height : do nothing
-                 endif ! limit_not_found
-              enddo ! limit_not_found
+                    c(d) = c(d) + sign ! go forward. Now c(d) = c0 + sign*s
+                    ! abandon search, but first perform operations that recod the height
+                 else if(vof_flag(c(1),c(2),c(3))==flag_other_end) then 
+                    ! (3) *found the full height* !
+                    ! there may be missing terms in the sum since the maximum extent
+                    ! (s=2*ndepth) of the stack was not
+                    ! necessarily reached. Add these terms. Here s = c(d) - c0
+                    height_p = height_p + (2*ndepth-s)*(cvof(c(1),c(2),c(3))-0.5d0)*normalsign
+                    ! height is now computed with respect to c1
+                    do while (c(d)/=(c0-sign))
+                       ! call verify_indices(c(1),c(2),c(3),index,3)
+                       ! correct the height to give it with respect to current position c(d)
+                       height(c(1),c(2),c(3),index) = height_p + c1 - c(d)
+                       !                    call check_all(c(1),c(2),c(3),index)
+                       c(d) = c(d) - sign ! go back down
+                    enddo
+                 else if(c(d)==climitp1) then 
+                    ! (4) reached top but : not full height since checked above in (3)
+                    !     save partial height in the last normal layer (normal as opposite to ghost)
+                    height_p = height_p + (- cvof(c(1),c(2),c(3)) + 0.5d0)*normalsign ! remove last addition
+                    c(d) = c(d) - sign ! go back one step to climit
+                    ! (**) here s = c(d) - c0 + 1 and s=1 for c(d)=c0=climit
+                    !call verify_indices(c(1),c(2),c(3),index,4)
+                    height(c(1),c(2),c(3),index) = height_p + BIGINT*s 
+                    !                call check_all(c(1),c(2),c(3),index)
+                 endif ! abandon_search
+              enddo ! while not abandon search
            enddo ! sign
         endif ! vof_flag
      enddo; enddo; enddo;  ! i,j,k
