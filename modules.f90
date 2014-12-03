@@ -262,12 +262,12 @@ contains
     percentage = 1d2*times/totaltime
     open(unit=123,file='aggregate_timer_stats')
     do n=1,components
-       write(123,'((A)T26," ",f5.1," %")') TRIM(timer_component(n)),percentage(n)
+       write(123,'((A),T26," ",f5.1," %")') TRIM(timer_component(n)),percentage(n)
     enddo
     write(123,*) "   "
-    write(123,'("Overall speed Z/np"T24,es16.5e2)') ZZ
+    write(123,'("Overall speed Z/np",T24,es16.5e2)') ZZ
     write(123,*) "   "
-    write(123,'("Allocated/proc "T24,es16.5e2,"Gbytes")') alloc_size
+    write(123,'("Allocated/proc ",T24,es16.5e2,"Gbytes")') alloc_size
     close(123)
   end subroutine wrap_up_timer
 end module module_timer
@@ -455,7 +455,7 @@ contains
     k=3*nz/4
     if(test_point_in(i,j,k)) then
        OPEN(UNIT=89,FILE=TRIM(out_path)//'/droplet-test-vel.txt',status='unknown', &
-            action='write',access='append')
+            action='write',position='append')
        write(89,310) time, w(i,j,k)
        close(unit=89)
     endif
@@ -476,7 +476,7 @@ contains
 10     format('!NBLOCKS ',I4)
        opened=1
     else
-    	OPEN(UNIT=90,FILE='velocity.visit',access='append')
+    	OPEN(UNIT=90,FILE='velocity.visit',position='append')
     endif
     
     do prank=0,NpDomain-1
@@ -502,7 +502,7 @@ contains
        write(91,10) nPdomain
        opened_p=1
     else
-       OPEN(UNIT=91,FILE='pressure.visit',access='append')
+       OPEN(UNIT=91,FILE='pressure.visit',position='append')
     endif
     do prank=0,NpDomain-1
        write(91,11) rootname//TRIM(int2text(prank,padding))//'.vtk'
@@ -624,7 +624,7 @@ subroutine output1(nf,i1,i2,j1,j2,k1,k2)
   enddo; enddo; enddo
   close(7)
   if(rank==0)then
-    OPEN(UNIT=7,FILE=trim(out_path)//'/averages.dat',access='append')
+    OPEN(UNIT=7,FILE=trim(out_path)//'/averages.dat',position='append')
     write(7,1110) time
     do j=Ng,Ng+Ny+1
       write(7,1200) y(j),real(allaverages(:,j)-oldaverages(:,j))
@@ -2375,7 +2375,7 @@ subroutine SetupVvel(v,dv,rho,mu,rho1,mu1,dt,A)
      do k=ks,ke; do j=js,je; do i=is,ie;
         rhom = 0.5d0*(rho(i,j+1,k)+rho(i,j,k))
         if((dy(j  )*dyh(j)*rhom)==0d0)then
-           write(*,'(10I4,3f7.3)'),rank,i,j,k,is,ie,js,je,ks,ke,dy(j),dyh(j),rhom
+           write(*,'(10I4,3f7.3)') rank,i,j,k,is,ie,js,je,ks,ke,dy(j),dyh(j),rhom
         endif
         A(i,j,k,3) = dt/(dy(j  )*dyh(j)*rhom)*2d0*mu(i,j  ,k)
         A(i,j,k,4) = dt/(dy(j+1)*dyh(j)*rhom)*2d0*mu(i,j+1,k)

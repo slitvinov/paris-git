@@ -1411,7 +1411,7 @@ contains
 10     format('!NBLOCKS ',I4)
        vof_opened=1
     else
-       OPEN(UNIT=88,FILE=TRIM(file_name),access='append')
+       OPEN(UNIT=88,FILE=TRIM(file_name),position='append')
     endif
     do prank=0,NpDomain-1
        write(88,11) rootname//TRIM(int2text(prank,padding))//'.vtk'

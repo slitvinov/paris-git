@@ -62,7 +62,7 @@
    integer, dimension(:), allocatable :: tag_mergeflag
 
    integer, dimension(:), allocatable :: new_drop_id
-   integer :: tag_threshold=1d-9
+   real(8) :: tag_threshold=1d-9
 
    type element 
       real(8) :: xc,yc,zc,uc,vc,wc,duc,dvc,dwc,vol
@@ -2300,7 +2300,7 @@ contains
       We = urel2*rho1*dp/(sigma+1.d-16)
 
       rootname=trim(out_path)//'/LPP-PARA'//TRIM(int2text(rank,padding))//'-'
-      OPEN(UNIT=11,FILE=TRIM(rootname)//TRIM(int2text(ipart,padding))//'.dat',access='append')
+      OPEN(UNIT=11,FILE=TRIM(rootname)//TRIM(int2text(ipart,padding))//'.dat',position='append')
       write(11,'(13(E15.8,1X))') time,xp,yp,zp,up,vp,wp,uf,vf,wf,Re,We,dp
       CLOSE(11)
    
@@ -3585,7 +3585,7 @@ module module_output_lpp
 10       format('!NBLOCKS ',I4)
          lpp_opened=1
       else
-         OPEN(UNIT=88,FILE='lpp.visit',access='append')
+         OPEN(UNIT=88,FILE='lpp.visit',position='append')
       endif
       do prank=0,NpDomain-1
          if ( outputlpp_format == LPPformatPlot3D ) then 

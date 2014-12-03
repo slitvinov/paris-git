@@ -803,7 +803,7 @@ subroutine discrete_divergence(u,v,w,iout)
      if (n_total(l) > 1d-10) domain(l)=domain(l)/n_total(l)
   enddo
   if (rank==0) then
-     OPEN(unit=21,file='div_type.txt',access='append')
+     OPEN(unit=21,file='div_type.txt',position='append')
      write(21,115)iout,domain(0),domain(1),domain(2),domain(3),avg2
      close(unit=21)
   endif
@@ -864,7 +864,7 @@ subroutine FreeSolver(A,p,maxError,beta,maxit,it,ierr,iout,time,tres2)
      call get_vol(Vol)
      p_c = P_ref*(V_0/Vol)**gamma
      if(mod(iout,10)==0 .and. rank==0 .and. solver_flag==2) then
-        OPEN(unit=11,file='RP_volume',access='append')
+        OPEN(unit=11,file='RP_volume',position='append')
         write(11,2)time,Vol
      endif
   else
@@ -1070,7 +1070,7 @@ subroutine append_visit_fs(index,iout)
 10   format('!NBLOCKS ',I4)
      vtk_open(index) = .true.
   else
-     OPEN(UNIT=100,FILE=TRIM(file)//'.visit',access='append')
+     OPEN(UNIT=100,FILE=TRIM(file)//'.visit',position='append')
   endif
 
   file_root = TRIM(out_path)//'/VTK/'//TRIM(file_short(index))
@@ -1183,8 +1183,6 @@ subroutine write_RP_test(t)
   real(8) :: t, vol, p_mid, p_corner
   real(8), parameter :: pi=3.141592653589793238462643383
   vol = 4d0/3d0*pi*R_RK**3d0
-  p_mid = pressure(0.5d0)
-  p_corner = pressure(sqrt(2d0)/2d0)
   OPEN(UNIT=20,FILE='RK_int_RP.txt',access='append')
   WRITE(20,2) t, R_RK, dR_RK, ddR_RK, vol, p_mid, p_corner
   CLOSE(unit=20)

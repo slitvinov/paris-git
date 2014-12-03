@@ -507,7 +507,7 @@ subroutine final_output(flowrate)
   use module_IO
   implicit none
   real(8) flowrate
-  open(unit=121,file=TRIM(out_path)//'/flowrate.txt',access='append')
+  open(unit=121,file=TRIM(out_path)//'/flowrate.txt',position='append')
   write(121,'(e16.8,e16.8)') dx(3),flowrate
   close(121)
  end subroutine final_output

@@ -389,7 +389,7 @@ subroutine h_of_KHI2D(timestep,output_time)
   !Debugg section*******************************************************************************
   IF((rank==1.or.rank==2.or.rank==5.or.rank==6).and.letsdebug) THEN
      OPEN(UNIT=86,FILE=TRIM(out_path)//'/'//TRIM(file_name1)// &
-   TRIM(int2text(rank,padding))//'-'//TRIM(int2text(timestep,padding))//'.txt', ACCESS='append')
+   TRIM(int2text(rank,padding))//'-'//TRIM(int2text(timestep,padding))//'.txt', POSITION='append')
         write(86,19) cvof(i,65,3), cvof(i,66,3), cvof(i,67,3), cvof(i,68,3) 
         19     format(E14.6,E14.6,E14.6,E14.6)       
      CLOSE(86)
@@ -453,11 +453,11 @@ subroutine h_of_KHI2D(timestep,output_time)
         first_open = .false.
      else
         ! Write ab coefficients file
-        OPEN(UNIT=88,FILE=TRIM(out_path)//TRIM(file_name2)//'.txt',ACCESS='append')
+        OPEN(UNIT=88,FILE=TRIM(out_path)//TRIM(file_name2)//'.txt',POSITION='append')
            write(88,18) output_time, a1_coef, b1_coef, SQRT(a1_coef**2 + b1_coef**2)
         CLOSE(88)
         ! Write v**2 file
-        OPEN(UNIT=89,FILE=TRIM(out_path)//TRIM(file_name3)//'.txt',ACCESS='append')
+        OPEN(UNIT=89,FILE=TRIM(out_path)//TRIM(file_name3)//'.txt',POSITION='append')
            write(89,17) output_time, global_KE
         CLOSE(89)
      endif

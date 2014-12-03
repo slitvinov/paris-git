@@ -176,7 +176,7 @@ Program paris
 
         if(rank==0) then
            end_time =  MPI_WTIME()
-           open(unit=121,file='stats',access='append')
+           open(unit=121,file='stats',position='append')
            write(121,'(30es14.6e2)')time,stats(1:nstatarray),dpdx,(stats(8)-stats(9))/dt,end_time-start_time
            close(121)
            write(out,'("Step:",I9," Iterations:",I9," cpu(s):",f10.2)')-1,0,end_time-start_time
@@ -556,7 +556,7 @@ Program paris
               !        write(121,'("Step:",I10," dt=",es16.5e2," time=",es16.5e2)')itimestep,dt,time
               !        write(121,'("            Iterations:",I7," cpu(s):",f10.2)')it,end_time-start_time
               !        close(121)
-           open(unit=121,file='stats',access='append')
+           open(unit=121,file='stats',position='append')
            write(121,'(30es14.6e2)')time,stats(1:nstatarray),dpdx,(stats(8)-stats(9))/dt,end_time-start_time
            close(121)
         endif
@@ -628,7 +628,7 @@ Program paris
         if(mod(itimestep,nout)==0)call print_fronts(ITIMESTEP/nout,time)
         if(mod(itimestep,nbackup)==0)call backup_front_write(time,iTimeStep)
         if(mod(itimestep,nstats)==0)then
-           open(unit=121,file='statsbub',access='append')
+           open(unit=121,file='statsbub',position='append')
            do i=1, NumBubble
               write(121,'(6es16.8e2)')time,FrontProps(1,i),FrontProps(5:7,i), FrontProps(14,i)
            enddo
@@ -669,7 +669,7 @@ subroutine TimeStepSize(deltaT)
   if(rank<nPdomain)then
     h  = minval(dx)
     vmax = maxval(sqrt(u(is:ie,js:je,ks:ke)**2+v(is:ie,js:je,ks:ke)**2+w(is:ie,js:je,ks:ke)**2))
-    vmax = max(vmax,1e-3)
+    vmax = max(vmax,1d-3)
   !  dtadv  = min(h/vmax,2d0*nu_min/vmax**2)
     dtadv  = h/vmax
     mydt = CFL*dtadv

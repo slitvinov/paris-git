@@ -1086,32 +1086,32 @@ end subroutine write_integer
     ! wall boundary condition
     if(bdry_cond(1)/=1 .and. coords(1)==0    ) then
       do point = 1, NumLocPoint
-          PointCoordsBuff(1,point) = max(PointCoordsBuff(1,point), 2.51)
+          PointCoordsBuff(1,point) = max(PointCoordsBuff(1,point), 2.51d0)
       enddo
     endif
     if(bdry_cond(4)/=1 .and. coords(1)==nPx-1) then
       do point = 1, NumLocPoint
-          PointCoordsBuff(1,point) = min(PointCoordsBuff(1,point), float(ie)+0.49)
+          PointCoordsBuff(1,point) = min(PointCoordsBuff(1,point), dble(ie)+0.49d0)
       enddo
     endif
     if(bdry_cond(2)/=1 .and. coords(2)==0    ) then
       do point = 1, NumLocPoint
-          PointCoordsBuff(2,point) = max(PointCoordsBuff(2,point), 2.51)
+          PointCoordsBuff(2,point) = max(PointCoordsBuff(2,point), 2.51d0)
       enddo
     endif
     if(bdry_cond(5)/=1 .and. coords(2)==nPy-1) then
       do point = 1, NumLocPoint
-          PointCoordsBuff(2,point) = min(PointCoordsBuff(2,point), float(je)+0.49)
+          PointCoordsBuff(2,point) = min(PointCoordsBuff(2,point), dble(je)+0.49d0)
       enddo
     endif
     if(bdry_cond(3)/=1 .and. coords(3)==0    ) then
       do point = 1, NumLocPoint
-          PointCoordsBuff(3,point) = max(PointCoordsBuff(3,point), 2.51)
+          PointCoordsBuff(3,point) = max(PointCoordsBuff(3,point), 2.51d0)
       enddo
     endif
     if(bdry_cond(6)/=1 .and. coords(3)==nPz-1) then
       do point = 1, NumLocPoint
-          PointCoordsBuff(3,point) = min(PointCoordsBuff(3,point), float(ke)+0.49)
+          PointCoordsBuff(3,point) = min(PointCoordsBuff(3,point), dble(ke)+0.49d0)
       enddo
     endif
 
