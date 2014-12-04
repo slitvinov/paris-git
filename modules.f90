@@ -1381,7 +1381,8 @@ module module_BC
          !tdelay_gas_inject = 1.d-2
          if ( y(j) <= radius_liq_inject ) then 
             uinject = uliq_inject & 
-                     *erf( (radius_liq_inject - y(j))/blayer_gas_inject )  
+                     *erf( (radius_liq_inject - y(j))/blayer_gas_inject ) &
+                     *erf(time/tdelay_gas_inject)  
          else if ( y(j) > radius_liq_inject .and. y(j) <= radius_gas_inject ) then
             uinject = ugas_inject & 
                      *erf( (y(j) -   radius_liq_inject)/blayer_gas_inject ) & 
@@ -1393,11 +1394,12 @@ module module_BC
          end if  !
       else if ( inject_type == 4 ) then ! 3d coaxial jet
          !tdelay_gas_inject = 0.d-2
-         ryz = sqrt( (y(j) - jetcenter_yc)**2.d0 + (z(k) - jetcenter_zc)**2.d0 )
-         if ( ryz <= radius_liq_inject ) then 
+         ryz = sqrt( (yh(j) - jetcenter_yc)**2.d0 + (zh(k) - jetcenter_zc)**2.d0 )
+         if ( ryz < radius_liq_inject ) then 
             uinject = uliq_inject & 
-                     *erf( (radius_liq_inject - ryz)/blayer_gas_inject )  
-         else if ( ryz > low_gas_radius .and. ryz <= radius_gas_inject ) then
+                     *erf( (radius_liq_inject - ryz)/blayer_gas_inject ) &
+                     *erf(time/tdelay_gas_inject) 
+         else if ( ryz > low_gas_radius .and. ryz < radius_gas_inject ) then
             uinject = ugas_inject & 
                      *erf( (ryz - low_gas_radius)/blayer_gas_inject ) & 
                      *erf( (radius_gas_inject - ryz)/blayer_gas_inject ) & 

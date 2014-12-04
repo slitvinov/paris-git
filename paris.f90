@@ -2038,11 +2038,11 @@ subroutine InitCondition
         ! -------------------------------------------------------------------
          if (test_jet ) then 
             ! Test: planar or cylindrical jet with finite length nozzle
-            if ( inject_type == 3 .or. inject_type == 4 ) then
-               do i = is,ie; do j=js,je; do k = ks,ke
-                  if((cvof(i,j,k) + cvof(i+1,j,k)) > 0.0d0) u(i,j,k) = uliq_inject 
-               end do; end do; end do
-            end if ! inject_type
+            !if ( inject_type == 3 .or. inject_type == 4 ) then
+            !   do i = is,ie; do j=js,je; do k = ks,ke
+            !      if((cvof(i,j,k) + cvof(i+1,j,k)) > 0.0d0) u(i,j,k) = uliq_inject 
+            !   end do; end do; end do
+            !end if ! inject_type
          end if ! test_jet
      
      endif
