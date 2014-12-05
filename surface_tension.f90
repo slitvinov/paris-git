@@ -363,7 +363,7 @@ contains
                  if(.not.abandon_search) then
                     s = s + 1
                     c(d) = c(d) + sign ! go forward. Now c(d) = c0 + sign*s
-                    ! abandon search, but first perform operations that recod the height
+                    ! abandon search, but first perform operations that record the height
                  else if(vof_flag(c(1),c(2),c(3))==flag_other_end) then 
                     ! (3) *found the full height* !
                     ! there may be missing terms in the sum since the maximum extent
@@ -383,7 +383,8 @@ contains
                     !     save partial height in the last normal layer (normal as opposite to ghost)
                     height_p = height_p + (- cvof(c(1),c(2),c(3)) + 0.5d0)*normalsign ! remove last addition
                     c(d) = c(d) - sign ! go back one step to climit
-                    ! (**) here s = c(d) - c0 + 1 and s=1 for c(d)=c0=climit
+                    ! (**) here s is the algebraic distance to c0 thus
+                    !      s = (c(d) - c0)*sign + 1 and s=1 for c(d)=c0=climit
                     !call verify_indices(c(1),c(2),c(3),index,4)
                     height(c(1),c(2),c(3),index) = height_p + BIGINT*s 
                     !                call check_all(c(1),c(2),c(3),index)
@@ -452,7 +453,7 @@ contains
                      if(ha<D_HALF_BIGINT) then ! height already found above
                         height(c(1),c(2),c(3),index) = ha + sign   ! set height below accordingly  @@@ check no logical issues
                      else if(ha>D_HALF_BIGINT.and.ha<1d6) then ! try to match
-                        sbelow = FLOOR(REAL(hb + D_HALF_BIGINT)/REAL(BIGINT)) 
+                        sbelow = FLOOR(REAL(hb + D_HALF_BIGINT)/REAL(BIGINT)) ! "below" is assuming sign=1
                         hb = hb - BIGINT*sbelow  ! above, below in direction of sign
                         sabove = FLOOR(REAL(ha + D_HALF_BIGINT)/REAL(BIGINT))
                         ha = ha - BIGINT*sabove
@@ -460,16 +461,16 @@ contains
                         !        cmiddle     index of center of stack (for this stack, can be half integer)
                         !        ctop        index of top of this stack
                         !        ctop-c0+1 = length of stack
-                        ! see (**) in pass 1 :
-                        !            |cb-c0|=sbelow-1
-                        !            |ca-ctop|=sabove-1
+                        ! see (**) in pass 1. s is a positive quantity
+                        !             cb-c0 =  sign*sbelow - sign
+                        !             ca-ctop= - sign*sabove + sign
                         ! hence
                         !  |cb-c0| +  |ca-ctop| + 2 = ctop-c0 + 1 = sabove + sbelow
                         !  cmiddle = c0 + (ctop-c0)/2
                         if(sabove + sbelow - 1 <= 2*ndepth+1) then  ! 
                            ! bottom is at 
                            c0   = cb - (sbelow-1)*sign  
-                           cmiddle   = dble(c0) + (sabove+sbelow-1)*0.5d0
+                           cmiddle   = dble(c0) + sign*(sabove+sbelow-1)*0.5d0
                            c(d) = cb + 2*sign 
                            do while (c(d)/=(c0-sign)) 
                               height(c(1),c(2),c(3),index) = ha + hb + cmiddle - c(d)
