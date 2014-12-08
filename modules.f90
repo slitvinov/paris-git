@@ -357,7 +357,7 @@ module module_IO
   integer :: nout, out, output_format, nbackup, nstats, termout, nfile
   character(len=20) :: out_path, x_file, y_file, z_file
   logical :: read_x, read_y, read_z, restart, ICOut, restartFront, restartAverages, zip_data
-  logical :: out_P, out_mom
+  logical :: out_P, out_mom, output_fields(3)
   real(8) :: tout,timeLastOutput
 contains
     !=================================================================================================

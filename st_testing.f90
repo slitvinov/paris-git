@@ -465,6 +465,153 @@ subroutine h_of_KHI2D(timestep,output_time)
      !write(*,*) 'exiting print succesfull ', rank
   endif
 end subroutine
+! Output zone=======================================================================================
+! General subroutine
+subroutine output_ALL(nf,i1,i2,j1,j2,k1,k2)
+  implicit none
+  integer :: nf,i1,i2,j1,j2,k1,k2
+  if(output_format==4) call output4(nf,i1,i2,j1,j2,k1,k2)
+end subroutine output_ALL
+! Visit file generation subroutine
+  subroutine append_General_visit_file(rootname)
+    implicit none
+    character(*) :: rootname
+    character(len=30), save :: file_name
+    integer prank
+    logical, save :: opened=.false.
+    
+    file_name='fields.visit'
+    
+    if(rank.ne.0) call pariserror('rank.ne.0 in append_VOF')
+    if(opened .eqv. .false.) then
+       OPEN(UNIT=88,FILE=TRIM(file_name))
+       write(88,10) nPdomain
+10     format('!NBLOCKS ',I4)
+       opened=.true.
+    else
+       OPEN(UNIT=88,FILE=TRIM(file_name),position='append')
+    endif
+    do prank=0,NpDomain-1
+       write(88,11) rootname//TRIM(int2text(prank,padding))//'.vtk'
+11     format(A)
+    enddo
+    close(88)
+  end subroutine  append_General_visit_file
+  !Output subroutine
+  subroutine output4(nf,i1,i2,j1,j2,k1,k2)
+  use module_flow
+  use module_grid
+  use module_surface_tension
+  use module_IO
+  implicit none
+  integer ::nf,i1,i2,j1,j2,k1,k2,i,j,k, itype=5
+!  logical, save :: first_time=.true.
+  character(len=30) :: rootname,filename
+  rootname=TRIM(out_path)//'/VTK/fields'//TRIM(int2text(nf,padding))//'-'
+  
+  
+  if(rank==0) call append_General_visit_file(TRIM(rootname))
+
+  OPEN(UNIT=8,FILE=TRIM(rootname)//TRIM(int2text(rank,padding))//'.vtk')
+    write(8,10)
+    write(8,11)time
+    write(8,12)
+    write(8,13)
+    write(8,14)i2-i1+1,j2-j1+1,k2-k1+1
+    write(8,15) x(i1),y(j1),z(k1)
+    write(8,16) x(i1+1)-x(i1),y(j1+1)-y(j1),z(k1+1)-z(k1)
+10  format('# vtk DataFile Version 3.0')
+11  format('grid, time ',F16.8)
+12  format('ASCII')
+13  format('DATASET STRUCTURED_POINTS')
+14  format('DIMENSIONS ',I5,I5,I5)
+15  format('ORIGIN ',F16.8,F16.8,F16.8)
+16  format('SPACING ',F16.8,F16.8,F16.8)
+
+    write(8,19)(i2-i1+1)*(j2-j1+1)*(k2-k1+1)
+    
+19  format('POINT_DATA',I17)
+17  format('SCALARS ',A20,' float 1')
+20  format('VECTORS velocity double')
+18  format('LOOKUP_TABLE default')
+
+    if(output_fields(1)) then
+		write(8,20)
+		do k=k1,k2; do j=j1,j2; do i=i1,i2;
+		  if (itype .eq. 1)write(8,210)rho(i,j,k)
+		  if (itype .eq. 5)write(8,310)0.5*(u(i,j,k)+u(i-1,j,k)), &
+			 0.5*(v(i,j,k)+v(i,j-1,k)),0.5*(w(i,j,k)+w(i,j,k-1))
+		enddo; enddo; enddo
+    endif
+    
+    !write(8,19)(i2-i1+1)*(j2-j1+1)*(k2-k1+1)
+    
+    ! Writing CVOF values
+    if(output_fields(2)) then
+		write(8,17) 'VOF'
+		write(8,18)
+		do k=k1,k2; do j=j1,j2; do i=i1,i2;
+			 write(8,210) cvof(i,j,k)
+		enddo; enddo; enddo
+    endif
+    
+    ! Writing Height function values
+    if(output_fields(3)) then
+		write(8,17) 'Heightx+'
+		write(8,18)
+	
+		do k=k1,k2; do j=j1,j2; do i=i1,i2;
+			 write(8,210) height(i,j,k,1) 
+		enddo; enddo; enddo
+	
+		write(8,17) 'Heightx-'
+		write(8,18)
+	
+		do k=k1,k2; do j=j1,j2; do i=i1,i2;
+			 write(8,210) height(i,j,k,2) 
+		enddo; enddo; enddo
+	
+		write(8,17) 'Heighty+'
+		write(8,18)
+	
+		do k=k1,k2; do j=j1,j2; do i=i1,i2;
+			 write(8,210) height(i,j,k,3) 
+		enddo; enddo; enddo
+	
+		write(8,17) 'Heighty-'
+		write(8,18)
+	
+		do k=k1,k2; do j=j1,j2; do i=i1,i2;
+			 write(8,210) height(i,j,k,4) 
+		enddo; enddo; enddo
+	
+		write(8,17) 'Heightz+'
+		write(8,18)
+	
+		do k=k1,k2; do j=j1,j2; do i=i1,i2;
+			 write(8,210) height(i,j,k,5) 
+		enddo; enddo; enddo
+	
+		write(8,17) 'Heightz-'
+		write(8,18)
+	
+		do k=k1,k2; do j=j1,j2; do i=i1,i2;
+			 write(8,210) height(i,j,k,6) 
+		enddo; enddo; enddo
+    endif
+210 format(e14.5)
+310 format(e14.5,e14.5,e14.5)
+
+    close(8)
+
+! TEMPORARY
+    if ( zip_data ) then 
+      filename = TRIM(rootname)//TRIM(int2text(rank,padding))//'.vtk'
+      call system('gzip '//trim(filename))
+    end if ! zip_data
+! END TEMPORARY 
+end subroutine output4
+! End of Output zone================================================================================
   end module module_st_testing
 
 

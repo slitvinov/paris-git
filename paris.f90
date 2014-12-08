@@ -145,6 +145,7 @@ Program paris
         if (.not.restart) call output(0,is,ie+1,js,je+1,ks,ke+1)
         if(DoVOF .and. .not.restart) then
            call output_VOF(0,is,ie+1,js,je+1,ks,ke+1)
+           call output_ALL(0,is,ie+1,js,je+1,ks,ke+1)
            if (FreeSurface) then
               do out_fs = 1,3
                  if (VTK_OUT(out_fs)) then
@@ -528,6 +529,7 @@ Program paris
                nfile = NINT(time/tout)
                call output(nfile,is,ie+1,js,je+1,ks,ke+1)
                if(DoVOF) call output_VOF(nfile,is,ie+1,js,je+1,ks,ke+1)
+               if(DoVOF) call output_ALL(nfile,is,ie+1,js,je+1,ks,ke+1)
                if(DoLPP) call output_LPP(nfile,is,ie+1,js,je+1,ks,ke+1)
                if(rank==0)then
                   end_time =  MPI_WTIME()
@@ -542,6 +544,7 @@ Program paris
                call write_vec_gnuplot(u,v,cvof,p,itimestep,DoVOF)
                call output(nfile,is,ie+1,js,je+1,ks,ke+1)
                if(DoVOF) call output_VOF(nfile,is,ie+1,js,je+1,ks,ke+1)
+               if(DoVOF) call output_ALL(nfile,is,ie+1,js,je+1,ks,ke+1)
                if(DoLPP) call output_LPP(nfile,is,ie+1,js,je+1,ks,ke+1)
                if(test_droplet) call output_droplet(w,time)
                if(rank==0)then
@@ -2190,7 +2193,8 @@ subroutine ReadParameters
                         blayer_gas_inject,            tdelay_gas_inject,            padding,     &
                         radius_gas_inject,            radius_liq_inject,     radius_gap_liqgas,  &
                         jetcenter_yc2yLength,         jetcenter_zc2zLength,                      & 
-                        cflmax_allowed,               out_P,         AdvectionScheme, out_mom
+                        cflmax_allowed,               out_P,         AdvectionScheme, out_mom,   &
+                        output_fields
  
   Nx = 0; Ny = 4; Nz = 4 ! cause absurd input file that lack nx value to fail. 
   Ng=2;xLength=1d0;yLength=1d0;zLength=1d0
@@ -2220,6 +2224,7 @@ subroutine ReadParameters
   cflmax_allowed=0.5d0
   AdvectionScheme = 'QUICK'
   out_mom = .false.
+  output_fields = [ .true. , .true. , .true. ]
 
   in=1
   out=2
