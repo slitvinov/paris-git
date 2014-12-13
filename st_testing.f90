@@ -61,7 +61,7 @@ contains
    subroutine output_heights()
      implicit none
      integer i,j,k,d,index, direction
-     real(8) h, th
+     real(8) h, th, ka, kb
      integer :: normalsign
 
      if(normal_up) then
@@ -70,13 +70,19 @@ contains
         normalsign=-1
      endif
 
-     k = nz/2 + 2  ! +2 because of ghost layers
+     ! kb in processor below in theory
+     kb = nz/2 + 2  ! +2 because of ghost layers
+     ! ka in processor above
+     ka = nz/2 + 3 
      j = ny/2 + 2  ! +2 because of ghost layers
 
-     if(k<ks.or.k>ke) return
-     if(j<js.or.j>je) return
+! First pass: search for height in processor below
 
-     OPEN(UNIT=89,FILE=TRIM(out_path)//'/height-'//TRIM(int2text(rank,padding))//'.txt')
+     k = kb
+     if(j<js.or.j>je) return
+     if(.not.(k<ks.or.k>ke)) then
+
+     OPEN(UNIT=89,FILE=TRIM(out_path)//'/heightb-'//TRIM(int2text(rank,padding))//'.txt')
      OPEN(UNIT=90,FILE=TRIM(out_path)//'/reference-'//TRIM(int2text(rank,padding))//'.txt')
 
      if(cylinder_dir==2) then
@@ -106,7 +112,7 @@ contains
            if(height(i,j,k,index).gt.1d6) then
               write(89,101) x(i),' -'
            else
-              write(89,100) x(i), h 
+              write(89,100) x(i), h  
            endif
         enddo
      else if(cylinder_dir==3) then
@@ -140,6 +146,79 @@ contains
            endif
         enddo
      endif
+  endif
+  close(unit=89)
+! second pass
+
+     k = ka
+
+     if(.not.(k<ks.or.k>ke)) then
+       
+     OPEN(UNIT=89,FILE=TRIM(out_path)//'/heighta-'//TRIM(int2text(rank,padding))//'.txt')
+!     OPEN(UNIT=90,FILE=TRIM(out_path)//'/reference-'//TRIM(int2text(rank,padding))//'.txt')
+
+     if(cylinder_dir==2) then
+        ! search in z direction
+        direction = 3
+        index = 2*(direction-1) + 1 + (-normalsign+1)/2
+        do i=is,ie
+           th = normalsign*wave2ls(x(i),y(j),z(k),cylinder_dir)/dx(nx/2+2)
+!           write(90,100) x(i),th
+           if (height(i,j,k,index).lt.1d6) then
+              h = height(i,j,k,index)
+           else
+              ! search for height
+              d=0
+              h = 2d6
+              do while(h.gt.1d6.and.k+d<ke.and.k-d>ks)
+                 d = d + 1
+                 if (height(i,j,k+d,index).lt.1d6) then
+                    h = height(i,j,k+d,index) + d
+                    height(i,j,k,index) = h 
+                 else if (height(i,j,k-d,index).lt.1d6) then
+                    h = height(i,j,k-d,index) - d
+                    height(i,j,k,index) = h 
+                 endif
+              enddo
+           endif
+           if(height(i,j,k,index).gt.1d6) then
+              write(89,101) x(i),' -'
+           else
+              write(89,100) x(i), h + ka - kb
+           endif
+        enddo
+     else if(cylinder_dir==3) then
+        ! search in y direction
+        direction=2
+        index = 2*(direction-1) + 1 + (-normalsign+1)/2
+        do i=is,ie
+           th = normalsign*wave2ls(x(i),y(j),z(k),cylinder_dir)/dx(nx/2+2)
+!           write(90,100) x(i),th
+           if (height(i,j,k,index).lt.1d6) then
+              h = height(i,j,k,index)
+           else
+              ! search for height
+              d=0
+              h = 2d6
+              do while(h.gt.1d6.and.j+d<je.and.j-d>js)
+                 d = d + 1
+                 if (height(i,j+d,k,index).lt.1d6) then
+                    h = height(i,j+d,k,index) + d
+                    height(i,j,k,index) = h 
+                 else if (height(i,j-d,k,index).lt.1d6) then
+                    h = height(i,j-d,k,index) - d
+                    height(i,j,k,index) = h 
+                 endif
+              enddo
+           endif
+           if(height(i,j,k,index).gt.1d6) then
+              write(89,101) x(i),' -'
+           else
+              write(89,100) x(i), h + ka - kb
+           endif
+        enddo
+     endif
+  endif
 
 100  format(2(f24.16))
 101  format(f24.16,A2)

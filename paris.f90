@@ -2430,5 +2430,29 @@ subroutine hello_coucou
   end if
 end subroutine hello_coucou
 
+subroutine hello_proc(n)
+  use module_grid
+  integer, parameter  :: debug=1
+  integer, save :: hello_count=1
+  integer :: n
+  if(debug == 1) then 
+  if(rank==n) write(6,*) 'coucou ',hello_count, "Process0"
+  if(rank==nPdomain) write(6,*) 'coucou ',hello_count, "Front"
+  hello_count = hello_count + 1
+  end if
+end subroutine hello_proc
+
+
+subroutine hello_all
+  use module_grid
+  integer, parameter  :: debug=1
+  integer, save :: hello_count=1
+  if(debug == 1) then 
+  write(6,*) 'coucou ',hello_count, "Process " , rank
+  if(rank==nPdomain) write(6,*) 'coucou ',hello_count, "Front"
+  hello_count = hello_count + 1
+  end if
+end subroutine hello_all
+
 
 

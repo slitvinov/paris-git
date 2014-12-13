@@ -71,9 +71,11 @@ echo `awk ' /START:/ { cpu = $8 } END { print "cpu = " cpu } ' < tmpout`
 
 if [ -d out ]; then
     cd out
-	cat height-0000?.txt >> output1
+	cat heighta-0000?.txt >> output1a
+	cat heightb-0000?.txt >> output1b
 	cat reference-0000?.txt >> reference.txt
-	compare output1 reference.txt $precision
+	compare output1a reference.txt $precision
+	compare output1b reference.txt $precision
     cd ..
 else
     RED="\\033[1;31m"
