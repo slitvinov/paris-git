@@ -541,7 +541,7 @@ Program paris
             if(mod(itimestep-itimestepRestart,nout)==0) then 
                nfile = ITIMESTEP/nout
                if ( tout > 0.d0 .and. dtFlag == 1 ) nfile = NINT(time/tout)
-               call write_vec_gnuplot(u,v,cvof,p,itimestep,DoVOF)
+               !call write_vec_gnuplot(u,v,cvof,p,itimestep,DoVOF)
                call output(nfile,is,ie+1,js,je+1,ks,ke+1)
                if(DoVOF) call output_VOF(nfile,is,ie+1,js,je+1,ks,ke+1)
                if(DoVOF) call output_ALL(nfile,is,ie+1,js,je+1,ks,ke+1)

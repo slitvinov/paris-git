@@ -172,7 +172,7 @@ subroutine setuppoisson_fs(utmp,vtmp,wtmp,vof_phase,rhot,dt,A,cvof,n1,n2,n3,kap,
 
   x_mod=dxh((is+ie)/2); y_mod=dyh((js+je)/2); z_mod=dzh((ks+ke)/2) !assumes an unstretched grid
   P_gx = 0d0; P_gy = 0d0; P_gz = 0d0
-  limit = 1d-4/dx((is+ie)/2)
+  limit = 1d-3/dx((is+ie)/2)
   c_min = 1d-2
   !Debugging
   debug = .false.
@@ -239,6 +239,7 @@ subroutine setuppoisson_fs(utmp,vtmp,wtmp,vof_phase,rhot,dt,A,cvof,n1,n2,n3,kap,
            alpha2=al3dnew(n_avg,c_stag)
            if (ABS(n_avg(1))>1d-12) then
               x_test2 = (alpha2 - (n_avg(2)+n_avg(3))/2d0)/n_avg(1)
+              if (x_test2 < 0.5d0) P_gx(i,j,k) = sigma*kap(i+1,j,k)/dx(i+1)
               x_mod(i,j,k) = dxh(i)*(1d0-x_test2)
               if (x_mod(i,j,k)>dxh(i)) x_mod(i,j,k) = dxh(i)
               if (x_mod(i,j,k)<limit*dxh(i)) x_mod(i,j,k) = limit*dxh(i)
@@ -291,6 +292,7 @@ subroutine setuppoisson_fs(utmp,vtmp,wtmp,vof_phase,rhot,dt,A,cvof,n1,n2,n3,kap,
            alpha2=al3dnew(n_avg,c_stag)
            if (ABS(n_avg(2))>1d-12) then
               y_test2 = (alpha2 - (n_avg(1)+n_avg(3))/2d0)/n_avg(2)
+              if (y_test2 < 0.5d0) P_gy(i,j,k) = sigma*kap(i,j+1,k)/dy(j+1)
               y_mod(i,j,k) = dyh(j)*(1d0-y_test2)
               if (y_mod(i,j,k)>dyh(j)) y_mod(i,j,k) = dyh(j)
               if (y_mod(i,j,k)<limit*dyh(j)) y_mod(i,j,k) = limit*dyh(j)
@@ -339,6 +341,7 @@ subroutine setuppoisson_fs(utmp,vtmp,wtmp,vof_phase,rhot,dt,A,cvof,n1,n2,n3,kap,
            alpha2=al3dnew(n_avg,c_stag)
            if (ABS(n_avg(3))>1d-12) then
               z_test2 = (alpha2 - (n_avg(1)+n_avg(2))/2d0)/n_avg(3)
+              if (z_test2 < 0.5d0) P_gz(i,j,k) = sigma*kap(i,j,k+1)/dz(k+1)
               z_mod(i,j,k) = dzh(k)*(1d0-z_test2)
               if (z_mod(i,j,k)>dzh(k)) z_mod(i,j,k) = dzh(k)
               if (z_mod(i,j,k)<limit*dzh(k)) z_mod(i,j,k) = limit*dzh(k)
@@ -413,6 +416,7 @@ subroutine setuppoisson_fs(utmp,vtmp,wtmp,vof_phase,rhot,dt,A,cvof,n1,n2,n3,kap,
            alpha2=al3dnew(n_avg,c_stag)
            if (ABS(n_avg(1))>1d-12) then
               x_test2 = (alpha2 - (n_avg(2)+n_avg(3))/2d0)/n_avg(1)
+              if (x_test2 < 0.5d0) P_gx(i+1,j,k) = sigma*kap(i,j,k)/dx(i)
               x_mod(i,j,k) = dxh(i)*x_test2
               if (x_mod(i,j,k)>dxh(i)) x_mod(i,j,k) = dxh(i)
               if (x_mod(i,j,k)<limit*dxh(i)) x_mod(i,j,k) = limit*dxh(i)
@@ -463,6 +467,7 @@ subroutine setuppoisson_fs(utmp,vtmp,wtmp,vof_phase,rhot,dt,A,cvof,n1,n2,n3,kap,
            alpha2=al3dnew(n_avg,c_stag)
            if (ABS(n_avg(2))>1d-12) then
               y_test2 = (alpha2 - (n_avg(1)+n_avg(3))/2d0)/n_avg(2)
+              if (y_test2 < 0.5d0) P_gy(i,j+1,k) = sigma*kap(i,j,k)/dy(j)
               y_mod(i,j,k) = dyh(j)*y_test2
               if (y_mod(i,j,k)>dyh(j)) y_mod(i,j,k) = dyh(j)
               if (y_mod(i,j,k)<limit*dyh(j)) y_mod(i,j,k) = limit*dyh(j)
@@ -511,6 +516,7 @@ subroutine setuppoisson_fs(utmp,vtmp,wtmp,vof_phase,rhot,dt,A,cvof,n1,n2,n3,kap,
            alpha2=al3dnew(n_avg,c_stag)
            if (ABS(n_avg(3))>1d-12) then
               z_test2 = (alpha2 - (n_avg(1)+n_avg(2))/2d0)/n_avg(3)
+              if (z_test2 < 0.5d0) P_gz(i,j,k+1) = sigma*kap(i,j,k)/dz(k)
               z_mod(i,j,k) = dzh(k)*z_test2
               if (z_mod(i,j,k)>dzh(k)) z_mod(i,j,k) = dzh(k)
               if (z_mod(i,j,k)<limit*dzh(k)) z_mod(i,j,k) = limit*dzh(k)
@@ -787,8 +793,11 @@ subroutine discrete_divergence(u,v,w,iout)
   divtot = 0d0; n_level = 0d0
 
   do k=ks,ke+1; do j=js,je+1; do i=is,ie+1
-     div(i,j,k)=ABS((u(i-1,j,k)-u(i,j,k))/dx(i)+(v(i,j-1,k)-v(i,j,k))/dy(j)+(w(i,j,k-1)-w(i,j,k))/dz(k))
-     !div(i,j,k)=(u(i-1,j,k)-u(i,j,k))*dy(j)*dz(k)+(v(i,j-1,k)-v(i,j,k))*dx(i)*dz(k)+(w(i,j,k-1)-w(i,j,k))*dx(i)*dy(j)
+     div(i,j,k)=ABS((u(i-1,j,k)-u(i,j,k))/dx(i)+(v(i,j-1,k)-v(i,j,k))/dy(j)+(w(i,j,k-1)-w(i,j,k))/dz(k)) !divergence
+     !div(i,j,k)=ABS((u(i-1,j,k)-u(i,j,k))*dy(j)*dz(k)+(v(i,j-1,k)-v(i,j,k))*dx(i)*dz(k)+(w(i,j,k-1)-w(i,j,k))*dx(i)*dy(j)) !volume error
+     !if (pcmask(i,j,k) == 1 .or. pcmask(i,j,k) == 2) then
+     !   div(i,j,k) = div(i,j,k)*dt
+     !endif
      do l=0,3
         if (pcmask(i,j,k)==l) then
            divtot(l)=divtot(l)+div(i,j,k)
@@ -914,7 +923,7 @@ subroutine FreeSolver(A,p,maxError,beta,maxit,it,ierr,iout,time,tres2)
     !else
     !   write(*,*)'No cells for this topology present in this processor'
     !endif
-    call catch_divergence_fs(res2,ierr)
+    call catch_divergence_fs(res2,cells,ierr)
     call MPI_ALLREDUCE(res2, tres2, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr)
     call MPI_ALLREDUCE(cells, tcells, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr)
     if(norm==2) tres2=sqrt(tres2)
@@ -923,7 +932,6 @@ subroutine FreeSolver(A,p,maxError,beta,maxit,it,ierr,iout,time,tres2)
 310 format(2I6,'  ',(e14.5))
     if (tres2<maxError) then 
        if(rank==0.and.recordconvergence) close(89)
-       !if (mod(iout,nout)==0) write(*,'("Solver flag and nr. of cells: ",I8,e14.5)')solver_flag,cells
        exit
     endif
   enddo
@@ -933,8 +941,8 @@ subroutine FreeSolver(A,p,maxError,beta,maxit,it,ierr,iout,time,tres2)
      write(*,'("Solver flag:",I8)')solver_flag
   endif
 contains
-  subroutine catch_divergence_fs(res2,ierr)
-    real(8), intent(in) :: res2
+  subroutine catch_divergence_fs(res2,cells,ierr)
+    real(8), intent(in) :: res2, cells
     integer, intent(out) :: ierr
     logical :: diverged=.false.
     logical :: extended=.true.
@@ -960,10 +968,16 @@ contains
        end do; end do; end do
     endif
     if ((res2*npx*npy*npz)>1.d16 ) then
-       if(rank<=30) print*,'Pressure solver diverged after',it,'iterations at rank ',rank
+       if(rank<=30) then
+          print*,'Pressure solver diverged after',it,'iterations at rank ',rank
+          write(*,'("Res2, cells, solver_flag :",2e14.5,I8)')res2,cells,solver_flag
+       endif
        call pariserror("freesolver error")
     else if (res2 .ne. res2) then 
-       if(rank<=30) print*, 'it:',it,'Pressure residual value is invalid at rank', rank
+       if(rank<=30) then
+          print*, 'it:',it,'Pressure residual value is invalid at rank', rank
+          write(*,'("Res2, cells, solver_flag :",2e14.5,I8)')res2,cells,solver_flag
+       endif
        call pariserror("freesolver error")
     else
        ierr=0
