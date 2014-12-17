@@ -1,0 +1,190 @@
+README
+-----
+
+to compile with VOFI type
+
+make HAVE_VOFI=1
+
+and set
+
+USE_VOFI = T
+
+in the "inputvof" parameter file. 
+
+Pressure boundary conditions
+----------------------------
+
+
+Outflow/fixed velocity (bdry_cond = 4)
+set u(ie) ==  u(ieu+1) to given outflow/fixed value
+last pressure updated ie, last velocity updated ieu  --> 
+replace gradient between ie and ie+1 by zero. 
+Thus  A(ie,j,k,2) * (p(ie+1,j,k) - p(ie,j,k)) = 0 
+and 
+A(ie,:,:,2) = 0
+
+same thing for presssure condition
+Fix p(ie) 
+set A(ie,:,:,2) = 0 
+
+
+Fortran 90/95
+-------------
+
+- no need to declare functions in module. 
+- initialized values are not saved between calls to subroutine
+
+Parallel/MPI/grid size/Hypre
+----------------------------
+
+Some of the solvers in hypre have power-of-two restrictions on the size of the periodic dimensions.
+Hypre uses the L1 norm. 
+
+Grid and array index conventions in ftc/paris
+---------------------------------------------
+
+paris/FTC:
+
+u(i) is at xh(i)  (xh means x half, maps to  i + 1/2)
+p(i), rho(i) at x(i)  (x maps to i)
+x(i) between xh(i-1) and xh(i)
+
+is = Ng + 1
+ie = Ng + Nx
+ 
+* bulk indices 
+
+u(i-1)  p(i)    u(i)   p(i+1)
+--x------x-------x------x--   
+        x(i)    xh(i)            		                   
+        			
+
+last advection point ieu
+last corrected velocity ieu
+
+* left boundary
+
+        p(is)  u(is)   p(is+1) 
+  x------x-------x-------x-----
+xh(Ng)              
+ !!
+  0
+
+*right boundary
+
+     u(ieu)     p(ie)  u(ie)   p(ie+1)
+...----x---------x------x------x-
+                        | XLength
+	        	GHOST POINTS	
+
+			boundary     rightmost
+			last correc-  pressure point	
+			ted velocity  in correction
+
+
+last calculated
+pressure point is p(ie)
+
+xh(i) = 0 for i=Ng
+xh(i) = xLength for i = Nx+Ng == ie
+
+size of array including ghost layers/points given by declaration with imin, imax etc.
+start/end of non-ghost points is,ie etc.
+
+Special conventions for velocity:
+  ieu=ie; if(bdry_cond(1)/='periodic' .and. coords(1)==nPx-1) ieu=ie-1
+
+
+SURFER:
+
+u(i) is at i-1/2  (looks like xh(i-1))
+
+v(2) is at y=0 as if ng=2. Boundary at y=0
+v(ny) is at y=L, boundary is at y=L
+
+
+Transfer fields:
+
+let ng=2, Nx_ftc = nx_surfer - 2
+u_ftc(i) = u_surfer(j(i)+1) *  delta x / delta t  from i=1 to i = nx_surfer - 1 = Nx_ftc + 1
+u_surfer(k) = u_ftc(j^-1(k) - 1)  *  delta t / delta x
+
+
+nx_surfer - 2 = Nx
+
+p_s(j(i)) = p_f(i)
+
+mais attention: imin_s = 1, i_first_point_surfer = 2; 
+i_first_point_ftc = i_min_ftc + NG
+
+i_first_point_surfer = j(i_first_point_ftc) ==> imin_ftc = j^-1(2) - NG
+j(imin_ftc+NG)=2
+
+is=coords(1)*Mx+1+Ng; ie=coords(1)*Mx+Mx+Ng; imin=is-Ng; imax=ie+Ng
+imin_ftc = Ng+1 - Ng = 1
+j(1+NG) = 2
+j(i) = i + 1 - Ng
+p_s(i+1-Ng) = p_f(i)
+
+
+
+ imin=is-Ng; imax=ie+Ng
+ imin_s = 1  imax_s = nx
+
+  first point ftc = is
+  first point surfer = 2
+
+if(ng < 1) fail ! 
+  cvof_s (1) = cvof(is-1)
+  cvof_s(i) = cvof(is+i-2)   j^-1(i) = is+i-2 = imin + NG - 2 + i 
+  u_surfer(i) = u_ftc(j^-1(i) - 1) = u_ftc(is + i - 3) 
+
+if(ng < 2) fail ! 
+  u_surfer(i) = u_ftc(is + i - 3) 
+
+from i = 1 to i = ny
+
+
+
+c      SKETCH OF TOP-BOTTOM BOUNDARY CONDITIONS
+c   
+c       *-----*------*------*------*  j =  ny   p(i,ny)
+c       |     |      |      |      |
+c   ....^.....^......^......^......^....        v(i,ny) = 0
+c       |     |      |      |      |
+c       |---------------------->---*  
+c       |     |      |      |      |  j = ny-1
+c       |     |      |      |      ^
+c       |--------------------------|
+c       |     |      |      |      |
+c   
+c   
+c       |  :  |      |      |      |
+c       |--:-----------------------
+c       |  :  |      |      |      |
+c       |  :  |      |      |  u(n-1,2)
+c   >---*--:--*---------------->-- |  p(n-1,2)            | Boundary conditions
+c       |  :  |      |      |      |                      |    u(i,1) = u(i,2)
+c   ....^..:.......................^...  y = 0 v(i,2)     |    p(i,1) = p(i,2) 
+c       |  :  |      |      |      |                      |    v(i,2) = 0
+c   >---*-->--*------*------*-->-- *   j=1                   S12(i,2) = 0 
+c       |  :  |      |      |      |   p(n-1,1)              S12(i,ny) = 0
+c       ^  :  ^      ^      ^      ^   v(n-1,1)
+c    v(1,1)
+c   
+
+
+2) Divergence
+
+
+   du/dx = (u(i) - u(i-1)) / (xh(i) - xh(i-1))  = u(i) - u(i-1) / dx(i) 
+
+   vof2 = du/dx C(u(i-1/2))
+
+3) rescaling
+
+  u * dt / dx = u(i) * dt / dxh(i) 
+
+4) Front-VOF merge:
+
+problem linfunc in nPdomain. 
