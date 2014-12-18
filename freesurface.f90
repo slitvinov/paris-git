@@ -220,7 +220,7 @@ subroutine setuppoisson_fs(utmp,vtmp,wtmp,vof_phase,rhot,dt,A,cvof,n1,n2,n3,kap,
            c1 = FL3DNEW(nr,alpha2,x0,dc)
            if (debug .and. k==(ks+ke)/2 .and. mod(iout,no)==0) write(55,314)x(i),y(j),c1,cvof(i,j,k)
            c_stag = c1+c0
-           if (c0>c_min) then ! use weighted average if liq VOF is not small, otherwise use cav normals
+           if (c0>c_min) then
               nr(1)=n1(i+1,j,k)*c0/c_stag + n1(i,j,k)*c1/c_stag
               nr(2)=n2(i+1,j,k)*c0/c_stag + n2(i,j,k)*c1/c_stag
               nr(3)=n3(i+1,j,k)*c0/c_stag + n3(i,j,k)*c1/c_stag
@@ -777,6 +777,102 @@ subroutine setuppoisson_fs2(utmp,vtmp,wtmp,dt,A,vof_phase,istep)
   enddo; enddo; enddo
 end subroutine setuppoisson_fs2
 !--------------------------------------------------------------------------------------------------------------------
+!=================================================================================================
+!
+!  Extrapolation of velocities for free surface
+!
+!=================================================================================================
+subroutine extrapolate_velocities()
+  use module_BC
+  use module_grid
+  use module_flow
+  use module_2phase
+  use module_freesurface
+  implicit none
+  integer :: i,j,k,level,nbr
+  real(8) :: nr(3)
+  real(8) :: x_vel, xcount
+
+  !New simple extrapolation: Velocities of neighbours at lower topological level averaged
+  do level = 1, X_level
+     do k=ks,ke; do j=js,je; do i=is,ie
+        if (u_cmask(i,j,k) == level) then
+           xcount = 0d0; x_vel = 0d0
+           do nbr=-1,1,2
+              if (u_cmask(i+nbr,j,k)==level-1) then
+                 xcount = xcount+1d0
+                 x_vel = x_vel + u(i+nbr,j,k)
+              endif
+           enddo
+           do nbr=-1,1,2
+              if (u_cmask(i,j+nbr,k)==level-1) then
+                 xcount = xcount+1d0
+                 x_vel = x_vel + u(i,j+nbr,k)
+              endif
+           enddo
+           do nbr=-1,1,2
+              if (u_cmask(i,j,k+nbr)==level-1) then
+                 xcount = xcount+1d0
+                 x_vel = x_vel + u(i,j,k+nbr)
+              endif
+           enddo
+           if (xcount>0d0) then
+              u(i,j,k) = x_vel/xcount
+           endif
+        endif
+        if (v_cmask(i,j,k) == level) then
+           xcount = 0d0; x_vel = 0d0
+           do nbr = -1,1,2
+              if (v_cmask(i+nbr,j,k)==level-1) then
+                 xcount = xcount+1d0
+                 x_vel = x_vel + v(i+nbr,j,k)
+              endif
+           enddo
+           do nbr = -1,1,2
+              if (v_cmask(i,j+nbr,k)==level-1) then
+                 xcount = xcount+1d0
+                 x_vel = x_vel + v(i,j+nbr,k)
+              endif
+           enddo
+           do nbr = -1,1,2
+              if (v_cmask(i,j,k+nbr)==level-1) then
+                 xcount = xcount+1d0
+                 x_vel = x_vel + v(i,j,k+nbr)
+              endif
+           enddo
+           if (xcount>0d0) then
+              v(i,j,k) = x_vel/xcount
+           endif
+        endif
+        if (w_cmask(i,j,k) == level) then
+           xcount = 0d0; x_vel = 0d0
+           do nbr = -1,1,2
+              if (w_cmask(i+nbr,j,k)==level-1) then
+                 xcount = xcount+1d0
+                 x_vel = x_vel + w(i+nbr,j,k)
+              endif
+           enddo
+           do nbr = -1,1,2
+              if (w_cmask(i,j+nbr,k)==level-1) then
+                 xcount = xcount+1d0
+                 x_vel = x_vel + w(i,j+nbr,k)
+              endif
+           enddo
+           do nbr = -1,1,2
+              if (w_cmask(i,j,k+nbr)==level-1) then
+                 xcount = xcount+1d0
+                 x_vel = x_vel + w(i,j,k+nbr)
+              endif
+           enddo
+           if (xcount>0d0) then
+              w(i,j,k) = x_vel/xcount
+           endif
+        endif
+     enddo; enddo; enddo
+     call do_ghost_vector(u,v,w)
+  enddo
+end subroutine extrapolate_velocities
+!=============================================================================================================================================
 subroutine discrete_divergence(u,v,w,iout)
   use module_grid
   use module_freesurface
