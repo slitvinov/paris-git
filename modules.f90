@@ -945,8 +945,8 @@ module module_BC
     ! same velocity as opposing inflow. ! @generalize this !!
     if(bdry_cond(4)==4 .and. coords(1)==nPx-1) then
         u(ie  ,:,:)=uaverage
-        v(ie+1,:,:)=v(ie-1,:,:)
-        w(ie+1,:,:)=w(ie-1,:,:)
+        v(ie+1,:,:)=v(ie,:,:)
+        w(ie+1,:,:)=w(ie,:,:)
     endif
 
 
@@ -1178,9 +1178,9 @@ module module_BC
     if(bdry_cond(4)==4 .and. coords(1)==nPx-1) then
         if (d.eq.1) then
             mom(ie  ,:,:)= mom(ie-1,:,:)
-            mom(ie+1,:,:)=-mom(ie-1,:,:)
+            mom(ie+1,:,:)=-mom(ie,:,:)
         else
-            mom(ie+1,:,:)=mom(ie-1,:,:)
+            mom(ie+1,:,:)=mom(ie,:,:)
         endif
     endif
 
