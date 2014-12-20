@@ -825,7 +825,7 @@ subroutine output5(timestep)
 	index = index + 1
 	
 #else
-	call pariserror('For output type 4 Silo library is required')
+	call pariserror('For output type 5 Silo library is required')
 #endif
 
 end subroutine output5
