@@ -25,7 +25,7 @@ BINDIR = $(HOME)/bin
 # babbage
 # HYPRE_DIR = /share/apps/hypre
 # Local
-SILO_DIR = $(HOME)/Dropbox/Paris_Work/silo-4.10.2
+SILO_DIR = $(HOME)/cfd/libs/silo-4.10.2
 
 HYPRE_DIR = $(HOME)/cfd/libs/hypre-2.9.0b/src/lib
 HYPRE_LIBS =  -L$(HYPRE_DIR) -lHYPRE 

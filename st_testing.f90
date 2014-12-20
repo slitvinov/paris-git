@@ -547,11 +547,11 @@ subroutine h_of_KHI2D(timestep,output_time)
 end subroutine
 ! Output zone=======================================================================================
 ! General subroutine
-subroutine output_ALL(nf,i1,i2,j1,j2,k1,k2)
+subroutine output_ALL(nf,i1,i2,j1,j2,k1,k2,timestep)
   implicit none
-  integer :: nf,i1,i2,j1,j2,k1,k2
+  integer :: nf,i1,i2,j1,j2,k1,k2,timestep
   if(output_format==4) call output4(nf,i1,i2,j1,j2,k1,k2)
-  if(output_format==5) call output5
+  if(output_format==5) call output5(timestep)
 end subroutine output_ALL
 ! Visit file generation subroutine
   subroutine append_General_visit_file(rootname)
@@ -579,7 +579,7 @@ end subroutine output_ALL
     close(88)
   end subroutine  append_General_visit_file
   !Output subroutine
-  subroutine output4(nf,i1,i2,j1,j2,k1,k2)
+subroutine output4(nf,i1,i2,j1,j2,k1,k2)
   use module_flow
   use module_grid
   use module_surface_tension
@@ -616,7 +616,74 @@ end subroutine output_ALL
 20  format('VECTORS velocity double')
 18  format('LOOKUP_TABLE default')
 
-CLOSE(9)
+    if(output_fields(1)) then
+		write(8,20)
+		do k=k1,k2; do j=j1,j2; do i=i1,i2;
+		  if (itype .eq. 1)write(8,210)rho(i,j,k)
+		  if (itype .eq. 5)write(8,310)0.5*(u(i,j,k)+u(i-1,j,k)), &
+			 0.5*(v(i,j,k)+v(i,j-1,k)),0.5*(w(i,j,k)+w(i,j,k-1))
+		enddo; enddo; enddo
+    endif
+    
+    !write(8,19)(i2-i1+1)*(j2-j1+1)*(k2-k1+1)
+    
+    ! Writing CVOF values
+    if(output_fields(2)) then
+		write(8,17) 'VOF'
+		write(8,18)
+		do k=k1,k2; do j=j1,j2; do i=i1,i2;
+			 write(8,210) cvof(i,j,k)
+		enddo; enddo; enddo
+    endif
+    
+    ! Writing Height function values
+    if(output_fields(3)) then
+		write(8,17) 'Heightx+'
+		write(8,18)
+	
+		do k=k1,k2; do j=j1,j2; do i=i1,i2;
+			 write(8,210) height(i,j,k,1) 
+		enddo; enddo; enddo
+	
+		write(8,17) 'Heightx-'
+		write(8,18)
+	
+		do k=k1,k2; do j=j1,j2; do i=i1,i2;
+			 write(8,210) height(i,j,k,2) 
+		enddo; enddo; enddo
+	
+		write(8,17) 'Heighty+'
+		write(8,18)
+	
+		do k=k1,k2; do j=j1,j2; do i=i1,i2;
+			 write(8,210) height(i,j,k,3) 
+		enddo; enddo; enddo
+	
+		write(8,17) 'Heighty-'
+		write(8,18)
+	
+		do k=k1,k2; do j=j1,j2; do i=i1,i2;
+			 write(8,210) height(i,j,k,4) 
+		enddo; enddo; enddo
+	
+		write(8,17) 'Heightz+'
+		write(8,18)
+	
+		do k=k1,k2; do j=j1,j2; do i=i1,i2;
+			 write(8,210) height(i,j,k,5) 
+		enddo; enddo; enddo
+	
+		write(8,17) 'Heightz-'
+		write(8,18)
+	
+		do k=k1,k2; do j=j1,j2; do i=i1,i2;
+			 write(8,210) height(i,j,k,6) 
+		enddo; enddo; enddo
+    endif
+210 format(e14.5)
+310 format(e14.5,e14.5,e14.5)
+
+    close(8)
 
 ! TEMPORARY
     if ( zip_data ) then 
@@ -626,7 +693,7 @@ CLOSE(9)
 ! END TEMPORARY 
 end subroutine output4
 
-subroutine output5
+subroutine output5(timestep)
 	use module_flow
 	use module_grid
   	use module_surface_tension
@@ -635,7 +702,9 @@ subroutine output5
 	include 'mpif.h'
 #ifdef HAVE_SILO
 	include 'silo_f9x.inc'
-		
+#endif	
+	integer :: timestep	
+#ifdef HAVE_SILO
 	! Silo Util Variables
 	
 	integer::narg,cptArg !#of arg & counter of arg
@@ -644,7 +713,7 @@ subroutine output5
  	real(4), dimension(:,:,:), allocatable :: matrix_small
  	real(8), dimension(:), allocatable :: x_axis, y_axis, z_axis
  	integer :: iee, ise, jee, jse, kee, kse
- 	integer :: i, j, k, ierr2, dbfile, optlist, timestep, lfile_name
+ 	integer :: i, j, k, ierr2, dbfile, optlist, lfile_name
  	integer, dimension(3) :: dims_mesh, dims_cpu, dims_vof, ghostlow, ghosttop
  	real(8) :: deltaX
  	integer, save :: index = 0
@@ -714,7 +783,7 @@ subroutine output5
 	ghosttop(3) = kee-ke
 	
 	! Writing multi mesh file
-	if (rank == 0) call write_master(TRIM(path)//'/fbasic',index)
+	if (rank == 0) call write_master(TRIM(path)//'/fbasic',index, time, timestep)
 	
 	! Setting *.silo file path
 	file_name = TRIM(path)//'/fbasic'//i2t(index,padd)//'-'//i2t(rank,padd)//".silo"
@@ -728,12 +797,11 @@ subroutine output5
 	ierr2 = dbcreate(TRIM(file_name), lfile_name, DB_CLOBBER, DB_LOCAL, &
 	 'Comment about the data', 22, DB_PDB, dbfile)
 	 
-	! Setting ghost layers, time step and physical time
-	ierr2 = dbmkoptlist(4, optlist)
+	! Setting ghost layers
+	ierr2 = dbmkoptlist(2, optlist)
     ierr2 = dbaddiopt(optlist, DBOPT_HI_OFFSET, ghosttop)
     ierr2 = dbaddiopt(optlist, DBOPT_LO_OFFSET, ghostlow)
-    ierr2 = dbaddiopt(optlist, DBOPT_CYCLE, timestep)
-    ierr2 = dbaddiopt(optlist, DBOPT_DTIME, time)
+
 	 
 	! Appending mesh to *.silo file
 	ierr2 = dbputqm (dbfile, 'srm', 18, "x", 1, &
@@ -772,7 +840,7 @@ function i2t(number,length)
 	enddo
 end function
 	
-subroutine write_master(rootname, step)
+subroutine write_master(rootname, step, time, timestep)
 	implicit none
 #ifdef HAVE_SILO
 	include 'silo_f9x.inc'
@@ -784,7 +852,8 @@ subroutine write_master(rootname, step)
 	character(len=levarnames), dimension(numProcess) :: varnames
 	character(len=lemeshnames), dimension(numProcess) :: meshnames
 	integer, dimension(numProcess) :: lmeshnames, lvarnames, meshtypes, vartypes
-	integer :: lfile_n, lsilon
+	integer :: lfile_n, lsilon, optlist, timestep
+	real(8) :: time
 		
 #ifdef HAVE_SILO
 	! Setting mesh types and variable types
@@ -818,9 +887,13 @@ subroutine write_master(rootname, step)
 	oldlen = dbget2dstrlen()
 	err = dbset2dstrlen(lemeshnames)
 	
+		! Setting ghost layers, time step and physical time
+	err = dbmkoptlist(2, optlist)
+    err = dbaddiopt(optlist, DBOPT_CYCLE, step)
+    err = dbaddiopt(optlist, DBOPT_DTIME, time)
 	! Append the multimesh object.
 	err = dbputmmesh(dbfile, "srucmesh", 8, numProcess, meshnames, &
-  	lmeshnames, meshtypes, DB_F77NULL, ierr)
+  	lmeshnames, meshtypes, optlist, ierr)
   	
   	!Restore the previous value for maximum string length
 	err = dbset2dstrlen(oldlen)
