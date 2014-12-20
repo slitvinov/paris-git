@@ -37,6 +37,7 @@ module module_st_testing
   use module_surface_tension
   implicit none
   integer :: testint
+  integer :: levarnames, lemeshnames, padd
 contains
    subroutine test_VOF_HF()
      implicit none
@@ -550,6 +551,7 @@ subroutine output_ALL(nf,i1,i2,j1,j2,k1,k2)
   implicit none
   integer :: nf,i1,i2,j1,j2,k1,k2
   if(output_format==4) call output4(nf,i1,i2,j1,j2,k1,k2)
+  if(output_format==5) call output5
 end subroutine output_ALL
 ! Visit file generation subroutine
   subroutine append_General_visit_file(rootname)
@@ -614,74 +616,7 @@ end subroutine output_ALL
 20  format('VECTORS velocity double')
 18  format('LOOKUP_TABLE default')
 
-    if(output_fields(1)) then
-		write(8,20)
-		do k=k1,k2; do j=j1,j2; do i=i1,i2;
-		  if (itype .eq. 1)write(8,210)rho(i,j,k)
-		  if (itype .eq. 5)write(8,310)0.5*(u(i,j,k)+u(i-1,j,k)), &
-			 0.5*(v(i,j,k)+v(i,j-1,k)),0.5*(w(i,j,k)+w(i,j,k-1))
-		enddo; enddo; enddo
-    endif
-    
-    !write(8,19)(i2-i1+1)*(j2-j1+1)*(k2-k1+1)
-    
-    ! Writing CVOF values
-    if(output_fields(2)) then
-		write(8,17) 'VOF'
-		write(8,18)
-		do k=k1,k2; do j=j1,j2; do i=i1,i2;
-			 write(8,210) cvof(i,j,k)
-		enddo; enddo; enddo
-    endif
-    
-    ! Writing Height function values
-    if(output_fields(3)) then
-		write(8,17) 'Heightx+'
-		write(8,18)
-	
-		do k=k1,k2; do j=j1,j2; do i=i1,i2;
-			 write(8,210) height(i,j,k,1) 
-		enddo; enddo; enddo
-	
-		write(8,17) 'Heightx-'
-		write(8,18)
-	
-		do k=k1,k2; do j=j1,j2; do i=i1,i2;
-			 write(8,210) height(i,j,k,2) 
-		enddo; enddo; enddo
-	
-		write(8,17) 'Heighty+'
-		write(8,18)
-	
-		do k=k1,k2; do j=j1,j2; do i=i1,i2;
-			 write(8,210) height(i,j,k,3) 
-		enddo; enddo; enddo
-	
-		write(8,17) 'Heighty-'
-		write(8,18)
-	
-		do k=k1,k2; do j=j1,j2; do i=i1,i2;
-			 write(8,210) height(i,j,k,4) 
-		enddo; enddo; enddo
-	
-		write(8,17) 'Heightz+'
-		write(8,18)
-	
-		do k=k1,k2; do j=j1,j2; do i=i1,i2;
-			 write(8,210) height(i,j,k,5) 
-		enddo; enddo; enddo
-	
-		write(8,17) 'Heightz-'
-		write(8,18)
-	
-		do k=k1,k2; do j=j1,j2; do i=i1,i2;
-			 write(8,210) height(i,j,k,6) 
-		enddo; enddo; enddo
-    endif
-210 format(e14.5)
-310 format(e14.5,e14.5,e14.5)
-
-    close(8)
+CLOSE(9)
 
 ! TEMPORARY
     if ( zip_data ) then 
@@ -690,6 +625,224 @@ end subroutine output_ALL
     end if ! zip_data
 ! END TEMPORARY 
 end subroutine output4
+
+subroutine output5
+	use module_flow
+	use module_grid
+  	use module_surface_tension
+  	use module_IO
+	implicit none
+	include 'mpif.h'
+#ifdef HAVE_SILO
+	include 'silo_f9x.inc'
+		
+	! Silo Util Variables
+	
+	integer::narg,cptArg !#of arg & counter of arg
+ 	character(len=70)::name !Arg name
+ 	character(len=70)::path, file_name
+ 	real(4), dimension(:,:,:), allocatable :: matrix_small
+ 	real(8), dimension(:), allocatable :: x_axis, y_axis, z_axis
+ 	integer :: iee, ise, jee, jse, kee, kse
+ 	integer :: i, j, k, ierr2, dbfile, optlist, timestep, lfile_name
+ 	integer, dimension(3) :: dims_mesh, dims_cpu, dims_vof, ghostlow, ghosttop
+ 	real(8) :: deltaX
+ 	integer, save :: index = 0
+ 		
+    padd = padding
+    path = 'out/VTK'
+    
+	!Debugging messages
+	!Write(*,*) 'Starting job in rank: ', rank
+
+	! Setting string lengths
+	levarnames = 25 + 2*padd
+	lemeshnames = 24 + 2*padd
+	
+	! Setting number of processors for each spatial dimension
+	dims_cpu(1) = nPx; dims_cpu(2) = nPy; dims_cpu(3) = nPz;
+	
+	! Voxel size of structured regular mesh
+	deltaX = xLength/REAL(Nx)
+	
+    ! Setting limits of the domain to be outputted
+    ise=imin; iee=imax; if(coords(1)==0) ise=is; if(coords(1)==nPx-1) iee=ie;
+    jse=jmin; jee=jmax; if(coords(2)==0) jse=js; if(coords(2)==nPy-1) jee=je;
+    kse=kmin; kee=kmax; if(coords(3)==0) kse=ks; if(coords(3)==nPz-1) kee=ke;
+    
+    ! Debugging messages
+    !WRITE(*,*) 'is In rank ', rank, is, ie, js, je, ks, ke
+	!WRITE(*,*) 'Maximim In rank ', rank, imin, imax, jmin, jmax, kmin, kmax
+	!WRITE(*,*) 'coords in rank ', rank, coords(1), coords(2), coords(3)
+	!WRITE(*,*) 'ise In rank ', rank, ise, iee, jse, jee, kse, kee
+	
+	! Allocating arrays
+	allocate(matrix_small(imin:imax,jmin:jmax,kmin:kmax))
+	allocate(x_axis(ise:iee+1),y_axis(jse:jee+1),z_axis(kse:kee+1))
+	
+	! Defining mesh axys
+	do i=ise,iee+1
+		x_axis(i)= REAL(i-3)*deltaX !+ REAL(coords(1))*(xLength/REAL(nPx))
+	enddo
+	!Write(*,*) 'In rank', rank, ' x limits ', x_axis
+	do j=jse,jee+1
+		y_axis(j)= REAL(j-3)*deltaX !+ coords(2)*yLength/nPy
+	enddo
+	do k=kse,kee+1
+		z_axis(k)= REAL(k-3)*deltaX !+ coords(3)*zLength/nPz
+	enddo
+	
+	! Defining dimensions of the mesh
+	dims_mesh(1) = iee - ise + 2
+	dims_mesh(2) = jee - jse + 2
+	dims_mesh(3) = kee - kse + 2
+	
+	! Defining dimensions of the cvof data
+	dims_vof(1) = iee - ise + 1
+	dims_vof(2) = jee - jse + 1
+	dims_vof(3) = kee - kse + 1
+	
+	! Debugging messages
+	!WRITE(*,*) 'Limits In rank ', rank, iee, ise, jee, jse, kee, kse
+	
+	! Defining ghost zones
+	ghostlow(1) = is-ise
+	ghostlow(2) = js-jse
+	ghostlow(3) = ks-kse
+	ghosttop(1) = iee-ie
+	ghosttop(2) = jee-je
+	ghosttop(3) = kee-ke
+	
+	! Writing multi mesh file
+	if (rank == 0) call write_master(TRIM(path)//'/fbasic',index)
+	
+	! Setting *.silo file path
+	file_name = TRIM(path)//'/fbasic'//i2t(index,padd)//'-'//i2t(rank,padd)//".silo"
+	! Setting *.silo file path length
+	lfile_name = 20 + 2*padd
+	
+	!Debugging message
+	!write(*,*) 'Path for silo is ', file_name
+	
+	! Generating .silo file
+	ierr2 = dbcreate(TRIM(file_name), lfile_name, DB_CLOBBER, DB_LOCAL, &
+	 'Comment about the data', 22, DB_PDB, dbfile)
+	 
+	! Setting ghost layers, time step and physical time
+	ierr2 = dbmkoptlist(4, optlist)
+    ierr2 = dbaddiopt(optlist, DBOPT_HI_OFFSET, ghosttop)
+    ierr2 = dbaddiopt(optlist, DBOPT_LO_OFFSET, ghostlow)
+    ierr2 = dbaddiopt(optlist, DBOPT_CYCLE, timestep)
+    ierr2 = dbaddiopt(optlist, DBOPT_DTIME, time)
+	 
+	! Appending mesh to *.silo file
+	ierr2 = dbputqm (dbfile, 'srm', 18, "x", 1, &
+         "y", 1, "z", 1, x_axis, y_axis, z_axis, dims_mesh, 3, &
+         DB_DOUBLE, DB_COLLINEAR, optlist, ierr2)
+     matrix_small = REAL(cvof)
+     
+    ! Appending cvof variable to *.silo file  
+    ierr2 = dbputqv1 (dbfile, 'cvof', 4, 'srm', 3, &
+        matrix_small(ise:iee,jse:jee,kse:kee), dims_vof, &
+    	3, DB_F77NULL, 0, DB_FLOAT, DB_ZONECENT, DB_F77NULL, ierr2) 
+    
+    ! Closing *.silo file		
+	ierr2 = dbclose(dbfile)
+	
+	! Debugging message	
+	!WRITE(*,*) "Every thing is fine! in proc: ", rank
+	!210 format(e14.5)
+	
+	! Updating index
+	index = index + 1
+	
+#else
+	call pariserror('For output type 4 Silo library is required')
+#endif
+
+end subroutine output5
+
+function i2t(number,length)
+	integer :: number, length, i
+	character(len=length) :: i2t
+	character, dimension(0:9) :: num = (/'0', '1', '2', '3', '4', '5', '6', '7', '8', '9'/)
+	if(number>=10**length) write(*,*) "i2t error: string is not large enough"
+	do i=1,length
+	  i2t(length+1-i:length+1-i) = num(mod(number/(10**(i-1)),10))
+	enddo
+end function
+	
+subroutine write_master(rootname, step)
+	implicit none
+#ifdef HAVE_SILO
+	include 'silo_f9x.inc'
+#endif
+	integer err, ierr, dbfile, nmesh, oldlen, m, step
+	character(*) :: rootname
+	character(len=50) :: file_n
+	character(len=40) :: fullname
+	character(len=levarnames), dimension(numProcess) :: varnames
+	character(len=lemeshnames), dimension(numProcess) :: meshnames
+	integer, dimension(numProcess) :: lmeshnames, lvarnames, meshtypes, vartypes
+	integer :: lfile_n, lsilon
+		
+#ifdef HAVE_SILO
+	! Setting mesh types and variable types
+	meshtypes = DB_QUAD_RECT
+	vartypes = DB_QUADVAR
+	
+	lmeshnames = lemeshnames
+	lvarnames = levarnames
+  
+	! Setting multi mesh and variables paths
+	file_n = TRIM(rootname)//i2t(step,padd)//'-'
+	do m=0,numProcess-1
+	   fullname = TRIM(file_n)//TRIM(i2t(m,padd))//'.silo:srm'
+	   !Debugging message
+	   !write(*,*) 'Paths1 ', fullname
+	   meshnames(m+1) = TRIM(fullname)
+	   varnames(m+1) = TRIM(file_n)//TRIM(i2t(m,padd))//'.silo:cvof'
+	   !write(*,*) 'Paths ', meshnames(m+1)
+	enddo
+	
+	! Setting length of multi mesh file pash
+	lsilon = 10 + padd
+	
+	! Creating root file
+	err = dbcreate('multi'//i2t(step,padd)//'.root', lsilon, DB_CLOBBER, DB_LOCAL, &
+  	"multimesh root", 14, DB_PDB, dbfile)
+  	
+	if(dbfile.eq.-1) write (6,*) 'Could not create Silo file!'
+	
+	!Set the maximum string length
+	oldlen = dbget2dstrlen()
+	err = dbset2dstrlen(lemeshnames)
+	
+	! Append the multimesh object.
+	err = dbputmmesh(dbfile, "srucmesh", 8, numProcess, meshnames, &
+  	lmeshnames, meshtypes, DB_F77NULL, ierr)
+  	
+  	!Restore the previous value for maximum string length
+	err = dbset2dstrlen(oldlen)
+  
+	! Set the maximum string length
+	oldlen = dbget2dstrlen()
+	err = dbset2dstrlen(levarnames)
+	
+	! Append the multivariable object.
+	err = dbputmvar(dbfile, "cvof", 4, numProcess, varnames, lvarnames, &
+	vartypes, DB_F77NULL, ierr)
+	
+	! Set maximum string length
+	err = dbset2dstrlen(oldlen)
+	
+	! Close file
+	err = dbclose(dbfile)
+	
+#endif
+	!End subroutine
+end subroutine write_master
+
 ! End of Output zone================================================================================
   end module module_st_testing
 

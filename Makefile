@@ -18,14 +18,6 @@ FC = mpif90
 FLAGS = -O2 -cpp # -fimplicit-none -fbounds-check # -g 
 
 
-ifdef HAVE_VOFI
-FFLAGS = -DHAVE_VOFI $(FLAGS) 
-VOFI_DIR =  $(HOME)/lib
-VOFI_LIBS = -L$(VOFI_DIR) -lvofi
-else
-FFLAGS = $(FLAGS) 
-endif
-
 CFLAGS = -O # -g -gstabs
 BINDIR = $(HOME)/bin
 
@@ -33,10 +25,32 @@ BINDIR = $(HOME)/bin
 # babbage
 # HYPRE_DIR = /share/apps/hypre
 # Local
+SILO_DIR = $(HOME)/Dropbox/Paris_Work/silo-4.10.2
+
 HYPRE_DIR = $(HOME)/cfd/libs/hypre-2.9.0b/src/lib
 HYPRE_LIBS =  -L$(HYPRE_DIR) -lHYPRE 
-LIBS = $(HYPRE_LIBS) $(VOFI_LIBS)
+INC_SILO = -I$(SILO_DIR)/include
+DIR_MPI = /usr/local/include
+INC_MPI = -I$(DIR_MPI)
+INC = $(INC_SILO) $(INC_MPI)
 
+
+ifdef HAVE_VOFI
+FFLAGS = -DHAVE_VOFI $(FLAGS) 
+VOFI_DIR =  $(HOME)/lib
+VOFI_LIBS = -L$(VOFI_DIR) -lvofi
+else
+FFLAGS = $(FLAGS)
+endif
+
+ifdef HAVE_SILO
+SFLAGS = -DHAVE_SILO $(FLAGS) $(INC)
+SILO_LIB = -L$(SILO_DIR)/lib -lsilo -lm -lstdc++
+else
+SFLAGS = $(FLAGS)
+endif
+
+LIBS = $(HYPRE_LIBS) $(VOFI_LIBS) $(SILO_LIB)
 
 #------------------------No changes needed beyond this line----------------------------------------------
 
@@ -94,7 +108,7 @@ surface_tension.o: surface_tension.f90 vofmodules.o modules.o
 	$(FC) -c $(FFLAGS) $<
 
 st_testing.o: st_testing.f90 vofmodules.o modules.o surface_tension.o
-	$(FC) -c $(FFLAGS) $<
+	$(FC) -c $(SFLAGS) $<
 
 solids.o:  solids.f90 modules.o
 	$(FC) -c $(FFLAGS) $<
