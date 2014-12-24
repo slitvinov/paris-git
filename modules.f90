@@ -1,35 +1,45 @@
 !=================================================================================================
 !=================================================================================================
-!=================================================================================================
-! Paris-0.1
-! Extended from Code: FTC3D2011 (Front Tracking Code for 3D simulations)
+!
+! PARIS (Parallel Robust Interface Software) Simulator 
+! Most common modules file
+!
+! Contact: Stephane Zaleski zaleski@dalembert.upmc.fr
 ! 
-! Authors: Sadegh Dabiri, Gretar Tryggvason
-! author for minor extenstions Stephane Zaleski(zaleski@dalembert.upmc.fr) 
-! Contact: sdabiri@gmail.com
-! A three-dimensional Navier-Stokes flow solver for modeling of multiphase 
-! flows. Flow can be driven by wall motion, density difference or pressure gradient.
-! Boundary conditions supported: wall and periodic
-! Version 1.0   1/21/2011   The 3D flow solver for variable density/viscosity is written. 
-!                           The density is advected by an ENO scheme.
-! Version 2.0   2/25/2011   Parallel implementation.
+! Authors (in alphabetical order):
+!         Thomas Arrufat Jackson
+!         Sadegh Dabiri      
+!         Daniel Fuster      
+! 	  Yue "Stanley" Ling 
+!         Leon Malan
+!         Ruben Scardovelli  
+!         Gretar Tryggvason  
+!         Phil Yecko         
+!         Stephane Zaleski   
 !
-! This program is free software; you can redistribute it and/or
-! modify it under the terms of the GNU General Public License as
-! published by the Free Software Foundation; either version 2 of the
-! License, or (at your option) any later version.
+! Extended from or inspired by Codes: 
+!      - FTC3D2011 (Front Tracking Code for 3D simulations) by Gretar Tryggvason and Sadegh Dabiri      
+!      - Surfer VOF code by Stephane Zaleski, Ruben Scardovelli and others
+!      - Gerris Flow Solver by Stephane Popinet
 !
-! This program is distributed in the hope that it will be useful,
-! but WITHOUT ANY WARRANTY; without even the implied warranty of
-! MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	See the GNU
-! General Public License for more details.
+! GPL Licence
 !
-! You should have received a copy of the GNU General Public License
-! along with this program; if not, write to the Free Software
-! Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
-! 02111-1307, USA.  
-!=================================================================================================
-!=================================================================================================
+!     This file is part of PARIS.
+!
+!     PARIS is free software: you can redistribute it and/or modify
+!     it under the terms of the GNU General Public License as published by
+!     the Free Software Foundation, either version 3 of the License, or
+!     (at your option) any later version.
+! 
+!     PARIS is distributed in the hope that it will be useful,
+!     but WITHOUT ANY WARRANTY; without even the implied warranty of
+!     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+!     GNU General Public License for more details.
+!
+!     You should have received a copy of the GNU General Public License
+!     along with PARIS.  If not, see <http://www.gnu.org/licenses/>.
+!
+! 
 !=================================================================================================
 ! module_grid: Contains definition of variables for the grid.
 !-------------------------------------------------------------------------------------------------

@@ -1,12 +1,14 @@
 !=================================================================================================
 !=================================================================================================
 !
-! PARIS  Parallel Robust Interface Simulator 
-! Main program to solve the 3D NS equations for multiphase flows
+!
+! PARIS (Parallel Robust Interface Software) Simulator 
+! Main program 
 !
 ! Contact: Stephane Zaleski zaleski@dalembert.upmc.fr
 ! 
 ! Authors (in alphabetical order):
+!         Thomas Arrufat Jackson
 !         Sadegh Dabiri      
 !         Daniel Fuster      
 ! 	  Yue "Stanley" Ling 
