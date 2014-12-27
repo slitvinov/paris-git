@@ -946,15 +946,18 @@ module module_BC
     ! wall boundary condition x+
     if(bdry_cond(4)==0 .and. coords(1)==nPx-1) then  
         u(ie  ,:,:)=0d0
-        u(ie+1,:,:)=-u(ie-1,:,:)
-        v(ie+1,:,:)=2*WallVel(2,2)-v(ie,:,:)
-        w(ie+1,:,:)=2*WallVel(2,3)-w(ie,:,:)
+        u(ie+1,:,:)=-u(ie-1,:,:)                  ! second order extrapolation
+        v(ie+1,:,:)=2*WallVel(2,2)-v(ie,:,:)      ! second order extrapolation
+        w(ie+1,:,:)=2*WallVel(2,3)-w(ie,:,:)      ! second order extrapolation
     endif
     
     ! outflow/velocity boundary condition
     ! same velocity as opposing inflow. ! @generalize this !!
     if(bdry_cond(4)==4 .and. coords(1)==nPx-1) then
         u(ie  ,:,:)=uaverage
+#ifndef OLD_BDRY_COND
+        u(ie+1,:,:)=uaverage
+#endif
         v(ie+1,:,:)=v(ie,:,:)
         w(ie+1,:,:)=w(ie,:,:)
     endif
@@ -1029,38 +1032,56 @@ module module_BC
     !Set zero normal velocity gradient for pressure boundary condition
     if (bdry_cond(1)==5 .and. coords(1)==0)then
        u(is-1,:,:)=u(is,:,:)
-       v(is-2,:,:)=v(is,:,:)
-       w(is-2,:,:)=w(is,:,:)
+#ifndef OLD_BDRY_COND
+       u(is-2,:,:)=u(is,:,:)
+#endif
+       v(is-1,:,:)=v(is,:,:)
+       w(is-1,:,:)=w(is,:,:)
     endif
     
     if (bdry_cond(4)==5 .and. coords(1)==nPx-1)then
        u(ie,:,:)=u(ie-1,:,:)
-       v(ie+1,:,:)=v(ie-1,:,:)
-       w(ie+1,:,:)=w(ie-1,:,:)
+#ifndef OLD_BDRY_COND
+       u(ie+1,:,:)=u(ie-1,:,:)
+#endif
+       v(ie+1,:,:)=v(ie,:,:)
+       w(ie+1,:,:)=w(ie,:,:)
     endif
     
     if (bdry_cond(2)==5 .and. coords(2)==0)then
        v(:,js-1,:)=v(:,js,:)
-       u(:,js-2,:)=u(:,js,:)
-       w(:,js-2,:)=w(:,js,:)
+#ifndef OLD_BDRY_COND
+       v(:,js-2,:)=v(:,js,:)
+#endif
+       u(:,js-1,:)=u(:,js,:)
+       w(:,js-1,:)=w(:,js,:)
     endif
     
     if (bdry_cond(5)==5 .and. coords(2)==nPy-1)then
        v(:,je,:)=v(:,je-1,:)
-       u(:,je+1,:)=u(:,je-1,:)
-       w(:,je+1,:)=w(:,je-1,:)
+#ifndef OLD_BDRY_COND
+       v(:,je+1,:)=v(:,je-1,:)
+#endif
+       u(:,je+1,:)=u(:,je,:)
+       w(:,je+1,:)=w(:,je,:)
     endif
     
     if (bdry_cond(3)==5 .and. coords(3)==0)then
        w(:,:,ks-1)=w(:,:,ks)
-       u(:,:,ks-2)=u(:,:,ks)
-       v(:,:,ks-2)=v(:,:,ks)
+#ifndef OLD_BDRY_COND
+       w(:,:,ks-2)=w(:,:,ks)
+#endif
+       u(:,:,ks-1)=u(:,:,ks)
+       v(:,:,ks-1)=v(:,:,ks)
     endif
     
     if (bdry_cond(6)==5 .and. coords(3)==nPz-1)then
        w(:,:,ke)=w(:,:,ke-1)
-       u(:,:,ke+1)=u(:,:,ke-1)
-       v(:,:,ke+1)=v(:,:,ke-1)    
+#ifndef OLD_BDRY_COND
+       w(:,:,ke+1)=w(:,:,ke-1)
+#endif
+       u(:,:,ke+1)=u(:,:,ke)
+       v(:,:,ke+1)=v(:,:,ke)    
     endif
 
     !Set zero radial velocity gradient for RP test in FreeSurface
@@ -1175,7 +1196,7 @@ module module_BC
        endif
     endif    
 
-    if(bdry_cond(4)==0 .and. coords(1)==nPx-1) then  ! @@@ ???
+    if(bdry_cond(4)==0 .and. coords(1)==nPx-1) then 
         if (d.eq.1) then
             mom(ie  ,:,:)=0d0
             mom(ie+1,:,:)=-mom(ie-1,:,:)
@@ -1185,7 +1206,7 @@ module module_BC
     endif
     
     ! outflow boundary condition
-    if(bdry_cond(4)==4 .and. coords(1)==nPx-1) then
+    if(bdry_cond(4)==4 .and. coords(1)==nPx-1) then  ! @@@ ???
         if (d.eq.1) then
             mom(ie  ,:,:)= mom(ie-1,:,:)
             mom(ie+1,:,:)=-mom(ie,:,:)
@@ -2257,7 +2278,7 @@ subroutine SetupPoisson(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask,VolumeS
 ! What follows is a lot of debugging for small A7 values and checking the matrix 
   do k=ks,ke; do j=js,je; do i=is,ie
      if(A(i,j,k,7) .lt. 1d-50)  then
-        ! check that we are in solid. Remember we can't have an isolated fluid cell exactly on the entrance. 
+        ! check that we are in solid. Remember that we cannot have an isolated fluid cell exactly on the entrance. 
         if(umask(i-1,j,k).lt.0.5d0.and.umask(i,j,k).lt.0.5d0.and.     &
              vmask(i,j-1,k).lt.0.5d0.and.vmask(i,j,k).lt.0.5d0.and.   &
              wmask(i,j,k-1).lt.0.5d0.and.wmask(i,j,k).lt.0.5d0 ) then ! we are in solid

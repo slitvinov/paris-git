@@ -106,6 +106,7 @@ first calculated pressure point is p(is)
 			boundary      rightmost
 			last correc-  pressure point	
 			ted velocity  in correction
+			for BC 5.
 
 last calculated velocity point ieu
 last corrected  velocity ieu
