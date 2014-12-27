@@ -69,18 +69,19 @@ subroutine swp_stg(us,c,f,d,vof1,vof2,vof3,dir)
 end subroutine swp_stg
 
 
-subroutine swpmom(us,c,d,mom1,mom2,mom3,mom)
+subroutine swpmom(us,c,d,mom1,mom2,mom3,mom,t)
   use module_vof
   implicit none
   integer, intent(in) :: d
   real(8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: us,mom
   real(8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: c
   real(8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: mom1,mom2,mom3
+  real(8) :: t
 
   if (VOF_advect=='Dick_Yue') then  ! Yue-Weymouth = Eulerian Implicit + central cell stuff
-     call swprmom(us,c,d,mom1,mom2,mom3,mom)
+     call swprmom(us,c,d,mom1,mom2,mom3,mom,t)
   elseif (VOF_advect=='CIAM') then  ! CIAM == Lagrangian Explicit
-     call swpzmom(us,c,d,mom1,mom2,mom3,mom)
+     call swpzmom(us,c,d,mom1,mom2,mom3,mom,t)
   else
      call pariserror("*** unknown vof scheme")
   endif
@@ -89,18 +90,19 @@ subroutine swpmom(us,c,d,mom1,mom2,mom3,mom)
 
 end subroutine swpmom
 
-subroutine swpmom_stg(us,c,d,mom1,mom2,mom3,mom,dir)
+subroutine swpmom_stg(us,c,d,mom1,mom2,mom3,mom,dir,t)
   use module_vof
   implicit none
   integer, intent(in) :: d,dir
   real(8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: us,mom
   real(8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: c
   real(8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: mom1,mom2,mom3
+  real(8) :: t
 
   if (VOF_advect=='Dick_Yue') then  ! Yue-Weymouth = Eulerian Implicit + central cell stuff
      call pariserror("*** not implemented yet")
   elseif (VOF_advect=='CIAM') then  ! CIAM == Lagrangian Explicit
-     call swpzmom_stg(us,c,d,mom1,mom2,mom3,mom,dir)
+     call swpzmom_stg(us,c,d,mom1,mom2,mom3,mom,dir,t)
   else
      call pariserror("*** unknown vof scheme")
   endif
@@ -313,7 +315,7 @@ subroutine swpz_stg(us,c,f,d,vof1,vof2,vof3,dir)
   !***
 end subroutine swpz_stg
 
-subroutine swpzmom(us,c,d,mom1,mom2,mom3,mom)
+subroutine swpzmom(us,c,d,mom1,mom2,mom3,mom,t)
 !  !***
   use module_grid
   use module_flow
@@ -331,7 +333,7 @@ subroutine swpzmom(us,c,d,mom1,mom2,mom3,mom)
   real(8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: c
   real(8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: mom1,mom2,mom3
   real(8) mm1,mm2,vof
-  real(8) a1,a2,alpha,uavg,rhoavg
+  real(8) t,a1,a2,alpha,uavg,rhoavg
   REAL(8) deltax(3),x0(3),fl3dnew
   real(8) mxyz(3), nr(3), stencil3x3(-1:1,-1:1,-1:1)
   intrinsic dmax1,dmin1
@@ -404,11 +406,11 @@ subroutine swpzmom(us,c,d,mom1,mom2,mom3,mom)
     enddo
   enddo
 
-  call SetMomentumBC(us,c,mom,d,umask,rho1,rho2) 
+  call SetMomentumBC(us,c,mom,d,umask,rho1,rho2,t) 
   !***
 end subroutine swpzmom
 
-subroutine swpzmom_stg(us,c,d,mom1,mom2,mom3,mom,dir)
+subroutine swpzmom_stg(us,c,d,mom1,mom2,mom3,mom,dir,t)
 !  !***
   use module_grid
   use module_flow
@@ -427,7 +429,7 @@ subroutine swpzmom_stg(us,c,d,mom1,mom2,mom3,mom,dir)
   real(8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: c
   real(8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: mom1,mom2,mom3
   real(8) mm1,mm2,vof
-  real(8) a1,a2,alpha,uavg,rhoavg
+  real(8) t,a1,a2,alpha,uavg,rhoavg
   REAL(8) deltax(3),x0(3),fl3dnew
   real(8) mxyz(3), nr(3), stencil3x3(-1:1,-1:1,-1:1)
   intrinsic dmax1,dmin1
@@ -501,7 +503,7 @@ subroutine swpzmom_stg(us,c,d,mom1,mom2,mom3,mom,dir)
     enddo
   enddo
 
-  call SetMomentumBC(us,c,mom,d,umask,rho1,rho2) 
+  call SetMomentumBC(us,c,mom,d,umask,rho1,rho2,t) 
   !***
 end subroutine swpzmom_stg
 
@@ -630,7 +632,7 @@ SUBROUTINE swpr(us,c,f,dir,vof1,cg,vof3)
   call setvofbc(c,f)
 end subroutine swpr
 
-SUBROUTINE swprmom(us,c,dir,mom1,cg,mom3,mom)
+SUBROUTINE swprmom(us,c,dir,mom1,cg,mom3,mom,t)
 !***
     USE module_grid
     USE module_flow
@@ -647,7 +649,7 @@ SUBROUTINE swprmom(us,c,dir,mom1,cg,mom3,mom)
     REAL (8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), INTENT(INOUT) :: c,mom1,cg,mom3
     REAL(8), TARGET :: dmx,dmy,dmz,dxyz
     REAL(8), POINTER :: dm1,dm2,dm3
-    REAL(8) :: a1,a2,alpha,vof,uavg
+    REAL(8) :: a1,a2,alpha,vof,uavg,t
     REAL(8) :: AL3DNEW, FL3DNEW, x0(3), deltax(3)
     real(8) :: mxyz(3),stencil3x3(-1:1,-1:1,-1:1)
     INTRINSIC DMAX1,DMIN1
@@ -715,7 +717,7 @@ SUBROUTINE swprmom(us,c,dir,mom1,cg,mom3,mom)
      enddo
   enddo
   ! apply proper boundary conditions 
-  call SetMomentumBC(us,c,mom,dir,umask,rho1,rho2) 
+  call SetMomentumBC(us,c,mom,dir,umask,rho1,rho2,t) 
 end subroutine swprmom
 
 !=================================================================================================

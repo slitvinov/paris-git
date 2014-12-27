@@ -1112,13 +1112,14 @@ subroutine get_velocity_from_momentum_staggered (mom,us,der)
 
 end subroutine get_velocity_from_momentum_staggered
 
-subroutine vofandmomsweepsstaggered(tswap)
+subroutine vofandmomsweepsstaggered(tswap,t)
     use module_BC
     use module_flow
     use module_tmpvar
     implicit none
     integer dir,i
     integer, intent(in) :: tswap
+    real(8) :: t
 
     do dir=1,3
         if (dir.eq.1) then
@@ -1134,51 +1135,51 @@ subroutine vofandmomsweepsstaggered(tswap)
     if (VOF_advect=='Dick_Yue') call c_mask(work(:,:,:,2))
     if (MOD(tswap,3).eq.0) then  ! do z then x then y 
        call swpmom_stg(w,tmp,3,work(:,:,:,1),work(:,:,:,2), &
-                    work(:,:,:,3),momentum,dir)
+                    work(:,:,:,3),momentum,dir,t)
        call swp_stg(w,tmp,tmp_flag,3,work(:,:,:,1),work(:,:,:,2),&
                     work(:,:,:,3),dir)
 
        call swpmom_stg(u,tmp,1,work(:,:,:,1),work(:,:,:,2), &
-                    work(:,:,:,3),momentum,dir)
+                    work(:,:,:,3),momentum,dir,t)
        call swp_stg(u,tmp,tmp_flag,1,work(:,:,:,1),work(:,:,:,2),&
                     work(:,:,:,3),dir)
 
        call swpmom_stg(v,tmp,2,work(:,:,:,1),work(:,:,:,2), &
-                    work(:,:,:,3),momentum,dir)
+                    work(:,:,:,3),momentum,dir,t)
        call swp_stg(v,tmp,tmp_flag,2,work(:,:,:,1),work(:,:,:,2),&
                     work(:,:,:,3),dir)
 
     elseif (MOD(tswap,3).eq.1) then ! do y z x
 
        call swpmom_stg(v,tmp,2,work(:,:,:,1),work(:,:,:,2), &
-                    work(:,:,:,3),momentum,dir)
+                    work(:,:,:,3),momentum,dir,t)
        call swp_stg(v,tmp,tmp_flag,2,work(:,:,:,1),work(:,:,:,2),&
                     work(:,:,:,3),dir)
 
        call swpmom_stg(w,tmp,3,work(:,:,:,1),work(:,:,:,2), &
-                    work(:,:,:,3),momentum,dir)
+                    work(:,:,:,3),momentum,dir,t)
        call swp_stg(w,tmp,tmp_flag,3,work(:,:,:,1),work(:,:,:,2),&
                     work(:,:,:,3),dir)
 
        call swpmom_stg(u,tmp,1,work(:,:,:,1),work(:,:,:,2), &
-                    work(:,:,:,3),momentum,dir)
+                    work(:,:,:,3),momentum,dir,t)
        call swp_stg(u,tmp,tmp_flag,1,work(:,:,:,1),work(:,:,:,2),&
                     work(:,:,:,3),dir)
 
     else ! do x y z
 
        call swpmom_stg(u,tmp,1,work(:,:,:,1),work(:,:,:,2), &
-                    work(:,:,:,3),momentum,dir)
+                    work(:,:,:,3),momentum,dir,t)
        call swp_stg(u,tmp,tmp_flag,1,work(:,:,:,1),work(:,:,:,2),&
                     work(:,:,:,3),dir)
 
        call swpmom_stg(v,tmp,2,work(:,:,:,1),work(:,:,:,2), &
-                    work(:,:,:,3),momentum,dir)
+                    work(:,:,:,3),momentum,dir,t)
        call swp_stg(v,tmp,tmp_flag,2,work(:,:,:,1),work(:,:,:,2),&
                     work(:,:,:,3),dir)
 
        call swpmom_stg(w,tmp,3,work(:,:,:,1),work(:,:,:,2), &
-                    work(:,:,:,3),momentum,dir)
+                    work(:,:,:,3),momentum,dir,t)
        call swp_stg(w,tmp,tmp_flag,3,work(:,:,:,1),work(:,:,:,2),&
                     work(:,:,:,3),dir)
 

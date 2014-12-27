@@ -12,6 +12,7 @@
 !         Sadegh Dabiri      
 !         Daniel Fuster      
 ! 	  Yue "Stanley" Ling 
+!         Jacai Lu
 !         Leon Malan
 !         Ruben Scardovelli  
 !         Gretar Tryggvason  
@@ -240,7 +241,7 @@ Program paris
            call my_timer(3)
            if(DoVOF) then
               if (DoMOMCONS) then
-                 call vofandmomsweepsstaggered(itimestep)
+                 call vofandmomsweepsstaggered(itimestep,time)
                  call vofsweeps(itimestep)
 !                 call vofandmomsweepsold(itimestep)
               else

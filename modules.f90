@@ -1093,7 +1093,7 @@ module module_BC
   !=================================================================================================
 ! subroutine SetMomentumBC: Sets the momentum boundary condition
 !-------------------------------------------------------------------------------------------------
-  subroutine SetMomentumBC(u,c,mom,d,mask,rho1,rho2)
+  subroutine SetMomentumBC(u,c,mom,d,mask,rho1,rho2,t)
     use module_grid
     use module_2phase
     
@@ -1103,7 +1103,8 @@ module module_BC
     real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: mask
     real(8), intent(in) :: rho1,rho2
     integer, intent(in) :: d
-    integer :: i,j,k
+    real(8) :: t,flux,tflux,uaverage
+    integer :: i,j,k,ierr
     ! solid obstacles
     u = u*mask
     mom = mom*mask
@@ -1117,14 +1118,17 @@ module module_BC
             mom(is-1,:,:)=(2*WallVel(1,2)-u(is,:,:))*(rho1*c(is,:,:) + rho2*(1.d0 - c(is,:,:))) !CHECK!!
         endif
     endif
-    ! inflow boundary condition x-
+    ! inflow boundary condition x- with injection
+
     if(bdry_cond(1)==3 .and. coords(1)==0    ) then
         if (d.eq.1) then
+        flux=0
         do j=jmin,jmax
           do k=kmin,kmax
-             mom(is-1,j,k)=WallVel(1,1)*uinject(j,k,0.d0)*(rho1*c(is-1,j,k) + rho2*(1.d0 - c(is-1,j,k)))
+             mom(is-1,j,k)=WallVel(1,1)*uinject(j,k,t)*(rho1*c(is-1,j,k) + rho2*(1.d0 - c(is-1,j,k)))
 #ifndef OLD_BDRY_COND
-             mom(is-2,j,k)=WallVel(1,1)*uinject(j,k,0.d0)*(rho1*c(is-1,j,k) + rho2*(1.d0 - c(is-1,j,k)))
+             mom(is-2,j,k)=WallVel(1,1)*uinject(j,k,t)*(rho1*c(is-1,j,k) + rho2*(1.d0 - c(is-1,j,k)))
+             if(j<=je.and.j>=js.and.k<=ke.and.k>=ks) flux=flux+WallVel(1,1)*uinject(j,k,t)
 #endif
           enddo
         enddo
@@ -1132,6 +1136,9 @@ module module_BC
             mom(is-1,:,:) = 0.d0
         endif
     endif
+    call MPI_ALLREDUCE(flux, tflux, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr)
+    uaverage=tflux/(ny*nz)
+
 
     ! inflow boundary condition y-
     if(bdry_cond(2)==3 .and. coords(2)==0    ) then
