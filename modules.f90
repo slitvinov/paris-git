@@ -1123,6 +1123,9 @@ module module_BC
         do j=jmin,jmax
           do k=kmin,kmax
              mom(is-1,j,k)=WallVel(1,1)*uinject(j,k,0.d0)*(rho1*c(is-1,j,k) + rho2*(1.d0 - c(is-1,j,k)))
+#ifndef OLD_BDRY_COND
+             mom(is-2,j,k)=WallVel(1,1)*uinject(j,k,0.d0)*(rho1*c(is-1,j,k) + rho2*(1.d0 - c(is-1,j,k)))
+#endif
           enddo
         enddo
         else
@@ -1206,10 +1209,15 @@ module module_BC
     endif
     
     ! outflow boundary condition
-    if(bdry_cond(4)==4 .and. coords(1)==nPx-1) then  ! @@@ ???
+    if(bdry_cond(4)==4 .and. coords(1)==nPx-1) then  
         if (d.eq.1) then
+#ifndef OLD_BDRY_COND
+            mom(ie  ,:,:) = uaverage*(rho1*c(ie,j,k) + rho2*(1.d0 - c(ie,j,k)))
+            mom(ie+1,:,:) = uaverage*(rho1*c(ie+1,j,k) + rho2*(1.d0 - c(ie+1,j,k)))
+#else
             mom(ie  ,:,:)= mom(ie-1,:,:)
             mom(ie+1,:,:)=-mom(ie,:,:)
+#endif
         else
             mom(ie+1,:,:)=mom(ie,:,:)
         endif
@@ -1307,55 +1315,65 @@ module module_BC
     !Set zero normal velocity gradient for pressure boundary condition
     if (bdry_cond(1)==5 .and. coords(1)==0) then
         if (d.eq.1) then
-           mom(is-1,:,:)= mom(is,:,:)
+           mom(is-1,:,:) = mom(is,:,:)
+#ifndef OLD_BDRY_COND  
+           mom(is-2,:,:) = mom(is,:,:)
+#else
            mom(is-2,:,:)=-mom(is,:,:)
+#endif
        else
-           mom(is-2,:,:)=mom(is,:,:)
+           mom(is-1,:,:)=mom(is,:,:)
        endif
     endif
     
     if (bdry_cond(4)==5 .and. coords(1)==nPx-1) then
        if (d.eq.1) then
            mom(ie,:,:)  = mom(ie-1,:,:)
+#ifndef OLD_BDRY_COND  
+           mom(ie+1,:,:)= mom(ie-1,:,:)
+#else
            mom(ie+1,:,:)=-mom(ie-1,:,:)
+#endif
        else
-           mom(ie+1,:,:)=mom(ie-1,:,:)
+           mom(ie+1,:,:)=mom(ie,:,:)
        endif
     endif
-    
+
+! DROP THE IFNDEF OLD_BDRY_COND IN WHAT FOLLOWS
+
     if (bdry_cond(2)==5 .and. coords(2)==0) then
         if (d.eq.2) then
-           mom(:,js-1,:)=mom(:,js,:)
-           mom(:,js-2,:)=-mom(:,js,:)
+           mom(:,js-1,:)= mom(:,js,:)
+           mom(:,js-2,:)= mom(:,js,:)
         else
-           mom(:,js-2,:)=mom(:,js,:)
+           mom(:,js-1,:)=mom(:,js,:)
         endif
     endif
     
     if (bdry_cond(5)==5 .and. coords(2)==nPy-1) then
        if (d.eq.2) then
            mom(:,je,:)  = mom(:,je-1,:)
-           mom(:,je+1,:)=-mom(:,je-1,:)
+           mom(:,je+1,:)= mom(:,je-1,:)
        else
-           mom(:,je+1,:)=mom(:,je-1,:)
+           mom(:,je+1,:)=mom(:,je,:)
        endif
     endif
     
     if (bdry_cond(3)==5 .and. coords(3)==0) then
         if (d.eq.3) then
-           mom(:,:,ks-1)=mom(:,:,ks)
-           mom(:,:,ks-2)=-mom(:,:,ks)
+           mom(:,:,ks-1)= mom(:,:,ks)
+           mom(:,:,ks-2)= mom(:,:,ks)
         else
-           mom(:,:,ks-2)=u(:,:,ks)
+           mom(:,:,ks-1)=u(:,:,ks)
         endif
     endif
     
     if (bdry_cond(6)==5 .and. coords(3)==nPz-1) then
         if (d.eq.3) then
             mom(:,:,ke)  = mom(:,:,ke-1)
-            mom(:,:,ke+1)=-mom(:,:,ke-1)
+            mom(:,:,ke+1)= mom(:,:,ke-1)
         else
-            mom(:,:,ke+1)=mom(:,:,ke-1)
+            mom(:,:,ke+1)=mom(:,:,ke)
         endif
     endif
     
