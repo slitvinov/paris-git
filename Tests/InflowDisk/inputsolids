@@ -1,7 +1,7 @@
 &SOLIDPARAMETERS
 
 dosolids = T
-solid_type ='BitMap'
+solid_type ='SingleDisk'
 solid_radius=0.3
 !=================================================================================================
 
