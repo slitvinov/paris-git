@@ -99,16 +99,16 @@ first calculated pressure point is p(is)
 
                          ieu
      u(ie-1)    p(ie)  u(ie)   p(ie+1)
-...---->---------x------>------x-
-                        | XLength
-	        	GHOST POINTS	
+...----->---------x------>------x-
+	:                |      ! beginning of
+	:               Xlength   GHOST POINTS	
+	:
+    boundary      rightmost
+    last correc-  pressure point	
+    ted velocity  in correction
 
-			boundary      rightmost
-			last correc-  pressure point	
-			ted velocity  in correction
-			for BC 5.
 
-last calculated velocity point ieu
+last calculated velocity point ieu = IE-1
 last corrected  velocity ieu
 last calculated pressure point is p(ie)
 
