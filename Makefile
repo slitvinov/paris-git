@@ -30,24 +30,24 @@ SILO_DIR = $(HOME)/cfd/libs/silo-4.10.2
 HYPRE_DIR = $(HOME)/cfd/libs/hypre-2.9.0b/src/lib
 HYPRE_LIBS =  -L$(HYPRE_DIR) -lHYPRE 
 INC_SILO = -I$(SILO_DIR)/include
-DIR_MPI = /usr/local/include
-INC_MPI = -I$(DIR_MPI)
-INC = $(INC_SILO) $(INC_MPI)
+#DIR_MPI = /usr/local/include
+#INC_MPI = -I$(DIR_MPI)
+INC = $(INC_SILO) # $(INC_MPI)
 
 
 ifdef HAVE_VOFI
-FFLAGS = -DHAVE_VOFI $(FLAGS) 
+AFLAGS = -DHAVE_VOFI $(FLAGS) 
 VOFI_DIR =  $(HOME)/lib
 VOFI_LIBS = -L$(VOFI_DIR) -lvofi
 else
-FFLAGS = $(FLAGS)
+AFLAGS = $(FLAGS)
 endif
 
 ifdef HAVE_SILO
-SFLAGS = -DHAVE_SILO $(FLAGS) $(INC)
+FFLAGS = -DHAVE_SILO $(AFLAGS) $(INC)
 SILO_LIB = -L$(SILO_DIR)/lib -lsilo -lm -lstdc++
 else
-SFLAGS = $(FLAGS)
+FFLAGS = $(AFLAGS)
 endif
 
 LIBS = $(HYPRE_LIBS) $(VOFI_LIBS) $(SILO_LIB)
@@ -108,7 +108,7 @@ surface_tension.o: surface_tension.f90 vofmodules.o modules.o
 	$(FC) -c $(FFLAGS) $<
 
 st_testing.o: st_testing.f90 vofmodules.o modules.o surface_tension.o
-	$(FC) -c $(SFLAGS) $<
+	$(FC) -c $(FFLAGS) $<
 
 solids.o:  solids.f90 modules.o
 	$(FC) -c $(FFLAGS) $<
