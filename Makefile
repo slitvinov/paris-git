@@ -65,7 +65,7 @@ install: $(OBJ)
 	mv paris $(BINDIR)/paris
 	@find .  -name "*.sh" -exec chmod +x  {} \; 
 
-all: tags install compare parisdeconv
+all: tags install pariscompare parisdeconv
 
 clean:
 	@rm -fR *.o *.mod paris stats *~ track out* errftc tmp* *.tmp fort.* *.visit core.* *stats*
@@ -76,11 +76,11 @@ clean:
 distclean: clean
 	@rm -fR  session* *.xml TAGS tags input
 
-test:  install compare parisdeconv
+test:  install pariscompare parisdeconv
 	@echo "The test suite takes less than 4 minutes on a 4-core intel i7 MacBookPro"
 	@cd Tests; chmod +x ./runtests.sh; ./runtests.sh
 
-longtest:  install compare parisdeconv
+longtest:  install pariscompare parisdeconv
 	@echo "This test takes 12 minutes on a 4-core intel i7 MacBookPro"
 	@cd Tests; chmod +x ./runlongtests.sh; ./runlongtests.sh
 
@@ -128,9 +128,9 @@ averages.o: averages.f90 modules.o solids.o vofmodules.o
 %.o : %.f90
 	$(FC) -c $(FFLAGS) $<
 
-compare: compare.o
-	@$(CC) -o compare compare.o -lm
-	@mv compare ~/bin
+pariscompare: compare.o
+	@$(CC) -o pariscompare compare.o -lm
+	@mv pariscompare ~/bin
 
 parisdeconv: parisdeconv.o
 	@$(CC) -o parisdeconv parisdeconv.o -lm

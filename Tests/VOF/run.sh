@@ -14,7 +14,7 @@ cat centerofmassref.txt >> compareref.tmp
 
 
 precision=1e-4
-compare  compareref.tmp compare.tmp $precision 0 0
+pariscompare  compareref.tmp compare.tmp $precision 0 0
 
 GREEN="\\033[1;32m"
 NORMAL="\\033[0m"

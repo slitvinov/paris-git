@@ -50,7 +50,7 @@ done
 
 awk '{print $1,  ($18 - $19)}' stats | tail -1 > pressure_gradient.txt 
 if [ -d out ]; then
-    compare reference.txt pressure_gradient.txt  $precision
+    pariscompare reference.txt pressure_gradient.txt  $precision
 else 
     echo "FAIL: directory out not created"
 fi

@@ -9,7 +9,7 @@ precision=4e-2
 ./run_one_test.sh F Curvature_test F 0 0.32 4e-2 8 32 0.5 0.5 0.5 3
 echo `awk ' /START:/ { cpu = $8 } END { print "cpu = " cpu } ' < tmpout`
 cd out
-compare curvature.txt reference.txt $precision 1 1
+pariscompare curvature.txt reference.txt $precision 1 1
 cd ..
 
 # temporary
@@ -23,7 +23,7 @@ precision=4e-2
 ./run_one_test.sh F Curvature2D F 2 0.32 4e-2 8 64 0.5 0.5 0.5 2
 echo `awk ' /START:/ { cpu = $8 } END { print "cpu = " cpu } ' < tmpout`
 cd out
-compare curvature.txt reference.txt $precision 1 1
+pariscompare curvature.txt reference.txt $precision 1 1
 cd ..
 
 

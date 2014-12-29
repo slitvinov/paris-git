@@ -33,5 +33,5 @@ if [[ $nprocs == 1 ]] ;  then
 	awk '{print $1, $11}' stats > cav_vol-serial
 else
 	awk '{print $1, $11}' stats > cav_vol-$npx-$npy-$npz-$nx
-	compare cav_vol-$npx-$npy-$npz-$nx cav_vol-serial 1e-12
+	pariscompare cav_vol-$npx-$npy-$npz-$nx cav_vol-serial 1e-12
 fi

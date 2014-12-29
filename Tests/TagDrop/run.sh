@@ -33,7 +33,7 @@ echo -e "$GREEN" "Check results using Visit/Tecplot."  "$NORMAL"
 ## assume that curvature.txt was written by paris
 #      cat curvature-0000?.txt > curvature.txt
 #      cat reference-0000?.txt > reference.txt
-#      compare curvature.txt reference.txt $precision
+#      pariscompare curvature.txt reference.txt $precision
 #else
 #    RED="\\033[1;31m"
 #    NORMAL="\\033[0m"

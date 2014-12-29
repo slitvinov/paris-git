@@ -37,7 +37,7 @@ replot
 EOF
 
 precision=2e-2
-compare out/droplet-test-vel.txt reference.txt $precision 1 1
+pariscompare out/droplet-test-vel.txt reference.txt $precision 1 1
 
 GREEN="\\033[1;32m"
 NORMAL="\\033[0m"

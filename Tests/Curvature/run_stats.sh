@@ -31,7 +31,7 @@ zc=`awk -v nx=$nx -v random=$RANDOM 'BEGIN {print (0.5 + (random / nx)/32767)}'`
 run_one_test.sh F Curvature_test F 2 $radius 1e20 $init $nx $xc $yc $zc $d || exit 1
 
 cd out
-echo `awk -v nx=$nx -v radius=$radius 'BEGIN {print nx * radius }'`  `compare curvature.txt reference.txt 0.1 1 2 `  >> ../errors.tmp
+echo `awk -v nx=$nx -v radius=$radius 'BEGIN {print nx * radius }'`  `pariscompare curvature.txt reference.txt 0.1 1 2 `  >> ../errors.tmp
 cd ..
 awk -v nx=$nx  -v radius=$radius '{print nx * radius, $1, $2, $3 }' mcount.tmp >> method_count-$dim-$ndepth.tmp
 

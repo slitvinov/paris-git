@@ -43,7 +43,7 @@ if [ -d out ]; then
     else
 	echo "case not handled: npstart = ",$npstart
     fi
-	compare output1 Poiseuille_theory $precision
+	pariscompare output1 Poiseuille_theory $precision
     cd ..
 else
     echo "FAIL: directory out not created"

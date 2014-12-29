@@ -56,6 +56,6 @@ cat centerofmass.tmp >> compare.tmp
 tail volumeref.txt > compareref.tmp
 cat centerofmassref.txt >> compareref.tmp
 
-compare  compareref.tmp compare.tmp $precision 1 1
+pariscompare  compareref.tmp compare.tmp $precision 1 1
 
 

@@ -19,7 +19,7 @@ replot
 EOF
 
 precision=1e-3
-compare results.dat ref_D2L.dat $precision 1 1
+pariscompare results.dat ref_D2L.dat $precision 1 1
 
 GREEN="\\033[1;32m"
 NORMAL="\\033[0m"

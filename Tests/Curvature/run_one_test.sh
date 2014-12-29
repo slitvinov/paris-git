@@ -88,7 +88,7 @@ if [ -d out ]; then
     cd out
     cat curvature-0000?.txt >> curvature.txt
     cat reference-0000?.txt >> reference.txt
-    echo `awk -v nx=$nx -v radius=$radius 'BEGIN {print nx * radius }'`  `compare curvature.txt reference.txt 0.1 1 2 `  >> ../paris-$nx-$ndepth.tmp
+    echo `awk -v nx=$nx -v radius=$radius 'BEGIN {print nx * radius }'`  `pariscompare curvature.txt reference.txt 0.1 1 2 `  >> ../paris-$nx-$ndepth.tmp
     cd ..
     awk -v nx=$nx  -v radius=$radius '{print nx * radius, $1, $2, $3 }' mcount.tmp >> mcount_one_test-$nx-$ndepth.tmp
 else

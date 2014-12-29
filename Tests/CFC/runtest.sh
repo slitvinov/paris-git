@@ -60,7 +60,7 @@ awk '{radius=0.0625; print "K/R^2 = " $2/(radius*radius)}' < out/flowrate.txt >>
 
 if [ -d out ]; then
     cd out
-	compare ../reference.txt flowrate.txt $precision
+	pariscompare ../reference.txt flowrate.txt $precision
     cd ..
 else
     echo "FAIL: directory out not created"

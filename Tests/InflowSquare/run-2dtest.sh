@@ -50,7 +50,7 @@ done
  
 if [ -d out ]; then
     cd out
-	compare ../reference.txt flowrate.txt $precision
+	pariscompare ../reference.txt flowrate.txt $precision
     cd ..
 else
     echo "FAIL: directory out not created"

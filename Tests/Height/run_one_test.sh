@@ -74,8 +74,8 @@ if [ -d out ]; then
 	cat heighta-0000?.txt >> output1a
 	cat heightb-0000?.txt >> output1b
 	cat reference-0000?.txt >> reference.txt
-	compare output1a reference.txt $precision
-	compare output1b reference.txt $precision
+	pariscompare output1a reference.txt $precision
+	pariscompare output1b reference.txt $precision
     cd ..
 else
     RED="\\033[1;31m"
