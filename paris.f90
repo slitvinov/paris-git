@@ -2196,15 +2196,14 @@ subroutine ReadParameters
                         blayer_gas_inject,            tdelay_gas_inject,            padding,     &
                         radius_gas_inject,            radius_liq_inject,     radius_gap_liqgas,  &
                         jetcenter_yc2yLength,         jetcenter_zc2zLength,                      & 
-                        cflmax_allowed,               out_P,         AdvectionScheme, out_mom,   &
-                        output_fields
+                        cflmax_allowed,               AdvectionScheme, out_mom,   output_fields
  
   Nx = 0; Ny = 4; Nz = 4 ! cause absurd input file that lack nx value to fail. 
   Ng=2;xLength=1d0;yLength=1d0;zLength=1d0
   gx = 0d0; gy=0d0; gz=0d0; bdry_cond = 0
   dPdx = 0d0;  dPdy = 0d0; dPdz = 0d0
   itime_scheme = 1;  nstep = 0; maxit = 50; maxError = 1d-3  
-  beta = 1.2; nout = 1; out_P = .false. 
+  beta = 1.2; nout = 1 
   TwoPhase = .false.; rho1 = 1d0; mu1 = 0d0
   rho2 = 1d0; mu2 = 0d0; sigma = 0d0; BuoyancyCase = 0; nPx = 1
   nPy = 1; nPz = 1; amin = 0.32; amax = 0.96; aspmax = 1.54
@@ -2227,7 +2226,7 @@ subroutine ReadParameters
   cflmax_allowed=0.5d0
   AdvectionScheme = 'QUICK'
   out_mom = .false.
-  output_fields = [ .true. , .true. , .true. ]
+  output_fields = [ .true. , .true. , .true., .true., .true. ]
 
   in=1
   out=2

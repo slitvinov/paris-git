@@ -367,7 +367,7 @@ module module_IO
   integer :: nout, out, output_format, nbackup, nstats, termout, nfile
   character(len=20) :: out_path, x_file, y_file, z_file
   logical :: read_x, read_y, read_z, restart, ICOut, restartFront, restartAverages, zip_data
-  logical :: out_P, out_mom, output_fields(3)
+  logical :: out_P, out_mom, output_fields(5)
   real(8) :: tout,timeLastOutput
 contains
     !=================================================================================================
@@ -499,29 +499,6 @@ contains
     close(90)
   end subroutine close_visit_file
 !=================================================================================================
-  SUBROUTINE append_visit_pressure(rootname)
-    use module_flow
-    use module_grid
-    implicit none
-    character(*) :: rootname
-    integer prank
-    !if(rank.ne.0) call pariserror("rank.ne.0 in append")
-    
-    if(opened_p==0) then
-       OPEN(UNIT=91,FILE='pressure.visit')
-       write(91,10) nPdomain
-       opened_p=1
-    else
-       OPEN(UNIT=91,FILE='pressure.visit',position='append')
-    endif
-    do prank=0,NpDomain-1
-       write(91,11) rootname//TRIM(int2text(prank,padding))//'.vtk'
-    enddo
-    close(unit=91)
-10  format('!NBLOCKS ',I4)
-11  format(A)
-  end subroutine  append_visit_pressure
-!=================================================================================================
 ! function int2text
 !   Returns 'number' as a string with length of 'length'
 !   called in:    function output
@@ -652,89 +629,64 @@ end subroutine output1
 subroutine output2(nf,i1,i2,j1,j2,k1,k2)
   use module_flow
   use module_grid
-  
+
   !use IO_mod
   implicit none
   integer ::nf,i1,i2,j1,j2,k1,k2,i,j,k, itype=5
-!  logical, save :: first_time=.true.
+  !  logical, save :: first_time=.true.
   character(len=30) :: rootname,filename
   rootname=TRIM(out_path)//'/VTK/plot'//TRIM(int2text(nf,padding))//'-'
 
   if(rank==0) call append_visit_file(TRIM(rootname))
 
-    OPEN(UNIT=8,FILE=TRIM(rootname)//TRIM(int2text(rank,padding))//'.vtk')
-    write(8,10)
-    write(8,11) time
-    write(8,12)
-    write(8,13)
-    write(8,14)i2-i1+1,j2-j1+1,k2-k1+1
-    write(8,15)(i2-i1+1)*(j2-j1+1)*(k2-k1+1)
+  OPEN(UNIT=8,FILE=TRIM(rootname)//TRIM(int2text(rank,padding))//'.vtk')
+  write(8,10)
+  write(8,11) time
+  write(8,12)
+  write(8,13)
+  write(8,14)i2-i1+1,j2-j1+1,k2-k1+1
+  write(8,15)(i2-i1+1)*(j2-j1+1)*(k2-k1+1)
 
-    do k=k1,k2; do j=j1,j2; do i=i1,i2;
-      write(8,320) x(i),y(j),z(k)
-    enddo; enddo; enddo
+  do k=k1,k2; do j=j1,j2; do i=i1,i2;
+     write(8,320) x(i),y(j),z(k)
+  enddo; enddo; enddo
 
-    write(8,19)(i2-i1+1)*(j2-j1+1)*(k2-k1+1)
-    if (itype .le. 4)then
-      write(8,17)'density'
-      write(8,18)
-    else
-      write(8,20)
-    endif
-20  format('VECTORS uv double')
-    do k=k1,k2; do j=j1,j2; do i=i1,i2;
-      if (itype .eq. 1)write(8,210)rho(i,j,k)
-      if (itype .eq. 5)write(8,310)0.5*(u(i,j,k)+u(i-1,j,k)), &
-         0.5*(v(i,j,k)+v(i,j-1,k)),0.5*(w(i,j,k)+w(i,j,k-1))
-    enddo; enddo; enddo
+  write(8,19)(i2-i1+1)*(j2-j1+1)*(k2-k1+1)
+  if (itype .le. 4)then
+     write(8,17)'density'
+     write(8,18)
+  else
+     write(8,20)
+  endif
+20 format('VECTORS uv double')
+  do k=k1,k2; do j=j1,j2; do i=i1,i2;
+     if (itype .eq. 1)write(8,210)rho(i,j,k)
+     if (itype .eq. 5)write(8,310)0.5*(u(i,j,k)+u(i-1,j,k)), &
+          0.5*(v(i,j,k)+v(i,j-1,k)),0.5*(w(i,j,k)+w(i,j,k-1))
+  enddo; enddo; enddo
 310 format(e14.5,e14.5,e14.5)
 
-    close(8)
+  close(8)
 
-! TEMPORARY
-    if ( zip_data ) then 
-      filename = TRIM(rootname)//TRIM(int2text(rank,padding))//'.vtk'
-      call system('gzip '//trim(filename))
-    end if ! zip_data
-! END TEMPORARY 
+  ! TEMPORARY
+  if ( zip_data ) then 
+     filename = TRIM(rootname)//TRIM(int2text(rank,padding))//'.vtk'
+     call system('gzip '//trim(filename))
+  end if ! zip_data
+  ! END TEMPORARY
 
-    if(out_P) then
-       rootname=TRIM(out_path)//'/VTK/pressure'//TRIM(int2text(nf,padding))//'-'
-       if(rank==0) call append_visit_pressure(TRIM(rootname))
+10 format('# vtk DataFile Version 2.0')
+11 format('grid, time ',F16.8)
+12 format('ASCII')
+13 format('DATASET STRUCTURED_GRID')
+14 format('DIMENSIONS ',I5,I5,I5)
+15 format('POINTS ',I17,' double' )
+  !16  format('SPACING ',F16.8,F16.8,F16.8)
+19 format('POINT_DATA ',I17)
+17 format('SCALARS ',A20,' double 1')
+18 format('LOOKUP_TABLE default')
 
-       OPEN(UNIT=8,FILE=TRIM(rootname)//TRIM(int2text(rank,padding))//'.vtk')
-       write(8,10)
-       write(8,11) time
-       write(8,12)
-       write(8,13)
-       write(8,14)i2-i1+1,j2-j1+1,k2-k1+1
-       write(8,15)(i2-i1+1)*(j2-j1+1)*(k2-k1+1)
-!       write(8,16) x(i1+1)-x(i1),y(j1+1)-y(j1),z(k1+1)-z(k1)
-       
-       do k=k1,k2; do j=j1,j2; do i=i1,i2;
-          write(8,320) x(i),y(j),z(k)
-       enddo; enddo; enddo
-
-       write(8,19)(i2-i1+1)*(j2-j1+1)*(k2-k1+1)
-       write(8,17)'P'
-       write(8,18)
-
-       do k=k1,k2; do j=j1,j2; do i=i1,i2;
-          write(8,210) P(i,j,k)
-       enddo; enddo; enddo
-210    format(e14.5)
-    endif
-10  format('# vtk DataFile Version 2.0')
-11  format('grid, time ',F16.8)
-12  format('ASCII')
-13  format('DATASET STRUCTURED_GRID')
-14  format('DIMENSIONS ',I5,I5,I5)
-15  format('POINTS ',I17,' double' )
-!16  format('SPACING ',F16.8,F16.8,F16.8)
-19  format('POINT_DATA ',I17)
-17  format('SCALARS ',A20,' double 1')
-18  format('LOOKUP_TABLE default')
-
+210 format(e14.5)
 320 format(e14.5,e14.5,e14.5)
 end subroutine output2
 !-------------------------------------------------------------------------------------------------

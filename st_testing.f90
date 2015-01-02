@@ -680,6 +680,16 @@ contains
           write(8,210) height(i,j,k,6) 
        enddo; enddo; enddo
     endif
+    
+    ! Writing pressure values
+    if(output_fields(4)) then
+       write(8,17) 'P'
+       write(8,18)
+       do k=k1,k2; do j=j1,j2; do i=i1,i2;
+          write(8,210) p(i,j,k)
+       enddo; enddo; enddo
+    endif
+    
 210 format(e14.5)
 310 format(e14.5,e14.5,e14.5)
 
