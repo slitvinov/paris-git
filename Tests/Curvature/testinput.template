@@ -1,9 +1,6 @@
-! Test file for VOF test case
+! Test file for Curvature
 ! 
-! 4  grid points per dimension per domain
-! 8  mpi processes
-
-! The input file for running the PARIS code
+! An input file for running the PARIS code
 ! Parameters are read using a namelist statement.
 ! Blank lines and commented lines are ignored.
 ! Location of the parameters in the list is not important.
@@ -20,11 +17,11 @@ DoFront   = F
 GetPropertiesFromFront = F ! T: uses Front-Tracking data to compute mu, rho and Surface Tension. 
 		           ! F: uses VOF data to compute mu and rho. 
 
-ZeroReynolds = T
-Implicit  = F     
-hypre     = F      ! T: uses hyprepackage, F: uses SOR solver 
-restart   = F       ! T: start the domain from a previous simulation
-restartFront = F    ! T: start the frontfrom  a previous simulation
+ZeroReynolds = F
+Implicit = F     
+hypre    = F       ! T: uses hyprepackage, F: uses SOR solver 
+restart  = F       ! T: start the domain from a previous simulation
+restartFront = F   ! T: start the frontfrom  a previous simulation
 restartAverages = F
 nBackup  = 200      ! number of time steps between  backups are kept.
 
@@ -69,12 +66,6 @@ Nx      = NXTEMP
 Ny      = NYTEMP
 Nz      = NZTEMP
 Ng      = 2
-                   ! grid size in x,y,z direction and number of ghost cells
-
-XLENGTH = 1.0
-YLENGTH = 1.0
-ZLENGTH = 1.0
-                   ! domain size in x,y,z direction
 
 read_x   = F       ! read the grid file for x-grid; If true xLength and xform are neglected
 read_y   = F
@@ -88,6 +79,11 @@ xform    = 0.0		!1.0
 yform    = 0.0		!1.0
 zform    = 0.0       	! non-uniformity of the grid if not reading an input file
                      	! 0:uniform; +:clustered at center; -:clustered near ends
+
+XLENGTH  = 1.0
+YLENGTH  = 1.0
+ZLENGTH  = 1.0
+                   ! domain size in x,y,z direction
 
 !=================================================================================================
 ! Flow parameters
