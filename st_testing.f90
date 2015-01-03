@@ -720,6 +720,7 @@ contains
     integer::narg,cptArg !#of arg & counter of arg
     character(len=70)::name !Arg name
     character(len=70)::path, file_name
+    !character(len=40)::
     real(4), dimension(:,:,:), allocatable :: matrix_small
     real(8), dimension(:), allocatable :: x_axis, y_axis, z_axis
     integer :: iee, ise, jee, jse, kee, kse
@@ -823,6 +824,33 @@ contains
     ierr2 = dbputqv1 (dbfile, 'cvof', 4, 'srm', 3, &
          matrix_small(ise:iee,jse:jee,kse:kee), dims_vof, &
          3, DB_F77NULL, 0, DB_FLOAT, DB_ZONECENT, DB_F77NULL, ierr2) 
+         
+    do k=kmin,kmax; do j=jmin,jmax; do i=imin,imax;
+       matrix_small(i,j,k)=0.5*(u(i,j,k)+u(i-1,j,k))
+    enddo; enddo; enddo
+        
+    ! Appending u_component variable to *.silo file  
+    ierr2 = dbputqv1 (dbfile, 'uvel', 4, 'srm', 3, &
+         matrix_small(ise:iee,jse:jee,kse:kee), dims_vof, &
+         3, DB_F77NULL, 0, DB_FLOAT, DB_ZONECENT, DB_F77NULL, ierr2) 
+    do k=kmin,kmax; do j=jmin,jmax; do i=imin,imax;
+       matrix_small(i,j,k)=0.5*(v(i,j,k)+v(i,j-1,k))
+    enddo; enddo; enddo
+         
+    ! Appending v_component variable to *.silo file  
+    ierr2 = dbputqv1 (dbfile, 'vvel', 4, 'srm', 3, &
+         matrix_small(ise:iee,jse:jee,kse:kee), dims_vof, &
+         3, DB_F77NULL, 0, DB_FLOAT, DB_ZONECENT, DB_F77NULL, ierr2) 
+	do k=kmin,kmax; do j=jmin,jmax; do i=imin,imax;
+       matrix_small(i,j,k)=0.5*(w(i,j,k)+w(i,j,k-1))
+    enddo; enddo; enddo
+	
+    ! Appending w_component variable to *.silo file  
+    ierr2 = dbputqv1 (dbfile, 'wvel', 4, 'srm', 3, &
+         matrix_small(ise:iee,jse:jee,kse:kee), dims_vof, &
+         3, DB_F77NULL, 0, DB_FLOAT, DB_ZONECENT, DB_F77NULL, ierr2) 
+    
+    
 
     ! Closing *.silo file		
     ierr2 = dbclose(dbfile)
@@ -849,6 +877,7 @@ contains
        i2t(length+1-i:length+1-i) = num(mod(number/(10**(i-1)),10))
     enddo
   end function i2t
+  
 
   subroutine write_master(rootname, step, time, timestep)
     implicit none
@@ -859,7 +888,8 @@ contains
     character(*) :: rootname
     character(len=50) :: file_n
     character(len=40) :: fullname
-    character(len=levarnames), dimension(numProcess) :: varnames
+    character(len=levarnames), dimension(numProcess) :: varnames, vec1n, vec2n
+    character(len=levarnames), dimension(numProcess) :: vec3n, vecn
     character(len=lemeshnames), dimension(numProcess) :: meshnames
     integer, dimension(numProcess) :: lmeshnames, lvarnames, meshtypes, vartypes
     integer :: lfile_n, lsilon, optlist, timestep
@@ -881,6 +911,9 @@ contains
        !write(*,*) 'Paths1 ', fullname
        meshnames(m+1) = TRIM(fullname)
        varnames(m+1) = TRIM(file_n)//TRIM(i2t(m,padd))//'.silo:cvof'
+       vec1n(m+1) = TRIM(file_n)//TRIM(i2t(m,padd))//'.silo:uvel'
+       vec2n(m+1) = TRIM(file_n)//TRIM(i2t(m,padd))//'.silo:vvel'
+       vec3n(m+1) = TRIM(file_n)//TRIM(i2t(m,padd))//'.silo:wvel'
        !write(*,*) 'Paths ', meshnames(m+1)
     enddo
 
@@ -915,6 +948,18 @@ contains
     ! Append the multivariable object.
     err = dbputmvar(dbfile, "cvof", 4, numProcess, varnames, lvarnames, &
          vartypes, DB_F77NULL, ierr)
+         
+	err = dbputmvar(dbfile, "uvel", 4, numProcess, vec1n, lvarnames, &
+         vartypes, DB_F77NULL, ierr)
+         
+    err = dbputmvar(dbfile, "vvel", 4, numProcess, vec2n, lvarnames, &
+         vartypes, DB_F77NULL, ierr)
+         
+    err = dbputmvar(dbfile, "wvel", 4, numProcess, vec3n, lvarnames, &
+         vartypes, DB_F77NULL, ierr)
+         
+    err = dbputdefvars(dbfile, 'defvars',7, 1, 'velocity',8, &
+    	DB_VARTYPE_VECTOR, '{uvel,vvel,wvel}', 16, DB_F77NULL, ierr)
 
     ! Set maximum string length
     err = dbset2dstrlen(oldlen)
