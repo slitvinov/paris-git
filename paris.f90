@@ -251,7 +251,7 @@ Program paris
               call get_all_heights()
               call my_timer(5)
               call linfunc(rho,rho1,rho2,DensMean)
-              if (.not. FreeSurface) call surfaceForce(du,dv,dw,rho)
+              if (.not. FreeSurface.and.sigma.gt.TINY_DOUBLE) call surfaceForce(du,dv,dw,rho)
               call my_timer(8)
               if (FreeSurface) then
                  call get_normals()
@@ -1649,7 +1649,7 @@ end subroutine volumeForce
 !=================================================================================================
 !=================================================================================================
 !=================================================================================================
-! Calculates the surface force in the momentum equations and adds them to du,dv,dw
+! Calculates the surface tension force in the momentum equations and adds them to du,dv,dw
 !-------------------------------------------------------------------------------------------------
 subroutine surfaceForce(du,dv,dw,rho)
 !  use module_solid

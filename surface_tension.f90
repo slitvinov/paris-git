@@ -73,6 +73,7 @@ contains
 !=================================================================================================
   subroutine initialize_surface_tension()
     implicit none
+    integer :: minM
     if(.not.recomputenormals .or. FreeSurface) then
        allocate(n1(imin:imax,jmin:jmax,kmin:kmax), n2(imin:imax,jmin:jmax,kmin:kmax),  &
                n3(imin:imax,jmin:jmax,kmin:kmax), kappa_fs(imin:imax,jmin:jmax,kmin:kmax))
@@ -83,7 +84,14 @@ contains
     if(nx.ge.500000.or.ny.gt.500000.or.nz.gt.500000) call pariserror("nx too large")
     if(NDEPTH.gt.20) call pariserror("ndepth too large")
     if(NDEPTH>BIGINT/2-2) call pariserror("BIGINT too small")
-    if(2*NDEPTH+1.gt.min(Mx,My,Mz)) call pariserror("ndepth too large for current box size nx/npx")
+    minM=min(Mx,My,Mz)
+! detect thin slice
+    if(Ny<=2) minM=min(Mx,Mz)
+    if(Nz<=2) minM=min(Mx,My)
+! thin slice expect in y or z. 
+    if(MinM<=2) call pariserror("unexpected thin slice")
+! detect small subdomains in which the stencil will straddle two boundaries. 
+    if(2*NDEPTH+1.gt.minM) call pariserror("ndepth too large for current box size nx/npx")
     if(MAX_EXT_H>BIGINT/2-2) call pariserror("MAX_EXT > BIGINT/2")
     if(MAX_EXT_H>nx/2) call pariserror("MAX_EXT > nx/2")
 !    allocate(geom_case_list(10))

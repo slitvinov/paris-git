@@ -14,8 +14,8 @@
 !=================================================================================================
 ! General parameters
 
-TWOPHASE = T         ! TwoPhase: Is the flow two phase?
-DoVOF 	  = T
+TWOPHASE = F         ! TwoPhase: Is the flow two phase?
+DoVOF 	  = F
 DoFront   = F
 GetPropertiesFromFront = F ! T: uses Front-Tracking data to compute mu, rho and Surface Tension. 
 		           ! F: uses VOF data to compute mu and rho. 

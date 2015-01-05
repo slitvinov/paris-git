@@ -117,7 +117,7 @@ MU1      = 1.0
 
 RHO2     = 1.0
 MU2      = 1.0
-SIGMA    = 0.       ! rho2, mu2, sigma : properties of the drop and surface tension
+SIGMA    = 0d0       ! rho2, mu2, sigma : properties of the drop and surface tension
                    
 
 NumBubble = 0      !number of bubbles
