@@ -83,6 +83,7 @@ contains
     if(nx.ge.500000.or.ny.gt.500000.or.nz.gt.500000) call pariserror("nx too large")
     if(NDEPTH.gt.20) call pariserror("ndepth too large")
     if(NDEPTH>BIGINT/2-2) call pariserror("BIGINT too small")
+    if(2*NDEPTH+1.gt.min(Mx,My,Mz)) call pariserror("ndepth too large for current box size nx/npx")
     if(MAX_EXT_H>BIGINT/2-2) call pariserror("MAX_EXT > BIGINT/2")
     if(MAX_EXT_H>nx/2) call pariserror("MAX_EXT > nx/2")
 !    allocate(geom_case_list(10))
@@ -801,7 +802,7 @@ contains
 
       kappa = 0.d0
       ! if all nine heights found 
-      if ( nfound == 9 ) then
+      if ( nfound == 9 .and.use_full_heights) then
 #ifdef COUNT
          method_count(1) = method_count(1) + 1
 #endif
@@ -814,14 +815,14 @@ contains
          a(4) = (h(1,0)-h(-1,0))/2.d0
          a(5) = (h(0,1)-h(0,-1))/2.d0
          kappa = 2.d0*(a(1)*(1.d0+a(5)*a(5)) + a(2)*(1.d0+a(4)*a(4)) - a(3)*a(4)*a(5)) &
-               /(1.d0+a(4)*a(4)+a(5)*a(5))**(1.5d0)
+              /(1.d0+a(4)*a(4)+a(5)*a(5))**(1.5d0)
          kappa = sign(1.d0,mxyz(try(1)))*kappa
          return
       endif ! nfound == 9
-         nfound = ind_pos(points,nposit) 
-         ! *** determine the origin. 
-         call FindCutAreaCentroid(i0,j0,k0,origin)
-         bpoints = points
+      nfound = ind_pos(points,nposit) 
+      ! *** determine the origin. 
+      call FindCutAreaCentroid(i0,j0,k0,origin)
+      bpoints = points
       ! Determine the curvature from fits. 
       ! Rotate coordinate sytems by permutation of x,y,z
       !  x_i' = x_k(i)
