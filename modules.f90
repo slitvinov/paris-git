@@ -1171,8 +1171,8 @@ module module_BC
     if(bdry_cond(4)==4 .and. coords(1)==nPx-1) then  
         if (d.eq.1) then
 #ifndef OLD_BDRY_COND
-            mom(ie  ,:,:) = uaverage*(rho1*c(ie,j,k) + rho2*(1.d0 - c(ie,j,k)))
-            mom(ie+1,:,:) = uaverage*(rho1*c(ie+1,j,k) + rho2*(1.d0 - c(ie+1,j,k)))
+            mom(ie  ,:,:) = uaverage*(rho1*c(ie,:,:) + rho2*(1.d0 - c(ie,:,:)))
+            mom(ie+1,:,:) = uaverage*(rho1*c(ie+1,:,:) + rho2*(1.d0 - c(ie+1,:,:)))
 #else
             mom(ie  ,:,:)= mom(ie-1,:,:)
             mom(ie+1,:,:)=-mom(ie,:,:)
