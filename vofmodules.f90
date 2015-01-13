@@ -1042,6 +1042,39 @@ end subroutine get_half_fractions
    endif
   end subroutine vofsweeps
 !=================================================================================================
+  subroutine get_momentum_centered(us,d,mom)
+
+  use module_grid
+  use module_flow
+  use module_tmpvar
+
+  integer i,j,k,d
+  integer i0,j0,k0
+  real(8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), intent(in)  :: us
+  real(8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), intent(out) :: mom
+  real(8) :: rhoavg
+
+  tmp = cvof
+  work(:,:,:,1) = 0.d0
+  work(:,:,:,2) = 0.d0
+  call init_i0j0k0 (d,i0,j0,k0)
+  
+  call do_all_ghost(us)
+
+  do k=ks-1,ke+1
+     do j=js-1,je+1
+        do i=is-1,ie+1
+           rhoavg = tmp(i,j,k)*rho2 + (1.d0-tmp(i,j,k))*rho1
+           mom(i,j,k) = 0.5d0*(us(i,j,k)+us(i-i0,j-j0,k-k0))*rhoavg
+        enddo
+     enddo
+  enddo
+
+  call do_all_ghost(tmp)
+  call do_all_ghost(mom)
+
+  end subroutine get_momentum_centered
+
   subroutine get_momentum_staggered(us,d,mom)
 
   use module_grid
@@ -1086,6 +1119,39 @@ end subroutine get_half_fractions
 
   end subroutine get_momentum_staggered
 
+  subroutine get_velocity_from_momentum_centered (mom,us,der,d)
+  use module_grid
+  use module_flow
+  use module_BC
+  use module_tmpvar
+  implicit none
+  integer :: i,j,k,d
+  integer :: i0,j0,k0
+  real(8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: mom
+  real(8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: us,der
+  real(8) :: cflag0,rhoavg0,cflag1, rhoavg1
+
+  call init_i0j0k0 (d,i0,j0,k0)
+
+  do k=ks-1,ke+1
+    do j=js-1,je+1
+      do i=is-1,ie+1
+          cflag0 = tmp(i,j,k)
+          rhoavg0 = rho2*cflag0 + (1.d0-cflag0)*rho1
+          cflag1 = tmp(i+i0,j+j0,k+k0)
+          rhoavg1 = rho2*cflag1 + (1.d0-cflag1)*rho1
+          if (((cflag0.gt.0.d0).and.(cflag0.lt.1.d0)).OR. &
+              ((cflag1.gt.0.d0).and.(cflag1.lt.1.d0))) then
+            der(i,j,k) = ((mom(i,j,k)/rhoavg0+mom(i+i0,j+j0,k+k0)/rhoavg1)*0.5d0 - us(i,j,k))/dt
+          endif
+      enddo
+    enddo
+  enddo
+
+  call do_all_ghost(der)
+
+end subroutine get_velocity_from_momentum_centered
+
 subroutine get_velocity_from_momentum_staggered (mom,us,der)
   use module_grid
   use module_flow
@@ -1116,135 +1182,160 @@ subroutine get_velocity_from_momentum_staggered (mom,us,der)
 end subroutine get_velocity_from_momentum_staggered
 
 subroutine vofandmomsweepsstaggered(tswap,t)
-    use module_BC
-    use module_flow
-    use module_tmpvar
-    implicit none
-    integer dir,i
-    integer, intent(in) :: tswap
-    real(8) :: t
+  use module_BC
+  use module_flow
+  use module_tmpvar
+  implicit none
+  integer dir,i
+  integer, intent(in) :: tswap
+  real(8) :: t
+  logical :: staggeredmom =.false.
 
+  if (staggeredmom) then
     do dir=1,3
-        if (dir.eq.1) then
-            call get_momentum_staggered(u,1,momentum)
+      if (dir.eq.1) then
+        call get_momentum_staggered(u,1,momentum)
         elseif (dir.eq.2) then
-            call get_momentum_staggered(v,2,momentum)
+        call get_momentum_staggered(v,2,momentum)
         elseif (dir.eq.3) then
-            call get_momentum_staggered(w,3,momentum)
-        endif
+        call get_momentum_staggered(w,3,momentum)
+      endif
 
-        tmp_flag = vof_flag
- 
-    if (VOF_advect=='Dick_Yue') call c_mask(work(:,:,:,2))
-    if (MOD(tswap,3).eq.0) then  ! do z then x then y 
-       call swpmom_stg(w,tmp,3,work(:,:,:,1),work(:,:,:,2), &
-                    work(:,:,:,3),momentum,dir,t)
-       call swp_stg(w,tmp,tmp_flag,3,work(:,:,:,1),work(:,:,:,2),&
-                    work(:,:,:,3),dir)
+      tmp_flag = vof_flag
 
-       call swpmom_stg(u,tmp,1,work(:,:,:,1),work(:,:,:,2), &
-                    work(:,:,:,3),momentum,dir,t)
-       call swp_stg(u,tmp,tmp_flag,1,work(:,:,:,1),work(:,:,:,2),&
-                    work(:,:,:,3),dir)
+      if (VOF_advect=='Dick_Yue') call c_mask(work(:,:,:,2))
+      if (MOD(tswap,3).eq.0) then  ! do z then x then y 
+        call swpmom_stg(w,tmp,3,work(:,:,:,1),work(:,:,:,2), &
+        work(:,:,:,3),momentum,dir,t)
+        call swp_stg(w,tmp,tmp_flag,3,work(:,:,:,1),work(:,:,:,2),&
+        work(:,:,:,3),dir)
 
-       call swpmom_stg(v,tmp,2,work(:,:,:,1),work(:,:,:,2), &
-                    work(:,:,:,3),momentum,dir,t)
-       call swp_stg(v,tmp,tmp_flag,2,work(:,:,:,1),work(:,:,:,2),&
-                    work(:,:,:,3),dir)
+        call swpmom_stg(u,tmp,1,work(:,:,:,1),work(:,:,:,2), &
+        work(:,:,:,3),momentum,dir,t)
+        call swp_stg(u,tmp,tmp_flag,1,work(:,:,:,1),work(:,:,:,2),&
+        work(:,:,:,3),dir)
 
-    elseif (MOD(tswap,3).eq.1) then ! do y z x
+        call swpmom_stg(v,tmp,2,work(:,:,:,1),work(:,:,:,2), &
+        work(:,:,:,3),momentum,dir,t)
+        call swp_stg(v,tmp,tmp_flag,2,work(:,:,:,1),work(:,:,:,2),&
+        work(:,:,:,3),dir)
 
-       call swpmom_stg(v,tmp,2,work(:,:,:,1),work(:,:,:,2), &
-                    work(:,:,:,3),momentum,dir,t)
-       call swp_stg(v,tmp,tmp_flag,2,work(:,:,:,1),work(:,:,:,2),&
-                    work(:,:,:,3),dir)
+        elseif (MOD(tswap,3).eq.1) then ! do y z x
 
-       call swpmom_stg(w,tmp,3,work(:,:,:,1),work(:,:,:,2), &
-                    work(:,:,:,3),momentum,dir,t)
-       call swp_stg(w,tmp,tmp_flag,3,work(:,:,:,1),work(:,:,:,2),&
-                    work(:,:,:,3),dir)
+        call swpmom_stg(v,tmp,2,work(:,:,:,1),work(:,:,:,2), &
+        work(:,:,:,3),momentum,dir,t)
+        call swp_stg(v,tmp,tmp_flag,2,work(:,:,:,1),work(:,:,:,2),&
+        work(:,:,:,3),dir)
 
-       call swpmom_stg(u,tmp,1,work(:,:,:,1),work(:,:,:,2), &
-                    work(:,:,:,3),momentum,dir,t)
-       call swp_stg(u,tmp,tmp_flag,1,work(:,:,:,1),work(:,:,:,2),&
-                    work(:,:,:,3),dir)
+        call swpmom_stg(w,tmp,3,work(:,:,:,1),work(:,:,:,2), &
+        work(:,:,:,3),momentum,dir,t)
+        call swp_stg(w,tmp,tmp_flag,3,work(:,:,:,1),work(:,:,:,2),&
+        work(:,:,:,3),dir)
 
-    else ! do x y z
+        call swpmom_stg(u,tmp,1,work(:,:,:,1),work(:,:,:,2), &
+        work(:,:,:,3),momentum,dir,t)
+        call swp_stg(u,tmp,tmp_flag,1,work(:,:,:,1),work(:,:,:,2),&
+        work(:,:,:,3),dir)
 
-       call swpmom_stg(u,tmp,1,work(:,:,:,1),work(:,:,:,2), &
-                    work(:,:,:,3),momentum,dir,t)
-       call swp_stg(u,tmp,tmp_flag,1,work(:,:,:,1),work(:,:,:,2),&
-                    work(:,:,:,3),dir)
+      else ! do x y z
 
-       call swpmom_stg(v,tmp,2,work(:,:,:,1),work(:,:,:,2), &
-                    work(:,:,:,3),momentum,dir,t)
-       call swp_stg(v,tmp,tmp_flag,2,work(:,:,:,1),work(:,:,:,2),&
-                    work(:,:,:,3),dir)
+        call swpmom_stg(u,tmp,1,work(:,:,:,1),work(:,:,:,2), &
+        work(:,:,:,3),momentum,dir,t)
+        call swp_stg(u,tmp,tmp_flag,1,work(:,:,:,1),work(:,:,:,2),&
+        work(:,:,:,3),dir)
 
-       call swpmom_stg(w,tmp,3,work(:,:,:,1),work(:,:,:,2), &
-                    work(:,:,:,3),momentum,dir,t)
-       call swp_stg(w,tmp,tmp_flag,3,work(:,:,:,1),work(:,:,:,2),&
-                    work(:,:,:,3),dir)
+        call swpmom_stg(v,tmp,2,work(:,:,:,1),work(:,:,:,2), &
+        work(:,:,:,3),momentum,dir,t)
+        call swp_stg(v,tmp,tmp_flag,2,work(:,:,:,1),work(:,:,:,2),&
+        work(:,:,:,3),dir)
 
-   endif
+        call swpmom_stg(w,tmp,3,work(:,:,:,1),work(:,:,:,2), &
+        work(:,:,:,3),momentum,dir,t)
+        call swp_stg(w,tmp,tmp_flag,3,work(:,:,:,1),work(:,:,:,2),&
+        work(:,:,:,3),dir)
 
-!    if (VOF_advect=='Dick_Yue') call c_mask(work(:,:,:,2))
-!    if (MOD(tswap,3).eq.0) then  ! do z then x then y 
-!       call swpmom(w,tmp,3,work(:,:,:,1),work(:,:,:,2), &
-!                    work(:,:,:,3),momentum)
-!       call swp(w,tmp,tmp_flag,3,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3))
-!
-!       call swpmom(u,tmp,1,work(:,:,:,1),work(:,:,:,2), &
-!                    work(:,:,:,3),momentum)
-!       call swp(u,tmp,tmp_flag,1,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3))
-!
-!       call swpmom(v,tmp,2,work(:,:,:,1),work(:,:,:,2), &
-!                    work(:,:,:,3),momentum)
-!       call swp(v,tmp,tmp_flag,2,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3))
-!
-!    elseif (MOD(tswap,3).eq.1) then ! do y z x
-!
-!       call swpmom(v,tmp,2,work(:,:,:,1),work(:,:,:,2), &
-!                    work(:,:,:,3),momentum)
-!       call swp(v,tmp,tmp_flag,2,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3))
-!
-!       call swpmom(w,tmp,3,work(:,:,:,1),work(:,:,:,2), &
-!                    work(:,:,:,3),momentum)
-!       call swp(w,tmp,tmp_flag,3,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3))
-!
-!       call swpmom(u,tmp,1,work(:,:,:,1),work(:,:,:,2), &
-!                    work(:,:,:,3),momentum)
-!       call swp(u,tmp,tmp_flag,1,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3))
-!
-!    else ! do x y z
-!
-!       call swpmom(u,tmp,1,work(:,:,:,1),work(:,:,:,2),&
-!                   work(:,:,:,3),momentum)
-!       call swp(u,tmp,tmp_flag,1,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3))
-!
-!       call swpmom(v,tmp,2,work(:,:,:,1),work(:,:,:,2), &
-!                    work(:,:,:,3),momentum)
-!       call swp(v,tmp,tmp_flag,2,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3))
-!
-!       call swpmom(w,tmp,3,work(:,:,:,1),work(:,:,:,2), &
-!                    work(:,:,:,3),momentum)
-!       call swp(w,tmp,tmp_flag,3,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3))
-!
-!   endif
+      endif
 
-   
-   if (dir.eq.1) then
-       call get_velocity_from_momentum_staggered (momentum,u,du)
-   elseif (dir.eq.2) then
-       call get_velocity_from_momentum_staggered (momentum,v,dv)
-   elseif (dir.eq.3) then
-       call get_velocity_from_momentum_staggered (momentum,w,dw)
-   endif
+      if (dir.eq.1) then
+        call get_velocity_from_momentum_staggered (momentum,u,du)
+        elseif (dir.eq.2) then
+        call get_velocity_from_momentum_staggered (momentum,v,dv)
+        elseif (dir.eq.3) then
+        call get_velocity_from_momentum_staggered (momentum,w,dw)
+      endif
 
-   enddo
+    enddo
+
+  else
+    do dir=1,3
+      if (dir.eq.1) then
+        call get_momentum_centered(u,1,momentum)
+        elseif (dir.eq.2) then
+        call get_momentum_centered(v,2,momentum)
+        elseif (dir.eq.3) then
+        call get_momentum_centered(w,3,momentum)
+      endif
+
+      tmp_flag = vof_flag
+
+      if (VOF_advect=='Dick_Yue') call c_mask(work(:,:,:,2))
+      if (MOD(tswap,3).eq.0) then  ! do z then x then y 
+        call swpmom(w,tmp,3,work(:,:,:,1),work(:,:,:,2), &
+        work(:,:,:,3),momentum,t)
+        call swp(w,tmp,tmp_flag,3,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3))
+
+        call swpmom(u,tmp,1,work(:,:,:,1),work(:,:,:,2), &
+        work(:,:,:,3),momentum,t)
+        call swp(u,tmp,tmp_flag,1,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3))
+
+        call swpmom(v,tmp,2,work(:,:,:,1),work(:,:,:,2), &
+        work(:,:,:,3),momentum,t)
+        call swp(v,tmp,tmp_flag,2,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3))
+
+        elseif (MOD(tswap,3).eq.1) then ! do y z x
+
+        call swpmom(v,tmp,2,work(:,:,:,1),work(:,:,:,2), &
+        work(:,:,:,3),momentum,t)
+        call swp(v,tmp,tmp_flag,2,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3))
+
+        call swpmom(w,tmp,3,work(:,:,:,1),work(:,:,:,2), &
+        work(:,:,:,3),momentum,t)
+        call swp(w,tmp,tmp_flag,3,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3))
+
+        call swpmom(u,tmp,1,work(:,:,:,1),work(:,:,:,2), &
+        work(:,:,:,3),momentum,t)
+        call swp(u,tmp,tmp_flag,1,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3))
+
+      else ! do x y z
+
+        call swpmom(u,tmp,1,work(:,:,:,1),work(:,:,:,2),&
+        work(:,:,:,3),momentum,t)
+        call swp(u,tmp,tmp_flag,1,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3))
+
+        call swpmom(v,tmp,2,work(:,:,:,1),work(:,:,:,2), &
+        work(:,:,:,3),momentum,t)
+        call swp(v,tmp,tmp_flag,2,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3))
+
+        call swpmom(w,tmp,3,work(:,:,:,1),work(:,:,:,2), &
+        work(:,:,:,3),momentum,t)
+        call swp(w,tmp,tmp_flag,3,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3))
+
+      endif
+
+      if (dir.eq.1) then
+        call get_velocity_from_momentum_centered (momentum,u,du,1)
+        elseif (dir.eq.2) then
+        call get_velocity_from_momentum_centered (momentum,v,dv,2)
+        elseif (dir.eq.3) then
+        call get_velocity_from_momentum_centered (momentum,w,dw,3)
+      endif
 
 
-  end subroutine vofandmomsweepsstaggered
+    enddo
+
+  endif
+
+end subroutine vofandmomsweepsstaggered
 
 !-------------------------------------------------------------------------------------------------
 !-------------------------------------------------------------------------------------------------
