@@ -1189,7 +1189,7 @@ subroutine vofandmomsweepsstaggered(tswap,t)
   integer dir,i
   integer, intent(in) :: tswap
   real(8) :: t
-  logical :: staggeredmom =.false.
+  logical :: staggeredmom =.true.
 
   if (staggeredmom) then
     do dir=1,3
