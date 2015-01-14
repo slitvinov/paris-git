@@ -46,7 +46,7 @@ contains
        write(*,*) calc_imax(vof_flag), "expecting maximum flag = 2"
        call pariserror("bad flags")
     endif
-    call get_all_heights()
+    call get_all_heights(0)
     if(test_heights) then
        call output_heights()
     else if(test_curvature .or. test_curvature_2D) then

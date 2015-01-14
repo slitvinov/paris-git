@@ -270,12 +270,17 @@ contains
 ! the core of HF computation
 !
 !=================================================================================================
-   subroutine get_all_heights
+   subroutine get_all_heights(iout)
+     !use module_grid
+     !use module_IO
      use module_timer
      implicit none
      include 'mpif.h'
      integer :: direction, ierr, i
      integer :: req(24),sta(MPI_STATUS_SIZE,24)
+     logical :: debug
+     integer :: iout,l,j,k
+     integer :: prank
      if(.not.st_initialized) call initialize_surface_tension()
 
      !*** Initialize
@@ -317,6 +322,29 @@ contains
      enddo
      call MPI_WAITALL(24,req(1:24),sta(:,1:24),ierr)
      call my_timer(6)
+     
+     !! Parallel debugging output for pariscompare3D
+     if (debug_par) then
+        do l=1,6
+           if (rank==0) then
+              OPEN(UNIT=21,FILE='Height'//TRIM(int2text(l,1))//'holder-'//TRIM(int2text(iout,padding))//'.txt')
+              write(21,12)NpDomain
+              do prank=0,NpDomain-1
+                 write(21,13)TRIM(out_path)//'/Height'//TRIM(int2text(l,1))//'-'//&
+                      TRIM(int2text(prank,padding))//'-'//TRIM(int2text(iout,padding))//'.txt'
+              enddo
+           endif
+           OPEN(UNIT=20,FILE=TRIM(out_path)//'/Height'//TRIM(int2text(l,1))//'-'//&
+                TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout,padding))//'.txt')
+           do k=ks,ke; do j=je,je; do i=is,ie
+              write(20,14)x(i),y(j),z(k),height(i,j,k,l)
+           enddo;enddo;enddo
+           close(20)
+        enddo
+     endif
+12   format('NPROCS',I4)
+13   format(A)  
+14   format(4e14.5)
   end subroutine get_all_heights
 !=================================================================================================
 ! 
@@ -670,67 +698,89 @@ contains
       print *, " "
     end subroutine print_cvof_3x3x3
 !
-   subroutine get_all_curvatures(kapparray)
-     implicit none
-     include 'mpif.h'
-     real(8), intent(inout) :: kapparray(imin:imax,jmin:jmax,kmin:kmax)
-     real(8) :: afit(6), kappa
-     integer :: ierr, i,j,k, nfound, nposit
-     integer :: req(24),sta(MPI_STATUS_SIZE,24)
-     logical :: is_bulk_cell
-     if(.not.st_initialized) call initialize_surface_tension()
+    subroutine get_all_curvatures(kapparray,iout)
+      use module_IO
+      implicit none
+      include 'mpif.h'
+      real(8), intent(inout) :: kapparray(imin:imax,jmin:jmax,kmin:kmax)
+      real(8) :: afit(6), kappa
+      integer :: ierr, i,j,k, nfound, nposit
+      integer :: req(24),sta(MPI_STATUS_SIZE,24)
+      logical :: is_bulk_cell
+      logical :: debug
+      integer :: iout, prank
+      if(.not.st_initialized) call initialize_surface_tension()
 
-     !*** Initialize
-     kapparray=2d6
-     kappa = 0d0
+      !*** Initialize
+      kapparray=2d6
+      kappa = 0d0
 
-     do k=ks,ke; do j=js,je; do i=is,ie
-        is_bulk_cell=.false. 
-        if (vof_flag(i,j,k) == 2 ) then  ! mixed cell
-           call get_curvature(i,j,k,kappa,nfound,nposit,afit,.false.)
-           !debugging
-           !if (kappa /= kappa) write(*,'("Kappa from mixed cell NaN, Kappa: ",e14.5,3I8)')kappa, i,j,k 
-        else if (vof_flag(i,j,k) > 2 ) then
-           call pariserror("inconsistent vof_flag > 3")
-        else if(.not.bulk_cell(i,j,k)) then !  non-bulk pure cell
-           call get_curvature(i,j,k,kappa,nfound,nposit,afit,.true.)
-           !debugging
-           !if (kappa /= kappa) write(*,'("Kappa from non_bulk cell NaN, Kappa: ",e14.5,3I8)')kappa, i,j,k 
-        else
-           is_bulk_cell=.true.
-        endif
-        if(abs(kappa)>kappamax) then
-           geom_case_count(17) = geom_case_count(17) + 1
-           kappa = sign(1d0,kappa)*kappamax
-           !debugging
-           !if (kappa /= kappa) write(*,'("Kappa limit NaN, Kappa: ",e14.5,3I8)')kappa, i,j,k 
-        endif
-        if(.not.is_bulk_cell) kapparray(i,j,k) = kappa
-        if (kappa /= kappa) then !debugging
-           write(*,'("Kappa read into array is NaN, Kapparay, Kappa: ",2e14.5,3I8)')kapparray(i,j,k), kappa, i,j,k 
-           call pariserror("Kappa read into array is NaN") !debugging
-        endif
-     enddo;enddo;enddo
+      do k=ks,ke; do j=js,je; do i=is,ie
+         is_bulk_cell=.false. 
+         if (vof_flag(i,j,k) == 2 ) then  ! mixed cell
+            call get_curvature(i,j,k,kappa,nfound,nposit,afit,.false.)
+            !debugging
+            !if (kappa /= kappa) write(*,'("Kappa from mixed cell NaN, Kappa: ",e14.5,3I8)')kappa, i,j,k 
+         else if (vof_flag(i,j,k) > 2 ) then
+            call pariserror("inconsistent vof_flag > 3")
+         else if(.not.bulk_cell(i,j,k)) then !  non-bulk pure cell
+            call get_curvature(i,j,k,kappa,nfound,nposit,afit,.true.)
+            !debugging
+            !if (kappa /= kappa) write(*,'("Kappa from non_bulk cell NaN, Kappa: ",e14.5,3I8)')kappa, i,j,k 
+         else
+            is_bulk_cell=.true.
+         endif
+         if(abs(kappa)>kappamax) then
+            geom_case_count(17) = geom_case_count(17) + 1
+            kappa = sign(1d0,kappa)*kappamax
+            !debugging
+            !if (kappa /= kappa) write(*,'("Kappa limit NaN, Kappa: ",e14.5,3I8)')kappa, i,j,k 
+         endif
+         if(.not.is_bulk_cell) kapparray(i,j,k) = kappa
+         if (kappa /= kappa) then !debugging
+            write(*,'("Kappa read into array is NaN, Kapparay, Kappa: ",2e14.5,3I8)')kapparray(i,j,k), kappa, i,j,k 
+            call pariserror("Kappa read into array is NaN") !debugging
+         endif
+      enddo;enddo;enddo
 
-     call ghost_x(kapparray(:,:,:),2,req(1:4))
-     call ghost_y(kapparray(:,:,:),2,req(5:8))
-     call ghost_z(kapparray(:,:,:),2,req(9:12))
-     call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
-     contains
-       function bulk_cell(i,j,k)
-         implicit none
-         integer :: i,j,k, n_mass
-         logical :: bulk_cell
-         n_mass = vof_flag(i,j,k+1) + vof_flag(i,j,k-1) + &
-                 vof_flag(i,j-1,k) + vof_flag(i,j+1,k) + &
-                 vof_flag(i-1,j,k) + vof_flag(i+1,j,k) 
+      call ghost_x(kapparray(:,:,:),2,req(1:4))
+      call ghost_y(kapparray(:,:,:),2,req(5:8))
+      call ghost_z(kapparray(:,:,:),2,req(9:12))
+      call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
+      
+      if (debug_par) then
+         if (rank==0) then
+            OPEN(UNIT=21,FILE='Kappa_holder-'//TRIM(int2text(iout,padding))//'.txt')
+            write(21,12)NpDomain
+            do prank=0,NpDomain-1
+               write(21,13)TRIM(out_path)//'/Kappa-'//TRIM(int2text(prank,padding))//'-'//TRIM(int2text(iout,padding))//'.txt'
+            enddo
+         endif
+         OPEN(UNIT=20,FILE=TRIM(out_path)//'/Kappa-'//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout,padding))//'.txt')
+         do k=kmin,kmax; do j=jmin,jmax; do i=imin,imax
+            write(20,14)x(i),y(j),z(k),kapparray(i,j,k)
+         enddo;enddo;enddo
+         close(20)
+      endif
+      
+12    format('NPROCS',I4)
+13    format(A)
+14    format(4e14.5)
+    contains
+      function bulk_cell(i,j,k)
+        implicit none
+        integer :: i,j,k, n_mass
+        logical :: bulk_cell
+        n_mass = vof_flag(i,j,k+1) + vof_flag(i,j,k-1) + &
+             vof_flag(i,j-1,k) + vof_flag(i,j+1,k) + &
+             vof_flag(i-1,j,k) + vof_flag(i+1,j,k) 
 
-         bulk_cell = (vof_flag(i,j,k+1)/2 + vof_flag(i,j,k-1)/2 + &
-                 vof_flag(i,j-1,k)/2 + vof_flag(i,j+1,k)/2 + &
-                 vof_flag(i-1,j,k)/2 + vof_flag(i+1,j,k)/2 == 0).and. &
-                 ((n_mass == 6.and.vof_flag(i,j,k)==1).or. &
-                 (n_mass == 0 .and.vof_flag(i,j,k)==0))
-       end function bulk_cell
+        bulk_cell = (vof_flag(i,j,k+1)/2 + vof_flag(i,j,k-1)/2 + &
+             vof_flag(i,j-1,k)/2 + vof_flag(i,j+1,k)/2 + &
+             vof_flag(i-1,j,k)/2 + vof_flag(i+1,j,k)/2 == 0).and. &
+             ((n_mass == 6.and.vof_flag(i,j,k)==1).or. &
+             (n_mass == 0 .and.vof_flag(i,j,k)==0))
+      end function bulk_cell
 
 ! contains
 ! count flags if all faces pure

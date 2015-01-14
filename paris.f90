@@ -248,14 +248,14 @@ Program paris
                  call vofsweeps(itimestep)
               endif
               call my_timer(4)
-              call get_all_heights()
+              call get_all_heights(0)
               call my_timer(5)
               call linfunc(rho,rho1,rho2,DensMean)
               if (.not. FreeSurface.and.sigma.gt.TINY_DOUBLE) call surfaceForce(du,dv,dw,rho)
               call my_timer(8)
               if (FreeSurface) then
                  call get_normals()
-                 call get_all_curvatures(kappa_fs)
+                 call get_all_curvatures(kappa_fs,0)
                  call set_topology(vof_phase,itimestep) !vof_phase updated in vofsweeps
               endif
            endif
@@ -553,6 +553,10 @@ Program paris
                if(rank==0)then
                   end_time =  MPI_WTIME()
                   write(out,'("Step:",I9," Iterations:",I9," cpu(s):",f10.2)')itimestep,it,end_time-start_time
+               endif
+               if (DoVOF .and. debug_par) then
+                  call get_all_curvatures(tmp,nfile)
+                  call get_all_heights(nfile)
                endif
             endif
         end if ! tout
@@ -1665,7 +1669,7 @@ subroutine surfaceForce(du,dv,dw,rho)
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: du, dv, dw, rho
   integer :: i,j,k,n
   deltax=dx(nx)
-  call get_all_curvatures(tmp)
+  call get_all_curvatures(tmp,0)
   call my_timer(7)
   do k=ks,ke;  do j=js,je; do i=is,ieu
      if(abs(cvof(i+1,j,k)-cvof(i,j,k))>EPSC/1d1) then  ! there is a non-zero grad H (H Heaviside function) 
@@ -1956,11 +1960,11 @@ subroutine InitCondition
         end if ! DoLPP
         if(DoVOF) then
            call initconditions_VOF()
-           call get_all_heights()
+           call get_all_heights(0)
            if (FreeSurface) then
               call set_topology(vof_phase,itimestep) !vof_phases are updated in initconditions_VOF called above
               call get_normals()
-              call get_all_curvatures(kappa_fs)
+              call get_all_curvatures(kappa_fs,0)
               if (RP_test) then
                  call get_ref_volume !!! can rather call this init_RP_test
                  call initialize_P_RP(p)  !initialize P field for RP test
@@ -2455,6 +2459,3 @@ subroutine hello_all
   hello_count = hello_count + 1
   end if
 end subroutine hello_all
-
-
-

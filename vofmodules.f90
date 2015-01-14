@@ -84,6 +84,7 @@ module module_VOF
   logical :: debug_curvature
   logical :: mixed_heights
   logical :: use_full_heights
+  logical :: debug_par
 
 
   real(8) :: b1,b2,b3,b4,hshift
@@ -249,7 +250,7 @@ contains
        FreeSurface, ViscMeanIsArith, DensMeanIsArith, &
        output_filtered_VOF, DoMOMCONS, use_vofi,nfilter, &
        hshift, do_rotation, debug_curvature, mixed_heights, &
-       use_full_heights
+       use_full_heights, debug_par
     ! Free Surface parameters to be read from a parameter file called "inputFS"
     namelist /FSparameters/ X_level, RP_test, gamma, R_ref, P_ref,&
          VTK_OUT, NOUT_VTK
@@ -274,6 +275,7 @@ contains
     ! oldvof = .false.  ! .true.
     mixed_heights = .true.
     use_full_heights = .true. 
+    debug_par = .false.
     
     in=31
 
