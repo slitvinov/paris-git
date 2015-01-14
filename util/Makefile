@@ -1,8 +1,8 @@
-SRC =  kozenycarman.c rockread.c 
+SRC =  kozenycarman.c rockread.c compare_4cols.c
 CFLAGS = -O  # -g -gstabs
 BINDIR = $(HOME)/bin
 
-all: kozenycarman rockread tags
+all: kozenycarman rockread tags pariscompare3D
 
 tags:	$(SRC)
 # @SZ Create a tags file named TAGS for use by emacs
@@ -18,6 +18,10 @@ kozenycarman: kozenycarman.o
 rockread: rockread.o
 	$(CC) -o rockread rockread.o -lm
 	mv rockread $(BINDIR)
+
+pariscompare3D: compare_4cols.o
+	$(CC) -o pariscompare3D compare_4cols.o
+	mv pariscompare3D $(BINDIR)
 
 clean:
 	rm *~ *.o
