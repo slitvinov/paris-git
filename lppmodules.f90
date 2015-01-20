@@ -75,8 +75,8 @@
       integer :: num_cell_drop
       real(8) :: AspRatio
    end type drop
-   type (drop), dimension(:,:), allocatable :: drops
-   integer, dimension(:,:,:), allocatable :: drops_cell_list
+   type (drop), dimension(:), allocatable :: drops
+   integer, dimension(:,:), allocatable :: drops_cell_list
    
    type drop_merge
       type(element) :: element
@@ -86,8 +86,8 @@
       integer :: diff_tag_list(maxnum_diff_tag)
       integer :: flag_center_mass
    end type drop_merge
-   type (drop_merge), dimension(:,:), allocatable :: drops_merge
-   integer, dimension(:,:,:), allocatable :: drops_merge_cell_list
+   type (drop_merge), dimension(:), allocatable :: drops_merge
+   integer, dimension(:,:), allocatable :: drops_merge_cell_list
    integer, dimension(:,:,:), allocatable :: drops_merge_gcell_list
 
    type drop_merge_comm
@@ -163,7 +163,7 @@
                        xlpp_max,ylpp_max,zlpp_max
    character(20) :: lppbdry_cond(6)
 
-   integer :: max_num_drop 
+   integer :: max_num_drop, max_num_drop_merge 
    integer :: maxnum_cell_drop
    integer :: max_num_part
    integer :: max_num_part_cross
@@ -199,6 +199,7 @@
               umax_part_seed, vmax_part_seed, wmax_part_seed
    integer :: num_part_seed
    real(8) :: time_part_seed
+   integer :: tag_opened=0
 contains
 !=================================================================================================
    subroutine initialize_LPP()
@@ -216,11 +217,11 @@ contains
       allocate( tagmax (0:nPdomain-1) )
       allocate( tag_flag(imin:imax,jmin:jmax,kmin:kmax) )
       allocate( tag_id  (imin:imax,jmin:jmax,kmin:kmax) )
-      allocate( drops(max_num_drop,0:nPdomain-1) )
-      allocate( drops_merge(max_num_drop,0:nPdomain-1) )
-      allocate( drops_cell_list(3,maxnum_cell_drop,max_num_drop) )
-      allocate( drops_merge_cell_list(3,maxnum_cell_drop,max_num_drop) )
-      allocate( drops_merge_gcell_list(3,maxnum_cell_drop,max_num_drop) )
+      allocate( drops(max_num_drop) )
+      allocate( drops_merge(max_num_drop_merge) )
+      allocate( drops_cell_list(3,max_num_drop) )
+      allocate( drops_merge_cell_list(3,max_num_drop_merge) )
+      allocate( drops_merge_gcell_list(3,maxnum_cell_drop,max_num_drop_merge) )
       allocate( sdu(imin:imax,jmin:jmax,kmin:kmax), & 
                 sdv(imin:imax,jmin:jmax,kmin:kmax), &
                 sdw(imin:imax,jmin:jmax,kmin:kmax), & 
@@ -261,7 +262,7 @@ contains
       namelist /lppparameters/ DropStatisticsMethod, dragmodel, nTimeStepTag,   &
          DoConvertVOF2LPP,DoConvertLPP2VOF,CriteriaConvertCase, ConvertRegSizeToDiam, & 
          vol_cut,xlpp_min,xlpp_max,ylpp_min,ylpp_max,zlpp_min,zlpp_max,    &
-         max_num_drop, maxnum_cell_drop, max_num_part, max_num_part_cross, &
+         max_num_drop, max_num_drop_merge, maxnum_cell_drop, max_num_part, max_num_part_cross, &
          outputlpp_format,nStepConverion,AspRatioTol, &
          WallEffectSettling,output_lpp_evolution,lppbdry_cond,& 
          TwoWayCouplingFlag,LengthLPP2dp,mfLPP_ref,UnsteadyPartForce,&  
@@ -287,8 +288,9 @@ contains
       ylpp_max = yh(Ny+Ng)
       zlpp_min = zh(   Ng)
       zlpp_max = zh(Nz+Ng)
-      max_num_drop = 10
-      maxnum_cell_drop = 1000000
+      max_num_drop = 100
+      max_num_drop_merge = 20
+      maxnum_cell_drop = 10000
       max_num_part = 100
       max_num_part_cross = 10
       outputlpp_format = 3
@@ -411,7 +413,7 @@ contains
     
     real(8) :: volcell,cvof_scaled
 
-    integer :: num_cell_drop,cell_list(3,maxnum_cell_drop)
+    integer :: num_cell_drop,cell_list(3)
     real(8) :: xc,yc,zc,uc,vc,wc,duc,dvc,dwc,vol 
 
     logical :: merge_drop
@@ -428,7 +430,7 @@ contains
     tag_flag(:,:,:) = 0
     current_id = 1
 
-    drops_merge(:,rank)%num_gcell = 0
+    drops_merge(:)%num_gcell = 0
 
     ns_queue = 0
     s_queue(:,:) = 0
@@ -510,12 +512,12 @@ contains
                duc  = duc  + cvof_scaled*sdu(isq,jsq,ksq)
                dvc  = dvc  + cvof_scaled*sdv(isq,jsq,ksq)
                dwc  = dwc  + cvof_scaled*sdw(isq,jsq,ksq)
-               if ( num_cell_drop < maxnum_cell_drop ) then
+!               if ( num_cell_drop < maxnum_cell_drop ) then
                   num_cell_drop = num_cell_drop + 1
-                  cell_list(1:3,num_cell_drop) = [isq,jsq,ksq]
+                  if ( num_cell_drop == 1) cell_list(1:3) = [isq,jsq,ksq]
 !               else
 !                  write(*,*) 'Warning: cell number of tag',current_id,'at rank',rank,'reaches max value!'
-               end if ! num_cell_drop
+!               end if ! num_cell_drop
             else if ( isq >= Ng+1 .and. isq <= Ng+Nx .and. &     ! block ghost cells 
                       jsq >= Ng+1 .and. jsq <= Ng+Ny .and. & 
                       ksq >= Ng+1 .and. ksq <= Ng+Nz ) then
@@ -524,17 +526,17 @@ contains
                   merge_drop = .true.
                   num_drop      (rank) = num_drop      (rank) - 1
                   num_drop_merge(rank) = num_drop_merge(rank) + 1
-                  if ( num_drop_merge(rank) > max_num_drop ) & 
+                  if ( num_drop_merge(rank) > max_num_drop_merge ) & 
                      call lpperror("Drop merge number exceeds maximum number!") 
                end if ! merge_drop
-               if ( drops_merge(num_drop_merge(rank),rank)%num_gcell < maxnum_cell_drop) then 
-                  drops_merge(num_drop_merge(rank),rank)%num_gcell = drops_merge(num_drop_merge(rank),rank)%num_gcell + 1
-                  drops_merge_gcell_list(1,drops_merge(num_drop_merge(rank),rank)%num_gcell,num_drop_merge(rank)) = isq
-                  drops_merge_gcell_list(2,drops_merge(num_drop_merge(rank),rank)%num_gcell,num_drop_merge(rank)) = jsq
-                  drops_merge_gcell_list(3,drops_merge(num_drop_merge(rank),rank)%num_gcell,num_drop_merge(rank)) = ksq
-!               else
-!                  write(*,*) 'Warning: ghost cell number of tag',current_id,'at rank',rank,'reaches max value!'
-               end if ! drops_merge(num_drop_merge(rank),rank)%num_gcell
+               if ( drops_merge(num_drop_merge(rank))%num_gcell < maxnum_cell_drop) then 
+                  drops_merge(num_drop_merge(rank))%num_gcell = drops_merge(num_drop_merge(rank))%num_gcell + 1
+                  drops_merge_gcell_list(1,drops_merge(num_drop_merge(rank))%num_gcell,num_drop_merge(rank)) = isq
+                  drops_merge_gcell_list(2,drops_merge(num_drop_merge(rank))%num_gcell,num_drop_merge(rank)) = jsq
+                  drops_merge_gcell_list(3,drops_merge(num_drop_merge(rank))%num_gcell,num_drop_merge(rank)) = ksq
+               else
+                  write(*,*) 'Warning: ghost cell number of tag',current_id,'at rank',rank,'reaches max value!'
+               end if ! drops_merge(num_drop_merge(rank))%num_gcell
             else                                                        ! domain ghost cells 
                ! Note: periodic bdry cond, to be added later
             end if ! isq, jsq, ksq
@@ -556,43 +558,43 @@ contains
           end if ! nc_queue
         end do ! ns_queue>0
 
-        if ( vol > tag_threshold ) then  
+        if ( vol > 0.d0 ) then  
           if ( merge_drop ) then
-            drops_merge(num_drop_merge(rank),rank)%element%id  = current_id
-            drops_merge(num_drop_merge(rank),rank)%element%vol = vol 
-            drops_merge(num_drop_merge(rank),rank)%element%xc  = xc/vol 
-            drops_merge(num_drop_merge(rank),rank)%element%yc  = yc/vol 
-            drops_merge(num_drop_merge(rank),rank)%element%zc  = zc/vol 
-            drops_merge(num_drop_merge(rank),rank)%element%uc  = uc/vol 
-            drops_merge(num_drop_merge(rank),rank)%element%vc  = vc/vol
-            drops_merge(num_drop_merge(rank),rank)%element%wc  = wc/vol
-            drops_merge(num_drop_merge(rank),rank)%element%duc  = duc/vol 
-            drops_merge(num_drop_merge(rank),rank)%element%dvc  = dvc/vol
-            drops_merge(num_drop_merge(rank),rank)%element%dwc  = dwc/vol
-            drops_merge(num_drop_merge(rank),rank)%num_cell_drop = num_cell_drop
-            drops_merge_cell_list(:,:,num_drop_merge(rank)) = cell_list
+            drops_merge(num_drop_merge(rank))%element%id  = current_id
+            drops_merge(num_drop_merge(rank))%element%vol = vol 
+            drops_merge(num_drop_merge(rank))%element%xc  = xc/vol 
+            drops_merge(num_drop_merge(rank))%element%yc  = yc/vol 
+            drops_merge(num_drop_merge(rank))%element%zc  = zc/vol 
+            drops_merge(num_drop_merge(rank))%element%uc  = uc/vol 
+            drops_merge(num_drop_merge(rank))%element%vc  = vc/vol
+            drops_merge(num_drop_merge(rank))%element%wc  = wc/vol
+            drops_merge(num_drop_merge(rank))%element%duc  = duc/vol 
+            drops_merge(num_drop_merge(rank))%element%dvc  = dvc/vol
+            drops_merge(num_drop_merge(rank))%element%dwc  = dwc/vol
+            drops_merge(num_drop_merge(rank))%num_cell_drop = num_cell_drop
+            drops_merge_cell_list(:,num_drop_merge(rank)) = cell_list
           else 
-            drops(num_drop(rank),rank)%element%id  = current_id
-            drops(num_drop(rank),rank)%element%vol = vol 
-            drops(num_drop(rank),rank)%element%xc  = xc/vol
-            drops(num_drop(rank),rank)%element%yc  = yc/vol
-            drops(num_drop(rank),rank)%element%zc  = zc/vol
-            drops(num_drop(rank),rank)%element%uc  = uc/vol
-            drops(num_drop(rank),rank)%element%vc  = vc/vol
-            drops(num_drop(rank),rank)%element%wc  = wc/vol
-            drops(num_drop(rank),rank)%element%duc  = duc/vol
-            drops(num_drop(rank),rank)%element%dvc  = dvc/vol
-            drops(num_drop(rank),rank)%element%dwc  = dwc/vol
-            drops(num_drop(rank),rank)%num_cell_drop = num_cell_drop
-            drops_cell_list(:,:,num_drop(rank)) = cell_list
+            drops(num_drop(rank))%element%id  = current_id
+            drops(num_drop(rank))%element%vol = vol 
+            drops(num_drop(rank))%element%xc  = xc/vol
+            drops(num_drop(rank))%element%yc  = yc/vol
+            drops(num_drop(rank))%element%zc  = zc/vol
+            drops(num_drop(rank))%element%uc  = uc/vol
+            drops(num_drop(rank))%element%vc  = vc/vol
+            drops(num_drop(rank))%element%wc  = wc/vol
+            drops(num_drop(rank))%element%duc  = duc/vol
+            drops(num_drop(rank))%element%dvc  = dvc/vol
+            drops(num_drop(rank))%element%dwc  = dwc/vol
+            drops(num_drop(rank))%num_cell_drop = num_cell_drop
+            drops_cell_list(:,num_drop(rank)) = cell_list
 
-            drops(num_drop(rank),rank)%AspRatio = DBLE(MAX(idif_drop,jdif_drop,kdif_drop)) & 
+            drops(num_drop(rank))%AspRatio = DBLE(MAX(idif_drop,jdif_drop,kdif_drop)) & 
                                                  /DBLE(MIN(idif_drop,jdif_drop,kdif_drop))
           end if ! merge_drop
           current_id = current_id+1
         else ! no need to merge droplet piece only contains ghost cells  
           if ( merge_drop ) then
-             drops_merge(num_drop_merge(rank),rank)%num_gcell = 0
+             drops_merge(num_drop_merge(rank))%num_gcell = 0
              num_drop_merge(rank) = num_drop_merge(rank) - 1
           else 
              num_drop      (rank) = num_drop      (rank) - 1
@@ -663,21 +665,21 @@ contains
       ! Check ghost cells of droplet pieces
       if ( num_drop_merge(rank) > 0 ) then 
       do idrop = 1, num_drop_merge(rank) 
-         drops_merge(idrop,rank)%num_diff_tag = 1 
-         drops_merge(idrop,rank)%diff_tag_list(drops_merge(idrop,rank)%num_diff_tag) &
+         drops_merge(idrop)%num_diff_tag = 1 
+         drops_merge(idrop)%diff_tag_list(drops_merge(idrop)%num_diff_tag) &
             = tag_id(drops_merge_gcell_list(1,1,idrop), &
                      drops_merge_gcell_list(2,1,idrop), &
                      drops_merge_gcell_list(3,1,idrop))
-         if ( drops_merge(idrop,rank)%num_gcell > 1 ) then 
+         if ( drops_merge(idrop)%num_gcell > 1 ) then 
             ! Go through the ghost cells and list all different tags
-            do iCell = 2,drops_merge(idrop,rank)%num_gcell
+            do iCell = 2,drops_merge(idrop)%num_gcell
                ! Check if the tag of the current cell is already list 
                TagAlreadyListed = .false.
-               do idiff_tag = 1, drops_merge(idrop,rank)%num_diff_tag
+               do idiff_tag = 1, drops_merge(idrop)%num_diff_tag
                   if ( tag_id(drops_merge_gcell_list(1,iCell,idrop), & 
                               drops_merge_gcell_list(2,iCell,idrop), & 
                               drops_merge_gcell_list(3,iCell,idrop)) &
-                    == drops_merge(idrop,rank)%diff_tag_list(idiff_tag)) then 
+                    == drops_merge(idrop)%diff_tag_list(idiff_tag)) then 
                      TagAlreadyListed = .true.
                      exit
                   end if ! tag_id
@@ -686,21 +688,21 @@ contains
                if ( TagAlreadyListed ) then 
                   cycle 
                else  ! a new differet tag is found
-                  drops_merge(idrop,rank)%num_diff_tag = &
-                  drops_merge(idrop,rank)%num_diff_tag + 1
-                  if ( drops_merge(idrop,rank)%num_diff_tag <= maxnum_diff_tag ) then  
+                  drops_merge(idrop)%num_diff_tag = &
+                  drops_merge(idrop)%num_diff_tag + 1
+                  if ( drops_merge(idrop)%num_diff_tag <= maxnum_diff_tag ) then  
 !                     call lpperror("Number of different tags of a droplet pieces exceeds the max number!") 
-                     drops_merge(idrop,rank)%diff_tag_list(drops_merge(idrop,rank)%num_diff_tag) &
+                     drops_merge(idrop)%diff_tag_list(drops_merge(idrop)%num_diff_tag) &
                         = tag_id(drops_merge_gcell_list(1,iCell,idrop), &
                                  drops_merge_gcell_list(2,iCell,idrop), &
                                  drops_merge_gcell_list(3,iCell,idrop))
                   else
                      write(*,*) "Number of diff tags exceeds the max number!",time,rank,idrop 
-                     exit
+                     call lpperror("Number of diff tags exceeds the max number!") 
                   end if ! maxnum_diff_tag
                end if ! idiff_tag
             end do ! iCell
-         end if ! drops_merge(idrop,irank)%num_gcell
+         end if ! drops_merge(idrop)%num_gcell
       end do ! idrop
       end if ! num_drop_merge(rank)
 
@@ -799,7 +801,7 @@ contains
          totalnum_drop = totalnum_drop_indep + num_new_drop
       end if ! rank 
 
-      call distributeDropMerge
+      call DistributeDropMerge
    
       ! finalize
       if ( rank == 0 ) deallocate( new_drop_id )
@@ -814,7 +816,7 @@ contains
       real(8), intent(in) :: time
       integer :: req(2),sta(MPI_STATUS_SIZE,2),MPI_Comm,ireq,ierr
       integer :: MPI_element_type, oldtypes(0:1), blockcounts(0:1), & 
-                 offsets(0:1), extent,r8extent, MPI_element_row 
+                 offsets(0:1), extent,r8extent 
       integer :: maxnum_element, total_num_element
       integer :: irank, idrop, ielement, ielem_plot
       integer :: num_element_estimate(0:nPdomain-1)
@@ -852,36 +854,36 @@ contains
       if ( num_drop(rank) > 0 ) then 
          do idrop = 1,num_drop(rank) 
             num_element(rank) = num_element(rank) + 1
-            element_stat(num_element(rank),rank)%vol = drops(idrop,rank)%element%vol
-            element_stat(num_element(rank),rank)%xc  = drops(idrop,rank)%element%xc
-            element_stat(num_element(rank),rank)%yc  = drops(idrop,rank)%element%yc
-            element_stat(num_element(rank),rank)%zc  = drops(idrop,rank)%element%zc
-            element_stat(num_element(rank),rank)%uc  = drops(idrop,rank)%element%uc
-            element_stat(num_element(rank),rank)%vc  = drops(idrop,rank)%element%vc
-            element_stat(num_element(rank),rank)%wc  = drops(idrop,rank)%element%wc
-            element_stat(num_element(rank),rank)%duc  = drops(idrop,rank)%element%duc
-            element_stat(num_element(rank),rank)%dvc  = drops(idrop,rank)%element%dvc
-            element_stat(num_element(rank),rank)%dwc  = drops(idrop,rank)%element%dwc
-            element_stat(num_element(rank),rank)%id  = drops(idrop,rank)%element%id
+            element_stat(num_element(rank),rank)%vol = drops(idrop)%element%vol
+            element_stat(num_element(rank),rank)%xc  = drops(idrop)%element%xc
+            element_stat(num_element(rank),rank)%yc  = drops(idrop)%element%yc
+            element_stat(num_element(rank),rank)%zc  = drops(idrop)%element%zc
+            element_stat(num_element(rank),rank)%uc  = drops(idrop)%element%uc
+            element_stat(num_element(rank),rank)%vc  = drops(idrop)%element%vc
+            element_stat(num_element(rank),rank)%wc  = drops(idrop)%element%wc
+            element_stat(num_element(rank),rank)%duc  = drops(idrop)%element%duc
+            element_stat(num_element(rank),rank)%dvc  = drops(idrop)%element%dvc
+            element_stat(num_element(rank),rank)%dwc  = drops(idrop)%element%dwc
+            element_stat(num_element(rank),rank)%id  = drops(idrop)%element%id
          end do ! idrop
       end if ! num_drop(rank)
       
       if ( num_drop_merge(rank) > 0 ) then 
          do idrop = 1,num_drop_merge(rank)
-            if ( drops_merge(idrop,rank)%flag_center_mass == 1 ) then  
+            if ( drops_merge(idrop)%flag_center_mass == 1 ) then  
                num_element(rank) = num_element(rank) + 1
-               element_stat(num_element(rank),rank)%vol = drops_merge(idrop,rank)%element%vol
-               element_stat(num_element(rank),rank)%xc  = drops_merge(idrop,rank)%element%xc
-               element_stat(num_element(rank),rank)%yc  = drops_merge(idrop,rank)%element%yc
-               element_stat(num_element(rank),rank)%zc  = drops_merge(idrop,rank)%element%zc
-               element_stat(num_element(rank),rank)%uc  = drops_merge(idrop,rank)%element%uc
-               element_stat(num_element(rank),rank)%vc  = drops_merge(idrop,rank)%element%vc
-               element_stat(num_element(rank),rank)%wc  = drops_merge(idrop,rank)%element%wc
-               element_stat(num_element(rank),rank)%duc  = drops_merge(idrop,rank)%element%duc
-               element_stat(num_element(rank),rank)%dvc  = drops_merge(idrop,rank)%element%dvc
-               element_stat(num_element(rank),rank)%dwc  = drops_merge(idrop,rank)%element%dwc
-               element_stat(num_element(rank),rank)%id  = drops_merge(idrop,rank)%element%id
-            end if !drops_merge(idrop,rank)%flag_center_mass
+               element_stat(num_element(rank),rank)%vol = drops_merge(idrop)%element%vol
+               element_stat(num_element(rank),rank)%xc  = drops_merge(idrop)%element%xc
+               element_stat(num_element(rank),rank)%yc  = drops_merge(idrop)%element%yc
+               element_stat(num_element(rank),rank)%zc  = drops_merge(idrop)%element%zc
+               element_stat(num_element(rank),rank)%uc  = drops_merge(idrop)%element%uc
+               element_stat(num_element(rank),rank)%vc  = drops_merge(idrop)%element%vc
+               element_stat(num_element(rank),rank)%wc  = drops_merge(idrop)%element%wc
+               element_stat(num_element(rank),rank)%duc  = drops_merge(idrop)%element%duc
+               element_stat(num_element(rank),rank)%dvc  = drops_merge(idrop)%element%dvc
+               element_stat(num_element(rank),rank)%dwc  = drops_merge(idrop)%element%dwc
+               element_stat(num_element(rank),rank)%id  = drops_merge(idrop)%element%id
+            end if !drops_merge(idrop)%flag_center_mass
          end do ! idrop
       end if ! num_drop(rank)
 
@@ -906,17 +908,15 @@ contains
       num_element_rank= num_element(rank)
       call MPI_ALLGATHER(num_element_rank, 1, MPI_INTEGER, &
                          num_element(:),   1, MPI_INTEGER, MPI_Comm_World, ierr)
-      call MPI_TYPE_CONTIGUOUS (maxnum_element, MPI_element_type, MPI_element_row, ierr)
-      call MPI_TYPE_COMMIT(MPI_element_row, ierr)
 
       if ( rank > 0 ) then
-         call MPI_ISEND(element_stat(1:maxnum_element,rank),1, & 
-                        MPI_element_row, 0, 14, MPI_COMM_WORLD, req(1), ierr)
+         call MPI_ISEND(element_stat(1,rank),num_element(rank), & 
+                        MPI_element_type, 0, 14, MPI_COMM_WORLD, req(1), ierr)
          call MPI_WAIT(req(1),sta(:,1),ierr)
       else
          do irank = 1,nPdomain-1
-            call MPI_IRECV(element_stat(1:maxnum_element,irank),1, & 
-                           MPI_element_row, irank, 14, MPI_COMM_WORLD, req(2), ierr)
+            call MPI_IRECV(element_stat(1,irank),num_element(irank), & 
+                           MPI_element_type, irank, 14, MPI_COMM_WORLD, req(2), ierr)
             call MPI_WAIT(req(2),sta(:,2),ierr)
          end do ! irank
       end if ! rank
@@ -1007,11 +1007,11 @@ contains
       integer :: req(2),sta(MPI_STATUS_SIZE,2),MPI_Comm,ireq,ierr
       integer :: MPI_drop_merge_comm_type, oldtypes(0:1), blockcounts(0:1), & 
                  offsets(0:1), extent,r8extent 
-      integer :: maxnum_drop_merge 
+      integer :: max_num_drop_merge_use 
       integer :: irank, idrop
 
-      maxnum_drop_merge = maxval(num_drop_merge)
-      allocate( drops_merge_comm(maxnum_drop_merge,0:nPdomain-1) )
+      max_num_drop_merge_use = maxval(num_drop_merge)
+      allocate( drops_merge_comm(max_num_drop_merge_use,0:nPdomain-1) )
 
       !  Setup MPI derived type for drop_merge_comm
       offsets (0) = 0 
@@ -1029,33 +1029,33 @@ contains
       !  initialize drops_merge_comm 
       if ( num_drop_merge(rank) > 0 ) then 
          do idrop = 1, num_drop_merge(rank)
-            drops_merge_comm(idrop,rank)%id            = drops_merge(idrop,rank)%element%id
-            drops_merge_comm(idrop,rank)%num_diff_tag  = drops_merge(idrop,rank)%num_diff_tag
-            drops_merge_comm(idrop,rank)%diff_tag_list = drops_merge(idrop,rank)%diff_tag_list
-            drops_merge_comm(idrop,rank)%vol           = drops_merge(idrop,rank)%element%vol
-            drops_merge_comm(idrop,rank)%xc            = drops_merge(idrop,rank)%element%xc
-            drops_merge_comm(idrop,rank)%yc            = drops_merge(idrop,rank)%element%yc
-            drops_merge_comm(idrop,rank)%zc            = drops_merge(idrop,rank)%element%zc
-            drops_merge_comm(idrop,rank)%uc            = drops_merge(idrop,rank)%element%uc
-            drops_merge_comm(idrop,rank)%vc            = drops_merge(idrop,rank)%element%vc
-            drops_merge_comm(idrop,rank)%wc            = drops_merge(idrop,rank)%element%wc
-            drops_merge_comm(idrop,rank)%duc            = drops_merge(idrop,rank)%element%duc
-            drops_merge_comm(idrop,rank)%dvc            = drops_merge(idrop,rank)%element%dvc
-            drops_merge_comm(idrop,rank)%dwc            = drops_merge(idrop,rank)%element%dwc
+            drops_merge_comm(idrop,rank)%id            = drops_merge(idrop)%element%id
+            drops_merge_comm(idrop,rank)%num_diff_tag  = drops_merge(idrop)%num_diff_tag
+            drops_merge_comm(idrop,rank)%diff_tag_list = drops_merge(idrop)%diff_tag_list
+            drops_merge_comm(idrop,rank)%vol           = drops_merge(idrop)%element%vol
+            drops_merge_comm(idrop,rank)%xc            = drops_merge(idrop)%element%xc
+            drops_merge_comm(idrop,rank)%yc            = drops_merge(idrop)%element%yc
+            drops_merge_comm(idrop,rank)%zc            = drops_merge(idrop)%element%zc
+            drops_merge_comm(idrop,rank)%uc            = drops_merge(idrop)%element%uc
+            drops_merge_comm(idrop,rank)%vc            = drops_merge(idrop)%element%vc
+            drops_merge_comm(idrop,rank)%wc            = drops_merge(idrop)%element%wc
+            drops_merge_comm(idrop,rank)%duc            = drops_merge(idrop)%element%duc
+            drops_merge_comm(idrop,rank)%dvc            = drops_merge(idrop)%element%dvc
+            drops_merge_comm(idrop,rank)%dwc            = drops_merge(idrop)%element%dwc
          end do ! idrop
       end if ! num_drop_merge(rank)
 
       ! Send all droplet pieces to rank 0
       if ( rank > 0 ) then
          if ( num_drop_merge(rank) > 0 ) then 
-            call MPI_ISEND(drops_merge_comm(1:num_drop_merge(rank),rank),num_drop_merge(rank), & 
+            call MPI_ISEND(drops_merge_comm(1,rank),num_drop_merge(rank), & 
                            MPI_drop_merge_comm_type, 0,    13, MPI_COMM_WORLD, req(1), ierr)
             call MPI_WAIT(req(1),sta(:,1),ierr)
          end if ! num_drop_merge(rank)
       else
          do irank = 1,nPdomain-1
             if ( num_drop_merge(irank) > 0 ) then 
-               call MPI_IRECV(drops_merge_comm(1:num_drop_merge(irank),irank),num_drop_merge(irank), & 
+               call MPI_IRECV(drops_merge_comm(1,irank),num_drop_merge(irank), & 
                               MPI_drop_merge_comm_type, irank, 13, MPI_COMM_WORLD, req(2), ierr)
                call MPI_WAIT(req(2),sta(:,2),ierr)
             end if ! num_drop_merge(irank)
@@ -1092,14 +1092,14 @@ contains
       ! Send merged droplet from rank 0 to all ranks 
       if ( rank > 0 ) then
          if ( num_drop_merge(rank) > 0 ) then 
-            call MPI_IRECV(drops_merge_comm(1:num_drop_merge(rank),rank),num_drop_merge(rank), & 
+            call MPI_IRECV(drops_merge_comm(1,rank),num_drop_merge(rank), & 
                            MPI_drop_merge_comm_type, 0,    13, MPI_COMM_WORLD, req(1), ierr)
             call MPI_WAIT(req(1),sta(:,1),ierr)
          end if ! num_drop_merge(rank)
       else
          do irank = 1,nPdomain-1
                if ( num_drop_merge(irank) > 0 ) then 
-               call MPI_ISEND(drops_merge_comm(1:num_drop_merge(irank),irank),num_drop_merge(irank), & 
+               call MPI_ISEND(drops_merge_comm(1,irank),num_drop_merge(irank), & 
                               MPI_drop_merge_comm_type, irank, 13, MPI_COMM_WORLD, req(2), ierr)
                call MPI_WAIT(req(2),sta(:,2),ierr)
             end if ! num_drop_merge(irank)
@@ -1108,17 +1108,17 @@ contains
 
       if ( num_drop_merge(rank) > 0 ) then
          do idrop = 1, num_drop_merge(rank)
-            drops_merge(idrop,rank)%element%vol = drops_merge_comm(idrop,rank)%vol
-            drops_merge(idrop,rank)%element%xc  = drops_merge_comm(idrop,rank)%xc
-            drops_merge(idrop,rank)%element%yc  = drops_merge_comm(idrop,rank)%yc
-            drops_merge(idrop,rank)%element%zc  = drops_merge_comm(idrop,rank)%zc
-            drops_merge(idrop,rank)%element%uc  = drops_merge_comm(idrop,rank)%uc
-            drops_merge(idrop,rank)%element%vc  = drops_merge_comm(idrop,rank)%vc
-            drops_merge(idrop,rank)%element%wc  = drops_merge_comm(idrop,rank)%wc
-            drops_merge(idrop,rank)%element%duc  = drops_merge_comm(idrop,rank)%duc
-            drops_merge(idrop,rank)%element%dvc  = drops_merge_comm(idrop,rank)%dvc
-            drops_merge(idrop,rank)%element%dwc  = drops_merge_comm(idrop,rank)%dwc
-            drops_merge(idrop,rank)%flag_center_mass  = drops_merge_comm(idrop,rank)%flag_center_mass
+            drops_merge(idrop)%element%vol = drops_merge_comm(idrop,rank)%vol
+            drops_merge(idrop)%element%xc  = drops_merge_comm(idrop,rank)%xc
+            drops_merge(idrop)%element%yc  = drops_merge_comm(idrop,rank)%yc
+            drops_merge(idrop)%element%zc  = drops_merge_comm(idrop,rank)%zc
+            drops_merge(idrop)%element%uc  = drops_merge_comm(idrop,rank)%uc
+            drops_merge(idrop)%element%vc  = drops_merge_comm(idrop,rank)%vc
+            drops_merge(idrop)%element%wc  = drops_merge_comm(idrop,rank)%wc
+            drops_merge(idrop)%element%duc  = drops_merge_comm(idrop,rank)%duc
+            drops_merge(idrop)%element%dvc  = drops_merge_comm(idrop,rank)%dvc
+            drops_merge(idrop)%element%dwc  = drops_merge_comm(idrop,rank)%dwc
+            drops_merge(idrop)%flag_center_mass  = drops_merge_comm(idrop,rank)%flag_center_mass
          end do ! idrop
       end if ! num_drop_merge(rank)
 
@@ -1141,23 +1141,23 @@ contains
 
       if ( num_drop(rank) > 0 ) then 
       do idrop = 1,num_drop(rank)
-         drops(idrop,rank)%element%id = tag_id( drops_cell_list(1,1,idrop), &
-                                                drops_cell_list(2,1,idrop), &
-                                                drops_cell_list(3,1,idrop) )
-         tag_dropid   (drops(idrop,rank)%element%id) = idrop
-         tag_rank     (drops(idrop,rank)%element%id) = rank 
-         tag_mergeflag(drops(idrop,rank)%element%id) = 0 
+         drops(idrop)%element%id = tag_id( drops_cell_list(1,idrop), &
+                                                drops_cell_list(2,idrop), &
+                                                drops_cell_list(3,idrop) )
+         tag_dropid   (drops(idrop)%element%id) = idrop
+         tag_rank     (drops(idrop)%element%id) = rank 
+         tag_mergeflag(drops(idrop)%element%id) = 0 
       end do ! idrop
       end if ! num_drop(rank)
       
       if ( num_drop_merge(rank) > 0 ) then 
       do idrop = 1,num_drop_merge(rank)
-         drops_merge(idrop,rank)%element%id = tag_id( drops_merge_cell_list(1,1,idrop), &
-                                                      drops_merge_cell_list(2,1,idrop), &
-                                                      drops_merge_cell_list(3,1,idrop) )
-         tag_dropid   (drops_merge(idrop,rank)%element%id) = idrop
-         tag_rank     (drops_merge(idrop,rank)%element%id) = rank 
-         tag_mergeflag(drops_merge(idrop,rank)%element%id) = 1 
+         drops_merge(idrop)%element%id = tag_id( drops_merge_cell_list(1,idrop), &
+                                                      drops_merge_cell_list(2,idrop), &
+                                                      drops_merge_cell_list(3,idrop) )
+         tag_dropid   (drops_merge(idrop)%element%id) = idrop
+         tag_rank     (drops_merge(idrop)%element%id) = rank 
+         tag_mergeflag(drops_merge(idrop)%element%id) = 1 
       end do ! idrop
       end if ! num_drop_merge(rank) 
 
@@ -1165,11 +1165,11 @@ contains
          ! MPI communication for tag tables
          if ( rank > 0 ) then
             if ( num_tag(rank) > 0 ) then 
-               call MPI_ISEND(tag_dropid   (tagmin(rank):tagmax(rank)),num_tag(rank), & 
+               call MPI_ISEND(tag_dropid   (tagmin(rank)),num_tag(rank), & 
                               MPI_INTEGER, 0,    10, MPI_COMM_WORLD, req(1), ierr)
-               call MPI_ISEND(tag_rank     (tagmin(rank):tagmax(rank)),num_tag(rank), & 
+               call MPI_ISEND(tag_rank     (tagmin(rank)),num_tag(rank), & 
                               MPI_INTEGER, 0,    11, MPI_COMM_WORLD, req(2), ierr)
-               call MPI_ISEND(tag_mergeflag(tagmin(rank):tagmax(rank)),num_tag(rank), & 
+               call MPI_ISEND(tag_mergeflag(tagmin(rank)),num_tag(rank), & 
                               MPI_INTEGER, 0,    12, MPI_COMM_WORLD, req(3), ierr)
                call MPI_WAITALL(3,req(1:3),sta(:,1:3),ierr)
             end if ! num_tag(rank)
@@ -1177,11 +1177,11 @@ contains
             ireq = 0 
             do irank = 1,nPdomain-1
                if ( num_tag(irank) > 0 ) then
-                  call MPI_IRECV(tag_dropid   (tagmin(irank):tagmax(irank)),num_tag(irank), & 
+                  call MPI_IRECV(tag_dropid   (tagmin(irank)),num_tag(irank), & 
                                  MPI_INTEGER, irank, 10, MPI_COMM_WORLD, req(4), ierr)
-                  call MPI_IRECV(tag_rank     (tagmin(irank):tagmax(irank)),num_tag(irank), & 
+                  call MPI_IRECV(tag_rank     (tagmin(irank)),num_tag(irank), & 
                                  MPI_INTEGER, irank, 11, MPI_COMM_WORLD, req(5), ierr)
-                  call MPI_IRECV(tag_mergeflag(tagmin(irank):tagmax(irank)),num_tag(irank), & 
+                  call MPI_IRECV(tag_mergeflag(tagmin(irank)),num_tag(irank), & 
                                  MPI_INTEGER, irank, 12, MPI_COMM_WORLD, req(6), ierr)
                   call MPI_WAITALL(3,req(4:6),sta(:,4:6),ierr)
                end if ! num_tag(irank)
@@ -1201,49 +1201,112 @@ contains
    end subroutine ReleaseTag2DropTable
 
 ! ==============================================
-! output tag of droplets
+! test tagging drops
 ! ==============================================
-   subroutine output_tagDrop()
+   subroutine test_tagDrop()
       implicit none
       integer :: i,j,k
-
       call output_VOF(0,is,ie+1,js,je+1,ks,ke+1)
       call tag_drop()
+      call output_tag(0,is,ie+1,js,je+1,ks,ke+1)
       if (nPdomain > 1 ) then 
          call tag_drop_all()
+         call output_tag(1,is,ie+1,js,je+1,ks,ke+1)
          call hello_coucou  ! 12
          call CreateTag2DropTable
          call merge_drop_pieces
          call ReleaseTag2DropTable
+         call output_tag(2,is,ie+1,js,je+1,ks,ke+1)
       end if ! nPdomain
       if ( DropStatisticsMethod > 0 ) call drop_statistics(0,0.d0)
-      call output_tag()
-   end subroutine output_tagDrop
+   end subroutine test_tagDrop
 
-   subroutine output_tag()
-      implicit none
-      integer :: i,j,k
+  subroutine output_tag(nf,i1,i2,j1,j2,k1,k2)
+    implicit none
+    integer ::nf,i1,i2,j1,j2,k1,k2,i,j,k
+    real(8) :: cfiltered
+    character(len=30) :: rootname,filename
+    rootname=trim(out_path)//'/VTK/tag'//TRIM(int2text(nf,padding))//'-'
+    if(rank==0) call append_tag_visit_file(TRIM(rootname))
 
-      OPEN(UNIT=90,FILE=TRIM(out_path)//'/tag-tecplot'//TRIM(int2text(rank,padding))//'.dat')
+    OPEN(UNIT=8,FILE=TRIM(rootname)//TRIM(int2text(rank,padding))//'.vtk')
+    write(8,10)
+    write(8,11) time
+    write(8,12)
+    write(8,13)
+    write(8,14)i2-i1+1,j2-j1+1,k2-k1+1
+    write(8,15)(i2-i1+1)*(j2-j1+1)*(k2-k1+1)
+10  format('# vtk DataFile Version 2.0')
+11  format('grid, time ',F16.8)
+12  format('ASCII')
+13  format('DATASET STRUCTURED_GRID')
+14  format('DIMENSIONS ',I5,I5,I5)
+15  format('POINTS ',I17,' double' )
 
-      write(90,*) 'title= " 3d tag "'
-      write(90,*) 'variables = "x", "y", "z", "tag", "c" '
-      !write(90,*) 'zone i=,',Nx/nPx+Ng*2, 'j=',Ny/nPy+Ng*2, 'k=',Nz/nPz+Ng*2,'f=point'
-      write(90,*) 'zone i=',imax-imin+1, ',j=',jmax-jmin+1, ',k=',kmax-kmin+1,'f=point'
-      do k = kmin,kmax
-         do j=jmin,jmax
-            do i=imin,imax 
-               write(90,'(4(I5,1X),(E15.8))') i,j,k,tag_id(i,j,k),cvof(i,j,k)
-            end do ! i
-         end do ! j
-      end do ! k
+    do k=k1,k2; do j=j1,j2; do i=i1,i2;
+      write(8,320) x(i),y(j),z(k)
+    enddo; enddo; enddo
+320 format(e14.5,e14.5,e14.5)
 
-   end subroutine output_tag
+    write(8,19)(i2-i1+1)*(j2-j1+1)*(k2-k1+1)
+    write(8,17)'tag'
+    write(8,18)
+19  format('POINT_DATA ',I17)
+17  format('SCALARS ',A20,' float 1')
+18  format('LOOKUP_TABLE default')
+
+    do k=k1,k2; do j=j1,j2; do i=i1,i2
+      write(8,210) tag_id(i,j,k)
+    enddo; enddo; enddo
+210 format(i5)
+    close(8)
+  end subroutine output_tag
+!-------------------------------------------------------------------------------------------------
+
+  subroutine append_tag_visit_file(rootname)
+    implicit none
+    character(*) :: rootname
+    integer prank
+    if(rank.ne.0) call pariserror('rank.ne.0 in append_tag')
+    if(tag_opened==0) then
+       OPEN(UNIT=88,FILE='tag.visit')
+       write(88,10) nPdomain
+10     format('!NBLOCKS ',I4)
+       tag_opened=1
+    else
+       OPEN(UNIT=88,FILE='tag.visit',position='append')
+    endif
+    do prank=0,NpDomain-1
+       write(88,11) rootname//TRIM(int2text(prank,padding))//'.vtk'
+11     format(A)
+    enddo
+    close(88)
+  end subroutine  append_tag_visit_file
+
+!   subroutine output_tag()
+!      implicit none
+!      integer :: i,j,k
+
+!      OPEN(UNIT=90,FILE=TRIM(out_path)//'/tag-tecplot'//TRIM(int2text(rank,padding))//'.dat')
+
+!      write(90,*) 'title= " 3d tag "'
+!      write(90,*) 'variables = "x", "y", "z", "tag", "c" '
+!      !write(90,*) 'zone i=,',Nx/nPx+Ng*2, 'j=',Ny/nPy+Ng*2, 'k=',Nz/nPz+Ng*2,'f=point'
+!      write(90,*) 'zone i=',imax-imin+1, ',j=',jmax-jmin+1, ',k=',kmax-kmin+1,'f=point'
+!      do k = kmin,kmax
+!         do j=jmin,jmax
+!            do i=imin,imax 
+!               write(90,'(4(I5,1X),(E15.8))') i,j,k,tag_id(i,j,k),cvof(i,j,k)
+!            end do ! i
+!         end do ! j
+!      end do ! k
+!
+!   end subroutine output_tag
 
 ! ==============================================
-! output droplets & particles 
+! test drop-particle conversion
 ! ==============================================
-   subroutine output_DP(tswap)
+   subroutine test_DropPartConv(tswap)
       implicit none
 
       integer, intent(in) :: tswap
@@ -1282,7 +1345,7 @@ contains
       end do ! i 
 !      call QSort(drops_ex,NumBubble)
       do ib = 1, NumBubble 
-         write(91,*) drops   (ib,rank)%element%xc, drops   (ib,rank)%element%vol
+         write(91,*) drops   (ib)%element%xc, drops   (ib)%element%vol
          write(92,*) drops_ex(ib)%element%xc, drops_ex(ib)%element%vol
       end do ! i 
       CLOSE(91)
@@ -1328,7 +1391,7 @@ contains
          end do ! idrop
          CLOSE(95)
       end if ! rank
-   end subroutine output_DP
+   end subroutine test_DropPartConv
 
 ! ===============================================
 ! Testing section
@@ -1340,9 +1403,9 @@ contains
 !      integer :: ierr
                      
       if(test_tag) then
-         call output_tagDrop()
+         call test_tagDrop()
       else if ( test_D2P ) then
-         call output_DP(tswap)
+         call test_DropPartConv(tswap)
       end if
                                                                              
    end subroutine test_Lag_part
@@ -1429,27 +1492,27 @@ contains
       do idrop = 1,num_drop(rank)
 
          ! Find cell index and check conversion criteria 
-         call FindPartLocCell(drops(idrop,rank)%element%xc,  & 
-                              drops(idrop,rank)%element%yc,  & 
-                              drops(idrop,rank)%element%zc,  &
+         call FindPartLocCell(drops(idrop)%element%xc,  & 
+                              drops(idrop)%element%yc,  & 
+                              drops(idrop)%element%zc,  &
                               ic,jc,kc) 
-         call CheckConvertDropCriteria(drops(idrop,rank)%element%vol, & 
-                                       drops(idrop,rank)%element%xc,  & 
-                                       drops(idrop,rank)%element%yc,  & 
-                                       drops(idrop,rank)%element%zc,  &
+         call CheckConvertDropCriteria(drops(idrop)%element%vol, & 
+                                       drops(idrop)%element%xc,  & 
+                                       drops(idrop)%element%yc,  & 
+                                       drops(idrop)%element%zc,  &
                                        ic,jc,kc,                      & 
                                        ConvertDropFlag,               & 
                                        CriteriaConvertCase,           &
-                                       drops(idrop,rank)%AspRatio)
+                                       drops(idrop)%AspRatio)
 
          volcell = dx(ic)*dy(jc)*dz(kc)
          if ( ConvertDropFlag ) then
             write(*,*) 'Drop is converted to particle', idrop,rank,tswap, &
-               drops(idrop,rank)%element%vol/volcell
+               drops(idrop)%element%vol/volcell
             
             ! transfer droplet properties to particle
             num_part(rank) = num_part(rank) + 1
-            parts(num_part(rank),rank)%element = drops(idrop,rank)%element
+            parts(num_part(rank),rank)%element = drops(idrop)%element
 
             parts(num_part(rank),rank)%ic = ic 
             parts(num_part(rank),rank)%jc = jc 
@@ -1459,7 +1522,7 @@ contains
             parts(num_part(rank),rank)%tstepConvert = tswap
 
             ! Define conversion region
-            dp = (6.d0*drops(idrop,rank)%element%vol/PI)**OneThird
+            dp = (6.d0*drops(idrop)%element%vol/PI)**OneThird
             ConvertRegSize = ConvertRegSizeToDiam*dp
             call FindCellIndexBdryConvertRegUnifMesh(ConvertRegSize, & 
                                              i1,ic,i2,j1,jc,j2,k1,kc,k2)
@@ -1486,17 +1549,17 @@ contains
                                          x1,x2,y1,y2,z1,z2,wf)
                                          
                ! compute undisturbed flow field from droplet acceleration
-!               call ComputeUndisturbedVelEE(drops(idrop,rank)%element%uc,  & 
-!                                            drops(idrop,rank)%element%duc, & 
-!                                            drops(idrop,rank)%element%vc,  & 
-!                                            drops(idrop,rank)%element%dvc, & 
-!                                            drops(idrop,rank)%element%wc,  & 
-!                                            drops(idrop,rank)%element%dwc, & 
+!               call ComputeUndisturbedVelEE(drops(idrop)%element%uc,  & 
+!                                            drops(idrop)%element%duc, & 
+!                                            drops(idrop)%element%vc,  & 
+!                                            drops(idrop)%element%dvc, & 
+!                                            drops(idrop)%element%wc,  & 
+!                                            drops(idrop)%element%dwc, & 
 !                                            dp,rho1,rho2,mu1,mu2,Gx,Gy,Gz,ufp,vfp,wfp)
 
-!               dist2 = (x(i)-drops(idrop,rank)%element%xc)**2.d0 & 
-!                     + (y(j)-drops(idrop,rank)%element%yc)**2.d0 & 
-!                     + (z(k)-drops(idrop,rank)%element%zc)**2.d0
+!               dist2 = (x(i)-drops(idrop)%element%xc)**2.d0 & 
+!                     + (y(j)-drops(idrop)%element%yc)**2.d0 & 
+!                     + (z(k)-drops(idrop)%element%zc)**2.d0
 !               wt = exp(-dist2*4.d0/dp/dp)
 !               u(i,j,k) = uf*(1.d0-wt) + ufp*wt
 !               v(i,j,k) = vf*(1.d0-wt) + vfp*wt
@@ -1518,10 +1581,10 @@ contains
       if ( num_drop_merge(rank) > 0 .and. ConvertMergeDrop ) then
       do idrop = 1,num_drop_merge(rank)
 
-         call CheckConvertDropCriteria(drops_merge(idrop,rank)%element%vol, & 
-                                       drops_merge(idrop,rank)%element%xc,  & 
-                                       drops_merge(idrop,rank)%element%yc,  & 
-                                       drops_merge(idrop,rank)%element%zc,  &
+         call CheckConvertDropCriteria(drops_merge(idrop)%element%vol, & 
+                                       drops_merge(idrop)%element%xc,  & 
+                                       drops_merge(idrop)%element%yc,  & 
+                                       drops_merge(idrop)%element%zc,  &
                                        ic,jc,kc,                            & 
                                        ConvertDropFlag,CriteriaConvertCase, & 
                                        AspRatioSphere)
@@ -1536,59 +1599,59 @@ contains
             wf = 0.d0 
 
             ! remove droplet vof structure
-            do ilist = 1,drops_merge(idrop,rank)%num_cell_drop
-               cvof(drops_merge_cell_list(1,ilist,idrop), &
-                    drops_merge_cell_list(2,ilist,idrop), &
-                    drops_merge_cell_list(3,ilist,idrop)) = 0.0
-                  u(drops_merge_cell_list(1,ilist,idrop), &
-                    drops_merge_cell_list(2,ilist,idrop), &
-                    drops_merge_cell_list(3,ilist,idrop)) = uf
-                  v(drops_merge_cell_list(1,ilist,idrop), &
-                    drops_merge_cell_list(2,ilist,idrop), &
-                    drops_merge_cell_list(3,ilist,idrop)) = vf
-                  w(drops_merge_cell_list(1,ilist,idrop), &
-                    drops_merge_cell_list(2,ilist,idrop), &
-                    drops_merge_cell_list(3,ilist,idrop)) = wf
-            end do ! ilist
+!            do ilist = 1,drops_merge(idrop)%num_cell_drop
+!               cvof(drops_merge_cell_list(1,ilist,idrop), &
+!                    drops_merge_cell_list(2,ilist,idrop), &
+!                    drops_merge_cell_list(3,ilist,idrop)) = 0.0
+!                  u(drops_merge_cell_list(1,ilist,idrop), &
+!                    drops_merge_cell_list(2,ilist,idrop), &
+!                    drops_merge_cell_list(3,ilist,idrop)) = uf
+!                  v(drops_merge_cell_list(1,ilist,idrop), &
+!                    drops_merge_cell_list(2,ilist,idrop), &
+!                    drops_merge_cell_list(3,ilist,idrop)) = vf
+!                  w(drops_merge_cell_list(1,ilist,idrop), &
+!                    drops_merge_cell_list(2,ilist,idrop), &
+!                    drops_merge_cell_list(3,ilist,idrop)) = wf
+!            end do ! ilist
 
             ! remove droplet vof structure
-            do ilist = 1,drops_merge(idrop,rank)%num_gcell
-               cvof(drops_merge_gcell_list(1,ilist,idrop), &
-                    drops_merge_gcell_list(2,ilist,idrop), &
-                    drops_merge_gcell_list(3,ilist,idrop)) = 0.0
-                  u(drops_merge_gcell_list(1,ilist,idrop), &
-                    drops_merge_gcell_list(2,ilist,idrop), &
-                    drops_merge_gcell_list(3,ilist,idrop)) = uf
-                  v(drops_merge_gcell_list(1,ilist,idrop), &
-                    drops_merge_gcell_list(2,ilist,idrop), &
-                    drops_merge_gcell_list(3,ilist,idrop)) = vf
-                  w(drops_merge_gcell_list(1,ilist,idrop), &
-                    drops_merge_gcell_list(2,ilist,idrop), &
-                    drops_merge_gcell_list(3,ilist,idrop)) = wf
-            end do ! ilist
+!            do ilist = 1,drops_merge(idrop)%num_gcell
+!               cvof(drops_merge_gcell_list(1,ilist,idrop), &
+!                    drops_merge_gcell_list(2,ilist,idrop), &
+!                    drops_merge_gcell_list(3,ilist,idrop)) = 0.0
+!                  u(drops_merge_gcell_list(1,ilist,idrop), &
+!                    drops_merge_gcell_list(2,ilist,idrop), &
+!                    drops_merge_gcell_list(3,ilist,idrop)) = uf
+!                  v(drops_merge_gcell_list(1,ilist,idrop), &
+!                    drops_merge_gcell_list(2,ilist,idrop), &
+!                    drops_merge_gcell_list(3,ilist,idrop)) = vf
+!                  w(drops_merge_gcell_list(1,ilist,idrop), &
+!                    drops_merge_gcell_list(2,ilist,idrop), &
+!                    drops_merge_gcell_list(3,ilist,idrop)) = wf
+!            end do ! ilist
 
             ! transfer droplet properties to particle if center of mass located
             ! in this droplet piece
-            if ( drops_merge(idrop,rank)%flag_center_mass == 1 ) then 
+            if ( drops_merge(idrop)%flag_center_mass == 1 ) then 
                num_part(rank) = num_part(rank) + 1
-               parts(num_part(rank),rank)%element = drops_merge(idrop,rank)%element
+               parts(num_part(rank),rank)%element = drops_merge(idrop)%element
             
                ! Find particle location cell
-               MinDistPart2CellCenter = 1.0d10
-               do ilist = 1,drops_merge(idrop,rank)%num_cell_drop
-                  DistPart2CellCenter = ( drops_merge(idrop,rank)%element%xc  & 
-                              - x(drops_merge_cell_list(1,ilist,idrop)))**2.d0 & 
-                                      + ( drops_merge(idrop,rank)%element%yc  & 
-                              - y(drops_merge_cell_list(2,ilist,idrop)))**2.d0 &
-                                      + ( drops_merge(idrop,rank)%element%zc  & 
-                              - z(drops_merge_cell_list(3,ilist,idrop)))**2.d0
-                  if ( DistPart2CellCenter < MinDistPart2CellCenter ) then 
-                     MinDistPart2CellCenter = DistPart2CellCenter
-                     parts(num_part(rank),rank)%ic = drops_merge_cell_list(1,ilist,idrop)
-                     parts(num_part(rank),rank)%jc = drops_merge_cell_list(2,ilist,idrop)
-                     parts(num_part(rank),rank)%kc = drops_merge_cell_list(3,ilist,idrop)
-                  end if !DistPart2CellCenter
-               end do ! ilist
+!               MinDistPart2CellCenter = 1.0d10
+!               do ilist = 1,drops_merge(idrop)%num_cell_drop
+!                  DistPart2CellCenter = ( drops_merge(idrop)%element%xc  & 
+!                              - x(drops_merge_cell_list(1,ilist,idrop)))**2.d0 & 
+!                                      + ( drops_merge(idrop)%element%yc  & 
+!                              - y(drops_merge_cell_list(2,ilist,idrop)))**2.d0 &
+!                                      + ( drops_merge(idrop)%element%zc  & 
+!                              - z(drops_merge_cell_list(3,ilist,idrop)))**2.d0
+!                  if ( DistPart2CellCenter < MinDistPart2CellCenter ) then 
+!                     MinDistPart2CellCenter = DistPart2CellCenter
+!                     parts(num_part(rank),rank)%ic = drops_merge_cell_list(1,ilist,idrop)
+!                     parts(num_part(rank),rank)%jc = drops_merge_cell_list(2,ilist,idrop)
+!                     parts(num_part(rank),rank)%kc = drops_merge_cell_list(3,ilist,idrop)
+!                  end if !DistPart2CellCenter
+!               end do ! ilist
             end if ! flag_center_mass 
 
          end if !ConvertDropFlag
@@ -1682,9 +1745,9 @@ contains
 
       ConvertDropFlag = ConvertDropRegion .and. ConvertDropShape
 
-      ! Always keep drop smaller than a cell as LPP (mostly generated by VOF
+      ! Always keep drops with diameter smaller than dx as LPP (mostly generated by VOF
       ! error)
-      if ( vol < volcell ) ConvertDropFlag = .true. 
+      ! if ( vol < volcell*PI/6.d0 ) ConvertDropFlag = .true. 
       
    end subroutine CheckConvertDropCriteria
 
@@ -1706,11 +1769,11 @@ contains
             ! Check volume of drop corresponding to the current cell
             droptag  = tag_id(i,j,k) 
             idrop    = tag_dropid   (droptag) 
-            droprank = tag_rank     (droptag)  
+!            droprank = tag_rank     (droptag)  
             if ( tag_mergeflag(droptag) == 0 ) then 
-               vol_drop = drops(idrop,droprank)%element%vol
+               vol_drop = drops(idrop)%element%vol
             else if ( tag_mergeflag(droptag) == 1 ) then 
-               vol_drop = drops_merge(idrop,droprank)%element%vol
+               vol_drop = drops_merge(idrop)%element%vol
             else 
                call lpperror("Unknown tag_mergeflag!")
             end if ! tag_mergeflag
@@ -1967,7 +2030,7 @@ contains
             write(*,*) 'Particle is converted to drop', ipart,rank,tswap,parts(ipart,rank)%element%vol/volcell
             ! transfer droplet properties to particle
             num_drop(rank) = num_drop(rank) + 1
-            drops(num_drop(rank),rank)%element = parts(ipart,rank)%element
+            drops(num_drop(rank))%element = parts(ipart,rank)%element
 
             ! Define conversion region
             ConvertRegSize = ConvertRegSizeToDiam*dp
@@ -2008,6 +2071,17 @@ contains
             end do ! ipart1
             num_part(rank) = num_part(rank) - 1
          end if ! ConvertDropFlag
+
+! TEMPORARY - remove particle within liquid (failed to capture its impact on interface)
+!         if ( cvof(ic,jc,kc) == 1.d0 ) then
+!            write(*,*) 'Particle is removed since within liquid', ipart,rank,parts(ipart,rank)%element%vol/volcell
+!            ! Remove the particle from the array  
+!            do ipart1 = ipart+1,num_part(rank)
+!               parts(ipart1-1,rank) = parts(ipart1,rank)
+!            end do ! ipart1
+!            num_part(rank) = num_part(rank) - 1
+!         end if ! cvof(ic,jc,kc)
+! END TEMPORARY
 
          ! Note: num_part(rank) has been updated
          if ( ipart > num_part(rank) ) exit

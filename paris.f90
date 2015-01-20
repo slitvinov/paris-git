@@ -524,6 +524,7 @@ Program paris
            else if ( DoVOF ) then 
               call backup_VOF_write
               if ( DoLPP ) call backup_LPP_write 
+              call wrap_up_timer(itimestep,iTimeStepRestart)
            end if ! DoFront, DoVOF
         end if ! itimestep
 !        if(mod(itimestep,noutuv)==0) then
@@ -536,7 +537,7 @@ Program paris
                if(DoLPP) call output_LPP(nfile,is,ie+1,js,je+1,ks,ke+1)
                if(rank==0)then
                   end_time =  MPI_WTIME()
-                  write(out,'("Step:",I9," Iterations:",I9," cpu(s):",f10.2)')itimestep,it,end_time-start_time
+                  write(out,'("Output data at Step:",I9," and time:",f10.2)')itimestep,time
                endif
                timeLastOutput = time
             end if! timeAfterOuput
@@ -650,7 +651,7 @@ Program paris
   endif
 !-------------------------------------------------------------------------------------------------
 !--------------- END OF MAIN TIME LOOP ----------------------------------------------------------
-  call wrap_up_timer(itimestep)
+  call wrap_up_timer(itimestep,iTimeStepRestart)
   if(rank==0) then 
      if(output_format==2) call close_visit_file()
   endif
@@ -1671,7 +1672,7 @@ subroutine surfaceForce(du,dv,dw,rho)
   deltax=dx(nx)
   call get_all_curvatures(tmp,0)
   call my_timer(7)
-  do k=ks,ke;  do j=js,je; do i=is,ieu
+  do k=ks,ke;  do j=js,je; do i=is,ie
      if(abs(cvof(i+1,j,k)-cvof(i,j,k))>EPSC/1d1) then  ! there is a non-zero grad H (H Heaviside function) 
         n=0
         kappa=0d0
@@ -2122,7 +2123,7 @@ subroutine InitCondition
      iTimeStep = 0
   endif
   iTimeStepRestart = iTimeStep
-  timeLastOutput = time
+  timeLastOutput = DBLE(INT(time/tout))*tout
 end subroutine InitCondition
 
 !=================================================================================================

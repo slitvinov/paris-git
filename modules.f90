@@ -256,15 +256,15 @@ contains
     tmp_time = this_time
     times(n) = times(n) + elapsed_time
   end subroutine my_timer
-  subroutine wrap_up_timer(itimestep)
+  subroutine wrap_up_timer(itimestep,iTimeStepRestart)
     use module_grid
     implicit none
     include 'mpif.h'
-    integer :: n,ierr2,itimestep
+    integer :: n,ierr2,itimestep,iTimeStepRestart
     real(8) :: totaltime, ZZ
     if(rank>0) return
     end_loop = MPI_WTIME(ierr2)
-    ZZ = nx*ny*nz/npx/npy/npz*itimestep/(end_loop-start_loop)
+    ZZ = nx*ny*nz/npx/npy/npz*(itimestep-iTimeStepRestart)/(end_loop-start_loop)
     totaltime=0d0
     do n=1,components
        totaltime = totaltime + times(n)
@@ -278,6 +278,8 @@ contains
     write(123,'("Overall speed Z/np",T24,es16.5e2)') ZZ
     write(123,*) "   "
     write(123,'("Allocated/proc ",T24,es16.5e2,"Gbytes")') alloc_size
+    write(123,*) "   "
+    write(123,'("Current and initial time steps:",2(I7,1X))') itimestep,iTimeStepRestart
     close(123)
   end subroutine wrap_up_timer
 end module module_timer

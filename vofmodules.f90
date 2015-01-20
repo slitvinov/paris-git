@@ -439,16 +439,13 @@ contains
           vofbdry_cond(orientation) = 'periodic'
           vofbdry_cond(dir) = 'periodic'
           if(bdry_cond(dir) /= 1) &
-               call pariserror(&
-"cannot have periodic set only in VOF &
-need to have both bdry_cond and vofbdry_cond set &
-or none at all")
+               call pariserror("periodic for both bdry_cond and vofbdry_cond or none at all")
        endif
     enddo
 
     if(rank==0) then
        do dir=1,3
-          write(6,'(A1,"-: ",(A)," / ",(A)T32," ",A1,"+: ",(A)," / ",(A))') &
+          write(6,'(A1,"-: ",(A)," / ",(A),T32," ",A1,"+: ",(A)," / ",(A))') &
                dc(dir),TRIM(expl(bdry_cond(dir))),TRIM(vofbdry_cond(dir)), &
                dc(dir),TRIM(expl(bdry_cond(dir+3))),TRIM(vofbdry_cond(dir+3)) ! ,rank
        enddo
@@ -519,7 +516,7 @@ or none at all")
     integer :: i,j,k
     real(8) :: ryz, sine
     
-    if( test_D2P .or. test_tag ) then 
+    if( test_D2P ) then 
        if ( rank == root_rank ) call random_bubbles
        call MPI_BCAST(rad, NumBubble, MPI_REAL8, &
                       root_rank, MPI_Comm_Cart, ierr)
@@ -590,10 +587,17 @@ or none at all")
 
     if ( test_PhaseInversion ) then 
       do i = is,ie; do j=js,je; do k = ks,ke
-         if (x(i) < 0.5d0*xLength .and. y(j) < 0.5d0*yLength .and. z(k) < 0.5d0*zLength  ) then 
-            cvof(i,j,k) = 1.d0
-            vof_flag(i,j,k) = 1
-         end if 
+         if ( bdry_cond(3) == 1 ) then       ! Quasi-2D, periodic in z direction 
+            if (x(i) < 0.5d0*xLength .and. y(j) < 0.5d0*yLength ) then 
+               cvof(i,j,k) = 1.d0
+               vof_flag(i,j,k) = 1
+            end if
+         else                                ! 3D 
+            if (x(i) < 0.5d0*xLength .and. y(j) < 0.5d0*yLength .and. z(k) < 0.5d0*zLength  ) then 
+               cvof(i,j,k) = 1.d0
+               vof_flag(i,j,k) = 1
+            end if
+         end if ! bdry_cond(3)
       end do; end do; end do
     end if ! test_PhaseInversion
 

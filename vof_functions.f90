@@ -359,7 +359,14 @@ SUBROUTINE CENT3D(nr,cc,xc0)
     m2 = np3
     ind(2) = 3
   endif
-  cch = DMIN1(cc,1.d0-cc)                              ! limit to: 0 < cch < 1/2
+! TEMPORARY - Stanley: not working for corner full/empty cell (cc=1,m1=0,m2=m3=0.5)
+  if ( cc == 1.d0 .or. cc == 0.d0 ) then
+    cch = cmin
+  else 
+    cch = DMIN1(cc,1.d0-cc)                              ! limit to: 0 < cch < 1/2
+  end if ! cc
+! END TEMPOARY
+!  cch = DMIN1(cc,1.d0-cc)                              ! limit to: 0 < cch < 1/2
   ccr = DMAX1(cch,cmin)                       ! full and empty neighboring cells  
   denom = DMAX1(6.d0*m1*m2*m3,1.d-50)                           ! get cch ranges
   c01 = m1*m1*m1/denom
