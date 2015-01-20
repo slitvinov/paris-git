@@ -1978,9 +1978,8 @@ subroutine InitCondition
         endif
         du = 0d0
 
-        ! ====================================================================
+        ! -------------------------------------------------------------------
         ! Initial conditions for different tests
-
         ! -------------------------------------------------------------------
         ! Test: inject a drop
          if ( test_injectdrop ) then
@@ -2010,9 +2009,11 @@ subroutine InitCondition
             w(i,j,k) = 0.d0
             enddo; enddo; enddo
          endif
-     
-        ! -------------------------------------------------------------------
-        ! Test: Test height function
+         !-------------------------------------------------------------------     
+         !  Perform tests
+         ! -------------------------------------------------------------------
+
+         ! Test: Test height function
          if(test_HF) then
             call test_VOF_HF()
          end if

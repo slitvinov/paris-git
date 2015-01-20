@@ -51,7 +51,6 @@ contains
        call output_heights()
     else if(test_curvature .or. test_curvature_2D) then
        method_count=0
-       call output_heights()
        call output_curvature()
     end if
     if(test_curvature_2D.and.nx<=16.and.ny<=16.and.nz<=2) then
