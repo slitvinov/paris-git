@@ -76,7 +76,7 @@ clean:
 distclean: clean
 	@rm -fR  session* *.xml TAGS tags input
 
-test:  install pariscompare parisdeconv
+test:  install pariscompare parisdeconv pariscompare3D
 	@echo "The test suite takes less than 4 minutes on a 4-core intel i7 MacBookPro"
 	@cd Tests; chmod +x ./runtests.sh; ./runtests.sh
 
@@ -131,6 +131,11 @@ averages.o: averages.f90 modules.o solids.o vofmodules.o
 pariscompare: compare.o
 	@$(CC) -o pariscompare compare.o -lm
 	@mv pariscompare ~/bin
+
+
+pariscompare3D: compare_4cols.o
+	$(CC) -o pariscompare3D compare_4cols.o
+	mv pariscompare3D $(BINDIR)
 
 parisdeconv: parisdeconv.o
 	@$(CC) -o parisdeconv parisdeconv.o -lm
