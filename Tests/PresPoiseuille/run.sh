@@ -49,9 +49,8 @@ else
     echo "FAIL: directory out not created"
 fi
 
+if [ $CGFONTGETGLYPH_PARIS_PROBLEM == 0 ]; then
 gnuplot <<EOF &
-#set term pdf
-#set out "tmp.pdf"
 set size square
 set grid
 set nolabel
@@ -64,6 +63,17 @@ set out 'Poiseuille_plot.pdf'
 replot
 exit
 EOF
+else
+gnuplot <<EOF &
+set size square
+set grid
+set nolabel
+set xrange[-0.1:1.1]
+set yrange[-0.05:*]
+plot "out/output1" w lp notitle, 0.5*x*(1-x) w l notitle, 0 w l notitle
+exit
+EOF
+fi
 
 /bin/rm -f input
 
