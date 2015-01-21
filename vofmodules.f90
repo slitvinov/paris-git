@@ -1166,15 +1166,32 @@ subroutine get_velocity_from_momentum_staggered (mom,us,der,d)
   implicit none
   integer :: i,j,k
   integer :: i0,j0,k0,d
+  integer :: iend,jend,kend
+  integer :: iini,jini,kini
   real(8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: mom
   real(8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: us,der
   real(8) :: cflag,rhoavg
 
   call init_i0j0k0 (d,i0,j0,k0)
 
-  do k=ks-1,ke+1
-    do j=js-1,je+1
-      do i=is-1,ie+1
+  kini=ks
+  kend=ke
+  jini=js
+  jend=je
+  iini=is
+  iend=ie 
+
+  if (d.eq.1) then
+    iend=ieu 
+  elseif (d.eq.2) then
+    jend=jev 
+  elseif (d.eq.3) then
+    kend=kew 
+  endif
+
+  do k=kini,kend
+    do j=jini,jend
+      do i=iini,iend
         ! if interface rewrite interface velocity
         cflag = (tmp(i,j,k) + cvof(i,j,k) + cvof(i+i0,j+j0,k+k0))/3.d0
 
