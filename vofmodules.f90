@@ -1158,22 +1158,25 @@ end subroutine get_half_fractions
 
 end subroutine get_velocity_from_momentum_centered
 
-subroutine get_velocity_from_momentum_staggered (mom,us,der)
+subroutine get_velocity_from_momentum_staggered (mom,us,der,d)
   use module_grid
   use module_flow
   use module_BC
   use module_tmpvar
   implicit none
   integer :: i,j,k
+  integer :: i0,j0,k0,d
   real(8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: mom
   real(8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: us,der
   real(8) :: cflag,rhoavg
+
+  call init_i0j0k0 (d,i0,j0,k0)
 
   do k=ks-1,ke+1
     do j=js-1,je+1
       do i=is-1,ie+1
         ! if interface rewrite interface velocity
-        cflag = tmp(i,j,k)
+        cflag = (tmp(i,j,k) + cvof(i,j,k) + cvof(i+i0,j+j0,k+k0))/3.d0
 
         if (((cflag.gt.0.d0).and.(cflag.lt.1.d0))) then
           rhoavg = rho2*cflag + (1.d0-cflag)*rho1
@@ -1263,11 +1266,11 @@ subroutine vofandmomsweepsstaggered(tswap,t)
       endif
 
       if (dir.eq.1) then
-        call get_velocity_from_momentum_staggered (momentum,u,du)
+        call get_velocity_from_momentum_staggered (momentum,u,du,1)
         elseif (dir.eq.2) then
-        call get_velocity_from_momentum_staggered (momentum,v,dv)
+        call get_velocity_from_momentum_staggered (momentum,v,dv,2)
         elseif (dir.eq.3) then
-        call get_velocity_from_momentum_staggered (momentum,w,dw)
+        call get_velocity_from_momentum_staggered (momentum,w,dw,3)
       endif
 
     enddo
