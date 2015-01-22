@@ -2461,3 +2461,33 @@ subroutine hello_all
   hello_count = hello_count + 1
   end if
 end subroutine hello_all
+
+subroutine write_par_var(varname,iout,var)
+  use module_grid
+  use module_IO
+  implicit none
+  include 'mpif.h'
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax) :: var
+  integer :: i,j,k,prank,iout
+  character(len=10) :: varname
+
+  write(*,*)TRIM(varname)
+  if (rank==0) then
+     OPEN(UNIT=21,FILE=TRIM(varname)//'-holder-'//TRIM(int2text(iout,padding))//'.txt')
+     write(21,12)NpDomain
+     do prank=0,NpDomain-1
+        write(21,13)TRIM(out_path)//'/'//TRIM(varname)//TRIM(int2text(prank,padding))//'-'//TRIM(int2text(iout,padding))//'.txt'
+     enddo
+     close(21)
+  endif
+  OPEN(UNIT=20,FILE=TRIM(out_path)//'/'//TRIM(varname)//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout,padding))//'.txt')
+  do k=kmin,kmax; do j=jmin,jmax; do i=imin,imax
+     write(20,14)x(i),y(j),z(k),var(i,j,k)
+  enddo;enddo;enddo
+  close(20)
+
+12 format('NPROCS',I4)
+13 format(A)
+14 format(4e14.5)
+
+end subroutine write_par_var

@@ -749,23 +749,9 @@ contains
       call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
       
       if (debug_par) then
-         if (rank==0) then
-            OPEN(UNIT=21,FILE='Kappa_holder-'//TRIM(int2text(iout,padding))//'.txt')
-            write(21,12)NpDomain
-            do prank=0,NpDomain-1
-               write(21,13)TRIM(out_path)//'/Kappa-'//TRIM(int2text(prank,padding))//'-'//TRIM(int2text(iout,padding))//'.txt'
-            enddo
-         endif
-         OPEN(UNIT=20,FILE=TRIM(out_path)//'/Kappa-'//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout,padding))//'.txt')
-         do k=kmin,kmax; do j=jmin,jmax; do i=imin,imax
-            write(20,14)x(i),y(j),z(k),kapparray(i,j,k)
-         enddo;enddo;enddo
-         close(20)
+         call write_par_var("Kappa     ",iout,kapparray)
       endif
-      
-12    format('NPROCS',I4)
-13    format(A)
-14    format(4e14.5)
+
     contains
       function bulk_cell(i,j,k)
         implicit none
