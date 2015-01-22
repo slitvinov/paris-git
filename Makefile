@@ -130,7 +130,7 @@ averages.o: averages.f90 modules.o solids.o vofmodules.o
 
 pariscompare: compare.o
 	@$(CC) -o pariscompare compare.o -lm
-	@mv pariscompare ~/bin
+	@mv pariscompare $(BINDIR)
 
 
 pariscompare3D: compare_4cols.o
@@ -139,7 +139,7 @@ pariscompare3D: compare_4cols.o
 
 parisdeconv: parisdeconv.o
 	@$(CC) -o parisdeconv parisdeconv.o -lm
-	@mv parisdeconv ~/bin
+	@mv parisdeconv $(BINDIR)
 
 .c.o:   $< 
 	@cc -c $(CFLAGS) $< 

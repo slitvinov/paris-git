@@ -1392,13 +1392,13 @@ module module_BC
          if ( y(j) <= radius_liq_inject ) then 
             uinject = uliq_inject & 
                      *erf( (radius_liq_inject - y(j))/blayer_gas_inject ) &
-                     *erf(time/tdelay_gas_inject)  
+                     *(1.d0 + erf((time-tdelay_gas_inject*0.5d0)/(tdelay_gas_inject*0.25d0)) )*0.5d0
          else if ( y(j) > radius_liq_inject .and. y(j) <= radius_gas_inject ) then
             uinject = ugas_inject & 
                      *erf( (y(j) -   radius_liq_inject)/blayer_gas_inject ) & 
                      !*erf( (radius_gas_inject - y(j))/blayer_gas_inject ) & 
                      !*erf(max(time-tdelay_gas_inject,0.d0)/tdelay_gas_inject) 
-                     *erf(time/tdelay_gas_inject) 
+                     *(1.d0 + erf((time-tdelay_gas_inject*0.5d0)/(tdelay_gas_inject*0.25d0)) )*0.5d0
          else 
             uinject = 0.d0 
          end if  !
@@ -1408,12 +1408,12 @@ module module_BC
          if ( ryz < radius_liq_inject ) then 
             uinject = uliq_inject & 
                      *erf( (radius_liq_inject - ryz)/blayer_gas_inject ) &
-                     *erf(time/tdelay_gas_inject) 
+                     *(1.d0 + erf((time-tdelay_gas_inject*0.5d0)/(tdelay_gas_inject*0.25d0)) )*0.5d0
          else if ( ryz > low_gas_radius .and. ryz < radius_gas_inject ) then
             uinject = ugas_inject & 
                      *erf( (ryz - low_gas_radius)/blayer_gas_inject ) & 
                      *erf( (radius_gas_inject - ryz)/blayer_gas_inject ) & 
-                     *erf(time/tdelay_gas_inject) 
+                     *(1.d0 + erf((time-tdelay_gas_inject*0.5d0)/(tdelay_gas_inject*0.25d0)) )*0.5d0
          else 
             uinject = 0.d0 
          end if  !
