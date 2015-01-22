@@ -107,46 +107,7 @@
      call ighost_z(u_cmask,2,req(1:4)); call ighost_z(v_cmask,2,req(5:8)); call ighost_z(w_cmask,2,req(9:12))
      call ighost_z(pcmask,2,req(13:16)); call MPI_WAITALL(16,req(1:16),sta(:,1:16),ierr)
   enddo
-!-Debugging
-  debug = .false.
-  no = 1
-  if (debug .and. mod(iout,no)==0) then
-     Open(unit=20,FILE=TRIM(out_path)//'/Top_0-'//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout/no,padding))//'.txt')
-     Open(unit=21,FILE=TRIM(out_path)//'/Top_1-'//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout/no,padding))//'.txt')
-     Open(unit=22,FILE=TRIM(out_path)//'/Top_2-'//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout/no,padding))//'.txt')
-     Open(unit=23,FILE=TRIM(out_path)//'/u_ass-'//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout/no,padding))//'.txt')
-     Open(unit=24,FILE=TRIM(out_path)//'/v_ass-'//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout/no,padding))//'.txt')
-     Open(unit=25,FILE=TRIM(out_path)//'/w_ass-'//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout/no,padding))//'.txt')
-     Open(unit=26,FILE=TRIM(out_path)//'/P1-'//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout/no,padding))//'.txt')
-     Open(unit=27,FILE=TRIM(out_path)//'/P2-'//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout/no,padding))//'.txt')
-     Open(unit=28,FILE=TRIM(out_path)//'/P3-'//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout/no,padding))//'.txt') 
-     Open(unit=29,FILE=TRIM(out_path)//'/P0-'//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout/no,padding))//'.txt') 
-     !j=(js+je)/2
-     k=(ks+ke)/2
-     !do k=kmin,kmax; do i=imin,imax
-     do j=jmin,jmax; do i=imin,imax
-        !write outputs for gnuplot 2D
-        if (u_cmask(i,j,k)==0) write(20,13)xh(i),y(j),z(k)
-        if (v_cmask(i,j,k)==0) write(20,13)x(i),yh(j),z(k)
-        !if (w_cmask(i,j,k)==0) write(20,13)x(i),y(j),zh(k)
-        if (pcmask(i,j,k)==0) write(29,13)x(i),y(j),z(k)
-        if (u_cmask(i,j,k)==1) write(21,13)xh(i),y(j),z(k)
-        if (v_cmask(i,j,k)==1) write(21,13)x(i),yh(j),z(k)
-        !if (w_cmask(i,j,k)==1) write(21,13)x(i),y(j),zh(k)
-        if (pcmask(i,j,k)==1) write(26,13)x(i),y(j),z(k)
-        if (u_cmask(i,j,k)==2) write(22,13)xh(i),y(j),z(k)
-        if (v_cmask(i,j,k)==2) write(22,13)x(i),yh(j),z(k)
-        !if (w_cmask(i,j,k)==2) write(22,13)x(i),y(j),zh(k)
-        if (pcmask(i,j,k)==2) write(27,13)x(i),y(j),z(k)
-        if (u_cmask(i,j,k)==3) write(23,13)xh(i),y(j),z(k)
-        if (v_cmask(i,j,k)==3) write(24,13)x(i),yh(j),z(k)
-        !if (w_cmask(i,j,k)==3) write(25,13)x(i),y(j),zh(k)
-        if (pcmask(i,j,k)==3) write(28,13)x(i),y(j),z(k)
-     enddo; enddo
-     close(unit=20); close(unit=21); close(unit=22); close(unit=23); close(unit=24); close(unit=25)
-     close(unit=26); close(unit=27); close(unit=28)
-  endif
-13 format(3e14.5)
+
 end subroutine set_topology
 !-------------------------------------------------------------------------------------------------
 subroutine setuppoisson_fs(utmp,vtmp,wtmp,vof_phase,rhot,dt,A,cvof,n1,n2,n3,kap,iout)    
@@ -174,15 +135,7 @@ subroutine setuppoisson_fs(utmp,vtmp,wtmp,vof_phase,rhot,dt,A,cvof,n1,n2,n3,kap,
   P_gx = 0d0; P_gy = 0d0; P_gz = 0d0
   limit = 1d-3/dx((is+ie)/2)
   c_min = 1d-2
-  !Debugging
-  debug = .false.
-  no=1
-  if (debug .and. mod(iout,no)==0) then
-     Open(unit=50,file=TRIM(out_path)//'/C_int-'//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout/no,padding))//'.txt')
-     !Open(unit=51,file=TRIM(out_path)//'/COEFFS-'//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout/no,padding))//'.txt')
-     Open(unit=55,file=TRIM(out_path)//'/C0-'//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout/no,padding))//'.txt')
-     Open(unit=56,file=TRIM(out_path)//'/C1-'//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout/no,padding))//'.txt')
-  endif
+
   do k=ks,ke; do j=js,je; do i=is,ie
      !----Cav-liquid neighbours, set P_g in cavity cells
      if(vof_phase(i,j,k)==1) then
@@ -209,7 +162,6 @@ subroutine setuppoisson_fs(utmp,vtmp,wtmp,vof_phase,rhot,dt,A,cvof,n1,n2,n3,kap,
            dc(1) = 0.5d0 
            dc(2) = 1d0; dc(3) = 1d0
            c0 = FL3DNEW(nr,alpha2,x0,dc)
-           if (debug .and. k==(ks+ke)/2 .and. mod(iout,no)==0) write(56,314)x(i+1),y(j),c0,cvof(i+1,j,k)
            !get_intersection for cav cell
            nr(1) = n1(i,j,k); nr(2) = n2(i,j,k); nr(3) = n3(i,j,k)
            alpha2 = al3dnew(nr,cvof(i,j,k))
@@ -218,7 +170,6 @@ subroutine setuppoisson_fs(utmp,vtmp,wtmp,vof_phase,rhot,dt,A,cvof,n1,n2,n3,kap,
            dc(1) = 0.5d0; 
            dc(2) = 1d0; dc(3) = 1d0
            c1 = FL3DNEW(nr,alpha2,x0,dc)
-           if (debug .and. k==(ks+ke)/2 .and. mod(iout,no)==0) write(55,314)x(i),y(j),c1,cvof(i,j,k)
            c_stag = c1+c0
            if (c0>c_min) then
               nr(1)=n1(i+1,j,k)*c0/c_stag + n1(i,j,k)*c1/c_stag
@@ -247,9 +198,6 @@ subroutine setuppoisson_fs(utmp,vtmp,wtmp,vof_phase,rhot,dt,A,cvof,n1,n2,n3,kap,
                  write(*,'("x_mod NaN. c_st, n, vofs, phases:",6e14.5,5I8)')&
                       c_stag,n_avg(1),n_avg(2),n_avg(3),cvof(i,j,k),cvof(i+1,j,k),vof_phase(i,j,k),vof_phase(i+1,j,k),i,j,k
               endif
-              if (debug .and. k==(ks+ke)/2 .and. mod(iout,no)==0) then
-                 write(50,314)x(i+1)-x_mod(i,j,k),y(j)
-              endif
            endif
         endif
         !-------Check y-neighbour
@@ -262,7 +210,6 @@ subroutine setuppoisson_fs(utmp,vtmp,wtmp,vof_phase,rhot,dt,A,cvof,n1,n2,n3,kap,
            dc(1) = 1d0 
            dc(2) = 0.5d0; dc(3) = 1d0
            c0 = FL3DNEW(nr,alpha2,x0,dc)
-           if (debug .and. k==(ks+ke)/2 .and. mod(iout,no)==0) write(56,314)x(i),y(j+1),c0,cvof(i,j+1,k)
            !get_intersection for cav cell----------------------------------------
            nr(1) = n1(i,j,k); nr(2) = n2(i,j,k); nr(3) = n3(i,j,k)
            alpha2 = al3dnew(nr,cvof(i,j,k))
@@ -271,7 +218,6 @@ subroutine setuppoisson_fs(utmp,vtmp,wtmp,vof_phase,rhot,dt,A,cvof,n1,n2,n3,kap,
            dc(2) = 0.5d0; 
            dc(1) = 1d0; dc(3) = 1d0
            c1 = FL3DNEW(nr,alpha2,x0,dc)
-           if (debug .and. k==(ks+ke)/2 .and. mod(iout,no)==0) write(55,314)x(i),y(j),c1,cvof(i,j,k)
            c_stag = c1+c0
            if (c0>c_min) then ! use weighted average if liq VOF is not small, otherwise use cav normals
               nr(1)=n1(i,j+1,k)*c0/c_stag + n1(i,j,k)*c1/c_stag
@@ -298,9 +244,6 @@ subroutine setuppoisson_fs(utmp,vtmp,wtmp,vof_phase,rhot,dt,A,cvof,n1,n2,n3,kap,
               if (y_mod(i,j,k)<limit*dyh(j)) y_mod(i,j,k) = limit*dyh(j)
               if (y_mod(i,j,k) /= y_mod(i,j,k)) write(*,'("y_mod NaN. c_st, n, vofs, phases:",4e14.5,2I8)')&
                    c_stag,n_avg(2),cvof(i,j,k),cvof(i,j+1,k),vof_phase(i,j,k),vof_phase(i,j+1,k)
-              if (debug .and. k==(ks+ke)/2 .and. mod(iout,no)==0) then
-                 write(50,314)x(i),y(j+1)-y_mod(i,j,k)
-              endif
            endif
         endif
         !-------Check z-neighbours
@@ -377,7 +320,6 @@ subroutine setuppoisson_fs(utmp,vtmp,wtmp,vof_phase,rhot,dt,A,cvof,n1,n2,n3,kap,
         endif
         !Check x-neighbour
         if (vof_phase(i+1,j,k) == 1) then
-           !if (cvof(i+1,j,k)<0.499d0) write(*,'("Vof phase error. Phase test 1, cvof: ",e14.5)')cvof(i+1,j,k) !debugging
            !vof fraction in half of cav cell
            nr(1)=n1(i+1,j,k); nr(2)=n2(i+1,j,k); nr(3)=n3(i+1,j,k)
            alpha2 = al3dnew(nr,cvof(i+1,j,k))
@@ -386,7 +328,6 @@ subroutine setuppoisson_fs(utmp,vtmp,wtmp,vof_phase,rhot,dt,A,cvof,n1,n2,n3,kap,
            dc(1) = 0.5d0 
            dc(2) = 1d0; dc(3) = 1d0
            c1 = FL3DNEW(nr,alpha2,x0,dc)
-           if (debug .and. k==(ks+ke)/2 .and. mod(iout,no)==0) write(56,314)x(i+1),y(j),c1,cvof(i+1,j,k)
            !vof fraction in half of liq cell
            nr(1) = n1(i,j,k); nr(2) = n2(i,j,k); nr(3) = n3(i,j,k)
            alpha2 = al3dnew(nr,cvof(i,j,k))
@@ -395,7 +336,6 @@ subroutine setuppoisson_fs(utmp,vtmp,wtmp,vof_phase,rhot,dt,A,cvof,n1,n2,n3,kap,
            dc(1) = 0.5d0; 
            dc(2) = 1d0; dc(3) = 1d0
            c0 = FL3DNEW(nr,alpha2,x0,dc)
-           if (debug .and. k==(ks+ke)/2 .and. mod(iout,no)==0) write(55,314)x(i),y(j),c0,cvof(i,j,k)
            c_stag = c1+c0
            if (c0>c_min) then ! use weighted average if liq VOF is not small, otherwise use cav normals
               nr(1)=n1(i,j,k)*c0/c_stag + n1(i+1,j,k)*c1/c_stag
@@ -422,9 +362,6 @@ subroutine setuppoisson_fs(utmp,vtmp,wtmp,vof_phase,rhot,dt,A,cvof,n1,n2,n3,kap,
               if (x_mod(i,j,k)<limit*dxh(i)) x_mod(i,j,k) = limit*dxh(i)
               if (x_mod(i,j,k) /= x_mod(i,j,k)) write(*,'("x_mod NaN. c_st, n, vofs, phases:",4e14.5,2I8)')&
                    c_stag,n_avg(1),cvof(i,j,k),cvof(i+1,j,k),vof_phase(i,j,k),vof_phase(i+1,j,k)
-              if (debug .and. k==(ks+ke)/2 .and. mod(iout,no)==0) then
-                 write(50,314)x(i)+x_mod(i,j,k),y(j) 
-              endif
            endif
         endif
         !-------Check y-neighbours in both directions 
@@ -437,7 +374,6 @@ subroutine setuppoisson_fs(utmp,vtmp,wtmp,vof_phase,rhot,dt,A,cvof,n1,n2,n3,kap,
            dc(1) = 1d0 
            dc(2) = 0.5d0; dc(3) = 1d0
            c1 = FL3DNEW(nr,alpha2,x0,dc)
-           if (debug .and. k==(ks+ke)/2 .and. mod(iout,no)==0) write(56,314)x(i),y(j+1),c1,cvof(i,j+1,k)
            !vof fraction in half of liq cell----------------------------------------
            nr(1) = n1(i,j,k); nr(2) = n2(i,j,k); nr(3) = n3(i,j,k)
            alpha2 = al3dnew(nr,cvof(i,j,k))
@@ -446,7 +382,6 @@ subroutine setuppoisson_fs(utmp,vtmp,wtmp,vof_phase,rhot,dt,A,cvof,n1,n2,n3,kap,
            dc(2) = 0.5d0; 
            dc(1) = 1d0; dc(3) = 1d0
            c0 = FL3DNEW(nr,alpha2,x0,dc)
-           if (debug .and. k==(ks+ke)/2 .and. mod(iout,no)==0) write(55,314)x(i),y(j),c0,cvof(i,j,k)
            c_stag = c1+c0
            if (c0>c_min) then ! use weighted average if liq VOF is not small, otherwise use cav normals
               nr(1)=n1(i,j,k)*c0/c_stag + n1(i,j+1,k)*c1/c_stag
@@ -473,9 +408,6 @@ subroutine setuppoisson_fs(utmp,vtmp,wtmp,vof_phase,rhot,dt,A,cvof,n1,n2,n3,kap,
               if (y_mod(i,j,k)<limit*dyh(j)) y_mod(i,j,k) = limit*dyh(j)
               if (y_mod(i,j,k) /= y_mod(i,j,k)) write(*,'("y_mod NaN. c_st, n, vofs, phases:",4e14.5,2I8)')&
                    c_stag,n_avg(2),cvof(i,j,k),cvof(i,j+1,k),vof_phase(i,j,k),vof_phase(i,j+1,k)
-              if (debug .and. k==(ks+ke)/2 .and. mod(iout,no)==0) then
-                 write(50,314)x(i),y(j)+y_mod(i,j,k) 
-              endif
            endif
         endif
         !-------Check z-neighbours
@@ -523,10 +455,6 @@ subroutine setuppoisson_fs(utmp,vtmp,wtmp,vof_phase,rhot,dt,A,cvof,n1,n2,n3,kap,
               if (z_mod(i,j,k) /= z_mod(i,j,k)) write(*,'("z_mod NaN. c_st, n, vofs, phases:",4e14.5,2I8)')&
                    c_stag,n_avg(3),cvof(i,j,k),cvof(i,j,k+1),vof_phase(i,j,k),vof_phase(i,j,k+1)
            endif
-           if (debug .and. j==(js+je)/2 .and. mod(iout,no)==0) then
-              write(50,314)x(i),z(k)+z_mod(i,j,k) 
-              !write(51,314)x(i),z(k),0d0,z_mod(i,j,k)
-           endif
         endif
      endif
   enddo;enddo;enddo
@@ -539,47 +467,6 @@ subroutine setuppoisson_fs(utmp,vtmp,wtmp,vof_phase,rhot,dt,A,cvof,n1,n2,n3,kap,
 !!$  call ghost_z(P_gx,1,req(1:4)); call ghost_z(P_gy,1,req(5:8)); call ghost_z(P_gz,1,req(9:12)) 
 !!$  call ghost_z(x_mod,1,req(13:16)); call ghost_z(y_mod,1,req(17:20)); call ghost_z(z_mod,1,req(21:24)) 
 !!$  call MPI_WAITALL(24,req(1:24),sta(:,1:24),ierr)
-!--Debugging
-  if (debug .and. mod(iout,no)==0) then
-     Open(unit=52,file=TRIM(out_path)//'/P_int1-'//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout/no,padding))//'.txt')
-     Open(unit=53,file=TRIM(out_path)//'/P_int2-'//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout/no,padding))//'.txt')
-     Open(unit=54,file=TRIM(out_path)//'/P_int3-'//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout/no,padding))//'.txt') 
-!!$     Open(unit=57,file=TRIM(out_path)//'/x_mod-'//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout/no,padding))//'.txt')
-!!$     Open(unit=58,file=TRIM(out_path)//'/y_mod-'//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout/no,padding))//'.txt')
-!!$     Open(unit=59,file=TRIM(out_path)//'/z_mod-'//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout/no,padding))//'.txt')
-     Open(unit=60,file=TRIM(out_path)//'/phase-'//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout/no,padding))//'.txt')
-     Open(unit=61,file=TRIM(out_path)//'/kappa-'//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout/no,padding))//'.txt')
-     Open(unit=62,file=TRIM(out_path)//'/n1-'//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout/no,padding))//'.txt')
-     Open(unit=63,file=TRIM(out_path)//'/n2-'//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout/no,padding))//'.txt')
-     Open(unit=64,file=TRIM(out_path)//'/n3-'//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout/no,padding))//'.txt') 
-     j=(js+je)/2
-     !k=(ks+ke)/2
-     do k=ks-1,ke; do i=is-1,ie
-        write(52,313)x(i),z(k),P_gx(i,j,k)
-        !write(53,313)x(i),y(j),P_gy(i,j,k)
-        write(54,313)x(i),z(k),P_gz(i,j,k)
-        !write(57,313)xh(i),y(j),x_mod(i,j,k)
-        !write(58,313)x(i),y(j),y_mod(i,j,k)
-        !write(59,313)x(i),zh(k),z_mod(i,j,k)
-        write(60,212)x(i),z(k),vof_phase(i,j,k)
-        write(61,313)x(i),z(k),kap(i,j,k)
-        Write(62,313)x(i),z(k),n1(i,j,k)
-        Write(63,313)x(i),z(k),n2(i,j,k)
-        Write(64,313)x(i),z(k),n3(i,j,k)
-     enddo; enddo   
-     close(unit=50);
-     close(unit=52); close(unit=53); close(unit=54)
-!!$     close(unit=55); close(unit=56); 
-!!$     close(unit=57); close(unit=58); close(unit=59)
-     close(unit=60); close(unit=61); close(unit=62); close(unit=63)
-     close(unit=64)
-  endif
-212 format(2e14.5,I8)
-312 format(2e14.5) !remove, debugging
-313 format(3e14.5) !remove, debugging
-323 format(2e14.5,e14.4) !remove, debugging
-314 format(4e14.5) !remove, debugging
-414 format(3e14.5,I8)
 !--------------------------------------------------------------------------------------------------------
   do k=ks,ke; do j=js,je; do i=is,ie
      if (vof_phase(i,j,k)==0) then
@@ -606,15 +493,6 @@ subroutine setuppoisson_fs(utmp,vtmp,wtmp,vof_phase,rhot,dt,A,cvof,n1,n2,n3,kap,
            write(*,'("A8 NaN, error imminent. P_g :",6e14.5,2I8)')P_gx(i-1,j,k),P_gx(i+1,j,k),&
                 P_gy(i,j-1,k),P_gy(i,j+1,k),P_gz(i,j,k-1),P_gz(i,j,k+1),i,k
            write(*,'("rho :",e14.5)')rhot(i,j,k)
-        endif
-        if (debug .and. mod(iout,no)==0 .and. j==(js+je)/2) then
-           Open(unit=51,file=TRIM(out_path)//'/COEFFS-'//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout/no,padding))//'.txt')
-           Open(unit=52,file=TRIM(out_path)//'/A-'//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout/no,padding))//'.txt')
-           write(51,314)x(i),z(k),-x_mod(i-1,j,k),0d0
-           write(51,314)x(i),z(k),x_mod(i,j,k),0d0
-           write(51,314)x(i),z(k),0d0,-z_mod(i,j,k-1)
-           write(51,314)x(i),z(k),0d0,z_mod(i,j,k)
-           if (cvof(i,j,k)>1d-20) write(52,'(10e14.5)')x(i),z(k),A(i,j,k,1:8)
         endif
         if (pcmask(i,j,k).ne.0) write(*,'("Error topology, phase 0, pcmask :",i8)')pcmask(i,j,k)
      endif

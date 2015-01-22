@@ -558,6 +558,9 @@ Program paris
                if (DoVOF .and. debug_par) then
                   call get_all_curvatures(tmp,nfile)
                   call get_all_heights(nfile)
+                  call write_par_var("P_gx      ",nfile,P_gx)
+                  call write_par_var("P_gy      ",nfile,P_gy)
+                  call write_par_var("P_gz      ",nfile,P_gz)
                endif
             endif
         end if ! tout
