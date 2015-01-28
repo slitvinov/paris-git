@@ -1193,7 +1193,8 @@ subroutine get_velocity_from_momentum_staggered (mom,us,der,d)
     do j=jini,jend
       do i=iini,iend
         ! if interface rewrite interface velocity
-        cflag = (tmp(i,j,k) + cvof(i,j,k) + cvof(i+i0,j+j0,k+k0))/3.d0
+  !      cflag = (tmp(i,j,k) + cvof(i,j,k) + cvof(i+i0,j+j0,k+k0))/3.d0
+        cflag = tmp(i,j,k)
 
         if (((cflag.gt.0.d0).and.(cflag.lt.1.d0))) then
           rhoavg = rho2*cflag + (1.d0-cflag)*rho1
