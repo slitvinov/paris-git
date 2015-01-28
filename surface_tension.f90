@@ -336,7 +336,7 @@ contains
            endif
            OPEN(UNIT=20,FILE=TRIM(out_path)//'/Height'//TRIM(int2text(l,1))//'-'//&
                 TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout,padding))//'.txt')
-           do k=ks,ke; do j=je,je; do i=is,ie
+           do k=ks,ke; do j=js,je; do i=is,ie
               write(20,14)x(i),y(j),z(k),height(i,j,k,l)
            enddo;enddo;enddo
            close(20)
@@ -707,8 +707,7 @@ contains
       integer :: ierr, i,j,k, nfound, nposit
       integer :: req(24),sta(MPI_STATUS_SIZE,24)
       logical :: is_bulk_cell
-      logical :: debug
-      integer :: iout, prank
+      integer :: iout
       if(.not.st_initialized) call initialize_surface_tension()
 
       !*** Initialize

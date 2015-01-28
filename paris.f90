@@ -2474,7 +2474,6 @@ subroutine write_par_var(varname,iout,var)
   integer :: i,j,k,prank,iout
   character(len=10) :: varname
 
-  write(*,*)TRIM(varname)
   if (rank==0) then
      OPEN(UNIT=21,FILE=TRIM(varname)//'-holder-'//TRIM(int2text(iout,padding))//'.txt')
      write(21,12)NpDomain
