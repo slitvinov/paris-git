@@ -39,8 +39,8 @@ subroutine swp(us,c,f,d,vof1,vof2,vof3)
      call pariserror("*** unknown vof scheme")
   endif
 
-  call get_flags_and_clip(c,f)
   call do_all_ghost(c)
+  call get_flags_and_clip(c,f)
   call do_all_ighost(f)
   call get_vof_phase(c)
 

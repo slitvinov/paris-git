@@ -242,7 +242,6 @@ Program paris
               if (DoMOMCONS) then
                  call vofandmomsweepsstaggered(itimestep,time)
                  call vofsweeps(itimestep)
-!                 call vofandmomsweepsold(itimestep)
               else
                  call vofsweeps(itimestep)
               endif
@@ -250,7 +249,8 @@ Program paris
               call get_all_heights(0)
               call my_timer(5)
               call linfunc(rho,rho1,rho2,DensMean)
-              if (.not. FreeSurface.and.sigma.gt.TINY_DOUBLE) call surfaceForce(du,dv,dw,rho)
+              if ((.not.STGhost).and.(.not.FreeSurface).and.(sigma.gt.TINY_DOUBLE)) &
+                  call surfaceForce(du,dv,dw,rho)
               call my_timer(8)
               if (FreeSurface) then
                  call get_normals()
@@ -332,7 +332,11 @@ Program paris
 !-----------------------------------------PROJECTION STEP-----------------------------------------
            call SetPressureBC(umask,vmask,wmask)
            if (.not.FreeSurface) then
+             if (DoVOF) then
+              call SetupPoissonGhost(u,v,w,umask,vmask,wmask,dt,A,tmp,VolumeSource)
+             else
               call SetupPoisson(u,v,w,umask,vmask,wmask,rho,dt,A,tmp,VolumeSource)
+            endif
            else 
               call Setuppoisson_fs(u,v,w,vof_phase,rho,dt,A,cvof,n1,n2,n3,kappa_fs,itimestep)
            endif
@@ -362,6 +366,11 @@ Program paris
               end if
            endif
            if (.not.FreeSurface) then
+             if (DoVOF) then
+               call project_velocity(u,umask,dt,p,1)
+               call project_velocity(v,vmask,dt,p,2)
+               call project_velocity(w,wmask,dt,p,3)
+             else
               do k=ks,ke;  do j=js,je; do i=is,ieu    ! CORRECT THE u-velocity 
                  u(i,j,k)=u(i,j,k)-dt*(2.0*umask(i,j,k)/dxh(i))*(p(i+1,j,k)-p(i,j,k))/(rho(i+1,j,k)+rho(i,j,k))
               enddo; enddo; enddo
@@ -373,6 +382,7 @@ Program paris
               do k=ks,kew;  do j=js,je; do i=is,ie   ! CORRECT THE w-velocity
                  w(i,j,k)=w(i,j,k)-dt*(2.0*wmask(i,j,k)/dzh(k))*(p(i,j,k+1)-p(i,j,k))/(rho(i,j,k+1)+rho(i,j,k))
               enddo; enddo; enddo
+            endif
            else
               do k=ks,ke;  do j=js,je; do i=is,ieu    ! CORRECT THE u-velocity 
                  if (u_cmask(i,j,k)==0) then
