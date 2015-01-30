@@ -823,6 +823,12 @@ contains
     ierr2 = dbputqv1 (dbfile, 'cvof', 4, 'srm', 3, &
          matrix_small(ise:iee,jse:jee,kse:kee), dims_vof, &
          3, DB_F77NULL, 0, DB_FLOAT, DB_ZONECENT, DB_F77NULL, ierr2) 
+      
+    matrix_small = REAL(p)     
+	! Appending Pressure variable to *.silo file  
+    ierr2 = dbputqv1 (dbfile, 'pres', 4, 'srm', 3, &
+         matrix_small(ise:iee,jse:jee,kse:kee), dims_vof, &
+         3, DB_F77NULL, 0, DB_FLOAT, DB_ZONECENT, DB_F77NULL, ierr2)
          
     do k=kmin,kmax; do j=jmin,jmax; do i=imin,imax;
        matrix_small(i,j,k)=0.5*(u(i,j,k)+u(i-1,j,k))
@@ -888,7 +894,7 @@ contains
     character(len=50) :: file_n
     character(len=40) :: fullname
     character(len=levarnames), dimension(numProcess) :: varnames, vec1n, vec2n
-    character(len=levarnames), dimension(numProcess) :: vec3n, vecn
+    character(len=levarnames), dimension(numProcess) :: vec3n, vecn, presn
     character(len=lemeshnames), dimension(numProcess) :: meshnames
     integer, dimension(numProcess) :: lmeshnames, lvarnames, meshtypes, vartypes
     integer :: lfile_n, lsilon, optlist, timestep
@@ -910,6 +916,7 @@ contains
        !write(*,*) 'Paths1 ', fullname
        meshnames(m+1) = TRIM(fullname)
        varnames(m+1) = TRIM(file_n)//TRIM(i2t(m,padd))//'.silo:cvof'
+       presn(m+1) = TRIM(file_n)//TRIM(i2t(m,padd))//'.silo:pres'
        vec1n(m+1) = TRIM(file_n)//TRIM(i2t(m,padd))//'.silo:uvel'
        vec2n(m+1) = TRIM(file_n)//TRIM(i2t(m,padd))//'.silo:vvel'
        vec3n(m+1) = TRIM(file_n)//TRIM(i2t(m,padd))//'.silo:wvel'
@@ -946,6 +953,9 @@ contains
 
     ! Append the multivariable object.
     err = dbputmvar(dbfile, "cvof", 4, numProcess, varnames, lvarnames, &
+         vartypes, DB_F77NULL, ierr)
+         
+	err = dbputmvar(dbfile, "p", 1, numProcess, presn, lvarnames, &
          vartypes, DB_F77NULL, ierr)
          
 	err = dbputmvar(dbfile, "uvel", 4, numProcess, vec1n, lvarnames, &
