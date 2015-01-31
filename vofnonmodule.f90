@@ -326,16 +326,15 @@ subroutine swpzmom(us,c,d,mom1,mom2,mom3,mom,t)
   integer i,j,k
   integer i0,j0,k0
   integer i1,j1,k1
-  integer inv(3)
   integer, intent(in) :: d
   real(8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: us
   real(8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: mom
   real(8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: c
   real(8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: mom1,mom2,mom3
   real(8) mm1,mm2,vof
-  real(8) t,a1,a2,alpha,uavg,rhoavg
+  real(8) t,a1,a2,alpha,uavg
   REAL(8) deltax(3),x0(3),fl3dnew
-  real(8) mxyz(3), nr(3), stencil3x3(-1:1,-1:1,-1:1)
+  real(8) nr(3), stencil3x3(-1:1,-1:1,-1:1)
   intrinsic dmax1,dmin1
   !***
   call init_i0j0k0 (d,i0,j0,k0)
@@ -422,16 +421,15 @@ subroutine swpzmom_stg(us,c,d,mom1,mom2,mom3,mom,dir,t)
   integer i0,j0,k0
   integer i1,j1,k1
   integer i2,j2,k2
-  integer inv(3)
   integer, intent(in) :: d
   real(8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: us
   real(8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: mom
   real(8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: c
   real(8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: mom1,mom2,mom3
   real(8) mm1,mm2,vof
-  real(8) t,a1,a2,alpha,uavg,rhoavg
+  real(8) t,a1,a2,alpha,uavg
   REAL(8) deltax(3),x0(3),fl3dnew
-  real(8) mxyz(3), nr(3), stencil3x3(-1:1,-1:1,-1:1)
+  real(8) nr(3), stencil3x3(-1:1,-1:1,-1:1)
   intrinsic dmax1,dmin1
   !***
   call init_i0j0k0 (d,i0,j0,k0)
@@ -509,8 +507,6 @@ end subroutine swpzmom_stg
 
 subroutine fit_plane_new(vof,d,a1,a2,stencil3x3,mxyz,alpha,error)
   use module_grid
-  integer i0,j0,k0
-  integer inv(3)
   integer, intent(in) :: d
   real(8) a1,a2,alpha,al3dnew,vof
   real(8) mxyz(3), stencil3x3(-1:1,-1:1,-1:1)
@@ -549,7 +545,7 @@ SUBROUTINE swpr(us,c,f,dir,vof1,cg,vof3)
     IMPLICIT NONE
     include 'mpif.h'
     INTEGER :: i,j,k
-    INTEGER :: invx,invy,invz,ii,jj,kk,i0,j0,k0
+    INTEGER :: ii,jj,kk,i0,j0,k0
     INTEGER, INTENT(IN) :: dir
     REAL (8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), INTENT(IN) :: us
     REAL (8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), INTENT(INOUT) :: c,vof1,cg,vof3
@@ -642,7 +638,7 @@ SUBROUTINE swprmom(us,c,dir,mom1,cg,mom3,mom,t)
     IMPLICIT NONE
     include 'mpif.h'
     INTEGER :: i,j,k
-    INTEGER :: invx,invy,invz,ii,jj,kk,i0,j0,k0
+    INTEGER :: ii,jj,kk,i0,j0,k0
     INTEGER, INTENT(IN) :: dir
     REAL (8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), INTENT(INOUT) :: us
     real(8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: mom
@@ -727,7 +723,7 @@ subroutine ls2vof_in_cell(stencil3x3,c,nflag)
   real(8), intent(out):: c
   integer, intent(out):: nflag
   real(8) :: zero(3), one(3), norml1
-  real(8) :: mx,my,mz,alpha
+  real(8) :: alpha
   real(8) :: fl3dnew
   real(8) :: mxyz(3),stencil3x3(-1:1,-1:1,-1:1)
 
@@ -989,7 +985,6 @@ subroutine youngs(c,mm)
   implicit none
   real(8), intent(in) :: c(0:2,0:2,0:2)
   real(8), intent(out) :: mm(0:2)
-  integer :: i
   real(8) :: norm
 
   call fd32(c,mm)
