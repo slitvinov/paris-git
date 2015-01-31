@@ -1,30 +1,6 @@
 #!/bin/bash
 #set -x
 
-if [ $CGFONTGETGLYPH_PARIS_PROBLEM == 0 ]; then
-gnuplot <<EOF
-set xlabel "time"
-set ylabel "w(0,0,R)"
-set term pdf
-set out "tmp.pdf"
-load "plot.gp"
-set term png
-set out "tmp.png"
-replot
-EOF
-else
-gnuplot <<EOF
-set xlabel "time"
-set ylabel "w(0,0,R)"
-set term png
-set out "tmp.png"
-load "plot.gp"
-EOF
-fi
-
-
-exit
-
 momconstrue=F
 plotlabel=NonMomCons
 nfilter=1
@@ -49,8 +25,30 @@ mpirun -np 8 paris > tmpout
 rm -f input
 echo `awk ' /Step:/ { cpu = $8 } END { print "cpu = " cpu } ' < tmpout`
 
+if [ ${CGFONTGETGLYPH_PARIS_PROBLEM:=0} == 0 ]; then
+gnuplot <<EOF
+set xlabel "time"
+set ylabel "w(0,0,R)"
+set term pdf
+set out "tmp.pdf"
+load "plot.gp"
+set term png
+set out "tmp.png"
+replot
+EOF
+else
+gnuplot <<EOF
+set xlabel "time"
+set ylabel "w(0,0,R)"
+set term png
+set out "tmp.png"
+load "plot.gp"
+EOF
+fi
+
 precision=2e-2
 pariscompare out/droplet-test-vel.txt reference.txt $precision 1 1
+
 
 GREEN="\\033[1;32m"
 NORMAL="\\033[0m"
