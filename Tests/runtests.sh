@@ -1,7 +1,7 @@
 #!/bin/bash
 #set -x
 
-gnuplot > /dev/null 2&>1 || echo "Warning: gnuplot not installed"
+command -v gnuplot >/dev/null 2>&1 || echo "Warning: gnuplot is not installed"
 CGFontGetGlyphPathIsObsolete=`gnuplot -e "set term pdf; set out 'tmp.pdf'; plot 0" 2>&1 | grep -c obsolete`
 
 export CGFONTGETGLYPH_PARIS_PROBLEM=0
