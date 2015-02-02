@@ -1585,6 +1585,7 @@ end subroutine project_velocity_staggered
 !           A4*Pij+1k + A5*Pijk-1 + A6*Pijk+1 + A8
 !-------------------------------------------------------------------------------------------------
 subroutine get_Poisson_matrix_x (A1,A2,A8, velmask,dtp,d)
+
   use module_grid
   use module_BC
   use module_2phase
@@ -1595,45 +1596,30 @@ subroutine get_Poisson_matrix_x (A1,A2,A8, velmask,dtp,d)
   real(8), dimension(is:ie,js:je,ks:ke), intent(out) :: A1,A2
   real(8), dimension(is:ie,js:je,ks:ke), intent(inout) :: A8
   real(8), intent(in) :: dtp
-  real(8) :: rhoavg, deltax, kappa
+  real(8) :: rhoavg, deltax
   integer :: i,j,k,d
   integer :: i0,j0,k0
 
   call init_i0j0k0 (d,i0,j0,k0)
   call get_staggered_fractions (tmp,d) 
+  if (d.eq.1) then
+    deltax = 1.d0/dx(nx)
+  elseif (d.eq.2) then
+    deltax = 1.d0/dy(ny)
+  else
+    deltax = 1.d0/dz(nz)
+  endif
 
   ! I use STGhost flag because it allows to call this function without
   ! the ghost fluid method if required in the future
   if (STGhost) tmp = NINT(tmp)
 
-  if (d.eq.1) then
-
-    do k=ks,ke; do j=js,je; do i=is,ie
-      rhoavg = tmp(i-i0,j-j0,k-k0)*rho2 + (1.d0-tmp(i-i0,j-j0,k-k0))*rho1
-      A1(i,j,k) = dtp*velmask(i-i0,j-j0,k-k0)/(dx(i)*dxh(i-1)*rhoavg)
-      rhoavg = tmp(i,j,k)*rho2 + (1.d0-tmp(i,j,k))*rho1
-      A2(i,j,k) = dtp*velmask(i,j,k)/(dx(i)*dxh(i)*rhoavg)
-    enddo; enddo; enddo
-
-  elseif (d.eq.2) then
-
-    do k=ks,ke; do j=js,je; do i=is,ie
-      rhoavg = tmp(i-i0,j-j0,k-k0)*rho2 + (1.d0-tmp(i-i0,j-j0,k-k0))*rho1
-      A1(i,j,k) = dtp*velmask(i-i0,j-j0,k-k0)/(dy(j)*dyh(j-1)*rhoavg)
-      rhoavg = tmp(i,j,k)*rho2 + (1.d0-tmp(i,j,k))*rho1
-      A2(i,j,k) = dtp*velmask(i,j,k)/(dy(j)*dyh(j)*rhoavg)
-    enddo; enddo; enddo
-
-  else
-
-    do k=ks,ke; do j=js,je; do i=is,ie
-      rhoavg = tmp(i-i0,j-j0,k-k0)*rho2 + (1.d0-tmp(i-i0,j-j0,k-k0))*rho1
-      A1(i,j,k) = dtp*velmask(i-i0,j-j0,k-k0)/(dz(k)*dzh(k-1)*rhoavg)
-      rhoavg = tmp(i,j,k)*rho2 + (1.d0-tmp(i,j,k))*rho1
-      A2(i,j,k) = dtp*velmask(i,j,k)/(dz(k)*dzh(k)*rhoavg)
-    enddo; enddo; enddo
-
-  endif
+  do k=ks,ke; do j=js,je; do i=is,ie
+    rhoavg = tmp(i-i0,j-j0,k-k0)*rho2 + (1.d0-tmp(i-i0,j-j0,k-k0))*rho1
+    A1(i,j,k) = dtp*velmask(i-i0,j-j0,k-k0)*deltax**2/rhoavg
+    rhoavg = tmp(i,j,k)*rho2 + (1.d0-tmp(i,j,k))*rho1
+    A2(i,j,k) = dtp*velmask(i,j,k)*deltax**2/rhoavg
+  enddo; enddo; enddo
 
   if (STGhost) then 
 
