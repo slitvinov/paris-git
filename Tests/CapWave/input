@@ -1,0 +1,143 @@
+! Test file for VOF test case
+! 
+! 4  grid points per dimension per domain
+! 8  mpi processes
+
+! The input file for running the PARIS code
+! Parameters are read using a namelist statement.
+! Blank lines and commented lines are ignored.
+! Location of the parameters in the list is not important.
+
+&PARAMETERS
+                   
+! name of the namelist
+!=================================================================================================
+! General parameters
+
+TWOPHASE = T         ! TwoPhase: Is the flow two-phase?
+DoVOF 	  = T
+DoFront   = F
+GetPropertiesFromFront = F ! T: uses Front-Tracking data to compute mu, rho and Surface Tension. 
+		           ! F: uses VOF data to compute mu and rho. 
+
+ZeroReynolds = F
+Implicit  = F     
+hypre     = F      ! T: uses hyprepackage, F: uses SOR solver 
+restart   = F       ! T: start the domain from a previous simulation
+restartFront = F    ! T: start the front from  a previous simulation
+restartAverages = F
+nBackup  = 200000      ! number of time steps between  backups are kept.
+
+NSTEP   = 2000000       ! maximum number of time steps
+EndTime = 2.2426211256   ! When to stop simulation
+
+MaxDt   = 0.1d0    ! maximum size of time step
+dtFlag  = 1        ! 1: fixed dt;  2: fixed CFL
+dt      = 0.0003042906    ! dt in case of dtFlag=1
+CFL     = 0.25
+MAXERROR= 1d-5     ! Residual for Poisson solver
+MAXERRORVOL = 1d-6 ! Tolerance for Front Tracking
+                   ! Numerical parameters
+
+ITIME_SCHEME = 1
+                   ! time scheme: 1:first order Euler, 2: second order quasi Crank-Nicolson
+
+MAXIT    = 2000
+BETA     = 1.0
+                    ! parameters for linear solver
+U_init   = 0.
+!=================================================================================================
+! Output parameters
+
+termout  = 500
+ICOut    = T        ! output initial condition
+NOUT     = 500        ! write the solution to file every nout time steps
+output_format = 2   ! 1:tecplot 2:vtk
+out_path = 'out'    ! name of the output directory
+nstats   = 10      ! number of time steps between flow statistics output
+
+!=================================================================================================
+! Grid parameters
+
+npx      = 1
+npy      = 3
+npz      = 1
+                   ! number of processors in x,y,z direction
+
+Nx      = 32
+Ny      = 96
+Nz      = 2
+Ng      = 2
+                   ! grid size in x,y,z direction and number of ghost cells
+
+XLENGTH = 1d0
+YLENGTH = 3d0
+ZLENGTH = 0.125d0
+                   ! domain size in x,y,z direction
+
+read_x   = F       ! read the grid file for x-grid; If true xLength and xform are neglected
+read_y   = F
+read_z   = F
+
+xform    = 0.0		!1.0
+yform    = 0.0		!1.0
+zform    = 0.0       	! non-uniformity of the grid if not reading an input file
+                     	! 0:uniform; +:clustered at center; -:clustered near ends
+
+!=================================================================================================
+! Flow parameters
+
+GX      = 0.0
+GY      = 0.0
+GZ      = 0.0
+                   ! Components of the gravity in x,y,z direction
+
+BDRY_COND = 1    1    1   1   1  1
+                   !Type of boundary condition in x,y,z direction: 0:wall  1:periodic  2:shear
+                   !x- y- z- x+ y+ z+
+
+dPdX      = 0.0
+dPdY      = 0.0
+dPdZ      = 0.0
+                   ! Px, Py, Pz: pressure gradients in case of pressure driven channel flow
+                   ! Px = (P(xLength)-P(0))/xLength
+
+RHO1    = 1.
+MU1     = 0.0182571749236
+                   ! rho1, mu1 : density and viscosity of the matrix phase
+
+RHO2    = 1.e0
+MU2     = 0.0182571749236
+                   ! rho2, mu2 : properties of the drop
+SIGMA    = 1.0
+NumBubble =  1
+excentricity = 0. 0. 0. 
+
+                   ! number of bubbles
+
+xyzrad(1, 1)  = 0.5d0
+xyzrad(2, 1)  = 0.5d0
+xyzrad(3, 1)  = 0.5d0
+xyzrad(4, 1)  = 0.1d0
+
+                   ! Initial bubble size and location : x,y,z,radius
+
+MaxPoint = 2000000
+MaxElem  = 4000000
+MaxFront = 100
+amin     = 0.32
+amax     = 0.96
+aspmax   = 1.54
+
+smooth   = T        !smooth the interface
+nsmooth  = 10       !every nsmooth time steps
+nregrid  = 10       !regrid the front every nregrid time steps
+
+BUOYANCYCASE = 0
+                   ! BuoyancyCase : determines what density will be subtracted from the gravity 
+                   ! body force.
+                   ! 0: rro=0,  1: rro=rho1,  2: rro=rho2,  3: rro=average(rho)
+!=================================================================================================
+
+/
+! end of the namelist

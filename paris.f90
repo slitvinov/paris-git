@@ -206,6 +206,7 @@ Program paris
      call initialize_timer()
 
      do while(time<EndTime .and. itimestep<nstep)
+        if (test_capwave.and.mod(itimestep,nstats)==0) call interface_max_min
         if(dtFlag==2)call TimeStepSize(dt)
         time=time+dt
         itimestep=itimestep+1
@@ -735,6 +736,43 @@ end function get_cfl_and_check
 !=================================================================================================
 ! subroutine calcStats
 !-------------------------------------------------------------------------------------------------
+
+subroutine interface_max_min
+
+  use module_grid
+  use module_flow
+  use module_VOF
+  implicit none
+  include "mpif.h"
+  integer :: i,j,k,ierr
+  real(8) :: int_max_y
+  
+  int_max_y = -10000000
+
+  call do_all_ghost(cvof)
+
+  !checkme: why does it get the border if I search until je?
+  do k=ks,ke;  do j=js,je-10;  do i=is,ie
+    if (abs(cvof(i,j,k)-cvof(i,j+1,k)).gt.0.) then
+      int_max_y = max(int_max_y, y(j)+dy(j)*(cvof(i,j,k) - 0.5d0))
+    endif 
+  enddo; enddo; enddo;
+
+  call MPI_ALLREDUCE(int_max_y, int_max_y, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_Domain, ierr)
+
+  if (rank==0) then
+    if (time.eq.0) then
+      open(unit=122,file='interface.dat')
+    else
+      open(unit=122,file='interface.dat',position='append')
+    endif
+
+    write(122,*) time, int_max_y
+    close(122)
+  endif
+
+end subroutine interface_max_min
+
 subroutine calcStats
   use module_grid
   use module_flow

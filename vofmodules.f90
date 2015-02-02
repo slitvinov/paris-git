@@ -1134,10 +1134,12 @@ end subroutine get_half_fractions
   end subroutine get_momentum_staggered
 
   subroutine get_velocity_from_momentum_centered (mom,us,der,d)
+
   use module_grid
   use module_flow
   use module_BC
   use module_tmpvar
+
   implicit none
   integer :: i,j,k,d
   integer :: i0,j0,k0

@@ -1520,59 +1520,42 @@ subroutine project_velocity_staggered (vel,velmask,dtp,pres,d)
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: vel
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: velmask,pres
   real(8), intent(in) :: dtp
-  real(8) :: rhoavg,deltax
+  real(8) :: rhoavg,invdeltax
   integer :: i,j,k,d
   integer :: i0,j0,k0
 
   call init_i0j0k0 (d,i0,j0,k0)
   call get_staggered_fractions (tmp,d) 
   
+  if (d.eq.1) then
+    invdeltax = 1.d0/dx(nx)
+  elseif (d.eq.2) then
+    invdeltax = 1.d0/dy(ny)
+  else
+    invdeltax = 1.d0/dz(nz)
+  endif
+
   if (STGhost) tmp = NINT(tmp)
 
-  if (d.eq.1) then
-
-    do k=ks,ke;  do j=js,je; do i=is,ieu  
-      rhoavg = tmp(i,j,k)*rho2 + (1.d0-tmp(i,j,k))*rho1
-      vel(i,j,k)=vel(i,j,k)-dtp*velmask(i,j,k)/dxh(i)*(pres(i+i0,j+j0,k+k0)-pres(i,j,k))/rhoavg
-    enddo; enddo; enddo
-
-  elseif (d.eq.2) then
-
-    do k=ks,ke;  do j=js,jev; do i=is,ie
-      rhoavg = tmp(i,j,k)*rho2 + (1.d0-tmp(i,j,k))*rho1
-      vel(i,j,k)=vel(i,j,k)-dtp*velmask(i,j,k)/dyh(j)*(pres(i+i0,j+j0,k+k0)-pres(i,j,k))/rhoavg
-    enddo; enddo; enddo
-
-  else
-
-    do k=ks,kew;  do j=js,je; do i=is,ie
-      rhoavg = tmp(i,j,k)*rho2 + (1.d0-tmp(i,j,k))*rho1
-      vel(i,j,k)=vel(i,j,k)-dtp*velmask(i,j,k)/dzh(k)*(pres(i+i0,j+j0,k+k0)-pres(i,j,k))/rhoavg
-    enddo; enddo; enddo
-
-  endif
+  do k=ks,ke;  do j=js,je; do i=is,ieu  
+    rhoavg = tmp(i,j,k)*rho2 + (1.d0-tmp(i,j,k))*rho1
+    vel(i,j,k)=vel(i,j,k)-dtp*velmask(i,j,k)*invdeltax*(pres(i+i0,j+j0,k+k0)-pres(i,j,k))/rhoavg
+  enddo; enddo; enddo
 
   if (STGhost) then 
 
     call get_all_curvatures(work(:,:,:,1),0)
-    if (d.eq.1) then
-      deltax = 1.d0/dx(nx)
-    elseif (d.eq.2) then
-      deltax = 1.d0/dy(ny)
-    else
-      deltax = 1.d0/dz(nz)
-    endif
-
+  
     do k=ks,ke; do j=js,je; do i=is,ie
 
       rhoavg = tmp(i,j,k)*rho2 + (1.d0-tmp(i,j,k))*rho1
       vel(i,j,k) = vel(i,j,k) - dtp/rhoavg*sigma* &
       (1.d0-tmp(i,j,k))*(work(i+i0,j+j0,k+k0,1)*cvof(i+i0,j+j0,k+k0)-&
-                         work(i,j,k,1)*cvof(i,j,k))*deltax**2
+                         work(i,j,k,1)*cvof(i,j,k))*invdeltax**2
       
       vel(i,j,k) = vel(i,j,k) + dtp/rhoavg*sigma* &
                    tmp(i,j,k)*(work(i+i0,j+j0,k+k0,1)*(1.d0-cvof(i+i0,j+j0,k+k0)) &
-                  -work(i,j,k,1)*(1.d0-cvof(i,j,k)))*deltax**2
+                  -work(i,j,k,1)*(1.d0-cvof(i,j,k)))*invdeltax**2
 
     enddo; enddo; enddo
   endif
@@ -1596,18 +1579,18 @@ subroutine get_Poisson_matrix_x (A1,A2,A8, velmask,dtp,d)
   real(8), dimension(is:ie,js:je,ks:ke), intent(out) :: A1,A2
   real(8), dimension(is:ie,js:je,ks:ke), intent(inout) :: A8
   real(8), intent(in) :: dtp
-  real(8) :: rhoavg, deltax
+  real(8) :: rhoavg, invdeltax
   integer :: i,j,k,d
   integer :: i0,j0,k0
 
   call init_i0j0k0 (d,i0,j0,k0)
   call get_staggered_fractions (tmp,d) 
   if (d.eq.1) then
-    deltax = 1.d0/dx(nx)
+    invdeltax = 1.d0/dx(nx)
   elseif (d.eq.2) then
-    deltax = 1.d0/dy(ny)
+    invdeltax = 1.d0/dy(ny)
   else
-    deltax = 1.d0/dz(nz)
+    invdeltax = 1.d0/dz(nz)
   endif
 
   ! I use STGhost flag because it allows to call this function without
@@ -1616,33 +1599,26 @@ subroutine get_Poisson_matrix_x (A1,A2,A8, velmask,dtp,d)
 
   do k=ks,ke; do j=js,je; do i=is,ie
     rhoavg = tmp(i-i0,j-j0,k-k0)*rho2 + (1.d0-tmp(i-i0,j-j0,k-k0))*rho1
-    A1(i,j,k) = dtp*velmask(i-i0,j-j0,k-k0)*deltax**2/rhoavg
+    A1(i,j,k) = dtp*velmask(i-i0,j-j0,k-k0)*invdeltax**2/rhoavg
     rhoavg = tmp(i,j,k)*rho2 + (1.d0-tmp(i,j,k))*rho1
-    A2(i,j,k) = dtp*velmask(i,j,k)*deltax**2/rhoavg
+    A2(i,j,k) = dtp*velmask(i,j,k)*invdeltax**2/rhoavg
   enddo; enddo; enddo
 
   if (STGhost) then 
 
     call get_all_curvatures(work(:,:,:,1),0)
-    if (d.eq.1) then
-      deltax = 1.d0/dx(nx)
-      elseif (d.eq.2) then
-      deltax = 1.d0/dy(ny)
-    else
-      deltax = 1.d0/dz(nz)
-    endif
 
     do k=ks,ke; do j=js,je; do i=is,ie
 
       rhoavg    = tmp(i-i0,j-j0,k-k0)*rho2 + (1.d0-tmp(i-i0,j-j0,k-k0))*rho1
-      A8(i,j,k) = A8(i,j,k) + dtp/rhoavg*sigma*deltax**3*( &
+      A8(i,j,k) = A8(i,j,k) + dtp/rhoavg*sigma*invdeltax**3*( &
       (1.d0-tmp(i-i0,j-j0,k-k0))*work(i-i0,j-j0,k-k0,1)*cvof(i-i0,j-j0,k-k0) &
       -(1.d0-tmp(i-i0,j-j0,k-k0))*work(i,j,k,1)*cvof(i,j,k) &
       -tmp(i-i0,j-j0,k-k0) *work(i-i0,j-j0,k-k0,1)*(1.d0-cvof(i-i0,j-j0,k-k0)) &
       +tmp(i-i0,j-j0,k-k0) *work(i,j,k,1)         *(1.d0-cvof(i,j,k))  )
 
       rhoavg = tmp(i,j,k)*rho2 + (1.d0-tmp(i,j,k))*rho1
-      A8(i,j,k) = A8(i,j,k) + dtp/rhoavg*sigma*deltax**3*( &
+      A8(i,j,k) = A8(i,j,k) + dtp/rhoavg*sigma*invdeltax**3*( &
       (1.d0-tmp(i,j,k))*work(i+i0,j+j0,k+k0,1)*cvof(i+i0,j+j0,k+k0) &
       - (1.d0-tmp(i,j,k))*work(i,j,k,1)*cvof(i,j,k) &
       - tmp(i,j,k)*work(i+i0,j+j0,k+k0,1)*(1.d0-cvof(i+i0,j+j0,k+k0)) &

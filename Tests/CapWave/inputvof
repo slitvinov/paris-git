@@ -1,0 +1,15 @@
+&VOFPARAMETERS
+
+VOFBDRY_COND = 'periodic' 'wet' 'wet' 'periodic' 'dry' 'dry'
+                   ! Type of VOF boundary condition in x,y,z direction: 'wet', '90deg','periodic'
+
+TEST_TYPE = 'Capillary_wave'
+VOF_ADVECT = 'CIAM'
+ViscMeanIsArith = T
+DoMOMCONS = T
+STGhost = T
+cylinder_dir = 3
+!=================================================================================================
+
+&end
+! end of the namelist
