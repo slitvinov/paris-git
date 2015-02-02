@@ -4,6 +4,7 @@
 tmp=`mktemp -d`
 
 rm -fR out
+cp inputlong input
 mpirun -np 3 paris > tmpout
 echo `awk ' /Step:/ { cpu = $8 } END { print "cpu = " cpu } ' < tmpout`
 
