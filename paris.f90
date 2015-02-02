@@ -225,7 +225,6 @@ Program paris
            if(DoVOF) cvofold  = cvof
            if ( DoLPP ) call StoreOldPartSol()
         endif
-        !if (FreeSurface .and. RP_test .and. rank==0) call Integrate_RP(dt,time)
  !------------------------------------ADVECTION & DIFFUSION----------------------------------------
         du = 0d0; dv = 0d0; dw = 0d0
         do ii=1, itime_scheme
@@ -558,9 +557,11 @@ Program paris
                if (DoVOF .and. debug_par) then
                   call get_all_curvatures(tmp,nfile)
                   call get_all_heights(nfile)
-                  call write_par_var("P_gx      ",nfile,P_gx)
-                  call write_par_var("P_gy      ",nfile,P_gy)
-                  call write_par_var("P_gz      ",nfile,P_gz)
+                  if (FreeSurface) then
+                     call write_par_var("P_gx      ",nfile,P_gx)
+                     call write_par_var("P_gy      ",nfile,P_gy)
+                     call write_par_var("P_gz      ",nfile,P_gz)
+                  endif
                endif
             endif
         end if ! tout
@@ -2483,7 +2484,7 @@ subroutine write_par_var(varname,iout,var)
      close(21)
   endif
   OPEN(UNIT=20,FILE=TRIM(out_path)//'/'//TRIM(varname)//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout,padding))//'.txt')
-  do k=kmin,kmax; do j=jmin,jmax; do i=imin,imax
+  do k=ks,ke; do j=js,je; do i=is,ie
      write(20,14)x(i),y(j),z(k),var(i,j,k)
   enddo;enddo;enddo
   close(20)

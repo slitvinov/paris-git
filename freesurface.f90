@@ -892,11 +892,6 @@ subroutine FreeSolver(A,p,maxError,beta,maxit,it,ierr,iout,time,tres2)
           cells = cells + 1d0
        endif
     enddo; enddo; enddo
-    !if (cells > 1d-10) then
-    !   res2 = res2/cells
-    !else
-    !   write(*,*)'No cells for this topology present in this processor'
-    !endif
     call catch_divergence_fs(res2,cells,ierr)
     call MPI_ALLREDUCE(res2, tres2, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr)
     call MPI_ALLREDUCE(cells, tcells, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr)
@@ -924,8 +919,11 @@ contains
     if(extended) then
        do k=ks,ke; do j=js,je; do i=is,ie
           do l=1,8
-             if(A(i,j,k,l)/=A(i,j,k,l).or.p(i,j,k)/=p(i,j,k)) then
-                diverged=.true.
+             if ((pcmask(i,j,k)==0 .and. solver_flag==1) &
+                  .or.((pcmask(i,j,k)==1 .or. pcmask(i,j,k)==2) .and. solver_flag==2)) then
+                if(A(i,j,k,l)/=A(i,j,k,l).or.p(i,j,k)/=p(i,j,k)) then
+                   diverged=.true.
+                endif
              endif
           enddo
           if(diverged) then
@@ -933,7 +931,12 @@ contains
              write(88,*) "ijk rank",i,j,k,rank
              write(88,*) "A",  A(i,j,k,:)
              write(88,*) "p",  p(i,j,k)
+             write(88,'("P neighbours: ",6e14.5)')p(i-1,j,k),p(i+1,j,k),p(i,j-1,k),p(i,j+1,k),&
+                  p(i,j,k-1),p(i,j,k+1)
              write(88,*) 'A or p is NaN after',it,'iterations at rank ',rank
+             write(88,'("Res2, cells, solver_flag :",2e14.5,I8)')res2,cells,solver_flag
+             write(88,'("Pcmask 1-7: ",7I8)')pcmask(i-1,j,k),pcmask(i+1,j,k),pcmask(i,j-1,k),pcmask(i,j+1,k),&
+                  pcmask(i,j,k-1),pcmask(i,j,k+1),pcmask(i,j,k)
              close(88)
              if(rank<=30) print*,'A or p is NaN after',it,'iterations at rank ',rank
              call pariserror("A or p is NaN")
@@ -971,7 +974,6 @@ contains
     enddo; enddo; enddo
     call MPI_ALLREDUCE(bub_vol,vol_tot,1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr)
     Vol_RP = vol_tot/(xLength*yLength*zLength)
-    !get_vol = sum(cvof(i=is:ie,j=js:je,k=ks:ke))
   end subroutine get_vol
 end subroutine FreeSolver
 !--------------------------------------ONE RELAXATION ITERATION (SMOOTHER)----------------------------------
