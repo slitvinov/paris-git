@@ -329,10 +329,12 @@ Program paris
               v = v + dt * dv
               w = w + dt * dw
            endif
+
            call my_timer(3)
            call SetVelocityBC(u,v,w,umask,vmask,wmask,time)
            call do_ghost_vector(u,v,w)
            call my_timer(1)
+
 !-----------------------------------------PROJECTION STEP-----------------------------------------
            call SetPressureBC(umask,vmask,wmask)
            if (.not.FreeSurface) then
@@ -348,10 +350,7 @@ Program paris
            if(HYPRE)then
               if (FreeSurface) call pariserror("HYPRE not functional for Free Surface")
               call poi_solve(A,p(is:ie,js:je,ks:ke),maxError/dt,maxit,it)
-              call ghost_x(p,1,req(1:4 ))
-              call ghost_y(p,1,req(5:8 ))
-              call ghost_z(p,1,req(9:12)) 
-              call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
+              call do_all_ghost(p)
            else
               if (FreeSurface) then
                  solver_flag = 1
@@ -369,50 +368,8 @@ Program paris
                  write(*,'("              pressure iterations :",I9)')it
               end if
            endif
-           if (.not.FreeSurface) then
-             if (STGhost) then
-               call project_velocity(u,umask,dt,p,1)
-               call project_velocity(v,vmask,dt,p,2)
-               call project_velocity(w,wmask,dt,p,3)
-             else
-              do k=ks,ke;  do j=js,je; do i=is,ieu    ! CORRECT THE u-velocity 
-                 u(i,j,k)=u(i,j,k)-dt*(2.0*umask(i,j,k)/dxh(i))*(p(i+1,j,k)-p(i,j,k))/(rho(i+1,j,k)+rho(i,j,k))
-              enddo; enddo; enddo
+           call project_velocity()
 
-              do k=ks,ke;  do j=js,jev; do i=is,ie    ! CORRECT THE v-velocity
-                 v(i,j,k)=v(i,j,k)-dt*(2.0*vmask(i,j,k)/dyh(j))*(p(i,j+1,k)-p(i,j,k))/(rho(i,j+1,k)+rho(i,j,k))
-              enddo; enddo; enddo
-
-              do k=ks,kew;  do j=js,je; do i=is,ie   ! CORRECT THE w-velocity
-                 w(i,j,k)=w(i,j,k)-dt*(2.0*wmask(i,j,k)/dzh(k))*(p(i,j,k+1)-p(i,j,k))/(rho(i,j,k+1)+rho(i,j,k))
-              enddo; enddo; enddo
-            endif
-           else
-              do k=ks,ke;  do j=js,je; do i=is,ieu    ! CORRECT THE u-velocity 
-                 if (u_cmask(i,j,k)==0) then
-                    u(i,j,k)=u(i,j,k)-dt*2d0/(rho(i,j,k)+rho(i+1,j,k))&
-                         *(p(i+1,j,k)+P_gx(i+1,j,k)-p(i,j,k)-P_gx(i,j,k))/x_mod(i,j,k)
-                    if (u(i,j,k) /= u(i,j,k)) write(*,'("WARNING u NaN :",2e14.5)')u(i,j,k), x_mod(i,j,k)
-                 endif
-              enddo; enddo; enddo
-
-              do k=ks,ke;  do j=js,jev; do i=is,ie    ! CORRECT THE v-velocity
-                 if (v_cmask(i,j,k)==0) then
-                    v(i,j,k)=v(i,j,k)-dt*2d0/(rho(i,j,k)+rho(i,j+1,k))&
-                         *(p(i,j+1,k)+P_gy(i,j+1,k)-p(i,j,k)-P_gy(i,j,k))/y_mod(i,j,k)
-                    if (v(i,j,k) /= v(i,j,k)) write(*,'("WARNING v NaN :",2e14.5)')v(i,j,k), y_mod(i,j,k)
-                 endif
-              enddo; enddo; enddo
-
-              do k=ks,kew;  do j=js,je; do i=is,ie   ! CORRECT THE w-velocity
-                 if (w_cmask(i,j,k)==0) then
-                    w(i,j,k)=w(i,j,k)-dt*2d0/(rho(i,j,k)+rho(i,j,k+1))&
-                         *(p(i,j,k+1)+P_gz(i,j,k+1)-p(i,j,k)-P_gz(i,j,k))/z_mod(i,j,k)
-                    if (w(i,j,k) /= w(i,j,k)) write(*,'("WARNING w NaN :",2e14.5)')w(i,j,k), z_mod(i,j,k)
-                 endif
-              enddo; enddo; enddo
-           endif
-   
            if(mod(itimestep,nout)==0) call check_corrected_vel(u,umask,itimestep)
            if( DoLPP ) call ComputeSubDerivativeVel()
            call my_timer(10)
@@ -433,14 +390,11 @@ Program paris
                     color(i,j,k)=max(color(i,j,k),0d0)
                  enddo; enddo; enddo
            endif
+           
            call my_timer(13)
            call SetVelocityBC(u,v,w,umask,vmask,wmask,time)
-           call ghost_x(u  ,2,req( 1: 4));  call ghost_x(v,2,req( 5: 8)); call ghost_x(w,2,req( 9:12)); 
-           call ghost_x(color,1,req(13:16));  call MPI_WAITALL(16,req(1:16),sta(:,1:16),ierr)
-           call ghost_y(u  ,2,req( 1: 4));  call ghost_y(v,2,req( 5: 8)); call ghost_y(w,2,req( 9:12)); 
-           call ghost_y(color,1,req(13:16));  call MPI_WAITALL(16,req(1:16),sta(:,1:16),ierr)
-           call ghost_z(u  ,2,req( 1: 4));  call ghost_z(v,2,req( 5: 8)); call ghost_z(w,2,req( 9:12)); 
-           call ghost_z(color,1,req(13:16));  call MPI_WAITALL(16,req(1:16),sta(:,1:16),ierr)
+           call do_ghost_vector(u,v,w)
+           call do_all_ghost(color)
            call my_timer(1)        
 
 !----------------------------------EXTRAPOLATION FOR FREE SURFACE---------------------------------
@@ -684,6 +638,59 @@ Program paris
   stop
 end program paris
 !=================================================================================================
+subroutine project_velocity ()
+
+  use module_flow
+  use module_grid
+  use module_freesurface
+  use module_vof
+  use module_surface_tension
+
+  if (.not.FreeSurface) then
+    if (STGhost) then
+      call project_velocity_staggered(u,umask,dt,p,1)
+      call project_velocity_staggered(v,vmask,dt,p,2)
+      call project_velocity_staggered(w,wmask,dt,p,3)
+    else
+      do k=ks,ke;  do j=js,je; do i=is,ieu    ! CORRECT THE u-velocity 
+        u(i,j,k)=u(i,j,k)-dt*(2.0*umask(i,j,k)/dxh(i))*(p(i+1,j,k)-p(i,j,k))/(rho(i+1,j,k)+rho(i,j,k))
+      enddo; enddo; enddo
+
+      do k=ks,ke;  do j=js,jev; do i=is,ie    ! CORRECT THE v-velocity
+        v(i,j,k)=v(i,j,k)-dt*(2.0*vmask(i,j,k)/dyh(j))*(p(i,j+1,k)-p(i,j,k))/(rho(i,j+1,k)+rho(i,j,k))
+      enddo; enddo; enddo
+
+      do k=ks,kew;  do j=js,je; do i=is,ie   ! CORRECT THE w-velocity
+        w(i,j,k)=w(i,j,k)-dt*(2.0*wmask(i,j,k)/dzh(k))*(p(i,j,k+1)-p(i,j,k))/(rho(i,j,k+1)+rho(i,j,k))
+      enddo; enddo; enddo
+    endif
+  else
+    do k=ks,ke;  do j=js,je; do i=is,ieu    ! CORRECT THE u-velocity 
+      if (u_cmask(i,j,k)==0) then
+        u(i,j,k)=u(i,j,k)-dt*2d0/(rho(i,j,k)+rho(i+1,j,k))&
+        *(p(i+1,j,k)+P_gx(i+1,j,k)-p(i,j,k)-P_gx(i,j,k))/x_mod(i,j,k)
+        if (u(i,j,k) /= u(i,j,k)) write(*,'("WARNING u NaN :",2e14.5)')u(i,j,k), x_mod(i,j,k)
+      endif
+    enddo; enddo; enddo
+
+    do k=ks,ke;  do j=js,jev; do i=is,ie    ! CORRECT THE v-velocity
+      if (v_cmask(i,j,k)==0) then
+        v(i,j,k)=v(i,j,k)-dt*2d0/(rho(i,j,k)+rho(i,j+1,k))&
+        *(p(i,j+1,k)+P_gy(i,j+1,k)-p(i,j,k)-P_gy(i,j,k))/y_mod(i,j,k)
+        if (v(i,j,k) /= v(i,j,k)) write(*,'("WARNING v NaN :",2e14.5)')v(i,j,k), y_mod(i,j,k)
+      endif
+    enddo; enddo; enddo
+
+    do k=ks,kew;  do j=js,je; do i=is,ie   ! CORRECT THE w-velocity
+      if (w_cmask(i,j,k)==0) then
+        w(i,j,k)=w(i,j,k)-dt*2d0/(rho(i,j,k)+rho(i,j,k+1))&
+        *(p(i,j,k+1)+P_gz(i,j,k+1)-p(i,j,k)-P_gz(i,j,k))/z_mod(i,j,k)
+        if (w(i,j,k) /= w(i,j,k)) write(*,'("WARNING w NaN :",2e14.5)')w(i,j,k), z_mod(i,j,k)
+      endif
+    enddo; enddo; enddo
+  endif
+
+end subroutine project_velocity
 !=================================================================================================
 ! subroutine TimeStepSize
 !-------------------------------------------------------------------------------------------------
