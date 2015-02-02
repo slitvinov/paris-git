@@ -1069,7 +1069,7 @@ module module_BC
             mom(is-1,:,:)=0d0
             mom(is-2,:,:)=-mom(is,:,:)
         else !y,z
-            mom(is-1,:,:)=(2*WallVel(1,2)-u(is,:,:))*(rho1*c(is,:,:) + rho2*(1.d0 - c(is,:,:))) !CHECK!!
+            mom(is-1,:,:)=(2*WallVel(1,2)-u(is,:,:))*(rho2*c(is,:,:) + rho1*(1.d0 - c(is,:,:))) !CHECK!!
         endif
     endif
     ! inflow boundary condition x- with injection
@@ -1079,9 +1079,9 @@ module module_BC
         flux=0
         do j=jmin,jmax
           do k=kmin,kmax
-             mom(is-1,j,k)=WallVel(1,1)*uinject(j,k,t)*(rho1*c(is-1,j,k) + rho2*(1.d0 - c(is-1,j,k)))
+             mom(is-1,j,k)=WallVel(1,1)*uinject(j,k,t)*(rho2*c(is-1,j,k) + rho1*(1.d0 - c(is-1,j,k)))
 #ifndef OLD_BDRY_COND
-             mom(is-2,j,k)=WallVel(1,1)*uinject(j,k,t)*(rho1*c(is-1,j,k) + rho2*(1.d0 - c(is-1,j,k)))
+             mom(is-2,j,k)=WallVel(1,1)*uinject(j,k,t)*(rho2*c(is-1,j,k) + rho1*(1.d0 - c(is-1,j,k)))
              if(j<=je.and.j>=js.and.k<=ke.and.k>=ks) flux=flux+WallVel(1,1)*uinject(j,k,t)
 #endif
           enddo
@@ -1099,8 +1099,8 @@ module module_BC
        if (d.eq.2) then
         do i=imin,imax
           do k=kmin,kmax
-             mom(i,js-1,k)=WallVel(3,2)*(rho1*c(i,js-1,k) + rho2*(1.d0 - c(i,js-1,k)))
-             mom(i,js-2,k)=WallVel(3,2)*(rho1*c(i,js-2,k) + rho2*(1.d0 - c(i,js-2,k)))
+             mom(i,js-1,k)=WallVel(3,2)*(rho2*c(i,js-1,k) + rho1*(1.d0 - c(i,js-1,k)))
+             mom(i,js-2,k)=WallVel(3,2)*(rho2*c(i,js-2,k) + rho1*(1.d0 - c(i,js-2,k)))
           enddo
         enddo
        else
@@ -1112,8 +1112,8 @@ module module_BC
        if (d.eq.3) then
          do i=imin,imax
           do j=jmin,jmax
-             mom(i,j,ks-1)= WallVel(5,3)*(rho1*c(i,j,ks-1) + rho2*(1.d0 - c(i,j,ks-1)))
-             mom(i,j,ks-2)= WallVel(5,3)*(rho1*c(i,j,ks-2) + rho2*(1.d0 - c(i,j,ks-2)))
+             mom(i,j,ks-1)= WallVel(5,3)*(rho2*c(i,j,ks-1) + rho1*(1.d0 - c(i,j,ks-1)))
+             mom(i,j,ks-2)= WallVel(5,3)*(rho2*c(i,j,ks-2) + rho1*(1.d0 - c(i,j,ks-2)))
           enddo
          enddo
      else
@@ -1125,8 +1125,8 @@ module module_BC
         if (d.eq.1) then
          do j=jmin,jmax
           do k=kmin,kmax
-             mom(ie,j,k)  = WallVel(2,1)*(rho1*c(ie,j,k) + rho2*(1.d0 - c(ie,j,k)))
-             mom(ie+1,j,k)= WallVel(2,1)*(rho1*c(ie+1,j,k) + rho2*(1.d0 - c(ie+1,j,k)))
+             mom(ie,j,k)  = WallVel(2,1)*(rho2*c(ie,j,k) + rho1*(1.d0 - c(ie,j,k)))
+             mom(ie+1,j,k)= WallVel(2,1)*(rho2*c(ie+1,j,k) + rho1*(1.d0 - c(ie+1,j,k)))
           enddo
          enddo
        else
@@ -1138,8 +1138,8 @@ module module_BC
         if (d.eq.2) then
            do i=imin,imax
               do k=kmin,kmax
-                mom(i,je,k)  = WallVel(4,2)*(rho1*c(i,je,k) + rho2*(1.d0 - c(i,je,k)))
-                mom(i,je+1,k)= WallVel(4,2)*(rho1*c(i,je+1,k) + rho2*(1.d0 - c(i,je+1,k)))
+                mom(i,je,k)  = WallVel(4,2)*(rho2*c(i,je,k) + rho1*(1.d0 - c(i,je,k)))
+                mom(i,je+1,k)= WallVel(4,2)*(rho2*c(i,je+1,k) + rho1*(1.d0 - c(i,je+1,k)))
               enddo
             enddo
         else
@@ -1151,8 +1151,8 @@ module module_BC
        if (d.eq.3) then
         do i=imin,imax
           do j=jmin,jmax
-             mom(i,j,ke)  = WallVel(6,3)*(rho1*c(i,j,ke) + rho2*(1.d0 - c(i,j,ke)))
-             mom(i,j,ke+1)= WallVel(6,3)*(rho1*c(i,j,ke+1) + rho2*(1.d0 - c(i,j,ke+1)))
+             mom(i,j,ke)  = WallVel(6,3)*(rho2*c(i,j,ke) + rho1*(1.d0 - c(i,j,ke)))
+             mom(i,j,ke+1)= WallVel(6,3)*(rho2*c(i,j,ke+1) + rho1*(1.d0 - c(i,j,ke+1)))
           enddo
         enddo
        else
@@ -1165,7 +1165,7 @@ module module_BC
             mom(ie  ,:,:)=0d0
             mom(ie+1,:,:)=-mom(ie-1,:,:)
         else
-            mom(ie+1,:,:)=(2*WallVel(2,2)-u(ie,:,:))**(rho1*c(ie,:,:) + rho2*(1.d0 - c(ie,:,:)))
+            mom(ie+1,:,:)=(2*WallVel(2,2)-u(ie,:,:))**(rho2*c(ie,:,:) + rho1*(1.d0 - c(ie,:,:)))
         endif
     endif
     
@@ -1173,8 +1173,8 @@ module module_BC
     if(bdry_cond(4)==4 .and. coords(1)==nPx-1) then  
         if (d.eq.1) then
 #ifndef OLD_BDRY_COND
-            mom(ie  ,:,:) = uaverage*(rho1*c(ie,:,:) + rho2*(1.d0 - c(ie,:,:)))
-            mom(ie+1,:,:) = uaverage*(rho1*c(ie+1,:,:) + rho2*(1.d0 - c(ie+1,:,:)))
+            mom(ie  ,:,:) = uaverage*(rho2*c(ie,:,:) + rho1*(1.d0 - c(ie,:,:)))
+            mom(ie+1,:,:) = uaverage*(rho2*c(ie+1,:,:) + rho1*(1.d0 - c(ie+1,:,:)))
 #else
             mom(ie  ,:,:)= mom(ie-1,:,:)
             mom(ie+1,:,:)=-mom(ie,:,:)
@@ -1190,7 +1190,7 @@ module module_BC
             mom(:,js-1,:)=0d0
             mom(:,js-2,:)=-mom(:,js,:)
         else
-            mom(:,js-1,:)=(2*WallVel(3,1)-u(:,js,:))*(rho1*c(:,js,:) + rho2*(1.d0 - c(:,js,:)))
+            mom(:,js-1,:)=(2*WallVel(3,1)-u(:,js,:))*(rho2*c(:,js,:) + rho1*(1.d0 - c(:,js,:)))
         endif
     endif
     if(bdry_cond(5)==0 .and. coords(2)==nPy-1) then
@@ -1198,7 +1198,7 @@ module module_BC
             mom(:,je  ,:)=0d0
             mom(:,je+1,:)=-mom(:,je-1,:)
         else
-            mom(:,je+1,:)=(2*WallVel(4,1)-u(:,je,:))*(rho1*c(:,je,:) + rho2*(1.d0 - c(:,je,:)))
+            mom(:,je+1,:)=(2*WallVel(4,1)-u(:,je,:))*(rho2*c(:,je,:) + rho1*(1.d0 - c(:,je,:)))
         endif
     endif
     if(bdry_cond(3)==0 .and. coords(3)==0    ) then
@@ -1206,7 +1206,7 @@ module module_BC
             mom(:,:,ks-1)=0d0
             mom(:,:,ks-2)=-mom(:,:,ks)
         else
-            mom(:,:,ks-1)=(2*WallVel(5,1)-u(:,:,ks))*(rho1*c(:,:,ks) + rho2*(1.d0 - c(:,:,ks)))
+            mom(:,:,ks-1)=(2*WallVel(5,1)-u(:,:,ks))*(rho2*c(:,:,ks) + rho1*(1.d0 - c(:,:,ks)))
         endif
     endif
     if(bdry_cond(6)==0 .and. coords(3)==nPz-1) then
@@ -1214,62 +1214,62 @@ module module_BC
             mom(:,:,ke  )=0d0
             mom(:,:,ke+1)=-mom(:,:,ke-1)
         else
-            mom(:,:,ke+1)=(2*WallVel(6,1)-u(:,:,ke))*(rho1*c(:,:,ke) + rho2*(1.d0 - c(:,:,ke)))
+            mom(:,:,ke+1)=(2*WallVel(6,1)-u(:,:,ke))*(rho2*c(:,:,ke) + rho1*(1.d0 - c(:,:,ke)))
         endif
     endif
     ! wall boundary condition: shear
     if(bdry_cond(1)==2 .and. coords(1)==0    ) then
         if (d.eq.2) then
             mom(is-1,:,:) = (-dxh(is-1)*WallShear(1,2)+u(is,:,:)) * &
-                            (rho1*c(is,:,:) + rho2*(1.d0 - c(is,:,:)))
+                            (rho2*c(is,:,:) + rho1*(1.d0 - c(is,:,:)))
         elseif (d.eq.3) then
             mom(is-1,:,:) = (-dxh(is-1)*WallShear(1,3)+u(is,:,:)) * &
-                            (rho1*c(is,:,:) + rho2*(1.d0 - c(is,:,:)))
+                            (rho2*c(is,:,:) + rho1*(1.d0 - c(is,:,:)))
         endif
     endif
     if(bdry_cond(4)==2 .and. coords(1)==nPx-1) then
         if (d.eq.2) then
             mom(ie+1,:,:) = (dxh(ie)*WallShear(2,2)+u(ie,:,:)) * &
-                            (rho1*c(ie,:,:) + rho2*(1.d0 - c(ie,:,:)))
+                            (rho2*c(ie,:,:) + rho1*(1.d0 - c(ie,:,:)))
         elseif (d.eq.3) then
             mom(ie+1,:,:) = (dxh(ie)*WallShear(2,3)+u(ie,:,:)) * &
-                            (rho1*c(ie,:,:) + rho2*(1.d0 - c(ie,:,:)))
+                            (rho2*c(ie,:,:) + rho1*(1.d0 - c(ie,:,:)))
         endif
     endif
     if(bdry_cond(2)==2 .and. coords(2)==0    ) then
         if (d.eq.1) then
             mom(:,js-1,:) = (-dyh(js-1)*WallShear(3,1)+u(:,js,:)) * &
-                            (rho1*c(:,js,:) + rho2*(1.d0 - c(:,js,:)))
+                            (rho2*c(:,js,:) + rho1*(1.d0 - c(:,js,:)))
         elseif (d.eq.3) then
             mom(:,js-1,:) = (-dyh(js-1)*WallShear(3,3)+u(:,js,:)) * &
-                            (rho1*c(:,js,:) + rho2*(1.d0 - c(:,js,:)))
+                            (rho2*c(:,js,:) + rho1*(1.d0 - c(:,js,:)))
         endif
     endif
     if(bdry_cond(5)==2 .and. coords(2)==nPy-1) then
         if (d.eq.1) then
             mom(:,je+1,:) = (dyh(je)*WallShear(4,1)+u(:,je,:)) * &
-                            (rho1*c(:,je,:) + rho2*(1.d0 - c(:,je,:)))
+                            (rho2*c(:,je,:) + rho1*(1.d0 - c(:,je,:)))
         elseif (d.eq.3) then
             mom(:,je+1,:) = (dyh(je)*WallShear(4,3)+u(:,je,:)) * &
-                            (rho1*c(:,je,:) + rho2*(1.d0 - c(:,je,:)))
+                            (rho2*c(:,je,:) + rho1*(1.d0 - c(:,je,:)))
         endif
     endif
     if(bdry_cond(3)==2 .and. coords(3)==0    ) then
         if (d.eq.1) then
             mom(:,:,ks-1) = (-dzh(ks-1)*WallShear(5,1)+u(:,:,ks)) * &
-                            (rho1*c(:,:,ks) + rho2*(1.d0 - c(:,:,ks)))
+                            (rho2*c(:,:,ks) + rho1*(1.d0 - c(:,:,ks)))
         elseif (d.eq.2) then
             mom(:,:,ks-1) = (-dzh(ks-1)*WallShear(5,2)+u(:,:,ks)) * &
-                            (rho1*c(:,:,ks) + rho2*(1.d0 - c(:,:,ks)))
+                            (rho2*c(:,:,ks) + rho1*(1.d0 - c(:,:,ks)))
         endif
     endif
     if(bdry_cond(6)==2 .and. coords(3)==nPz-1) then
         if (d.eq.1) then
             mom(:,:,ke+1) = (dzh(ke)*WallShear(6,1)+u(:,:,ke)) * &
-                            (rho1*c(:,:,ke) + rho2*(1.d0 - c(:,:,ke)))
+                            (rho2*c(:,:,ke) + rho1*(1.d0 - c(:,:,ke)))
         elseif (d.eq.2) then
             mom(:,:,ke+1) = (dzh(ke)*WallShear(6,2)+u(:,:,ke)) * &
-                            (rho1*c(:,:,ke) + rho2*(1.d0 - c(:,:,ke)))
+                            (rho2*c(:,:,ke) + rho1*(1.d0 - c(:,:,ke)))
         endif
     endif
     
