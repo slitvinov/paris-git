@@ -1,12 +1,8 @@
 #!/bin/bash
 #set -x
 
-nognuplot=0
-CGFontGetGlyphPathIsObsolete=`gnuplot -e "set term pdf; set out 'tmp.pdf'; plot 0" 2>&1 | grep -c obsolete` || nognuplot=1
-
-if [ $nognuplot == 1 ] ; then
-    echo "Warning: gnuplot not installed"
-fi
+gnuplot > /dev/null 2&>1 || echo "Warning: gnuplot not installed"
+CGFontGetGlyphPathIsObsolete=`gnuplot -e "set term pdf; set out 'tmp.pdf'; plot 0" 2>&1 | grep -c obsolete`
 
 export CGFONTGETGLYPH_PARIS_PROBLEM=0
 
