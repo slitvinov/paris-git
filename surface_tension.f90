@@ -8,6 +8,7 @@
 ! Contact: Stephane Zaleski zaleski@dalembert.upmc.fr
 ! 
 ! Authors:
+!         Daniel Fuster
 ! 	  Yue "Stanley" Ling 
 !         Leon Malan
 !         Ruben Scardovelli  
@@ -1510,6 +1511,333 @@ contains
       bpoints = points
       ind_pos_sorted = ni
    end function ind_pos_sorted
+
+subroutine project_velocity (vel,velmask,dtp,pres,d)
+  use module_grid
+  use module_flow
+
+  implicit none
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: vel
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: velmask,pres
+  real(8), intent(in) :: dtp
+  real(8) :: rhoavg,deltax
+  integer :: i,j,k,d
+  integer :: i0,j0,k0
+
+  call init_i0j0k0 (d,i0,j0,k0)
+  call get_staggered_fractions (tmp,d) 
+  
+  if (STGhost) tmp = NINT(tmp)
+
+  if (d.eq.1) then
+
+    do k=ks,ke;  do j=js,je; do i=is,ieu  
+      rhoavg = tmp(i,j,k)*rho2 + (1.d0-tmp(i,j,k))*rho1
+      vel(i,j,k)=vel(i,j,k)-dtp*velmask(i,j,k)/dxh(i)*(pres(i+i0,j+j0,k+k0)-pres(i,j,k))/rhoavg
+    enddo; enddo; enddo
+
+  elseif (d.eq.2) then
+
+    do k=ks,ke;  do j=js,jev; do i=is,ie
+      rhoavg = tmp(i,j,k)*rho2 + (1.d0-tmp(i,j,k))*rho1
+      vel(i,j,k)=vel(i,j,k)-dtp*velmask(i,j,k)/dyh(j)*(pres(i+i0,j+j0,k+k0)-pres(i,j,k))/rhoavg
+    enddo; enddo; enddo
+
+  else
+
+    do k=ks,kew;  do j=js,je; do i=is,ie
+      rhoavg = tmp(i,j,k)*rho2 + (1.d0-tmp(i,j,k))*rho1
+      vel(i,j,k)=vel(i,j,k)-dtp*velmask(i,j,k)/dzh(k)*(pres(i+i0,j+j0,k+k0)-pres(i,j,k))/rhoavg
+    enddo; enddo; enddo
+
+  endif
+
+  if (STGhost) then 
+
+    call get_all_curvatures(work(:,:,:,1),0)
+    if (d.eq.1) then
+      deltax = 1.d0/dx(nx)
+    elseif (d.eq.2) then
+      deltax = 1.d0/dy(ny)
+    else
+      deltax = 1.d0/dz(nz)
+    endif
+
+    do k=ks,ke; do j=js,je; do i=is,ie
+
+      rhoavg = tmp(i,j,k)*rho2 + (1.d0-tmp(i,j,k))*rho1
+      vel(i,j,k) = vel(i,j,k) - dtp/rhoavg*sigma* &
+      (1.d0-tmp(i,j,k))*(work(i+i0,j+j0,k+k0,1)*cvof(i+i0,j+j0,k+k0)-&
+                         work(i,j,k,1)*cvof(i,j,k))*deltax**2
+      
+      vel(i,j,k) = vel(i,j,k) + dtp/rhoavg*sigma* &
+                   tmp(i,j,k)*(work(i+i0,j+j0,k+k0,1)*(1.d0-cvof(i+i0,j+j0,k+k0)) &
+                  -work(i,j,k,1)*(1.d0-cvof(i,j,k)))*deltax**2
+
+    enddo; enddo; enddo
+  endif
+
+end subroutine project_velocity
+
+  !=================================================================================================
+! The Poisson equation for the pressure is setup with matrix A as
+! A7*Pijk = A1*Pi-1jk + A2*Pi+1jk + A3*Pij-1k + 
+!           A4*Pij+1k + A5*Pijk-1 + A6*Pijk+1 + A8
+!-------------------------------------------------------------------------------------------------
+subroutine get_Poisson_matrix_x (A1,A2,A8, velmask,dtp,d)
+  use module_grid
+  use module_BC
+  use module_2phase
+  use module_flow
+
+  implicit none
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: velmask
+  real(8), dimension(is:ie,js:je,ks:ke), intent(out) :: A1,A2
+  real(8), dimension(is:ie,js:je,ks:ke), intent(inout) :: A8
+  real(8), intent(in) :: dtp
+  real(8) :: rhoavg, deltax, kappa
+  integer :: i,j,k,d
+  integer :: i0,j0,k0
+
+  call init_i0j0k0 (d,i0,j0,k0)
+  call get_staggered_fractions (tmp,d) 
+
+  ! I use STGhost flag because it allows to call this function without
+  ! the ghost fluid method if required in the future
+  if (STGhost) tmp = NINT(tmp)
+
+  if (d.eq.1) then
+
+    do k=ks,ke; do j=js,je; do i=is,ie
+      rhoavg = tmp(i-i0,j-j0,k-k0)*rho2 + (1.d0-tmp(i-i0,j-j0,k-k0))*rho1
+      A1(i,j,k) = dtp*velmask(i-i0,j-j0,k-k0)/(dx(i)*dxh(i-1)*rhoavg)
+      rhoavg = tmp(i,j,k)*rho2 + (1.d0-tmp(i,j,k))*rho1
+      A2(i,j,k) = dtp*velmask(i,j,k)/(dx(i)*dxh(i)*rhoavg)
+    enddo; enddo; enddo
+
+  elseif (d.eq.2) then
+
+    do k=ks,ke; do j=js,je; do i=is,ie
+      rhoavg = tmp(i-i0,j-j0,k-k0)*rho2 + (1.d0-tmp(i-i0,j-j0,k-k0))*rho1
+      A1(i,j,k) = dtp*velmask(i-i0,j-j0,k-k0)/(dy(j)*dyh(j-1)*rhoavg)
+      rhoavg = tmp(i,j,k)*rho2 + (1.d0-tmp(i,j,k))*rho1
+      A2(i,j,k) = dtp*velmask(i,j,k)/(dy(j)*dyh(j)*rhoavg)
+    enddo; enddo; enddo
+
+  else
+
+    do k=ks,ke; do j=js,je; do i=is,ie
+      rhoavg = tmp(i-i0,j-j0,k-k0)*rho2 + (1.d0-tmp(i-i0,j-j0,k-k0))*rho1
+      A1(i,j,k) = dtp*velmask(i-i0,j-j0,k-k0)/(dz(k)*dzh(k-1)*rhoavg)
+      rhoavg = tmp(i,j,k)*rho2 + (1.d0-tmp(i,j,k))*rho1
+      A2(i,j,k) = dtp*velmask(i,j,k)/(dz(k)*dzh(k)*rhoavg)
+    enddo; enddo; enddo
+
+  endif
+
+  if (STGhost) then 
+
+    call get_all_curvatures(work(:,:,:,1),0)
+    if (d.eq.1) then
+      deltax = 1.d0/dx(nx)
+      elseif (d.eq.2) then
+      deltax = 1.d0/dy(ny)
+    else
+      deltax = 1.d0/dz(nz)
+    endif
+
+    do k=ks,ke; do j=js,je; do i=is,ie
+
+      rhoavg    = tmp(i-i0,j-j0,k-k0)*rho2 + (1.d0-tmp(i-i0,j-j0,k-k0))*rho1
+      A8(i,j,k) = A8(i,j,k) + dtp/rhoavg*sigma*deltax**3*( &
+      (1.d0-tmp(i-i0,j-j0,k-k0))*work(i-i0,j-j0,k-k0,1)*cvof(i-i0,j-j0,k-k0) &
+      -(1.d0-tmp(i-i0,j-j0,k-k0))*work(i,j,k,1)*cvof(i,j,k) &
+      -tmp(i-i0,j-j0,k-k0) *work(i-i0,j-j0,k-k0,1)*(1.d0-cvof(i-i0,j-j0,k-k0)) &
+      +tmp(i-i0,j-j0,k-k0) *work(i,j,k,1)         *(1.d0-cvof(i,j,k))  )
+
+      rhoavg = tmp(i,j,k)*rho2 + (1.d0-tmp(i,j,k))*rho1
+      A8(i,j,k) = A8(i,j,k) + dtp/rhoavg*sigma*deltax**3*( &
+      (1.d0-tmp(i,j,k))*work(i+i0,j+j0,k+k0,1)*cvof(i+i0,j+j0,k+k0) &
+      - (1.d0-tmp(i,j,k))*work(i,j,k,1)*cvof(i,j,k) &
+      - tmp(i,j,k)*work(i+i0,j+j0,k+k0,1)*(1.d0-cvof(i+i0,j+j0,k+k0)) &
+      + tmp(i,j,k)*work(i,j,k,1)         *(1.d0-cvof(i,j,k))    ) 
+
+    enddo; enddo; enddo
+
+  endif
+
+end subroutine get_Poisson_matrix_x
+
+subroutine SetupPoissonGhost(utmp,vtmp,wtmp,umask,vmask,wmask,dt,A,pmask,VolumeSource) 
+  use module_grid
+  use module_BC
+  use module_2phase
+  use module_IO
+
+  implicit none
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: utmp,vtmp,wtmp
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: umask,vmask,wmask
+  real(8), dimension(is:ie,js:je,ks:ke), intent(inout) :: pmask
+  real(8), dimension(is:ie,js:je,ks:ke,8), intent(out) :: A
+  real(8), intent(in) :: dt, VolumeSource
+  real(8), dimension(4) :: P_bc
+  integer :: i,j,k,l,istep
+
+  A(:,:,:,8) = 0.d0
+  
+  call get_Poisson_matrix_x(A(:,:,:,1),A(:,:,:,2),A(:,:,:,8),umask,dt,1)
+  call get_Poisson_matrix_x(A(:,:,:,3),A(:,:,:,4),A(:,:,:,8),vmask,dt,2)
+  call get_Poisson_matrix_x(A(:,:,:,5),A(:,:,:,6),A(:,:,:,8),wmask,dt,3)
+
+  do k=ks,ke; do j=js,je; do i=is,ie
+    A(i,j,k,7) = sum(A(i,j,k,1:6))
+    A(i,j,k,8) =  A(i,j,k,8) - (  VolumeSource +(utmp(i,j,k)-utmp(i-1,j,k))/dx(i) &
+    +  (vtmp(i,j,k)-vtmp(i,j-1,k))/dy(j) &
+    +  (wtmp(i,j,k)-wtmp(i,j,k-1))/dz(k) )
+  enddo; enddo; enddo
+
+  P_bc = 0d0
+  ! dp/dn = 0 for inflow bc on face 1 == x- : do not correct u(is-1)
+  ! inflow bc on other faces not implemented yet.  !@@ generalize this ! 
+  if(coords(1)==0) then
+     if(bdry_cond(1)==3) then  
+        A(is,:,:,7) = A(is,:,:,7) - A(is,:,:,1)
+        A(is,:,:,1) = 0d0
+        ! pressure boundary condition
+     else if(bdry_cond(1)==5) then 
+        A(is,:,:,8) = (2d0/3d0)*BoundaryPressure(1)  ! P_0 =  1/3 (Pinner - P_b) + P_b
+        A(is,:,:,7) = 1d0                      ! P_0  - 1/3 Pinner =  2/3 P_b
+        A(is,:,:,1:6) = 0d0                    ! A7 P_is + A2 P_is+1 = A8 
+        A(is,:,:,2) = 1d0/3d0 !sign due to definition in Poisson solver
+        P_bc(1) = 1d0
+     endif
+  endif
+  ! dp/dn = 0 for outflow/fixed velocity bc on face 4 == x+
+  ! outflow/fixed velocity bc on other faces not implemented yet.  
+  if(coords(1)==Npx-1) then
+     if(bdry_cond(4)==4) then
+        A(ie,:,:,7) = A(ie,:,:,7) - A(ie,:,:,2)
+        A(ie,:,:,2) = 0d0
+        ! pressure boundary condition
+     else if(bdry_cond(4)==5) then
+        A(ie,:,:,8) = (2d0/3d0)*BoundaryPressure(2)
+        A(ie,:,:,7) = 1d0  
+        A(ie,:,:,2:6) = 0d0
+        A(ie,:,:,1) = 1d0/3d0
+        P_bc(2) = 1d0
+     endif
+  endif
+
+  ! Pressure BC for y-
+  if(coords(2)==0 .and. (bdry_cond(2)==5)) then
+     A(:,js,:,8) = (2d0/3d0)*BoundaryPressure(3)
+     A(is,js,:,8) = (2d0/3d0)*(BoundaryPressure(3)+BoundaryPressure(1)*P_bc(1))
+     A(ie,js,:,8) = (2d0/3d0)*(BoundaryPressure(3)+BoundaryPressure(2)*P_bc(2))
+     A(:,js,:,7) = 1d0
+     A(is,js,:,7) = 1d0 + P_bc(1)
+     A(ie,js,:,7) = 1d0 + P_bc(2)
+     A(:,js,:,1:6) = 0d0      
+     A(is,js,:,2) = 1d0/3d0*P_bc(1)
+     A(ie,js,:,1) = 1d0/3d0*P_bc(2)
+     A(:,js,:,4) = 1d0/3d0
+     P_bc(3) = 1d0
+  endif
+  ! Pressure BC for y+
+  if(coords(2)==Npy-1 .and. (bdry_cond(5)==5) ) then
+     A(:,je,:,8) = (2d0/3d0)*BoundaryPressure(4)
+     A(is,je,:,8) = (2d0/3d0)*(BoundaryPressure(4)+BoundaryPressure(1)*P_bc(1))
+     A(ie,je,:,8) = (2d0/3d0)*(BoundaryPressure(4)+BoundaryPressure(2)*P_bc(2))
+     A(:,je,:,7) = 1d0  
+     A(is,je,:,7) = 1d0 + P_bc(1)
+     A(ie,je,:,7) = 1d0 + P_bc(2)
+     A(:,je,:,1:6) = 0d0
+     A(is,je,:,2) = 1d0/3d0*P_bc(1)
+     A(ie,je,:,1) = 1d0/3d0*P_bc(2)
+     A(:,je,:,3) = 1d0/3d0
+     P_bc(4) = 1d0
+  endif
+
+  ! Pressure BC for z-
+  if(coords(3)==0 .and. (bdry_cond(3)==5)) then
+     A(:,:,ks,8) = (2d0/3d0)*BoundaryPressure(5)
+     A(is,js,ks,8) = (2d0/3d0)*(BoundaryPressure(5)+BoundaryPressure(1)*P_bc(1)+BoundaryPressure(3)*P_bc(3))
+     A(ie,js,ks,8) = (2d0/3d0)*(BoundaryPressure(5)+BoundaryPressure(2)*P_bc(2)+BoundaryPressure(3)*P_bc(3))
+     A(is,je,ks,8) = (2d0/3d0)*(BoundaryPressure(5)+BoundaryPressure(1)*P_bc(1)+BoundaryPressure(4)*P_bc(4))
+     A(ie,je,ks,8) = (2d0/3d0)*(BoundaryPressure(5)+BoundaryPressure(2)*P_bc(2)+BoundaryPressure(4)*P_bc(4))
+     A(:,:,ks,7) = 1d0
+     A(is,js,ks,7) = 1d0 + P_bc(1) + P_bc(3)
+     A(ie,js,ks,7) = 1d0 + P_bc(2) + P_bc(3)
+     A(is,je,ks,7) = 1d0 + P_bc(1) + P_bc(4)
+     A(ie,je,ks,7) = 1d0 + P_bc(2) + P_bc(4)
+     A(:,:,ks,1:6) = 0d0   
+     A(is,js,ks,2) = 1d0/3d0*P_bc(1); A(is,js,ks,4) = 1d0/3d0*P_bc(3)
+     A(ie,js,ks,1) = 1d0/3d0*P_bc(2); A(ie,js,ks,4) = 1d0/3d0*P_bc(3)
+     A(is,je,ks,2) = 1d0/3d0*P_bc(1); A(is,je,ks,3) = 1d0/3d0*P_bc(4)
+     A(ie,je,ks,1) = 1d0/3d0*P_bc(2); A(ie,je,ks,3) = 1d0/3d0*P_bc(4)
+     A(:,:,ks,6) = 1d0/3d0
+  endif
+  ! Pressure BC for z+
+  if(coords(3)==Npz-1 .and. (bdry_cond(6)==5) ) then
+     A(:,:,ke,8) = (2d0/3d0)*BoundaryPressure(6)
+     A(is,js,ke,8) = (2d0/3d0)*(BoundaryPressure(6)+BoundaryPressure(1)*P_bc(1)+BoundaryPressure(3)*P_bc(3))
+     A(ie,js,ke,8) = (2d0/3d0)*(BoundaryPressure(6)+BoundaryPressure(2)*P_bc(2)+BoundaryPressure(3)*P_bc(3))
+     A(is,je,ke,8) = (2d0/3d0)*(BoundaryPressure(6)+BoundaryPressure(1)*P_bc(1)+BoundaryPressure(4)*P_bc(4))
+     A(ie,je,ke,8) = (2d0/3d0)*(BoundaryPressure(6)+BoundaryPressure(2)*P_bc(2)+BoundaryPressure(4)*P_bc(4))
+     A(:,:,ke,7) = 1d0  
+     A(is,js,ke,7) = 1d0 + P_bc(1) + P_bc(3)
+     A(ie,js,ke,7) = 1d0 + P_bc(2) + P_bc(3)
+     A(is,je,ke,7) = 1d0 + P_bc(1) + P_bc(4)
+     A(ie,je,ke,7) = 1d0 + P_bc(2) + P_bc(4)
+     A(:,:,ke,1:6) = 0d0
+     A(is,js,ke,2) = 1d0/3d0*P_bc(1); A(is,js,ks,4) = 1d0/3d0*P_bc(3)
+     A(ie,js,ke,1) = 1d0/3d0*P_bc(2); A(ie,js,ks,4) = 1d0/3d0*P_bc(3)
+     A(is,je,ke,2) = 1d0/3d0*P_bc(1); A(is,je,ks,3) = 1d0/3d0*P_bc(4)
+     A(ie,je,ke,1) = 1d0/3d0*P_bc(2); A(ie,je,ks,3) = 1d0/3d0*P_bc(4)
+     A(:,:,ke,5) = 1d0/3d0
+  endif
+
+! What follows is a lot of debugging for small A7 values and checking the matrix 
+  do k=ks,ke; do j=js,je; do i=is,ie
+     if(A(i,j,k,7) .lt. 1d-50)  then
+        ! check that we are in solid. Remember that we cannot have an isolated fluid cell exactly on the entrance. 
+        if(umask(i-1,j,k).lt.0.5d0.and.umask(i,j,k).lt.0.5d0.and.     &
+             vmask(i,j-1,k).lt.0.5d0.and.vmask(i,j,k).lt.0.5d0.and.   &
+             wmask(i,j,k-1).lt.0.5d0.and.wmask(i,j,k).lt.0.5d0 ) then ! we are in solid
+           if(A(i,j,k,8).gt.1d-50) then ! check A8 for debugging
+              OPEN(UNIT=88,FILE=TRIM(out_path)//'/message-rank-'//TRIM(int2text(rank,padding))//'.txt')
+              write(88,*) "A8 non zero in solid at ijk + minmax = ",i,j,k,imin,imax,jmin,jmax,kmin,kmax
+              write(88,*) "VolumeSource",VolumeSource
+              write(88,*) "umask(i-1,j,k),umask(i,j,k),vmask(i,j-1,k)",&
+                   "vmask(i,j,k),wmask(i,j,k-1),wmask(i,j,k)",         &
+                   umask(i-1,j,k),umask(i,j,k),vmask(i,j-1,k),         &
+                   vmask(i,j,k),wmask(i,j,k-1),wmask(i,j,k)
+              write(88,*) "dx(i),dy(j),dz(k)",dx(i),dy(j),dz(k)
+              close(88)
+              call pariserror("A8 non zero in solid") 
+           endif
+           if(maxval(A(i,j,k,1:6)).gt.1d-50.or.minval(A(i,j,k,1:6)).lt.0d0) then
+              call pariserror("inconsistency in A1-6")
+           endif
+           A(i,j,k,7) = 1d0
+        else ! we are not in solid: error.
+           OPEN(UNIT=88,FILE=TRIM(out_path)//'/message-rank-'//TRIM(int2text(rank,padding))//'.txt')
+           write(88,*) "A7 tiny outside of solid at ijk minmax = ",i,j,k,imin,imax,jmin,jmax,kmin,kmax
+           write(88,*) "dt",dt
+           write(88,*) "umask(i-1,j,k),umask(i,j,k),vmask(i,j-1,k)",&
+                "vmask(i,j,k),wmask(i,j,k-1),wmask(i,j,k)",         &
+                umask(i-1,j,k),umask(i,j,k),vmask(i,j-1,k),         &
+                vmask(i,j,k),wmask(i,j,k-1),wmask(i,j,k)
+           close(88)
+           call pariserror("A7 tiny outside of solid. Debug me")
+        endif
+     endif
+  enddo; enddo; enddo
+
+  if(check_setup) call check_poisson_setup(A,pmask,umask,vmask,wmask)
+  
+! End debugging and checking
+end subroutine SetupPoissonGhost
+
 
   end module module_surface_tension
 

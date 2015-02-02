@@ -1,0 +1,14 @@
+&VOFPARAMETERS
+
+VOFBDRY_COND = 'periodic' 'periodic' 'periodic' 
+                   ! Type of VOF boundary condition in x,y,z direction: 'wet', '90deg','periodic'
+
+TEST_TYPE = 'parasitic_currents'
+VOF_ADVECT = 'CIAM'
+ViscMeanIsArith = T
+DoMOMCONS = T
+STGhost = T
+!=================================================================================================
+
+&end
+! end of the namelist

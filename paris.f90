@@ -180,7 +180,11 @@ Program paris
 
         if(rank==0) then
            end_time =  MPI_WTIME()
-           open(unit=121,file='stats',position='append')
+           if (time.eq.0.d0) then
+             open(unit=121,file='stats')
+           else
+             open(unit=121,file='stats',position='append')
+           endif
            write(121,'(30es14.6e2)')time,stats(1:nstatarray),dpdx,(stats(8)-stats(9))/dt,end_time-start_time
            close(121)
            write(out,'("Step:",I9," Iterations:",I9," cpu(s):",f10.2)')-1,0,end_time-start_time
@@ -332,7 +336,7 @@ Program paris
 !-----------------------------------------PROJECTION STEP-----------------------------------------
            call SetPressureBC(umask,vmask,wmask)
            if (.not.FreeSurface) then
-             if (DoVOF) then
+             if (STGhost) then
               call SetupPoissonGhost(u,v,w,umask,vmask,wmask,dt,A,tmp,VolumeSource)
              else
               call SetupPoisson(u,v,w,umask,vmask,wmask,rho,dt,A,tmp,VolumeSource)
@@ -366,7 +370,7 @@ Program paris
               end if
            endif
            if (.not.FreeSurface) then
-             if (DoVOF) then
+             if (STGhost) then
                call project_velocity(u,umask,dt,p,1)
                call project_velocity(v,vmask,dt,p,2)
                call project_velocity(w,wmask,dt,p,3)
@@ -1751,6 +1755,7 @@ subroutine surfaceForce(du,dv,dw,rho)
         endif
      endif
   enddo; enddo; enddo
+
 
 end subroutine surfaceForce
 !=================================================================================================
