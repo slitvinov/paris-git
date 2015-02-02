@@ -435,6 +435,63 @@ contains
     y1 = y1 + y(j)
     ! some stuff is missing here
   end subroutine PlotCutAreaCentroid
+  
+  subroutine do_droplet_test(timestep,output_time)
+    use module_flow
+    implicit none
+    include 'mpif.h'
+    integer :: i,j,k,timestep, ierr
+    real(8) :: vol, uvel, vvel, wvel, output_time
+    real(8), dimension(6):: local_data, gbdata
+    character*128 :: file_name
+    LOGICAL :: Found
+    LOGICAL, SAVE :: first_open = .true.
+    
+    file_name = 'droplet_results'
+    ! Compute Local Stats
+    
+    
+    do k=ks,ke; do j=js,je; do i=is,ie;
+       vol = dx(i) * dy(j) * dz(k)
+       uvel = 0.5*(u(i,j,k)+u(i-1,j,k))
+       vvel = 0.5*(v(i,j,k)+v(i,j-1,k))
+       wvel = 0.5*(w(i,j,k)+w(i,j,k-1))
+    	
+       !Computing kinetic energy of phase 1
+       local_data(1)=rho2*cvof(i,j,k)*(uvel**2 &
+        	+ vvel**2 +wvel**2)*vol
+       !Computing kinetic energy of phase 2
+       local_data(2)=rho1*(1 - cvof(i,j,k))*(uvel**2 &
+        	+ vvel**2 +wvel**2)*vol
+       !Computing overall kinetic energy
+       local_data(3)=(rho2*cvof(i,j,k) + rho1*(1 - cvof(i,j,k)))*(uvel**2 &
+       	   + vvel**2 +wvel**2)*vol
+       !Computing mass phase 1
+       local_data(4) = rho2*cvof(i,j,k)*vol
+       !Computing mass phase 2
+       local_data(5)=rho1*(1 - cvof(i,j,k))*vol
+       !Computing overall mass
+       local_data(6)=(rho2*cvof(i,j,k)+rho1*(1-cvof(i,j,k)))*vol
+    enddo; enddo; enddo	
+    	
+    call MPI_ALLREDUCE(local_data, gbdata, 6, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr)
+    
+    if(rank==0) then
+     if(first_open) then
+       OPEN(UNIT=88,FILE=TRIM(out_path)//TRIM(file_name)//'.dat')
+       write(88,18) timestep,gbdata(1),gbdata(2),gbdata(3),gbdata(4),gbdata(5),gbdata(6)
+       CLOSE(88)
+       first_open = .false.
+     else
+       OPEN(UNIT=88,FILE=TRIM(out_path)//TRIM(file_name)//'.dat',POSITION='append')
+       write(88,18) timestep,gbdata(1),gbdata(2),gbdata(3),gbdata(4),gbdata(5),gbdata(6)
+       CLOSE(88)
+     endif
+    endif
+    
+    call output_droplet(w,output_time)
+18     format(I8.8,E14.6,E14.6,E14.6,E14.6,E14.6,E14.6)   
+end subroutine do_droplet_test
 
   subroutine h_of_KHI2D(timestep,output_time)
     use module_surface_tension

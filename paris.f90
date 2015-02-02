@@ -170,7 +170,7 @@ Program paris
            endif
         endif
         if(DoLPP .and. .not.restart) call output_LPP(0,is,ie+1,js,je+1,ks,ke+1)
-        if(test_droplet) call output_droplet(w,time)
+        if(test_droplet) call do_droplet_test(itimestep,time)
         call setvelocityBC(u,v,w,umask,vmask,wmask,time)
         call write_vec_gnuplot(u,v,cvof,p,itimestep,DoVOF)
         call calcstats
@@ -518,7 +518,7 @@ Program paris
                if(DoVOF) call output_VOF(nfile,is,ie+1,js,je+1,ks,ke+1)
                if(DoVOF) call output_ALL(nfile,is,ie+1,js,je+1,ks,ke+1,itimestep)
                if(DoLPP) call output_LPP(nfile,is,ie+1,js,je+1,ks,ke+1)
-               if(test_droplet) call output_droplet(w,time)
+               if(test_droplet) call do_droplet_test(itimestep,time)
                if(rank==0)then
                   end_time =  MPI_WTIME()
                   write(out,'("Step:",I9," Iterations:",I9," cpu(s):",f10.2)')itimestep,it,end_time-start_time
