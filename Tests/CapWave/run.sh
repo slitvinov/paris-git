@@ -1,7 +1,7 @@
 #!/bin/bash
 #set -x
 
-tmp=`mktemp -d`
+tmp=`mktemp -d 2>/dev/null || mktemp -d -t 'tmp'`
 
 rm -fR out
 cp inputshort input
