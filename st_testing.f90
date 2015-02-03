@@ -442,13 +442,15 @@ contains
     include 'mpif.h'
     integer :: i,j,k,timestep, ierr
     real(8) :: vol, uvel, vvel, wvel, output_time
-    real(8), dimension(6):: local_data, gbdata
+    real(8), dimension(9):: local_data, bgd
     character*128 :: file_name
     LOGICAL :: Found
     LOGICAL, SAVE :: first_open = .true.
     
     file_name = 'droplet_results'
     ! Compute Local Stats
+    local_data = 0d0
+    bgd = 0d0
     
     
     do k=ks,ke; do j=js,je; do i=is,ie;
@@ -458,39 +460,48 @@ contains
        wvel = 0.5*(w(i,j,k)+w(i,j,k-1))
     	
        !Computing kinetic energy of phase 1
-       local_data(1)=rho2*cvof(i,j,k)*(uvel**2 &
+       local_data(1) = local_data(1) + rho2*cvof(i,j,k)*(uvel**2 &
         	+ vvel**2 +wvel**2)*vol
        !Computing kinetic energy of phase 2
-       local_data(2)=rho1*(1 - cvof(i,j,k))*(uvel**2 &
+       local_data(2) = local_data(2) + rho1*(1 - cvof(i,j,k))*(uvel**2 &
         	+ vvel**2 +wvel**2)*vol
        !Computing overall kinetic energy
-       local_data(3)=(rho2*cvof(i,j,k) + rho1*(1 - cvof(i,j,k)))*(uvel**2 &
+       local_data(3) = local_data(3) + (rho2*cvof(i,j,k) + rho1*(1 - cvof(i,j,k)))*(uvel**2 &
        	   + vvel**2 +wvel**2)*vol
        !Computing mass phase 1
-       local_data(4) = rho2*cvof(i,j,k)*vol
+       local_data(4) = local_data(4) + rho2*cvof(i,j,k)*vol
        !Computing mass phase 2
-       local_data(5)=rho1*(1 - cvof(i,j,k))*vol
+       local_data(5) = local_data(5) + rho1*(1 - cvof(i,j,k))*vol
        !Computing overall mass
-       local_data(6)=(rho2*cvof(i,j,k)+rho1*(1-cvof(i,j,k)))*vol
-    enddo; enddo; enddo	
+       local_data(6) = local_data(6) + (rho2*cvof(i,j,k)+rho1*(1-cvof(i,j,k)))*vol
+       !Computing xgc
+       local_data(7) = local_data(7) + rho2*cvof(i,j,k)*vol*x(i)
+       !Computing ygc
+       local_data(8) = local_data(8) + rho2*cvof(i,j,k)*vol*y(j)
+       !Computing zgc
+       local_data(9) = local_data(9) + rho2*cvof(i,j,k)*vol*z(k)
+     enddo; enddo; enddo	
     	
-    call MPI_ALLREDUCE(local_data, gbdata, 6, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr)
+    call MPI_ALLREDUCE(local_data, bgd, 9, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr)
     
     if(rank==0) then
+    bgd(7) = bgd(7)/bgd(4)
+    bgd(8) = bgd(8)/bgd(4)
+    bgd(9) = bgd(9)/bgd(4)
      if(first_open) then
        OPEN(UNIT=88,FILE=TRIM(out_path)//TRIM(file_name)//'.dat')
-       write(88,18) timestep,gbdata(1),gbdata(2),gbdata(3),gbdata(4),gbdata(5),gbdata(6)
+       write(88,18) timestep,bgd(1),bgd(2),bgd(3),bgd(4),bgd(5),bgd(6),bgd(7),bgd(8),bgd(9)
        CLOSE(88)
        first_open = .false.
      else
        OPEN(UNIT=88,FILE=TRIM(out_path)//TRIM(file_name)//'.dat',POSITION='append')
-       write(88,18) timestep,gbdata(1),gbdata(2),gbdata(3),gbdata(4),gbdata(5),gbdata(6)
+       write(88,18) timestep,bgd(1),bgd(2),bgd(3),bgd(4),bgd(5),bgd(6),bgd(7),bgd(8),bgd(9)
        CLOSE(88)
      endif
     endif
     
     call output_droplet(w,output_time)
-18     format(I8.8,E14.6,E14.6,E14.6,E14.6,E14.6,E14.6)   
+18     format(I8.8,E14.6,E14.6,E14.6,E14.6,E14.6,E14.6,E14.6,E14.6,E14.6)   
 end subroutine do_droplet_test
 
   subroutine h_of_KHI2D(timestep,output_time)
