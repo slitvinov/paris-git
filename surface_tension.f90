@@ -1655,17 +1655,10 @@ subroutine SetupPoissonGhost(utmp,vtmp,wtmp,umask,vmask,wmask,dt,A,pmask,VolumeS
     A(i,j,k,8) =  A(i,j,k,8) - (  VolumeSource +(utmp(i,j,k)-utmp(i-1,j,k))/dx(i) &
     +  (vtmp(i,j,k)-vtmp(i,j-1,k))/dy(j) &
     +  (wtmp(i,j,k)-wtmp(i,j,k-1))/dz(k) )
-    ! Check if the cell is inside the solid
-    if(umask(i-1,j,k).lt.0.5d0.and.umask(i,j,k).lt.0.5d0.and.     &
-      vmask(i,j-1,k).lt.0.5d0.and.vmask(i,j,k).lt.0.5d0.and.   &
-      wmask(i,j,k-1).lt.0.5d0.and.wmask(i,j,k).lt.0.5d0 ) then 
-      A(i,j,k,1:6) = 0d0
-      A(i,j,k,7) = 1d0
-    endif
   enddo; enddo; enddo
 
   call Poisson_BCs(A)
-  
+  call check_and_debug_Poisson(A,umask,vmask,wmask,1.,pmask,dt,VolumeSource)
 
 end subroutine SetupPoissonGhost
 

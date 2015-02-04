@@ -2277,7 +2277,7 @@ subroutine Poisson_BCs(A)
 
   implicit none
   real(8), intent(in) :: VolumeSource,dt
-  real(8), dimension(is:ie,js:je,ks:ke,8), intent(out) :: A
+  real(8), dimension(is:ie,js:je,ks:ke,8), intent(inout) :: A
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: umask,vmask,wmask,pmask,rhot
   integer :: i,j,k,l
 
