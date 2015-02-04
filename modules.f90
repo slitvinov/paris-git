@@ -2279,7 +2279,7 @@ subroutine Poisson_BCs(A)
   real(8), intent(in) :: VolumeSource,dt
   real(8), dimension(is:ie,js:je,ks:ke,8), intent(inout) :: A
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: pmask
-  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: umask,vmask,wmask,pmask,rhot
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: umask,vmask,wmask,rhot
   integer :: i,j,k,l
 
   ! What follows is a lot of debugging for small A7 values and checking the matrix 
