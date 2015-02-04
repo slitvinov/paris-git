@@ -338,6 +338,7 @@ module module_2phase
   real(8) :: jetcenter_yc,         jetcenter_zc
   real(8) :: sigma
   integer :: NumBubble
+  real(8) :: NozzleThick2Cell,NozzleLength
 end module module_2phase
 !=================================================================================================
 !=================================================================================================
@@ -1366,7 +1367,7 @@ module module_BC
       integer :: j,k
       real(8) :: t
       real(8) :: uinject
-      real(8) :: ryz, low_gas_radius
+      real(8) :: ryz, low_gas_radius, HalfNozzleThickness
       real(8), parameter :: PI = 3.14159265359d0
       uinject=0d0
 
@@ -1387,16 +1388,16 @@ module module_BC
          if( (y(j) - jetcenter_yc)**2.d0 + (z(k) - jetcenter_zc)**2.d0 .lt. radius_liq_inject**2.d0 ) then 
             uinject=uliq_inject
          end if ! y(j)
-      else if ( inject_type == 3 ) then ! 2d coaxial jet
-         !tdelay_gas_inject = 1.d-2
-         if ( y(j) <= radius_liq_inject ) then 
+      else if ( inject_type == 3 ) then ! 2d coflowing jet
+         HalfNozzleThickness = NozzleThick2Cell*0.5d0*dx(is) 
+         if ( y(j) <= radius_liq_inject-HalfNozzleThickness ) then 
             uinject = uliq_inject & 
-                     *erf( (radius_liq_inject - y(j))/blayer_gas_inject ) &
+                     *erf( (radius_liq_inject - HalfNozzleThickness - y(j))/blayer_gas_inject ) &
                      *(1.d0 + erf((time-tdelay_gas_inject*0.5d0)/(tdelay_gas_inject*0.25d0)) )*0.5d0
-         else if ( y(j) > radius_liq_inject .and. y(j) <= radius_gas_inject ) then
+         else if ( y(j) > radius_liq_inject+HalfNozzleThickness .and. y(j) <= radius_gas_inject ) then
             uinject = ugas_inject & 
-                     *erf( (y(j) -   radius_liq_inject)/blayer_gas_inject ) & 
-                     !*erf( (radius_gas_inject - y(j))/blayer_gas_inject ) & 
+                     *erf( (y(j) -   radius_liq_inject - HalfNozzleThickness)/blayer_gas_inject ) & 
+                     *erf( (radius_gas_inject - y(j))/blayer_gas_inject ) & 
                      !*erf(max(time-tdelay_gas_inject,0.d0)/tdelay_gas_inject) 
                      *(1.d0 + erf((time-tdelay_gas_inject*0.5d0)/(tdelay_gas_inject*0.25d0)) )*0.5d0
          else 

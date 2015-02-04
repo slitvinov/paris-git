@@ -2265,7 +2265,8 @@ subroutine ReadParameters
                         excentricity,  tout,          zip_data,      ugas_inject,   uliq_inject, &  
                         blayer_gas_inject,            tdelay_gas_inject,            padding,     &
                         radius_gas_inject,            radius_liq_inject,     radius_gap_liqgas,  &
-                        jetcenter_yc2yLength,         jetcenter_zc2zLength,                      & 
+                        jetcenter_yc2yLength,         jetcenter_zc2zLength,                      &
+                        NozzleThick2Cell,             NozzleLength,                              &
                         cflmax_allowed,               AdvectionScheme, out_mom,   output_fields
  
   Nx = 0; Ny = 4; Nz = 4 ! cause absurd input file that lack nx value to fail. 
@@ -2292,6 +2293,8 @@ subroutine ReadParameters
   blayer_gas_inject=8.d-2; tdelay_gas_inject=1.d-2
   radius_gas_inject=0.1d0; radius_liq_inject=0.1d0 ; radius_gap_liqgas=0d0
   jetcenter_yc2yLength=0.5d0;jetcenter_zc2zLength=0.5d0
+  NozzleThick2Cell=2.d0
+  NozzleLength = 4.d-3
   padding=5
   cflmax_allowed=0.5d0
   AdvectionScheme = 'QUICK'
