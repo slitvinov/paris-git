@@ -133,7 +133,7 @@ subroutine setuppoisson_fs(utmp,vtmp,wtmp,vof_phase,rhot,dt,A,cvof,n1,n2,n3,kap,
 
   x_mod=dxh((is+ie)/2); y_mod=dyh((js+je)/2); z_mod=dzh((ks+ke)/2) !assumes an unstretched grid
   P_gx = 0d0; P_gy = 0d0; P_gz = 0d0
-  limit = 1d-3/dx((is+ie)/2)
+  limit = 1d-4/dx((is+ie)/2)
   c_min = 1d-2
 
   do k=ks,ke; do j=js,je; do i=is,ie
@@ -498,7 +498,7 @@ subroutine setuppoisson_fs(utmp,vtmp,wtmp,vof_phase,rhot,dt,A,cvof,n1,n2,n3,kap,
      endif
   enddo;enddo;enddo
 
-  call Poisson_BCs(A)
+  if (.not. RP_test) call Poisson_BCs(A)
 
 end subroutine setuppoisson_fs
 !--------------------------------------------------------------------------------------------------------------------
