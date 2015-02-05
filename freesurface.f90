@@ -548,6 +548,8 @@ subroutine setuppoisson_fs2(utmp,vtmp,wtmp,dt,A,vof_phase,istep)
            enddo
         endif
         A(i,j,k,7) = sum(A(i,j,k,1:6))
+        if (A(i,j,k,7)<1.d-12) pcmask(i,j,k) = 0 !Fix for isolated cav cells.
+
         A(i,j,k,8) =  -1d0*((utmp(i,j,k)-utmp(i-1,j,k))/dx(i) &
              +  (vtmp(i,j,k)-vtmp(i,j-1,k))/dy(j) &
              +  (wtmp(i,j,k)-wtmp(i,j,k-1))/dz(k))
