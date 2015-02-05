@@ -1935,13 +1935,14 @@ module module_poisson
 !=================================================================================================
   subroutine poi_solve(A,p,maxError,maxit,num_iterations)
     use module_timer
+    use module_grid
     use iso_c_binding, only: c_int,c_int8_t
     implicit none
     include 'mpif.h'
     integer :: ierr, nvalues, ijk, i,j,k
     real(8), dimension(:), allocatable :: values
     real(8), dimension(is:ie,js:je,ks:ke,8), intent(in) :: A
-    real(8), dimension(is:ie,js:je,ks:ke), intent(inout) :: p
+    real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: p
 !    real(8), dimension(is-2:ie+2,js-2:je+2,ks-2:ke+2), intent(inout) :: p
     real(8), intent(in) :: maxError
     integer, intent(in) :: maxit

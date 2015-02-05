@@ -306,21 +306,21 @@ Program paris
            if(Implicit) then   
               call SetupUvel(u,du,rho,mu,rho1,mu1,dt,A)
               if(hypre)then
-                 call poi_solve(A,u(is:ie,js:je,ks:ke),maxError,maxit,it)
+                 call poi_solve(A,u,maxError,maxit,it)
               else
                  call LinearSolver1(A,u,umask,maxError,beta,maxit,itu,ierr)
              endif
              if(mod(itimestep,termout)==0) call calcresidual1(A,u,umask,residualu)
              call SetupVvel(v,dv,rho,mu,rho1,mu1,dt,A)
              if(hypre)then
-                call poi_solve(A,v(is:ie,js:je,ks:ke),maxError,maxit,it)
+                call poi_solve(A,v,maxError,maxit,it)
              else
                 call LinearSolver1(A,v,vmask,maxError,beta,maxit,itv,ierr)
              endif
              if(mod(itimestep,termout)==0) call calcresidual1(A,v,vmask,residualv)
              call SetupWvel(w,dw,rho,mu,rho1,mu1,dt,A)
              if(hypre)then
-                call poi_solve(A,w(is:ie,js:je,ks:ke),maxError,maxit,it)
+                call poi_solve(A,w,maxError,maxit,it)
              else
                 call LinearSolver1(A,w,wmask,maxError,beta,maxit,itw,ierr)
               endif
@@ -350,7 +350,7 @@ Program paris
            ! (div u)*dt < epsilon => div u < epsilon/dt => maxresidual : maxerror/dt 
            if(HYPRE)then
               if (FreeSurface) call pariserror("HYPRE not functional for Free Surface")
-              call poi_solve(A,p(is:ie,js:je,ks:ke),maxError/dt,maxit,it)
+              call poi_solve(A,p,maxError/dt,maxit,it)
               call do_all_ghost(p)
            else
               if (FreeSurface) then
@@ -378,7 +378,7 @@ Program paris
            if (DoFront) then
                  call SetupDensity(dIdx,dIdy,dIdz,A,color)
                  if(hypre)then
-                    call poi_solve(A,color(is:ie,js:je,ks:ke),maxError,maxit,it)
+                    call poi_solve(A,color,maxError,maxit,it)
                  else
                     call NewSolver(A,color,maxError,beta,maxit,it,ierr)
                     if(mod(itimestep,termout)==0) then
@@ -1372,7 +1372,7 @@ subroutine momentumConvectionBCG()
   umask,vmask,wmask,rho,dt,A,tmp,cvof,n1,n2,n3,VolumeSource)
   ! (div u)*dt < epsilon => div u < epsilon/dt => maxresidual : maxerror/dt 
   if(HYPRE)then
-    call poi_solve(A,tmp(is:ie,js:je,ks:ke),maxError/dt,maxit,it)
+    call poi_solve(A,tmp,maxError/dt,maxit,it)
     call ghost_x(tmp,1,req(1:4 ))
     call ghost_y(tmp,1,req(5:8 ))
     call ghost_z(tmp,1,req(9:12)) 
@@ -2129,7 +2129,7 @@ subroutine InitCondition
         call Front2GridVector(fx, fy, fz, dIdx, dIdy, dIdz)
         call SetupDensity(dIdx,dIdy,dIdz,A,color)
         if(hypre) then
-           call poi_solve(A,color(is:ie,js:je,ks:ke),maxError,maxit,it)
+           call poi_solve(A,color,maxError,maxit,it)
            call ghost_x(color,1,req( 1: 4))
            call ghost_y(color,1,req( 5: 8))
            call ghost_z(color,1,req( 9:12))
