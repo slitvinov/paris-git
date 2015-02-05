@@ -190,7 +190,7 @@ subroutine setuppoisson_fs(utmp,vtmp,wtmp,vof_phase,rhot,dt,A,cvof,n1,n2,n3,kap,
            alpha2=al3dnew(n_avg,c_stag)
            if (ABS(n_avg(1))>1d-12) then
               x_test2 = (alpha2 - (n_avg(2)+n_avg(3))/2d0)/n_avg(1)
-              if (x_test2 < 0.5d0) P_gx(i,j,k) = sigma*kap(i+1,j,k)/dx(i+1)
+              !if (x_test2 < 0.5d0) P_gx(i,j,k) = sigma*kap(i+1,j,k)/dx(i+1)
               x_mod(i,j,k) = dxh(i)*(1d0-x_test2)
               if (x_mod(i,j,k)>dxh(i)) x_mod(i,j,k) = dxh(i)
               if (x_mod(i,j,k)<limit*dxh(i)) x_mod(i,j,k) = limit*dxh(i)
@@ -238,7 +238,7 @@ subroutine setuppoisson_fs(utmp,vtmp,wtmp,vof_phase,rhot,dt,A,cvof,n1,n2,n3,kap,
            alpha2=al3dnew(n_avg,c_stag)
            if (ABS(n_avg(2))>1d-12) then
               y_test2 = (alpha2 - (n_avg(1)+n_avg(3))/2d0)/n_avg(2)
-              if (y_test2 < 0.5d0) P_gy(i,j,k) = sigma*kap(i,j+1,k)/dy(j+1)
+              !if (y_test2 < 0.5d0) P_gy(i,j,k) = sigma*kap(i,j+1,k)/dy(j+1)
               y_mod(i,j,k) = dyh(j)*(1d0-y_test2)
               if (y_mod(i,j,k)>dyh(j)) y_mod(i,j,k) = dyh(j)
               if (y_mod(i,j,k)<limit*dyh(j)) y_mod(i,j,k) = limit*dyh(j)
@@ -284,7 +284,7 @@ subroutine setuppoisson_fs(utmp,vtmp,wtmp,vof_phase,rhot,dt,A,cvof,n1,n2,n3,kap,
            alpha2=al3dnew(n_avg,c_stag)
            if (ABS(n_avg(3))>1d-12) then
               z_test2 = (alpha2 - (n_avg(1)+n_avg(2))/2d0)/n_avg(3)
-              if (z_test2 < 0.5d0) P_gz(i,j,k) = sigma*kap(i,j,k+1)/dz(k+1)
+              !if (z_test2 < 0.5d0) P_gz(i,j,k) = sigma*kap(i,j,k+1)/dz(k+1)
               z_mod(i,j,k) = dzh(k)*(1d0-z_test2)
               if (z_mod(i,j,k)>dzh(k)) z_mod(i,j,k) = dzh(k)
               if (z_mod(i,j,k)<limit*dzh(k)) z_mod(i,j,k) = limit*dzh(k)
@@ -356,7 +356,7 @@ subroutine setuppoisson_fs(utmp,vtmp,wtmp,vof_phase,rhot,dt,A,cvof,n1,n2,n3,kap,
            alpha2=al3dnew(n_avg,c_stag)
            if (ABS(n_avg(1))>1d-12) then
               x_test2 = (alpha2 - (n_avg(2)+n_avg(3))/2d0)/n_avg(1)
-              if (x_test2 < 0.5d0) P_gx(i+1,j,k) = sigma*kap(i,j,k)/dx(i)
+              !if (x_test2 < 0.5d0) P_gx(i+1,j,k) = sigma*kap(i,j,k)/dx(i)
               x_mod(i,j,k) = dxh(i)*x_test2
               if (x_mod(i,j,k)>dxh(i)) x_mod(i,j,k) = dxh(i)
               if (x_mod(i,j,k)<limit*dxh(i)) x_mod(i,j,k) = limit*dxh(i)
@@ -402,7 +402,7 @@ subroutine setuppoisson_fs(utmp,vtmp,wtmp,vof_phase,rhot,dt,A,cvof,n1,n2,n3,kap,
            alpha2=al3dnew(n_avg,c_stag)
            if (ABS(n_avg(2))>1d-12) then
               y_test2 = (alpha2 - (n_avg(1)+n_avg(3))/2d0)/n_avg(2)
-              if (y_test2 < 0.5d0) P_gy(i,j+1,k) = sigma*kap(i,j,k)/dy(j)
+              !if (y_test2 < 0.5d0) P_gy(i,j+1,k) = sigma*kap(i,j,k)/dy(j)
               y_mod(i,j,k) = dyh(j)*y_test2
               if (y_mod(i,j,k)>dyh(j)) y_mod(i,j,k) = dyh(j)
               if (y_mod(i,j,k)<limit*dyh(j)) y_mod(i,j,k) = limit*dyh(j)
@@ -448,7 +448,7 @@ subroutine setuppoisson_fs(utmp,vtmp,wtmp,vof_phase,rhot,dt,A,cvof,n1,n2,n3,kap,
            alpha2=al3dnew(n_avg,c_stag)
            if (ABS(n_avg(3))>1d-12) then
               z_test2 = (alpha2 - (n_avg(1)+n_avg(2))/2d0)/n_avg(3)
-              if (z_test2 < 0.5d0) P_gz(i,j,k+1) = sigma*kap(i,j,k)/dz(k)
+              !if (z_test2 < 0.5d0) P_gz(i,j,k+1) = sigma*kap(i,j,k)/dz(k)
               z_mod(i,j,k) = dzh(k)*z_test2
               if (z_mod(i,j,k)>dzh(k)) z_mod(i,j,k) = dzh(k)
               if (z_mod(i,j,k)<limit*dzh(k)) z_mod(i,j,k) = limit*dzh(k)
