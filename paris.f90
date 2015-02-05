@@ -485,6 +485,9 @@ Program paris
         	call calcStats
         	if( test_KHI2D .or. test_HF ) call h_of_KHI2D(itimestep,time)
         endif
+        if(mod(itimestep,nsteps_probe)==0) then
+           call probes
+        endif
         call my_timer(2)
         if(mod(itimestep,nbackup)==0) then 
            if ( DoFront ) then 
@@ -733,9 +736,6 @@ function get_cfl_and_check(deltaT)
   if(get_cfl_and_check.gt.cflmax_allowed) call pariserror("CFL too large")
 end function get_cfl_and_check
 
-!=================================================================================================
-! subroutine calcStats
-!-------------------------------------------------------------------------------------------------
 
 subroutine interface_max_min
 
@@ -773,6 +773,9 @@ subroutine interface_max_min
 
 end subroutine interface_max_min
 
+!=================================================================================================
+! subroutine calcStats
+!-------------------------------------------------------------------------------------------------
 subroutine calcStats
   use module_grid
   use module_flow
@@ -906,6 +909,35 @@ subroutine calcStats
   call MPI_REDUCE(averages, allaverages, 10*(Ny+2), MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_Domain, ierr)
 
 end subroutine calcStats
+
+!=================================================================================================
+! subroutine probes
+!-------------------------------------------------------------------------------------------------
+   subroutine probes
+      use module_flow
+      use module_VOF
+
+      integer :: iprobe,i,j,k
+
+      do iprobe = 1,num_probes
+         i = ijk_probe(iprobe,1)
+         j = ijk_probe(iprobe,2)
+         k = ijk_probe(iprobe,3)
+         if (  i >= is .and. i <= ie .and. & 
+               j >= js .and. j <= je .and. & 
+               k >= ks .and. k <= ke ) then 
+            dat_probe(iprobe,1) = 0.5d0*(u(i,j,k)+u(i+1,j,k))
+            dat_probe(iprobe,2) = 0.5d0*(v(i,j,k)+v(i,j+1,k))
+            dat_probe(iprobe,3) = 0.5d0*(w(i,j,k)+w(i,j,k+1))
+            dat_probe(iprobe,4) = cvof(i,j,k)
+            dat_probe(iprobe,5) = p(i,j,k)
+            OPEN(UNIT=300+iprobe,FILE=TRIM(out_path)//'/probe-'//TRIM(int2text(iprobe,padding))//'.dat')
+            write(300+iprobe,'(6(E23.16,1X))') time,dat_probe(iprobe,:)
+         end if       
+      end do ! iprobe
+
+   end subroutine probes
+
 !=================================================================================================
 subroutine momentumConvection()
   use module_flow
@@ -2267,7 +2299,8 @@ subroutine ReadParameters
                         radius_gas_inject,            radius_liq_inject,     radius_gap_liqgas,  &
                         jetcenter_yc2yLength,         jetcenter_zc2zLength,                      &
                         NozzleThick2Cell,             NozzleLength,                              &
-                        cflmax_allowed,               AdvectionScheme, out_mom,   output_fields
+                        cflmax_allowed,               AdvectionScheme, out_mom,   output_fields, & 
+                        nsteps_probe,  num_probes,    ijk_probe
  
   Nx = 0; Ny = 4; Nz = 4 ! cause absurd input file that lack nx value to fail. 
   Ng=2;xLength=1d0;yLength=1d0;zLength=1d0
@@ -2300,6 +2333,7 @@ subroutine ReadParameters
   AdvectionScheme = 'QUICK'
   out_mom = .false.
   output_fields = [ .true. , .true. , .true., .true., .true. ]
+  nsteps_probe =1; num_probes = 0; ijk_probe = 1 
 
   in=1
   out=2

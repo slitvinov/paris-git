@@ -312,6 +312,11 @@ module module_flow
   integer :: maxStep, itmax, iTimeStep, iTimeStepRestart
   integer :: nstatarray
   character(20) :: AdvectionScheme
+  
+  integer :: num_probes
+  integer, parameter :: max_num_probes = 20 
+  real(8) :: dat_probe(max_num_probes,5)  !u,v,z,c,p
+  integer :: ijk_probe(max_num_probes,3)  !i,j,k
 
 end module module_flow
 !=================================================================================================
@@ -368,6 +373,7 @@ module module_IO
   integer :: padding
   integer :: opened=0, opened_p=0
   integer :: nout, out, output_format, nbackup, nstats, termout, nfile
+  integer :: nsteps_probe
   character(len=20) :: out_path, x_file, y_file, z_file
   logical :: read_x, read_y, read_z, restart, ICOut, restartFront, restartAverages, zip_data
   logical :: out_mom, output_fields(5)
