@@ -936,6 +936,19 @@ end subroutine calcStats
          end if       
       end do ! iprobe
 
+      do iprobe = 1,num_probes_cvof
+         i = ijk_probe_cvof(iprobe,1)
+         j = ijk_probe_cvof(iprobe,2)
+         k = ijk_probe_cvof(iprobe,3)
+         if (  i >= is .and. i <= ie .and. & 
+               j >= js .and. j <= je .and. & 
+               k >= ks .and. k <= ke ) then 
+            dat_probe_cvof(iprobe) = cvof(i,j,k)
+            OPEN(UNIT=400+iprobe,FILE=TRIM(out_path)//'/probe_cvof-'//TRIM(int2text(iprobe,padding))//'.dat')
+            write(400+iprobe,'(2(E23.16,1X))') time,dat_probe_cvof(iprobe)
+         end if       
+      end do ! iprobe
+
    end subroutine probes
 
 !=================================================================================================
@@ -2300,7 +2313,7 @@ subroutine ReadParameters
                         jetcenter_yc2yLength,         jetcenter_zc2zLength,                      &
                         NozzleThick2Cell,             NozzleLength,                              &
                         cflmax_allowed,               AdvectionScheme, out_mom,   output_fields, & 
-                        nsteps_probe,  num_probes,    ijk_probe
+                        nsteps_probe,  num_probes,    ijk_probe,  num_probes_cvof,  ijk_probe_cvof
  
   Nx = 0; Ny = 4; Nz = 4 ! cause absurd input file that lack nx value to fail. 
   Ng=2;xLength=1d0;yLength=1d0;zLength=1d0
@@ -2333,7 +2346,7 @@ subroutine ReadParameters
   AdvectionScheme = 'QUICK'
   out_mom = .false.
   output_fields = [ .true. , .true. , .true., .true., .true. ]
-  nsteps_probe =1; num_probes = 0; ijk_probe = 1 
+  nsteps_probe =1; num_probes = 0; ijk_probe = 1; num_probes_cvof = 0; ijk_probe_cvof = 1 
 
   in=1
   out=2

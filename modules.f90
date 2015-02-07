@@ -313,10 +313,12 @@ module module_flow
   integer :: nstatarray
   character(20) :: AdvectionScheme
   
-  integer :: num_probes
+  integer :: num_probes,num_probes_cvof
   integer, parameter :: max_num_probes = 20 
   real(8) :: dat_probe(max_num_probes,5)  !u,v,z,c,p
   integer :: ijk_probe(max_num_probes,3)  !i,j,k
+  real(8) :: dat_probe_cvof(max_num_probes)  
+  integer :: ijk_probe_cvof(max_num_probes,3)  !i,j,k
 
 end module module_flow
 !=================================================================================================
