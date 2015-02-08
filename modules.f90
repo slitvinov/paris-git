@@ -846,7 +846,11 @@ module module_BC
              w(is-1,j,k)=0d0
           enddo
        enddo
-       flux=sum(u(is-1,js:je,ks:ke))
+       do j=js,je
+       	do k=ks,ke
+       		flux = flux + u(is-1,j,k)
+       	enddo
+       enddo
     endif
     call MPI_ALLREDUCE(flux, tflux, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr)
     uaverage=tflux/(ny*nz)

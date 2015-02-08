@@ -824,7 +824,8 @@ end subroutine do_droplet_test
     !WRITE(*,*) 'ise In rank ', rank, ise, iee, jse, jee, kse, kee
 
     ! Allocating arrays
-    allocate(matrix_small(imin:imax,jmin:jmax,kmin:kmax))
+    
+    allocate(matrix_small(ise:iee,jse:jee,kse:kee))
     allocate(x_axis(ise:iee+1),y_axis(jse:jee+1),z_axis(kse:kee+1))
 
     ! Defining mesh axys
@@ -848,7 +849,7 @@ end subroutine do_droplet_test
     dims_vof(1) = iee - ise + 1
     dims_vof(2) = jee - jse + 1
     dims_vof(3) = kee - kse + 1
-
+    
     ! Debugging messages
     !WRITE(*,*) 'Limits In rank ', rank, iee, ise, jee, jse, kee, kse
 
@@ -859,7 +860,7 @@ end subroutine do_droplet_test
     ghosttop(1) = iee-ie
     ghosttop(2) = jee-je
     ghosttop(3) = kee-ke
-
+ 
     ! Writing multi mesh file
     if (rank == 0) call write_master(TRIM(path)//'/fbasic',index, time, timestep)
 
@@ -880,51 +881,58 @@ end subroutine do_droplet_test
     ierr2 = dbaddiopt(optlist, DBOPT_HI_OFFSET, ghosttop)
     ierr2 = dbaddiopt(optlist, DBOPT_LO_OFFSET, ghostlow)
 
-
+  
     ! Appending mesh to *.silo file
     ierr2 = dbputqm (dbfile, 'srm', 18, "x", 1, &
          "y", 1, "z", 1, x_axis, y_axis, z_axis, dims_mesh, 3, &
          DB_DOUBLE, DB_COLLINEAR, optlist, ierr2)
-    matrix_small = REAL(cvof)
+         
+    
+    do k=kse,kee; do j=jse,jee; do i=ise,iee;
+       matrix_small(i,j,k)=cvof(i,j,k)
+    enddo; enddo; enddo
 
     ! Appending cvof variable to *.silo file  
     ierr2 = dbputqv1 (dbfile, 'cvof', 4, 'srm', 3, &
-         matrix_small(ise:iee,jse:jee,kse:kee), dims_vof, &
+         matrix_small, dims_vof, &
          3, DB_F77NULL, 0, DB_FLOAT, DB_ZONECENT, DB_F77NULL, ierr2) 
       
-    matrix_small = REAL(p)     
+    do k=kse,kee; do j=jse,jee; do i=ise,iee;
+       matrix_small(i,j,k)=p(i,j,k)
+    enddo; enddo; enddo    
+    
 	! Appending Pressure variable to *.silo file  
     ierr2 = dbputqv1 (dbfile, 'pres', 4, 'srm', 3, &
-         matrix_small(ise:iee,jse:jee,kse:kee), dims_vof, &
+         matrix_small, dims_vof, &
          3, DB_F77NULL, 0, DB_FLOAT, DB_ZONECENT, DB_F77NULL, ierr2)
-         
-    do k=kmin,kmax; do j=jmin,jmax; do i=imin,imax;
+           
+    do k=kse,kee; do j=jse,jee; do i=ise,iee;
        matrix_small(i,j,k)=0.5*(u(i,j,k)+u(i-1,j,k))
     enddo; enddo; enddo
         
     ! Appending u_component variable to *.silo file  
     ierr2 = dbputqv1 (dbfile, 'uvel', 4, 'srm', 3, &
-         matrix_small(ise:iee,jse:jee,kse:kee), dims_vof, &
+         matrix_small, dims_vof, &
          3, DB_F77NULL, 0, DB_FLOAT, DB_ZONECENT, DB_F77NULL, ierr2) 
-    do k=kmin,kmax; do j=jmin,jmax; do i=imin,imax;
+          
+    do k=kse,kee; do j=jse,jee; do i=ise,iee;
        matrix_small(i,j,k)=0.5*(v(i,j,k)+v(i,j-1,k))
     enddo; enddo; enddo
          
     ! Appending v_component variable to *.silo file  
     ierr2 = dbputqv1 (dbfile, 'vvel', 4, 'srm', 3, &
-         matrix_small(ise:iee,jse:jee,kse:kee), dims_vof, &
-         3, DB_F77NULL, 0, DB_FLOAT, DB_ZONECENT, DB_F77NULL, ierr2) 
-	do k=kmin,kmax; do j=jmin,jmax; do i=imin,imax;
+         matrix_small, dims_vof, &
+         3, DB_F77NULL, 0, DB_FLOAT, DB_ZONECENT, DB_F77NULL, ierr2)
+          
+	do k=kse,kee; do j=jse,jee; do i=ise,iee;
        matrix_small(i,j,k)=0.5*(w(i,j,k)+w(i,j,k-1))
     enddo; enddo; enddo
 	
     ! Appending w_component variable to *.silo file  
     ierr2 = dbputqv1 (dbfile, 'wvel', 4, 'srm', 3, &
-         matrix_small(ise:iee,jse:jee,kse:kee), dims_vof, &
+         matrix_small, dims_vof, &
          3, DB_F77NULL, 0, DB_FLOAT, DB_ZONECENT, DB_F77NULL, ierr2) 
     
-    
-
     ! Closing *.silo file		
     ierr2 = dbclose(dbfile)
 

@@ -568,8 +568,8 @@ contains
          end do; end do; end do
       else if ( inject_type == 4 ) then
          do i = is,ie; do j=js,je; do k = ks,ke
-            ryz = sqrt( (y(j) - jetcenter_yc)**2.d0 + (z(k) - jetcenter_zc)**2.d0 )
-            if ( x(i) < NozzleLength .and. ryz < radius_liq_inject ) then 
+            ryz = sqrt((y(j) - jetcenter_yc)**2.d0 + (z(k) - jetcenter_zc)**2.d0 )
+            if ( ryz < radius_liq_inject .and. x(i) < NozzleLength) then 
                cvof(i,j,k) = 1.d0
                vof_flag(i,j,k) = 1
             end if ! 
