@@ -483,6 +483,7 @@ Program paris
 !--------------------------------------------OUTPUT-----------------------------------------------
         if(mod(itimestep,nstats)==0) then
         	call calcStats
+         if ( DoTurbStats ) call calcTurbStats(itimestep)
         	if( test_KHI2D .or. test_HF ) call h_of_KHI2D(itimestep,time)
         endif
         if(mod(itimestep,nsteps_probe)==0) then
@@ -701,6 +702,7 @@ end subroutine project_velocity
 subroutine TimeStepSize(deltaT)
   use module_grid
   use module_flow
+  use module_2phase
   implicit none
   include "mpif.h"
   real(8) :: deltaT, h, vmax, dtadv, mydt
@@ -710,6 +712,7 @@ subroutine TimeStepSize(deltaT)
     h  = minval(dx)
     vmax = maxval(sqrt(u(is:ie,js:je,ks:ke)**2+v(is:ie,js:je,ks:ke)**2+w(is:ie,js:je,ks:ke)**2))
     vmax = max(vmax,1d-3)
+    vmax = max(vmax,max(ugas_inject,uliq_inject))
   !  dtadv  = min(h/vmax,2d0*nu_min/vmax**2)
     dtadv  = h/vmax
     mydt = CFL*dtadv
@@ -787,6 +790,8 @@ subroutine calcStats
   real(8) :: kenergy,vort2,enstrophy
   real(8), save :: W_int=-0.02066
   real(8), save :: height4Stats=0.875d0
+  integer :: i0,j0,k0
+  real(8) :: stencil3x3(-1:1,-1:1,-1:1),mxyz(3),AREA3D
 
   nstatarray=24
   if(nstatarray > 100) call pariserror("nstatarray too large")
@@ -824,16 +829,26 @@ subroutine calcStats
      end if ! (DoVOF)
      ! interfacial area
      if (DoVOF .and. test_PhaseInversion) then
-        if (     max((cvof(i+1,j,k)-0.5d0)/abs(cvof(i+1,j,k)-0.5d0),0.d0) & 
-             - max((cvof(i-1,j,k)-0.5d0)/abs(cvof(i-1,j,k)-0.5d0),0.d0) /= 0.d0 &
-             .or. max((cvof(i,j+1,k)-0.5d0)/abs(cvof(i,j+1,k)-0.5d0),0.d0) & 
-             - max((cvof(i,j-1,k)-0.5d0)/abs(cvof(i,j-1,k)-0.5d0),0.d0) /= 0.d0 &
-             .or. max((cvof(i,j,k+1)-0.5d0)/abs(cvof(i,j,k+1)-0.5d0),0.d0) & 
-             - max((cvof(i,j,k-1)-0.5d0)/abs(cvof(i,j,k-1)-0.5d0),0.d0) /= 0.d0 & 
-             ) then
-           if ( vof_flag(i,j,k) == 2 ) & 
-                mystats(19) = mystats(19) + dx(i)*dy(j)
-        end if ! cvof
+         ! MODEMI version of interface area 
+!        if (     max((cvof(i+1,j,k)-0.5d0)/abs(cvof(i+1,j,k)-0.5d0),0.d0) & 
+!             - max((cvof(i-1,j,k)-0.5d0)/abs(cvof(i-1,j,k)-0.5d0),0.d0) /= 0.d0 &
+!             .or. max((cvof(i,j+1,k)-0.5d0)/abs(cvof(i,j+1,k)-0.5d0),0.d0) & 
+!             - max((cvof(i,j-1,k)-0.5d0)/abs(cvof(i,j-1,k)-0.5d0),0.d0) /= 0.d0 &
+!             .or. max((cvof(i,j,k+1)-0.5d0)/abs(cvof(i,j,k+1)-0.5d0),0.d0) & 
+!             - max((cvof(i,j,k-1)-0.5d0)/abs(cvof(i,j,k-1)-0.5d0),0.d0) /= 0.d0 & 
+!             ) then
+!           if ( vof_flag(i,j,k) == 2 ) & 
+!                mystats(19) = mystats(19) + dx(i)*dy(j)
+!        end if ! cvof
+         
+         ! PLIC interface area 
+         if ( cvof(i,j,k) > 0.d0 .and. cvof(i,j,k) < 1.d0 ) then 
+            do i0=-1,1; do j0=-1,1; do k0=-1,1
+               stencil3x3(i0,j0,k0) =cvof(i+i0,j+j0,k+k0)
+            enddo;enddo;enddo
+            call mycs(stencil3x3,mxyz)
+            mystats(19) = mystats(19) + AREA3D(mxyz,cvof(i,j,k))
+         end if ! cvof(i,j,k)
      end if ! DoVOF
      ! potential energy (considering gravity in y direction)  
      if(DoVOF .and. test_PhaseInversion) then
@@ -951,6 +966,206 @@ end subroutine calcStats
 
    end subroutine probes
 
+!=================================================================================================
+!  subroutine calcTurbStats
+!-------------------------------------------------------------------------------------------------
+   subroutine calcTurbStats(istep)
+      use module_flow
+      use module_VOF
+      implicit none
+      include "mpif.h"
+      
+      integer, intent(in) :: istep
+      real(8) :: uc(is:ie,js:je,ks:ke),  vc(is:ie,js:je,ks:ke), & 
+                 wc(is:ie,js:je,ks:ke),area(is:ie,js:je,ks:ke)
+      integer :: i0,j0,k0
+      real(8) :: stencil3x3(-1:1,-1:1,-1:1),mxyz(3),AREA3D
+      integer :: counts,cx,cy,i,j,k
+      integer :: req(2),sta(MPI_STATUS_SIZE,2),ierr,irank,irank_sum
+      character(len=30) :: filename 
+      logical :: file_exist
+      real(8), dimension(:,:,:,:), allocatable :: turb_vars_all !i,j,ivar,rank 
+      real(8), dimension(:,:,:), allocatable :: turb_vars_map !i,j,ivar
+
+      ! initialize
+      if ( .not. calcTurbStats_initialized ) then
+         calcTurbStats_initialized = .true.
+         if ( TurbStatsOrder == 1 ) then 
+            num_turb_vars = 6 
+         else if ( TurbStatsOrder == 2 ) then 
+            num_turb_vars = 27 
+         else if ( TurbStatsOrder == 3 ) then
+            num_turb_vars = 83
+         else 
+            call pariserror("Statistics of turbulence over 3rd order!")
+         end if ! TurbStatsOrder
+         allocate(turb_vars(is:ie,js:je,num_turb_vars))
+         turb_vars = 0.d0 
+         
+         iSumTurbStats = 0 
+      end if ! calcTurbStats_initialized
+
+      ! simulation variables at cell centers
+      uc=0.d0;vc=0.d0;wc=0.d0;area=0.d0
+      do i= is,ie; do j=js,je; do k=ks,ke
+         uc(i,j,k) = 0.5d0*(u(i,j,k) + u(i+1,j,k))
+         vc(i,j,k) = 0.5d0*(v(i,j,k) + v(i,j+1,k))
+         wc(i,j,k) = 0.5d0*(w(i,j,k) + w(i,j,k+1))
+              
+         ! calculate interface area
+         if ( cvof(i,j,k) > 0.d0 .and. cvof(i,j,k) < 1.d0 ) then 
+            do i0=-1,1; do j0=-1,1; do k0=-1,1
+               stencil3x3(i0,j0,k0) =cvof(i+i0,j+j0,k+k0)
+            enddo;enddo;enddo
+            call mycs(stencil3x3,mxyz)
+            area(i,j,k) = AREA3D(mxyz,cvof(i,j,k))
+         end if ! cvof
+      end do; end do; end do
+      
+      ! calculate turbulent variables and sum over z direction
+      iSumTurbStats = iSumTurbStats + 1  
+      do k = ks,ke
+         ! 1st order stats (1-6)
+         if (TurbStatsOrder >= 1 ) then 
+         turb_vars(is:ie,js:je,1) = turb_vars(is:ie,js:je,1) + uc(is:ie,js:je,k)
+         turb_vars(is:ie,js:je,2) = turb_vars(is:ie,js:je,2) + vc(is:ie,js:je,k)
+         turb_vars(is:ie,js:je,3) = turb_vars(is:ie,js:je,3) + wc(is:ie,js:je,k)
+         turb_vars(is:ie,js:je,4) = turb_vars(is:ie,js:je,4) + p(is:ie,js:je,k)
+         turb_vars(is:ie,js:je,5) = turb_vars(is:ie,js:je,5) + cvof(is:ie,js:je,k)
+         turb_vars(is:ie,js:je,6) = turb_vars(is:ie,js:je,6) + area(is:ie,js:je,k)
+         end if ! TurStatsOrder 
+
+         ! 2nd order stats (7-27)
+         if ( TurbStatsOrder >= 2 ) then 
+         turb_vars(is:ie,js:je, 7) = turb_vars(is:ie,js:je,7) & 
+                                   + uc(is:ie,js:je,k)*uc(is:ie,js:je,k)
+         turb_vars(is:ie,js:je, 8) = turb_vars(is:ie,js:je,8) & 
+                                   + vc(is:ie,js:je,k)*vc(is:ie,js:je,k)
+         turb_vars(is:ie,js:je, 9) = turb_vars(is:ie,js:je,9) & 
+                                   + wc(is:ie,js:je,k)*wc(is:ie,js:je,k)
+         turb_vars(is:ie,js:je,10) = turb_vars(is:ie,js:je,10) & 
+                                   + uc(is:ie,js:je,k)*vc(is:ie,js:je,k)
+         turb_vars(is:ie,js:je,11) = turb_vars(is:ie,js:je,11) & 
+                                   + uc(is:ie,js:je,k)*wc(is:ie,js:je,k)
+         turb_vars(is:ie,js:je,12) = turb_vars(is:ie,js:je,12) & 
+                                   + vc(is:ie,js:je,k)*wc(is:ie,js:je,k)
+         turb_vars(is:ie,js:je,13) = turb_vars(is:ie,js:je,13) & 
+                                   +  p(is:ie,js:je,k)* p(is:ie,js:je,k)
+         turb_vars(is:ie,js:je,14) = turb_vars(is:ie,js:je,14) & 
+                                   +  p(is:ie,js:je,k)*uc(is:ie,js:je,k)
+         turb_vars(is:ie,js:je,15) = turb_vars(is:ie,js:je,15) & 
+                                   +  p(is:ie,js:je,k)*vc(is:ie,js:je,k)
+         turb_vars(is:ie,js:je,16) = turb_vars(is:ie,js:je,16) & 
+                                   +  p(is:ie,js:je,k)*wc(is:ie,js:je,k)
+         turb_vars(is:ie,js:je,17) = turb_vars(is:ie,js:je,17) & 
+                                   + cvof(is:ie,js:je,k)*cvof(is:ie,js:je,k)
+         turb_vars(is:ie,js:je,18) = turb_vars(is:ie,js:je,18) & 
+                                   + cvof(is:ie,js:je,k)*uc(is:ie,js:je,k)
+         turb_vars(is:ie,js:je,19) = turb_vars(is:ie,js:je,19) & 
+                                   + cvof(is:ie,js:je,k)*vc(is:ie,js:je,k)
+         turb_vars(is:ie,js:je,20) = turb_vars(is:ie,js:je,20) & 
+                                   + cvof(is:ie,js:je,k)*wc(is:ie,js:je,k)
+         turb_vars(is:ie,js:je,21) = turb_vars(is:ie,js:je,21) & 
+                                   + area(is:ie,js:je,k)*area(is:ie,js:je,k)
+         turb_vars(is:ie,js:je,22) = turb_vars(is:ie,js:je,22) & 
+                                   + area(is:ie,js:je,k)*uc(is:ie,js:je,k)
+         turb_vars(is:ie,js:je,23) = turb_vars(is:ie,js:je,23) & 
+                                   + area(is:ie,js:je,k)*vc(is:ie,js:je,k)
+         turb_vars(is:ie,js:je,24) = turb_vars(is:ie,js:je,24) & 
+                                   + area(is:ie,js:je,k)*wc(is:ie,js:je,k)
+         turb_vars(is:ie,js:je,25) = turb_vars(is:ie,js:je,25) & 
+                                   +  p(is:ie,js:je,k)*cvof(is:ie,js:je,k)
+         turb_vars(is:ie,js:je,26) = turb_vars(is:ie,js:je,26) & 
+                                   +  p(is:ie,js:je,k)*area(is:ie,js:je,k)
+         turb_vars(is:ie,js:je,27) = turb_vars(is:ie,js:je,27) & 
+                                   + cvof(is:ie,js:je,k)*area(is:ie,js:je,k)
+         end if ! TurbStatsOrder
+
+         ! 3rd order stats
+         if ( TurbStatsOrder >= 3 ) then 
+         end if ! TurbStatsOrder
+      end do ! 
+
+      ! Output turbulence statistics
+     if ( mod(iStep,nStepOutputTurbStats) == 0 ) then 
+      
+      if ( rank == 0 ) then 
+         filename=TRIM(out_path)//'/turb-vars.dat'
+         inquire(FILE=filename,EXIST=file_exist)
+         if ( file_exist ) then 
+            OPEN(UNIT=101,FILE=filename, STATUS='replace')
+         else 
+            OPEN(UNIT=101,FILE=filename, STATUS='new')
+         end if ! file_exist
+         write(101,*) "#",iSumTurbStats
+      end if ! rank 
+
+      if ( nPdomain > 1 ) then 
+         if ( rank == 0 ) then 
+            allocate(turb_vars_all(Mx,My,num_turb_vars,0:nPdomain-1))
+            allocate(turb_vars_map(Nx,Ny,num_turb_vars))
+            turb_vars_all = 0.d0 
+            turb_vars_map = 0.d0 
+         end if ! rank 
+         ! collect all data to root
+         counts = Mx*My*num_turb_vars   ! assuming same number of cells in each block
+         if ( rank > 0 ) then
+            call MPI_ISEND(turb_vars(is,js,1),counts, & 
+                           MPI_DOUBLE_PRECISION, 0, 14, MPI_COMM_WORLD, req(1), ierr)
+            call MPI_WAIT(req(1),sta(:,1),ierr)
+         else
+            do irank = 1,nPdomain-1
+               call MPI_IRECV(turb_vars_all(1,1,1,irank),counts, & 
+                              MPI_DOUBLE_PRECISION, irank, 14, MPI_COMM_WORLD, req(2), ierr)
+               call MPI_WAIT(req(2),sta(:,2),ierr)
+            end do ! irank
+         end if ! rank
+
+         ! sum over z direction and map to global 
+         if ( rank == 0 ) then
+            turb_vars_all(:,:,:,0) = turb_vars(:,:,:)
+            do irank = 0,nPdomain-1,nPz
+               do irank_sum = 0,npz-1
+                  cx = irank/(nPy*nPz)
+                  cy = (irank-cx*nPy*nPz)/nPz 
+                  i = cx*Mx + 1
+                  j = cy*My + 1
+                  turb_vars_map(i:i+Mx-1,j:j+My-1,:) & 
+                     = turb_vars_map(i:i+Mx-1,j:j+My-1,:) & 
+                     + turb_vars_all(1:  Mx  ,1:  My  ,:,irank+irank_sum)
+               end do ! irank_sum
+            end do ! irank
+         end if ! nPz
+            
+         ! output
+         if ( rank == 0 ) then 
+            do i=1,Nx
+               do j=1,Ny
+                  write(101,'(2(E15.8,1X),83(E25.16,1X))') & 
+                  (dble(i)-0.5d0)*dx(is),& 
+                  (dble(j)-0.5d0)*dy(js),& 
+                  turb_vars_map(i,j,1:num_turb_vars)
+               end do !j 
+               write(101,*)
+            end do ! i
+         end if ! rank
+      else 
+         do i=is,ie
+            do j=js,je
+               write(101,'(2(E15.8,1X),83(E25.16,1X))') & 
+               x(i),y(j),turb_vars(i,j,1:num_turb_vars)
+            end do !j 
+            write(101,*)
+         end do ! i
+      end if ! nPdomain
+      if ( rank == 0 ) then  
+         CLOSE(UNIT=101)
+         deallocate(turb_vars_all)
+         deallocate(turb_vars_map)
+      end if ! rank
+     end if !iStep
+
+   end subroutine calcTurbStats
 !=================================================================================================
 subroutine momentumConvection()
   use module_flow
@@ -2313,7 +2528,9 @@ subroutine ReadParameters
                         jetcenter_yc2yLength,         jetcenter_zc2zLength,                      &
                         NozzleThick2Cell,             NozzleLength,                              &
                         cflmax_allowed,               AdvectionScheme, out_mom,   output_fields, & 
-                        nsteps_probe,  num_probes,    ijk_probe,  num_probes_cvof,  ijk_probe_cvof
+                        nsteps_probe,  num_probes,    ijk_probe,                                 &
+                        num_probes_cvof,  ijk_probe_cvof,                                        & 
+                        DoTurbStats,   nStepOutputTurbStats, TurbStatsOrder
  
   Nx = 0; Ny = 4; Nz = 4 ! cause absurd input file that lack nx value to fail. 
   Ng=2;xLength=1d0;yLength=1d0;zLength=1d0
@@ -2347,6 +2564,7 @@ subroutine ReadParameters
   out_mom = .false.
   output_fields = [ .true. , .true. , .true., .true., .true. ]
   nsteps_probe =1; num_probes = 0; ijk_probe = 1; num_probes_cvof = 0; ijk_probe_cvof = 1 
+  DoTurbStats = .false.; nStepOutputTurbStats = 1000; TurbStatsOrder = 2
 
   in=1
   out=2
