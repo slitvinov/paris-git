@@ -251,7 +251,7 @@ Program paris
                  call vofsweeps(itimestep)
               endif
               call my_timer(4)
-              call get_all_heights(0)
+              call get_all_heights(itimestep)
               call my_timer(5)
               call linfunc(rho,rho1,rho2,DensMean)
               if ((.not.STGhost).and.(.not.FreeSurface).and.(sigma.gt.TINY_DOUBLE)) &
@@ -259,7 +259,7 @@ Program paris
               call my_timer(8)
               if (FreeSurface) then
                  call get_normals()
-                 call get_all_curvatures(kappa_fs,0)
+                 call get_all_curvatures(kappa_fs,itimestep)
                  call set_topology(vof_phase,itimestep) !vof_phase updated in vofsweeps
               endif
            endif
@@ -528,8 +528,9 @@ Program paris
                   write(out,'("Step:",I9," Iterations:",I9," cpu(s):",f10.2)')itimestep,it,end_time-start_time
                endif
                if (DoVOF .and. debug_par) then
-                  call get_all_curvatures(tmp,nfile)
-                  call get_all_heights(nfile)
+                  !call get_all_curvatures(tmp,nfile)
+                  !call get_all_heights(nfile)
+                  call write_par_var("VOF       ",nfile,cvof)           
                   if (FreeSurface) then
                      call write_par_var("P_gx      ",nfile,P_gx)
                      call write_par_var("P_gy      ",nfile,P_gy)
