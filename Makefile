@@ -134,7 +134,7 @@ pariscompare: compare.o
 
 
 pariscompare3D: compare_4cols.o
-	$(CC) -o pariscompare3D compare_4cols.o
+	$(CC) -o pariscompare3D compare_4cols.o -lm
 	mv pariscompare3D $(BINDIR)
 
 parisdeconv: parisdeconv.o

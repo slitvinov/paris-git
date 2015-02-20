@@ -28,6 +28,8 @@ int main(int argc, char * argv[]) // argc: argument count, # of arguments read f
   int n_pfiles=0;
   double cell_tolerance;
   char var[20];
+  double error2=0., errmax=0.;
+  int total_found=0;
   par_holder = fopen(argv[1],"r");
   if(par_holder == NULL)
     {
@@ -76,7 +78,7 @@ int main(int argc, char * argv[]) // argc: argument count, # of arguments read f
       printf("Error in reading file name in holder file");
       exit(1);
     }
-    n_lines = 0;
+    n_lines = 0; 
     par_file = fopen(filename,"r");
     read_par_line = fscanf(par_file,"%lg %lg %lg %lg",&ref[0],&ref[1],&ref[2],&ref[3]);
     if (read_par_line == EOF) {
@@ -88,6 +90,7 @@ int main(int argc, char * argv[]) // argc: argument count, # of arguments read f
     while ((read_par_line != EOF) && (n_lines < MAXLINES)) { 
       double comp[4];
       short int found;
+  
       n_lines++;
       // Now match line in serial file and calculate difference
       found = 0;
@@ -100,8 +103,11 @@ int main(int argc, char * argv[]) // argc: argument count, # of arguments read f
       	if ((fabsf(ref[0]-comp[0])<cell_tolerance) && (fabsf(ref[1]-comp[1])<cell_tolerance) && (fabsf(ref[2]-comp[2])<cell_tolerance)) {
       	  //calc diff
       	  diff = ref[3]-comp[3];
+	  error2+= diff*diff;
+	  if (abs(diff) > errmax) { errmax = abs(diff); }
       	  //write diff to file
       	  found = 1;
+	  total_found++;
       	  //call writing file
       	  write_diffs_file(comp[0],comp[1],comp[2],diff,head,var);
       	  head = 1;
@@ -121,10 +127,11 @@ int main(int argc, char * argv[]) // argc: argument count, # of arguments read f
       
       read_par_line = fscanf(par_file,"%lg %lg %lg %lg",&ref[0],&ref[1],&ref[2],&ref[3]);
     } //parallel line loop
-
     printf("Number of lines read in file %s: %d \n",filename,n_lines);
     fclose(par_file);
   }
+  if (total_found >= 1) {error2 = sqrt(error2/total_found);}
+  printf("L2 norm: %14.9f L_inf norm: %14.9f \n",error2,errmax);
   fclose(mono);
   fclose(par_holder);
   return 0;
