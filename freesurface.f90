@@ -110,7 +110,7 @@
 
 end subroutine set_topology
 !-------------------------------------------------------------------------------------------------
-subroutine setuppoisson_fs(utmp,vtmp,wtmp,vof_phase,rhot,dt,A,cvof,n1,n2,n3,kap,iout)    
+subroutine setuppoisson_fs(utmp,vtmp,wtmp,vof_phase,rhot,dt,A,cvof,n1,n2,n3,kap,iout)
   use module_grid
   use module_BC
   use module_2phase
@@ -139,19 +139,20 @@ subroutine setuppoisson_fs(utmp,vtmp,wtmp,vof_phase,rhot,dt,A,cvof,n1,n2,n3,kap,
   do k=ks,ke; do j=js,je; do i=is,ie
      !----Cav-liquid neighbours, set P_g in cavity cells
      if(vof_phase(i,j,k)==1) then
-        if (vof_phase(i+1,j,k)==0) then
-           P_gx(i,j,k) = sigma*kap(i,j,k)/dx(i) !!filaments and droplets of one cell will be an issue here
-           if (P_gx(i,j,k) /= P_gx(i,j,k)) write(*,*)'WARNING, P_g NaN x-dir'
-        endif
-        if (vof_phase(i,j+1,k)==0) then
-           P_gy(i,j,k) = sigma*kap(i,j,k)/dy(j)
-           if (P_gy(i,j,k) /= P_gy(i,j,k)) write(*,*)'WARNING, P_g NaN y-dir'
-        endif
-        if (vof_phase(i,j,k+1)==0) then
-           P_gz(i,j,k) = sigma*kap(i,j,k)/dz(k)
-           if (P_gz(i,j,k) /= P_gz(i,j,k)) write(*,*)'WARNING, P_g NaN z-dir'
-        endif
-
+        do l=-1,1,2
+           if (vof_phase(i+l,j,k)==0) then
+              P_gx(i,j,k) = sigma*kap(i,j,k)/dx(i) !!filaments and droplets of one cell will be an issue here
+              if (P_gx(i,j,k) /= P_gx(i,j,k)) write(*,*)'WARNING, P_g NaN x-dir'
+           endif
+           if (vof_phase(i,j+l,k)==0) then
+              P_gy(i,j,k) = sigma*kap(i,j,k)/dy(j)
+              if (P_gy(i,j,k) /= P_gy(i,j,k)) write(*,*)'WARNING, P_g NaN y-dir'
+           endif
+           if (vof_phase(i,j,k+l)==0) then
+              P_gz(i,j,k) = sigma*kap(i,j,k)/dz(k)
+              if (P_gz(i,j,k) /= P_gz(i,j,k)) write(*,*)'WARNING, P_g NaN z-dir'
+           endif
+        enddo
         !Check x-neighbour         
         if (vof_phase(i+1,j,k) == 0) then
            !get_intersection for liq cell
@@ -305,19 +306,6 @@ subroutine setuppoisson_fs(utmp,vtmp,wtmp,vof_phase,rhot,dt,A,cvof,n1,n2,n3,kap,
         A(i,j,k,8) =  -( (utmp(i,j,k)-utmp(i-1,j,k))/dx(i) &
              +  (vtmp(i,j,k)-vtmp(i,j-1,k))/dy(j) &
              +  (wtmp(i,j,k)-wtmp(i,j,k-1))/dz(k) )
-        ! set Laplace pressure jumps
-        if (vof_phase(i+1,j,k)==1) then
-           P_gx(i+1,j,k) = sigma*kap(i+1,j,k)/dx(i) !!filaments and droplets of one cell will be an issue here
-           if (P_gx(i+1,j,k) /= P_gx(i+1,j,k)) write(*,*)'WARNING, P_g NaN x-dir'
-        endif
-        if (vof_phase(i,j+1,k)==1) then
-           P_gy(i,j+1,k) = sigma*kap(i,j+1,k)/dy(j)
-           if (P_gy(i,j+1,k) /= P_gy(i,j+1,k)) write(*,*)'WARNING, P_g NaN y-dir'
-        endif
-        if (vof_phase(i,j,k+1)==1) then
-           P_gz(i,j,k+1) = sigma*kap(i,j,k+1)/dz(k)
-           if (P_gz(i,j,k+1) /= P_gz(i,j,k+1)) write(*,*)'WARNING, P_g NaN z-dir'
-        endif
         !Check x-neighbour
         if (vof_phase(i+1,j,k) == 1) then
            !vof fraction in half of cav cell
