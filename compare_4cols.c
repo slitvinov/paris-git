@@ -104,7 +104,9 @@ int main(int argc, char * argv[]) // argc: argument count, # of arguments read f
       	  //calc diff
       	  diff = ref[3]-comp[3];
 	  error2+= diff*diff;
-	  if (abs(diff) > errmax) { errmax = abs(diff); }
+	  if (fabs(diff) > errmax) { 
+	    errmax = fabs(diff); 
+	  }
       	  //write diff to file
       	  found = 1;
 	  total_found++;
