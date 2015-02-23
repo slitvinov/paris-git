@@ -323,6 +323,7 @@ module module_flow
   logical :: calcTurbStats_initialized = .false.
   logical :: DoTurbStats
   integer :: iSumTurbStats,nStepOutputTurbStats,TurbStatsOrder,num_turb_vars
+  real(8) :: timeStartTurbStats
   real(8), dimension(:,:,:), allocatable :: turb_vars !i,j,ivar 
 end module module_flow
 !=================================================================================================

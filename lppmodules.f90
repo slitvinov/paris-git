@@ -3338,17 +3338,21 @@ contains
    subroutine StoreBeforeConvectionTerms()
       ! Store du, dv, dw before convection terms are computed and added
       implicit none
-      sdu_work = du
-      sdv_work = dv
-      sdw_work = dw
+      if ( UnsteadyPartForce ) then 
+         sdu_work = du
+         sdv_work = dv
+         sdw_work = dw
+      end if ! UnsteadyPartForce
    end subroutine StoreBeforeConvectionTerms
 
    subroutine StoreAfterConvectionTerms()
       ! Store the portions of du, dv, dw due to convection terms
       implicit none
-      sdu_work = du - sdu_work
-      sdv_work = dv - sdv_work
-      sdw_work = dw - sdw_work
+      if ( UnsteadyPartForce ) then 
+         sdu_work = du - sdu_work
+         sdv_work = dv - sdv_work
+         sdw_work = dw - sdw_work
+      end if ! UnsteadyPartForce
    end subroutine StoreAfterConvectionTerms
 
    subroutine ComputeSubDerivativeVel()
@@ -3361,22 +3365,24 @@ contains
 
       ! Subtract the portions of du, dv, dw due to convection terms from the
       ! overall values
-      sdu = du - sdu_work
-      sdv = dv - sdv_work
-      sdw = dw - sdw_work
+      if ( UnsteadyPartForce ) then 
+         sdu = du - sdu_work
+         sdv = dv - sdv_work
+         sdw = dw - sdw_work
 
-      ! Correct du, dv, dw with pressure gradients
-      do k=ks,ke;  do j=js,je; do i=is,ieu     
-         sdu(i,j,k)=sdu(i,j,k)-(2.0/dxh(i))*(p(i+1,j,k)-p(i,j,k))/(rho(i+1,j,k)+rho(i,j,k))
-      enddo; enddo; enddo
+         ! Correct du, dv, dw with pressure gradients
+         do k=ks,ke;  do j=js,je; do i=is,ieu     
+            sdu(i,j,k)=sdu(i,j,k)-(2.0/dxh(i))*(p(i+1,j,k)-p(i,j,k))/(rho(i+1,j,k)+rho(i,j,k))
+         enddo; enddo; enddo
 
-      do k=ks,ke;  do j=js,jev; do i=is,ie    
-         sdv(i,j,k)=sdv(i,j,k)-(2.0/dyh(j))*(p(i,j+1,k)-p(i,j,k))/(rho(i,j+1,k)+rho(i,j,k))
-      enddo; enddo; enddo
+         do k=ks,ke;  do j=js,jev; do i=is,ie    
+            sdv(i,j,k)=sdv(i,j,k)-(2.0/dyh(j))*(p(i,j+1,k)-p(i,j,k))/(rho(i,j+1,k)+rho(i,j,k))
+         enddo; enddo; enddo
 
-      do k=ks,kew;  do j=js,je; do i=is,ie   
-         sdw(i,j,k)=sdw(i,j,k)-(2.0/dzh(k))*(p(i,j,k+1)-p(i,j,k))/(rho(i,j,k+1)+rho(i,j,k))
-      enddo; enddo; enddo
+         do k=ks,kew;  do j=js,je; do i=is,ie   
+            sdw(i,j,k)=sdw(i,j,k)-(2.0/dzh(k))*(p(i,j,k+1)-p(i,j,k))/(rho(i,j,k+1)+rho(i,j,k))
+         enddo; enddo; enddo
+      end if ! UnsteadyPartForce
 
    end subroutine ComputeSubDerivativeVel
 

@@ -483,7 +483,7 @@ Program paris
 !--------------------------------------------OUTPUT-----------------------------------------------
         if(mod(itimestep,nstats)==0) then
         	call calcStats
-         if ( DoTurbStats ) call calcTurbStats(itimestep)
+         if ( DoTurbStats .and. time > timeStartTurbStats ) call calcTurbStats(itimestep)
         	if( test_KHI2D .or. test_HF ) call h_of_KHI2D(itimestep,time)
         endif
         if(mod(itimestep,nsteps_probe)==0) then
@@ -848,7 +848,8 @@ subroutine calcStats
                stencil3x3(i0,j0,k0) =cvof(i+i0,j+j0,k+k0)
             enddo;enddo;enddo
             call mycs(stencil3x3,mxyz)
-            mystats(19) = mystats(19) + AREA3D(mxyz,cvof(i,j,k))
+            if ( mxyz(1)/=0.d0 .or. mxyz(2)/=0.d0 .or. mxyz(3)/=0.d0 ) &  
+               mystats(19) = mystats(19) + AREA3D(mxyz,cvof(i,j,k))
          end if ! cvof(i,j,k)
      end if ! DoVOF
      ! potential energy (considering gravity in y direction)  
@@ -973,6 +974,7 @@ end subroutine calcStats
    subroutine calcTurbStats(istep)
       use module_flow
       use module_VOF
+      use module_IO
       implicit none
       include "mpif.h"
       
@@ -996,14 +998,18 @@ end subroutine calcStats
          else if ( TurbStatsOrder == 2 ) then 
             num_turb_vars = 27 
          else if ( TurbStatsOrder == 3 ) then
-            num_turb_vars = 83
+            num_turb_vars = 33   !83
          else 
             call pariserror("Statistics of turbulence over 3rd order!")
          end if ! TurbStatsOrder
          allocate(turb_vars(is:ie,js:je,num_turb_vars))
-         turb_vars = 0.d0 
          
-         iSumTurbStats = 0 
+         if ( restart ) then  
+            call backup_turb_read
+         else
+            turb_vars = 0.d0 
+            iSumTurbStats = 0 
+         end if ! restart
       end if ! calcTurbStats_initialized
 
       ! simulation variables at cell centers
@@ -1019,7 +1025,8 @@ end subroutine calcStats
                stencil3x3(i0,j0,k0) =cvof(i+i0,j+j0,k+k0)
             enddo;enddo;enddo
             call mycs(stencil3x3,mxyz)
-            area(i,j,k) = AREA3D(mxyz,cvof(i,j,k))
+            if ( mxyz(1)/=0.d0 .or. mxyz(2)/=0.d0 .or. mxyz(3)/=0.d0 ) &  
+               area(i,j,k) = AREA3D(mxyz,cvof(i,j,k))*dx(i)
          end if ! cvof
       end do; end do; end do
       
@@ -1084,12 +1091,30 @@ end subroutine calcStats
 
          ! 3rd order stats
          if ( TurbStatsOrder >= 3 ) then 
+         turb_vars(is:ie,js:je,28) = turb_vars(is:ie,js:je,28) & 
+                                   + uc(is:ie,js:je,k)*uc(is:ie,js:je,k)*cvof(is:ie,js:je,k)
+         turb_vars(is:ie,js:je,29) = turb_vars(is:ie,js:je,29) & 
+                                   + vc(is:ie,js:je,k)*vc(is:ie,js:je,k)*cvof(is:ie,js:je,k)
+         turb_vars(is:ie,js:je,30) = turb_vars(is:ie,js:je,30) & 
+                                   + wc(is:ie,js:je,k)*wc(is:ie,js:je,k)*cvof(is:ie,js:je,k)
+         turb_vars(is:ie,js:je,31) = turb_vars(is:ie,js:je,31) & 
+                                   + uc(is:ie,js:je,k)*vc(is:ie,js:je,k)*cvof(is:ie,js:je,k)
+         turb_vars(is:ie,js:je,32) = turb_vars(is:ie,js:je,32) & 
+                                   + uc(is:ie,js:je,k)*wc(is:ie,js:je,k)*cvof(is:ie,js:je,k)
+         turb_vars(is:ie,js:je,33) = turb_vars(is:ie,js:je,33) & 
+                                   + vc(is:ie,js:je,k)*wc(is:ie,js:je,k)*cvof(is:ie,js:je,k)
          end if ! TurbStatsOrder
       end do ! 
 
+      ! backup turbulence statistics
+      if(mod(iStep,nbackup)==0) then 
+         call backup_turb_write
+      end if ! iStep
+
       ! Output turbulence statistics
      if ( mod(iStep,nStepOutputTurbStats) == 0 ) then 
-      
+
+
       if ( rank == 0 ) then 
          filename=TRIM(out_path)//'/turb-vars.dat'
          inquire(FILE=filename,EXIST=file_exist)
@@ -1165,6 +1190,32 @@ end subroutine calcStats
          deallocate(turb_vars_map)
       end if ! rank
      end if !iStep
+
+     contains 
+      subroutine backup_turb_write
+         integer ::i,j,k
+         character(len=100) :: filename
+         filename = trim(out_path)//'/backup_turb_'//int2text(rank,padding)
+         call system('touch '//trim(filename)//'; mv '//trim(filename)//' '//trim(filename)//'.old')
+         OPEN(UNIT=101,FILE=trim(filename),status='unknown',action='write')
+         write(101,*) iSumTurbStats
+         do i=is,ie; do j=js,je
+            write(101,'(2(E15.8,1X),83(E25.16,1X))') turb_vars(i,j,1:num_turb_vars)
+         enddo; enddo
+         CLOSE(UNIT=101)
+      end subroutine backup_turb_write
+
+      subroutine backup_turb_read
+         integer ::i,j,k
+         character(len=100) :: filename
+         filename = trim(out_path)//'/backup_turb_'//int2text(rank,padding)
+         OPEN(UNIT=101,FILE=trim(filename),status='unknown',action='read')
+         read(101,*) iSumTurbStats
+         do i=is,ie; do j=js,je
+            read(101,*) turb_vars(i,j,1:num_turb_vars)
+         enddo; enddo
+         CLOSE(UNIT=101)
+      end subroutine backup_turb_read
 
    end subroutine calcTurbStats
 !=================================================================================================
@@ -2531,7 +2582,7 @@ subroutine ReadParameters
                         cflmax_allowed,               AdvectionScheme, out_mom,   output_fields, & 
                         nsteps_probe,  num_probes,    ijk_probe,                                 &
                         num_probes_cvof,  ijk_probe_cvof,                                        & 
-                        DoTurbStats,   nStepOutputTurbStats, TurbStatsOrder
+                        DoTurbStats,   nStepOutputTurbStats, TurbStatsOrder,  timeStartTurbStats
  
   Nx = 0; Ny = 4; Nz = 4 ! cause absurd input file that lack nx value to fail. 
   Ng=2;xLength=1d0;yLength=1d0;zLength=1d0
@@ -2566,6 +2617,7 @@ subroutine ReadParameters
   output_fields = [ .true. , .true. , .true., .true., .true. ]
   nsteps_probe =1; num_probes = 0; ijk_probe = 1; num_probes_cvof = 0; ijk_probe_cvof = 1 
   DoTurbStats = .false.; nStepOutputTurbStats = 1000; TurbStatsOrder = 2
+  timeStartTurbStats = 0.d0
 
   in=1
   out=2
