@@ -1229,6 +1229,9 @@ subroutine momentumConvection()
     call momentumConvectionQUICK(u,v,w,du,dv,dw)
   elseif (AdvectionScheme=='ENO') then
     call momentumConvectionENO(u,v,w,du,dv,dw)
+!    call momentumConvectionENO_x(u,v,w,u,du,1)
+!    call momentumConvectionENO_x(u,v,w,v,dv,2)
+!    call momentumConvectionENO_x(u,v,w,w,dw,3)
   elseif (AdvectionScheme=='UpWind') then
     call momentumConvectionUpWind(u,v,w,du,dv,dw)
   elseif (AdvectionScheme=='Verstappen') then
@@ -1247,6 +1250,91 @@ end subroutine momentumConvection
 ! calculates the convection terms in mumentum equation using ENO scheme
 ! and returns them in du, dv, dw
 !-------------------------------------------------------------------------------------------------
+
+function slope_lim (a1,a2,a3)
+  implicit none
+  real(8), external :: minabs
+  real (8) :: slope_lim
+  real (8) :: slope_lim,a1,a2,a3
+
+  slope_lim = minabs((a3-a2),(a2-a1))
+
+end function slope_lim
+
+subroutine momentumConvectionENO_x(u,v,w,phi,dphi,d)
+  use module_grid
+  use module_tmpvar
+  implicit none
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: u, v, w, phi
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: dphi
+  real(8), external :: slope_lim
+  integer :: i,j,k,d
+  integer, dimension(3) :: is0,is1,ie1
+  integer :: i0,j0,k0
+!-------------------------------------ENO interpolation u-velocity--------------------------------
+  call init_i0j0k0 (d,i0,j0,k0)
+
+  is0(1)=is-1; is0(2)=js-1; is0(3)=ks-1
+  ie1(1)=ie; ie1(2)=je; ie1(3)=ke
+
+  if (d.eq.1) then
+    ie1(1) = ieu+1
+  elseif (d.eq.2) then
+    ie1(2) = jev+1
+  else
+    ie1(3) = kew + 1
+  endif
+
+  is1 = is0
+  if (d.eq.1) then
+    is1(:) = is1(:) + 1
+  endif
+
+  do k=is1(3),ie1(3); do j=is1(2),ie1(2); do i=is1(1),ie1(1)
+    if (u(i-i0,j+j0,k+k0)+u(i,j,k)>0.0) then
+      work(i,j,k,1)=phi(i-i0,j,k)+0.5*slope_lim(phi(i-1-i0,j,k),phi(i-i0,j,k),phi(i+1-i0,j,k))
+    else
+      work(i,j,k,1)=phi(i+1-i0,j,k)-0.5*slope_lim(phi(i+2-i0,j,k),phi(i+1-i0,j,k),phi(i-i0,j,k))
+    endif
+  enddo; enddo; enddo
+
+  is1 = is0
+  if (d.eq.2) then
+    is1(:) = is1(:) + 1
+  endif
+
+  do k=is1(3),ie1(3); do j=is1(2),ie1(2); do i=is1(1),ie1(1)
+    if(v(i,j,k)+v(i+i0,j-j0,k+k0)>0.0) then
+      work(i,j,k,2)=phi(i,j,k)+0.5*slope_lim(phi(i,j-1-j0,k),phi(i,j-j0,k),phi(i,j+1-j0,k))
+    else
+      work(i,j,k,2)=phi(i,j+1-j0,k)-0.5*slope_lim(phi(i,j+2-j0,k),phi(i,j+1-j0,k),phi(i,j-j0,k))
+    endif
+  enddo; enddo; enddo
+
+  is1 = is0
+  if (d.eq.3) then
+    is1(:) = is1(:) + 1
+  endif
+
+  do k=is1(3),ie1(3); do j=is1(2),ie1(2); do i=is1(1),ie1(1)
+    if(w(i,j,k)+w(i+i0,j+j0,k-k0)>0.0) then
+      work(i,j,k,3)=phi(i,j,k)+0.5*slope_lim(phi(i,j,k-1-k0),phi(i,j,k-k0),phi(i,j,k+1-k0))
+    else
+      work(i,j,k,3)=phi(i,j,k+1-k0)-0.5*slope_lim(phi(i,j,k+2-k0),phi(i,j,k+1-k0),phi(i,j,k-k0))
+    endif
+  enddo; enddo; enddo
+
+  do k=ks,ke;  do j=js,je; do i=is,ieu
+    dphi(i,j,k)= -0.5*((u(i,j  ,k  )+u(i+i0,j+j0,k+k0))*work(i+i0,j  ,k  ,1)- &
+                    (u(i-1+i0,j  ,k  )+u(i-1,j  ,k  ))*work(i-1+i0 ,j  ,k  ,1))/dx(i) &
+              -0.5*((v(i,j  ,k  )+v(i+i0,j+j0,k+k0))*work(i  ,j+j0 ,k  ,2)-&
+                    (v(i,j-1+j0,k  )+v(i+i0,j-1,k  ))*work(i  ,j-1+j0,k  ,2))/dy(j)  &
+              -0.5*((w(i,j  ,k  )+w(i+i0,j+j0,k+k0))*work(i  ,j  ,k+k0  ,3)-&
+                    (w(i,j  ,k-1+k0)+w(i+i0,j+j0,k-1))*work(i  ,j  ,k-1+k0,3))/dz(k)
+  enddo; enddo; enddo
+
+end subroutine momentumConvectionENO_x
+
 subroutine momentumConvectionENO(u,v,w,du,dv,dw)
   use module_grid
   use module_tmpvar
