@@ -366,6 +366,7 @@ module module_freesurface
   integer :: X_level, solver_flag=0
   logical :: FreeSurface, debug=.false., initialize_fs = .false.
   logical :: RP_test
+  logical :: imploding
   logical, dimension(1:3) :: VTK_OUT, vtk_open
   character(len=10) :: visit_file(1:3) = (/ "divergence", "curvature ", "deltaPfs  " /)
   character(len=3) :: file_short(1:3) = (/ "DIV", "KAP", "Pfs" /)

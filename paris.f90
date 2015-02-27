@@ -259,8 +259,10 @@ Program paris
               call my_timer(8)
               if (FreeSurface) then
                  call get_normals()
-                 call get_all_curvatures(kappa_fs,itimestep)
+                 !call get_all_curvatures(kappa_fs,itimestep)
                  call set_topology(vof_phase,itimestep) !vof_phase updated in vofsweeps
+              elseif (.not.Freesurface .and. debug_par) then
+                 call get_all_curvatures(tmp,itimestep)
               endif
            endif
            if (DoLPP) then
@@ -345,6 +347,7 @@ Program paris
               call SetupPoisson(u,v,w,umask,vmask,wmask,rho,dt,A,tmp,VolumeSource)
             endif
            else 
+              call get_all_curvatures(kappa_fs,itimestep)
               call Setuppoisson_fs(u,v,w,vof_phase,rho,dt,A,cvof,n1,n2,n3,kappa_fs,itimestep)
            endif
            ! (div u)*dt < epsilon => div u < epsilon/dt => maxresidual : maxerror/dt 
@@ -400,6 +403,7 @@ Program paris
 
 !----------------------------------EXTRAPOLATION FOR FREE SURFACE---------------------------------
            if (DoVOF .and. FreeSurface) then
+              !if (.not. imploding) then
               call extrapolate_velocities()
               call setuppoisson_fs2(u,v,w,dt,A,vof_phase,itimestep)
               ! Solve for an intermediate pressure in gas
@@ -437,6 +441,7 @@ Program paris
               enddo; enddo; enddo
               call SetVelocityBC(u,v,w,umask,vmask,wmask,time) !check this
               call do_ghost_vector(u,v,w)
+              !endif
               if (mod(itimestep,nstats)==0 .and. mod(ii,itime_scheme)==0) call discrete_divergence(u,v,w,itimestep/nstats)
            endif !Extrapolation
 !------------------------------------------------------------------------------------------------

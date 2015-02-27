@@ -31,7 +31,8 @@
   include 'mpif.h' 
   integer, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: vof_phase
   integer :: req(16),sta(MPI_STATUS_SIZE,16)
-  integer :: i,j,k,level,iout,nbr,ierr,no
+  integer :: i,j,k,level,iout,ierr
+  integer :: level3, l3sum
 
   !initialize all masks to 3
   if (.not.initialize_fs) call pariserror("Error: Free surface variables not initialized")
@@ -108,6 +109,24 @@
      call ighost_z(pcmask,2,req(13:16)); call MPI_WAITALL(16,req(1:16),sta(:,1:16),ierr)
   enddo
 
+  !Count level 3
+  level3 = 0
+  do k=ks,ke; do j=js,je; do i=is,ie
+     if (pcmask(i,j,k)==3) level3 = level3 + 1
+  enddo; enddo; enddo
+  call MPI_ALLREDUCE(level3,l3sum, 1, MPI_INT, MPI_SUM, MPI_COMM_Active, ierr)
+  !Check, set alarm
+  if (l3sum <= 10) then
+     imploding=.true.
+     if (rank==0) write(*,'("Total L3: ",I8)')level3   
+  endif
+
+  !if (rank==0) write(*,'(L4)')imploding
+
+  if (imploding) then
+     if (rank==0) write(*,'("Total L3: ",I8)') level3
+     pcmask = 0; u_cmask = 0; v_cmask = 0; w_cmask = 0 !Set masks to zero 
+  endif
 end subroutine set_topology
 !-------------------------------------------------------------------------------------------------
 subroutine setuppoisson_fs(utmp,vtmp,wtmp,vof_phase,rhot,dt,A,cvof,n1,n2,n3,kap,iout)
@@ -137,6 +156,18 @@ subroutine setuppoisson_fs(utmp,vtmp,wtmp,vof_phase,rhot,dt,A,cvof,n1,n2,n3,kap,
   c_min = 1d-2
 
   do k=ks,ke; do j=js,je; do i=is,ie
+
+     A(i,j,k,1) = 2d0*dt/(dx(i)*dxh(i-1)*(rhot(i-1,j,k)+rhot(i,j,k)))
+     A(i,j,k,2) = 2d0*dt/(dx(i)*dxh(i  )*(rhot(i+1,j,k)+rhot(i,j,k)))
+     A(i,j,k,3) = 2d0*dt/(dy(j)*dyh(j-1)*(rhot(i,j-1,k)+rhot(i,j,k)))
+     A(i,j,k,4) = 2d0*dt/(dy(j)*dyh(j  )*(rhot(i,j+1,k)+rhot(i,j,k)))
+     A(i,j,k,5) = 2d0*dt/(dz(k)*dzh(k-1)*(rhot(i,j,k-1)+rhot(i,j,k)))
+     A(i,j,k,6) = 2d0*dt/(dz(k)*dzh(k  )*(rhot(i,j,k+1)+rhot(i,j,k)))
+     A(i,j,k,7) = sum(A(i,j,k,1:6))
+     A(i,j,k,8) =  -( (utmp(i,j,k)-utmp(i-1,j,k))/dx(i) &
+          +  (vtmp(i,j,k)-vtmp(i,j-1,k))/dy(j) &
+          +  (wtmp(i,j,k)-wtmp(i,j,k-1))/dz(k) )
+
      !----Cav-liquid neighbours, set P_g in cavity cells
      if(vof_phase(i,j,k)==1) then
         do l=-1,1,2
@@ -296,16 +327,7 @@ subroutine setuppoisson_fs(utmp,vtmp,wtmp,vof_phase,rhot,dt,A,cvof,n1,n2,n3,kap,
      endif
 !----Liquid-cavity neighbours-----------------------------------------------------
      if (vof_phase(i,j,k)==0) then
-        A(i,j,k,1) = 2d0*dt/(dx(i)*dxh(i-1)*(rhot(i-1,j,k)+rhot(i,j,k)))
-        A(i,j,k,2) = 2d0*dt/(dx(i)*dxh(i  )*(rhot(i+1,j,k)+rhot(i,j,k)))
-        A(i,j,k,3) = 2d0*dt/(dy(j)*dyh(j-1)*(rhot(i,j-1,k)+rhot(i,j,k)))
-        A(i,j,k,4) = 2d0*dt/(dy(j)*dyh(j  )*(rhot(i,j+1,k)+rhot(i,j,k)))
-        A(i,j,k,5) = 2d0*dt/(dz(k)*dzh(k-1)*(rhot(i,j,k-1)+rhot(i,j,k)))
-        A(i,j,k,6) = 2d0*dt/(dz(k)*dzh(k  )*(rhot(i,j,k+1)+rhot(i,j,k)))
-        A(i,j,k,7) = sum(A(i,j,k,1:6))
-        A(i,j,k,8) =  -( (utmp(i,j,k)-utmp(i-1,j,k))/dx(i) &
-             +  (vtmp(i,j,k)-vtmp(i,j-1,k))/dy(j) &
-             +  (wtmp(i,j,k)-wtmp(i,j,k-1))/dz(k) )
+        
         !Check x-neighbour
         if (vof_phase(i+1,j,k) == 1) then
            !vof fraction in half of cav cell
@@ -657,7 +679,7 @@ subroutine discrete_divergence(u,v,w,iout)
 
   divtot = 0d0; n_level = 0d0
 
-  do k=ks,ke+1; do j=js,je+1; do i=is,ie+1
+  do k=ks,ke; do j=js,je; do i=is,ie
      div(i,j,k)=ABS((u(i-1,j,k)-u(i,j,k))/dx(i)+(v(i,j-1,k)-v(i,j,k))/dy(j)+(w(i,j,k-1)-w(i,j,k))/dz(k)) !divergence
      !div(i,j,k)=ABS((u(i-1,j,k)-u(i,j,k))*dy(j)*dz(k)+(v(i,j-1,k)-v(i,j,k))*dx(i)*dz(k)+(w(i,j,k-1)-w(i,j,k))*dx(i)*dy(j)) !volume error
      !if (pcmask(i,j,k) == 1 .or. pcmask(i,j,k) == 2) then
@@ -786,8 +808,8 @@ subroutine FreeSolver(A,p,maxError,beta,maxit,it,ierr,iout,time,tres2)
     call catch_divergence_fs(res2,cells,ierr)
     call MPI_ALLREDUCE(res2, tres2, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr)
     call MPI_ALLREDUCE(cells, tcells, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr)
+    if (tcells>=1) tres2=tres2/tcells
     if(norm==2) tres2=sqrt(tres2)
-    tres2 = tres2/tcells
     if(rank==0.and.mod(it,10) == 0.and.recordconvergence) write(89,310) it, solver_flag, tres2
 310 format(2I6,'  ',(e14.5))
     if (tres2<maxError) then 

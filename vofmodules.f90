@@ -394,6 +394,7 @@ contains
        pcmask=3; p_ext=0d0
        initialize_fs = .true.
        vtk_open = .false.
+       imploding = .false.
     endif
     if ( itime_scheme == 2 ) then  
       allocate(cvofold(imin:imax,jmin:jmax,kmin:kmax))
