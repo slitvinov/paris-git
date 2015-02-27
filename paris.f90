@@ -1327,7 +1327,17 @@ subroutine momentumConvectionENO_x(u,v,w,phi,dphi,d)
     endif
   enddo; enddo; enddo
 
-  do k=ks,ke;  do j=js,je; do i=is,ieu
+  is1 = is0 +1
+  ie1 = ie0
+  if (d.eq.1) then
+    ie1(1) = ieu
+  elseif (d.eq.2) then
+    ie1(2) = jev
+  else
+    ie1(3) = kew
+  endif
+
+  do k=is1(3),ie1(3); do j=is1(2),ie1(2); do i=is1(1),ie1(1)
     dphi(i,j,k)= -0.5*((u(i,j  ,k  )+u(i+i0,j+j0,k+k0))*work(i+i0,j  ,k  ,1)- &
                     (u(i-1+i0,j  ,k  )+u(i-1,j+j0,k  ))*work(i-1+i0 ,j  ,k  ,1))/dx(i) &
               -0.5*((v(i,j  ,k  )+v(i+i0,j+j0,k+k0))*work(i  ,j+j0 ,k  ,2)-&
