@@ -1256,13 +1256,13 @@ end subroutine momentumConvection
 ! and returns them in du, dv, dw
 !-------------------------------------------------------------------------------------------------
 
-function slope_lim (a1,a2,a3)
+function slope_lim (val1,val2,val3)
   implicit none
   real(8), external :: minabs
   real (8) :: slope_lim
-  real (8) :: slope_lim,a1,a2,a3
+  real (8) :: slope_lim,val1,val2,val3
 
-  slope_lim = minabs((a3-a2),(a2-a1))
+  slope_lim = minabs((val3-val2),(val2-val1))
 
 end function slope_lim
 
@@ -1274,25 +1274,19 @@ subroutine momentumConvectionENO_x(u,v,w,phi,dphi,d)
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: dphi
   real(8), external :: slope_lim
   integer :: i,j,k,d
-  integer, dimension(3) :: is0,is1,ie1
+  integer, dimension(3) :: is0,is1,ie0,ie1
   integer :: i0,j0,k0
 !-------------------------------------ENO interpolation u-velocity--------------------------------
   call init_i0j0k0 (d,i0,j0,k0)
 
   is0(1)=is-1; is0(2)=js-1; is0(3)=ks-1
-  ie1(1)=ie; ie1(2)=je; ie1(3)=ke
-
-  if (d.eq.1) then
-    ie1(1) = ieu+1
-  elseif (d.eq.2) then
-    ie1(2) = jev+1
-  else
-    ie1(3) = kew + 1
-  endif
+  ie0(1)=ie; ie0(2)=je; ie0(3)=ke
 
   is1 = is0
+  ie1 = ie0
   if (d.eq.1) then
     is1(:) = is1(:) + 1
+    ie1(1) = ieu+1
   endif
 
   do k=is1(3),ie1(3); do j=is1(2),ie1(2); do i=is1(1),ie1(1)
@@ -1304,8 +1298,10 @@ subroutine momentumConvectionENO_x(u,v,w,phi,dphi,d)
   enddo; enddo; enddo
 
   is1 = is0
+  ie1 = ie0
   if (d.eq.2) then
     is1(:) = is1(:) + 1
+    ie1(2) = jev+1
   endif
 
   do k=is1(3),ie1(3); do j=is1(2),ie1(2); do i=is1(1),ie1(1)
@@ -1317,8 +1313,10 @@ subroutine momentumConvectionENO_x(u,v,w,phi,dphi,d)
   enddo; enddo; enddo
 
   is1 = is0
+  ie1 = ie0
   if (d.eq.3) then
     is1(:) = is1(:) + 1
+    ie1(3) = kew + 1
   endif
 
   do k=is1(3),ie1(3); do j=is1(2),ie1(2); do i=is1(1),ie1(1)
@@ -1331,9 +1329,9 @@ subroutine momentumConvectionENO_x(u,v,w,phi,dphi,d)
 
   do k=ks,ke;  do j=js,je; do i=is,ieu
     dphi(i,j,k)= -0.5*((u(i,j  ,k  )+u(i+i0,j+j0,k+k0))*work(i+i0,j  ,k  ,1)- &
-                    (u(i-1+i0,j  ,k  )+u(i-1,j  ,k  ))*work(i-1+i0 ,j  ,k  ,1))/dx(i) &
+                    (u(i-1+i0,j  ,k  )+u(i-1,j+j0,k  ))*work(i-1+i0 ,j  ,k  ,1))/dx(i) &
               -0.5*((v(i,j  ,k  )+v(i+i0,j+j0,k+k0))*work(i  ,j+j0 ,k  ,2)-&
-                    (v(i,j-1+j0,k  )+v(i+i0,j-1,k  ))*work(i  ,j-1+j0,k  ,2))/dy(j)  &
+                    (v(i,j-1+j0,k  )+v(i+i0,j-1,k+k0 ))*work(i  ,j-1+j0,k  ,2))/dy(j)  &
               -0.5*((w(i,j  ,k  )+w(i+i0,j+j0,k+k0))*work(i  ,j  ,k+k0  ,3)-&
                     (w(i,j  ,k-1+k0)+w(i+i0,j+j0,k-1))*work(i  ,j  ,k-1+k0,3))/dz(k)
   enddo; enddo; enddo
