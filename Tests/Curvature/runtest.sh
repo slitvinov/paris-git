@@ -13,7 +13,7 @@ d=$3
 levelmax=$4
 
 dim=$3'D'
-list=`seq 3 $levelmax`
+list=`seq 5 $levelmax`
 echo $list
 
 ndepth=`head -60  ../../surface_tension.f90 |  awk -F '=' ' /NDEPTH/ {print $2}' | tr -d ' '`
@@ -22,7 +22,7 @@ ndepth=`head -60  ../../surface_tension.f90 |  awk -F '=' ' /NDEPTH/ {print $2}'
 for level in $list; do
     echo $level
     nx=`awk -v level=$level 'BEGIN {print 2**level}'`
-    for radius in 0.2 0.25 0.32; do 
+    for radius in 0.05 0.0625 0.03125 0.1 0.125 0.16 0.2 0.25 0.32; do 
 	run_stats.sh $nx $init $radius $nstats $d || exit 1
     done
 done

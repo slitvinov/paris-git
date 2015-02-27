@@ -8,7 +8,7 @@ export CGFONTGETGLYPH_PARIS_PROBLEM=0
 
 if [ $CGFontGetGlyphPathIsObsolete -gt 0 ]; then 
 echo "CGFontGetGlyphPathIsObsolete problem, no pdf output" 
-echo "This problem occurs when running gnuplot on MacOS X Yosemite version 10.10.1"
+echo "This problem occurs when running gnuplot on MacOS X Yosemite version 10.10.1 and above"
 echo "the full error message may be obtained by running"
 echo gnuplot -e \"set term pdf\; plot sin\(x\)\" \> \/dev\/null 
 export CGFONTGETGLYPH_PARIS_PROBLEM=1

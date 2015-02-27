@@ -92,7 +92,12 @@ contains
 ! thin slice expect in y or z. 
     if(MinM<=2) call pariserror("unexpected thin slice")
 ! detect small subdomains in which the stencil will straddle two boundaries. 
-    if(2*NDEPTH+1.gt.minM) call pariserror("ndepth too large for current box size nx/npx")
+    if(2*NDEPTH+1.gt.minM) then
+       if(rank==0) then
+          print *, 'Mx=',Mx,'My=',My,'Mz=',Mz,'minM=',minM
+       endif
+       call pariserror("ndepth too large for current box size nx/npx")
+    endif
     if(MAX_EXT_H>BIGINT/2-2) call pariserror("MAX_EXT > BIGINT/2")
     if(MAX_EXT_H>nx/2) call pariserror("MAX_EXT > nx/2")
 !    allocate(geom_case_list(10))
@@ -789,7 +794,7 @@ contains
             points(:,1) = bpoints(:,try(2))  - origin(try(2))
             points(:,2) = bpoints(:,try(3))  - origin(try(3))
             points(:,3) = bpoints(:,try(1))  - origin(try(1))   
-            ! fit over all positions returned by ind_pos
+            ! fit over all positions returned by ind_pos ! ???
             weights=1d0
             call parabola_fit_with_rotation(points,fit,weights,mv,nposit,a,kappasign,fit_success) 
             ! call parabola_fit(points,weights,nposit,a,fit_success) 
@@ -804,7 +809,7 @@ contains
                return
             else
                geom_case_count(16) = geom_case_count(16) + 1
-               nfound = 0
+               nfound = 0 ! no curvature set. 
                return
             endif ! fit_success
          endif !  (-nfound) > nfound_min  
