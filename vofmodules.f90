@@ -77,6 +77,7 @@ module module_VOF
   logical :: test_shear_multiphase = .false.
   logical :: test_KHI2D = .false.
   logical :: test_PhaseInversion = .false.
+  logical :: test_fsdrop = .false.
   logical :: linfunc_initialized = .false.
   logical :: DoMOMCONS = .false.
   logical :: STGhost = .false.
@@ -430,6 +431,8 @@ contains
        test_KHI2D = .true.
     else if(test_type=='PhaseInversion') then
        test_PhaseInversion = .true.
+    else if(test_type=='droplet_fs') then
+       test_fsdrop = .true.
     else
        write(*,*) test_type, rank
        call pariserror("unknown initialization")
@@ -510,9 +513,9 @@ contains
   !=================================================================================================
   subroutine initconditions_VOF()
     use module_grid
-
     use module_flow
     use module_BC
+    use module_freesurface
     use module_2phase
     use module_solid
 
@@ -619,6 +622,15 @@ contains
         endif
       end do; end do; end do
     end if
+
+    if (test_fsdrop) then
+       if (.not. FreeSurface) call pariserror('FS has to be switched on for this test case')
+       do i=is,ie; do j=js,je; do k=ks,ke
+          cvof(i,j,k) = 1.d0-cvof(i,j,k)
+       enddo; enddo; enddo 
+       call get_flags_and_clip(cvof,vof_flag)
+       !call get_vof_phase
+    endif
 
     call do_all_ghost(cvof)
     call do_all_ighost(vof_flag)
