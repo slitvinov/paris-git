@@ -1259,7 +1259,6 @@ end subroutine momentumConvection
 function slope_lim (val1,val2,val3)
   implicit none
   real(8), external :: minabs
-  real (8) :: slope_lim
   real (8) :: slope_lim,val1,val2,val3
 
   slope_lim = minabs((val3-val2),(val2-val1))
