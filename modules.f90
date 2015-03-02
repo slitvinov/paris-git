@@ -1967,7 +1967,16 @@ module module_poisson
     integer, intent(in) :: maxit
     integer, intent(out):: num_iterations
 !     real(8) :: final_res_norm
+    integer :: hypreSolver = 1 
+    integer, parameter :: hypreSolver_SMG  = 1 
+    integer, parameter :: hypreSolver_PFMG = 2
+#ifdef DEBUG_HYPRE
+    real(8) :: timeConstruct,timeSetup,timeSolve,timeCleanup,timeTotal
+#endif
 !----------------------------------------Fill in matrix Amat--------------------------------------
+#ifdef DEBUG_HYPRE
+   if ( rank == 0 ) timeConstruct=MPI_WTIME(ierr)
+#endif
     num_iterations = 0
     nvalues = mx * my * mz * nstencil
     allocate(values(nvalues), stat=ierr)
@@ -2013,25 +2022,78 @@ module module_poisson
     call HYPRE_StructMatrixAssemble(Amat, ierr)
     call HYPRE_StructVectorAssemble(Bvec, ierr)
     call HYPRE_StructVectorAssemble(Xvec, ierr)
+#ifdef DEBUG_HYPRE
+   if (rank == 0 ) then
+      timeConstruct = MPI_WTIME(ierr)-timeConstruct
+      write(*,*) "timeConstruct: ", timeConstruct
+   end if ! rank
+#endif
 !---------------------------------------Solve the equations---------------------------------------
+#ifdef DEBUG_HYPRE
+   if ( rank == 0 ) timeSetup=MPI_WTIME(ierr)
+#endif
+   if ( hypreSolver == hypreSolver_SMG ) then 
     call HYPRE_StructSMGCreate(mpi_comm_poi, solver, ierr)
     call HYPRE_StructSMGSetMaxIter(solver, maxit, ierr)
     call HYPRE_StructSMGSetTol(solver, MaxError, ierr)
-#ifdef PFMG
-    call HYPRE_StructPFMGSetRelaxType(solver, 3, ierr)
-#endif
     call hypre_structSMGsetLogging(solver, 1, ierr)
-    call HYPRE_StructSMGSetup(solver, Amat, Bvec, Xvec, ierr)
     call HYPRE_StructSMGSetPrintLevel(solver,1,ierr) 
+    call HYPRE_StructSMGSetup(solver, Amat, Bvec, Xvec, ierr)
+   else if ( hypreSolver == hypreSolver_PFMG ) then  
+    call HYPRE_StructPFMGCreate(mpi_comm_poi, solver, ierr)
+    call HYPRE_StructPFMGSetMaxIter(solver, maxit, ierr)
+    call HYPRE_StructPFMGSetTol(solver, MaxError, ierr)
+    call hypre_structPFMGsetLogging(solver, 1, ierr)
+    call HYPRE_StructPFMGSetPrintLevel(solver,1,ierr) 
+    call HYPRE_StructPFMGSetRelChange(solver, 1, ierr) 
+    call HYPRE_StructPFMGSetRelaxType(solver, 3, ierr) 
+    !Red/Black Gauss-Seidel (nonsymmetric: RB pre- and post-relaxation)
+    call HYPRE_StructPFMGSetup(solver, Amat, Bvec, Xvec, ierr)
+   end if ! hypreSolver
+#ifdef DEBUG_HYPRE
+   if (rank == 0 ) then
+      timeSetup = MPI_WTIME(ierr)-timeSetup
+      write(*,*) "timeSetup: ", timeSetup
+   end if ! rank
+#endif
+
+#ifdef DEBUG_HYPRE
+   if ( rank == 0 ) timeSolve=MPI_WTIME(ierr)
+#endif
+   if ( hypreSolver == hypreSolver_SMG ) then 
     call HYPRE_StructSMGSolve(solver, Amat, Bvec, Xvec, ierr)
+   else if ( hypreSolver == hypreSolver_PFMG ) then  
+    call HYPRE_StructPFMGSolve(solver, Amat, Bvec, Xvec, ierr)
+   end if ! hypreSolver
     ierr = GetNumIterations(solver, num_iterations)
+#ifdef DEBUG_HYPRE
+   if (rank == 0 ) then
+      timeSolve = MPI_WTIME(ierr)-timeSolve
+      write(*,*) "timeSolve: ", timeSolve
+   end if ! rank
+#endif
 !    ierr = Getfinalrelative(solver, final_res_norm)
 !    print *, "relative error",final_res_norm
 !--------------------------------------Retrieve the solution--------------------------------------
+#ifdef DEBUG_HYPRE
+   if ( rank == 0 ) timeCleanup=MPI_WTIME(ierr)
+#endif
     nvalues = mx * my * mz
     allocate(values(nvalues), stat=ierr)
     call HYPRE_StructVectorGetBoxValues(Xvec, ilower, iupper, values, ierr)
     call HYPRE_StructSMGDestroy(solver, ierr)
+#ifdef DEBUG_HYPRE
+   if (rank == 0 ) then
+      timeCleanup = MPI_WTIME(ierr)-timeCleanup
+      write(*,*) "timeCleanup: ", timeCleanup
+      write(*,*) " ********************************** "
+      timeTotal = timeConstruct + timeSetup + timeSolve + timeCleanup
+      write(*,*) "timeConstruct: ", timeConstruct/timeTotal
+      write(*,*) "timeSetup    : ", timeSetup/timeTotal
+      write(*,*) "timeSolve    : ", timeSolve/timeTotal
+      write(*,*) "timeCleanup  : ", timeCleanup/timeTotal
+   end if ! rank
+#endif
 
     ijk = 1
     do k=ks,ke;  do j=js,je;  do i=is,ie

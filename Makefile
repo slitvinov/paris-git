@@ -27,7 +27,7 @@ BINDIR = $(HOME)/bin
 # Local
 SILO_DIR = $(HOME)/cfd/libs/silo-4.10.2
 
-HYPRE_DIR = $(HOME)/cfd/libs/hypre-2.9.0b/src/lib
+HYPRE_DIR = $(HOME)/cfd/libs/hypre-2.10.0b/src/lib
 HYPRE_LIBS =  -L$(HYPRE_DIR) -lHYPRE 
 INC_SILO = -I$(SILO_DIR)/include
 #DIR_MPI = /usr/local/include

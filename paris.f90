@@ -353,23 +353,29 @@ Program paris
            ! (div u)*dt < epsilon => div u < epsilon/dt => maxresidual : maxerror/dt 
            if(HYPRE)then
               if (FreeSurface) call pariserror("HYPRE not functional for Free Surface")
-!              call poi_solve(A,p,maxError/dt,maxit,it)
-              call poi_solve(A,p,maxError/dt*ErrorScaleHYPRE,maxit,it)
+              call poi_solve(A,p,maxError/MaxDt*ErrorScaleHYPRE,maxit,it)
               call do_all_ghost(p)
            else
               if (FreeSurface) then
                  solver_flag = 1
                  if (RP_test) call set_RP_pressure(p)
-                 call FreeSolver(A,p,maxError/dt,beta,maxit,it,ierr,itimestep,time,residual)
+                 call FreeSolver(A,p,maxError/MaxDt,beta,maxit,it,ierr,itimestep,time,residual)
               else
-                 call NewSolver(A,p,maxError/dt,beta,maxit,it,ierr)
+                 call NewSolver(A,p,maxError/MaxDt,beta,maxit,it,ierr)
               endif
            endif
            if(mod(itimestep,termout)==0) then
               call calcResidual(A,p,ResNormOrderPressure,residual)
+              if (HYPRE .and. residual/(maxError/MaxDt) > 2.d0 ) then  
+                 ErrorScaleHYPRE = ErrorScaleHYPRE*0.5d0
+                 if (rank == 0) write(*,*) "ErrorScaleHYPRE is decreased.",ErrorScaleHYPRE
+              else if (HYPRE .and. residual/(maxError/MaxDt) < 0.25d0 ) then  
+                 ErrorScaleHYPRE = ErrorScaleHYPRE*2.0d0
+                 if (rank == 0) write(*,*) "ErrorScaleHYPRE is increased.",ErrorScaleHYPRE
+              end if ! HYPRE & residual
               if(rank==0) then
                  write(*,'("              pressure residual*dt:   ",e7.1,&
-                   &" maxerror: ",e7.1)') residual*dt,maxerror
+                   &" maxerror: ",e7.1)') residual*MaxDt,maxerror
                  write(*,'("              pressure iterations :",I9)')it
               end if
            endif
@@ -412,13 +418,13 @@ Program paris
               if(HYPRE)then !HYPRE will not work with removed nodes from domain.
                  call pariserror("HYPRE solver not yet available for Free Surfaces")
               else
-                 call FreeSolver(A,p_ext,maxError/dt,beta,maxit,it,ierr,itimestep,time,residual)
+                 call FreeSolver(A,p_ext,maxError/MaxDt,beta,maxit,it,ierr,itimestep,time,residual)
               endif
               if(mod(itimestep,termout)==0) then
                  !call calcresidual(A,p,residual)
                  if(rank==0) then
                     write(*,'("FS2:          pressure residual:   ",e7.1,&
-                         &" maxerror: ",e7.1)') residual*dt,maxerror
+                         &" maxerror: ",e7.1)') residual*MaxDt,maxerror
                     write(*,'("              pressure iterations :",I9)')it
                  endif
               endif
@@ -1788,13 +1794,13 @@ subroutine momentumConvectionBCG()
   umask,vmask,wmask,rho,dt,A,tmp,cvof,n1,n2,n3,VolumeSource)
   ! (div u)*dt < epsilon => div u < epsilon/dt => maxresidual : maxerror/dt 
   if(HYPRE)then
-    call poi_solve(A,tmp,maxError/dt,maxit,it)
+    call poi_solve(A,tmp,maxError/MaxDt,maxit,it)
     call ghost_x(tmp,1,req(1:4 ))
     call ghost_y(tmp,1,req(5:8 ))
     call ghost_z(tmp,1,req(9:12)) 
     call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
   else
-    call NewSolver(A,tmp,maxError/dt,beta,maxit,it,ierr)
+    call NewSolver(A,tmp,maxError/MaxDt,beta,maxit,it,ierr)
   endif
   if (.not.FreeSurface) then
     do k=ks,ke;  do j=js,je; do i=is,ieu    ! CORRECT THE u-velocity 
