@@ -353,7 +353,8 @@ Program paris
            ! (div u)*dt < epsilon => div u < epsilon/dt => maxresidual : maxerror/dt 
            if(HYPRE)then
               if (FreeSurface) call pariserror("HYPRE not functional for Free Surface")
-              call poi_solve(A,p,maxError/dt,maxit,it)
+!              call poi_solve(A,p,maxError/dt,maxit,it)
+              call poi_solve(A,p,maxError/dt*ErrorScaleHYPRE,maxit,it)
               call do_all_ghost(p)
            else
               if (FreeSurface) then
@@ -712,15 +713,18 @@ subroutine TimeStepSize(deltaT)
   implicit none
   include "mpif.h"
   real(8) :: deltaT, h, vmax, dtadv, mydt
+  real(8) :: vmax_phys
   integer :: ierr
 
+  vmax_phys = max(1.d-3,max(ugas_inject,uliq_inject))
   if(rank<nPdomain)then
     h  = minval(dx)
     vmax = maxval(sqrt(u(is:ie,js:je,ks:ke)**2+v(is:ie,js:je,ks:ke)**2+w(is:ie,js:je,ks:ke)**2))
-    vmax = max(vmax,1d-3)
-    vmax = max(vmax,max(ugas_inject,uliq_inject))
-  !  dtadv  = min(h/vmax,2d0*nu_min/vmax**2)
-    dtadv  = h/vmax
+    if ( vmax > vmax_phys*1.d2 ) then
+       call pariserror("Max velocity 100 times larger than physical value, something wrong!") 
+    else 
+       dtadv  = h/(max(vmax,vmax_phys))
+    end if ! vmax
     mydt = CFL*dtadv
     mydt = min(mydt,MaxDt)
   else
@@ -2683,7 +2687,7 @@ subroutine ReadParameters
                         nsteps_probe,  num_probes,    ijk_probe,                                 &
                         num_probes_cvof,  ijk_probe_cvof,                                        & 
                         DoTurbStats,   nStepOutputTurbStats, TurbStatsOrder,  timeStartTurbStats,&
-                        ResNormOrderPressure
+                        ResNormOrderPressure,ErrorScaleHYPRE
  
   Nx = 0; Ny = 4; Nz = 4 ! cause absurd input file that lack nx value to fail. 
   Ng=2;xLength=1d0;yLength=1d0;zLength=1d0
@@ -2719,7 +2723,7 @@ subroutine ReadParameters
   nsteps_probe =1; num_probes = 0; ijk_probe = 1; num_probes_cvof = 0; ijk_probe_cvof = 1 
   DoTurbStats = .false.; nStepOutputTurbStats = 1000; TurbStatsOrder = 2
   timeStartTurbStats = 0.d0
-  ResNormOrderPressure = 1.d0 
+  ResNormOrderPressure = 100; ErrorScaleHYPRE = 1.d-2; 
 
   in=1
   out=2
