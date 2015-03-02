@@ -365,7 +365,7 @@ Program paris
               endif
            endif
            if(mod(itimestep,termout)==0) then
-              !call calcresidual(A,p,residual)
+              call calcResidual(A,p,ResNormOrderPressure,residual)
               if(rank==0) then
                  write(*,'("              pressure residual*dt:   ",e7.1,&
                    &" maxerror: ",e7.1)') residual*dt,maxerror
@@ -2661,7 +2661,7 @@ subroutine ReadParameters
   namelist /parameters/ out_path,      Nx,            Ny,            Nz,            Ng,          &
                         xLength,       yLength,       zLength,       gx,            gy,          &
                         gz,            bdry_cond,     dPdx,          dPdy,          dPdz,        &
-                        itime_scheme,  nstep,         maxit,         maxError,      &
+                        itime_scheme,  nstep,         maxit,         maxError,                   &
                         beta,          nout,          TwoPhase,      rho1,          mu1,         &
                         rho2,          mu2,           sigma,         BuoyancyCase,  nPx,         &
                         nPy,           nPz,           amin,          amax,          aspmax,      &
@@ -2682,7 +2682,8 @@ subroutine ReadParameters
                         cflmax_allowed,               AdvectionScheme, out_mom,   output_fields, & 
                         nsteps_probe,  num_probes,    ijk_probe,                                 &
                         num_probes_cvof,  ijk_probe_cvof,                                        & 
-                        DoTurbStats,   nStepOutputTurbStats, TurbStatsOrder,  timeStartTurbStats
+                        DoTurbStats,   nStepOutputTurbStats, TurbStatsOrder,  timeStartTurbStats,&
+                        ResNormOrderPressure
  
   Nx = 0; Ny = 4; Nz = 4 ! cause absurd input file that lack nx value to fail. 
   Ng=2;xLength=1d0;yLength=1d0;zLength=1d0
@@ -2718,6 +2719,7 @@ subroutine ReadParameters
   nsteps_probe =1; num_probes = 0; ijk_probe = 1; num_probes_cvof = 0; ijk_probe_cvof = 1 
   DoTurbStats = .false.; nStepOutputTurbStats = 1000; TurbStatsOrder = 2
   timeStartTurbStats = 0.d0
+  ResNormOrderPressure = 1.d0 
 
   in=1
   out=2
@@ -2769,7 +2771,7 @@ subroutine ReadParameters
      if ( abs(xLength*dble(Ny)/yLength/dble(Nx) - 1.d0) > 1.d-8 .or. &  
           abs(xLength*dble(Nz)/zLength/dble(Nx) - 1.d0) > 1.d-8 ) & 
           !call pariserror("Mesh is not cubic!")
-          write(*,*) "*** WARNING: Mesh is not cubic, and non-uniform VOF is not ready! ***"
+          call pariserror("*** WARNING: Mesh is not cubic, and non-uniform VOF is not ready! ***")
   endif
 
   ! For jet setup

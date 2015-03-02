@@ -114,7 +114,7 @@
   do k=ks,ke; do j=js,je; do i=is,ie
      if (pcmask(i,j,k)==3) level3 = level3 + 1
   enddo; enddo; enddo
-  call MPI_ALLREDUCE(level3,l3sum, 1, MPI_INT, MPI_SUM, MPI_COMM_Active, ierr)
+  call MPI_ALLREDUCE(level3,l3sum, 1, MPI_INTEGER, MPI_SUM, MPI_COMM_Active, ierr)
   !Check, set alarm
   if (l3sum <= 10) then
      imploding=.true.

@@ -307,6 +307,7 @@ module module_flow
   real(8) :: dpdx, dpdy, dpdz, W_ave  !pressure gradients in case of pressure driven channel flow
   real(8) :: dpdx_stat, dpdy_stat, dpdz_stat
   real(8) :: beta, MaxError
+  real(8) :: ResNormOrderPressure
   integer :: maxit, it, itime_scheme, BuoyancyCase, drive
   integer :: sbx, sby, Nstep
   integer :: maxStep, itmax, iTimeStep, iTimeStepRestart
@@ -2679,28 +2680,35 @@ end subroutine LinearSolver1
 !=================================================================================================
 ! Returns the residual. L1 norm of the new divergence. 
 !-------------------------------------------------------------------------------------------------
-subroutine calcResidual(A,p, residual)
+subroutine calcResidual(A,p,NormOrder, residual)
   use module_grid
   use module_BC
   implicit none
   include 'mpif.h'
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: p
   real(8), dimension(is:ie,js:je,ks:ke,8), intent(in) :: A
-  real(8) :: res, Residual,locres ! ,globmax,maxnorm
+  real(8), intent(in) :: NormOrder
+  real(8) :: res, Residual,locres
   integer :: i,j,k, ierr
   res = 0d0
-!  maxnorm = 0d0
   do k=ks,ke; do j=js,je; do i=is,ie
       locres = abs(-p(i,j,k) * A(i,j,k,7) +                             &
       A(i,j,k,1) * p(i-1,j,k) + A(i,j,k,2) * p(i+1,j,k) +            &
       A(i,j,k,3) * p(i,j-1,k) + A(i,j,k,4) * p(i,j+1,k) +            &
       A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8) )
-      res = res + locres
-!      maxnorm = max(maxnorm,locres)
+      if ( NormOrder > 2.d0 ) then 
+         res = max(res,locres)
+      else 
+         res = res + locres**NormOrder
+      end if ! NormOrder
   enddo; enddo; enddo
   res = res/float(Nx*Ny*Nz)
-  call MPI_ALLREDUCE(res, residual, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr)
-!  call MPI_ALLREDUCE(maxnorm, globmax, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_Comm_Cart, ierr)
+  if ( NormOrder > 2.d0 ) then 
+      call MPI_ALLREDUCE(res, residual, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_Comm_Cart, ierr)
+  else 
+      call MPI_ALLREDUCE(res, residual, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr)
+      Residual = residual**(1.d0/NormOrder)
+   end if ! NormOrder
 end subroutine calcResidual
 !=================================================================================================
 !=================================================================================================
