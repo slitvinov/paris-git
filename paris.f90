@@ -1299,10 +1299,10 @@ subroutine momentumConvectionENO_x(u,v,w,phi,dphi,d)
   endif
 
   do k=is1(3),ie1(3); do j=is1(2),ie1(2); do i=is1(1),ie1(1)
-    if (u(i-i0,j+j0,k+k0)+u(i,j,k)>0.0) then
+    if (u(i-i0,j,k)+u(i,j+j0,k+k0)>0.0) then
       work(i,j,k,1)=phi(i-i0,j,k)+0.5*slope_lim(phi(i-1-i0,j,k),phi(i-i0,j,k),phi(i+1-i0,j,k))
     else
-      work(i,j,k,1)=phi(i+1-i0,j,k)-0.5*slope_lim(phi(i+2-i0,j,k),phi(i+1-i0,j,k),phi(i-i0,j,k))
+      work(i,j,k,1)=phi(i+1-i0,j,k)-0.5*slope_lim(phi(i-i0,j,k),phi(i+1-i0,j,k),phi(i+2-i0,j,k))
     endif
   enddo; enddo; enddo
 
@@ -1314,10 +1314,10 @@ subroutine momentumConvectionENO_x(u,v,w,phi,dphi,d)
   endif
 
   do k=is1(3),ie1(3); do j=is1(2),ie1(2); do i=is1(1),ie1(1)
-    if(v(i,j,k)+v(i+i0,j-j0,k+k0)>0.0) then
+    if(v(i,j-j0,k)+v(i+i0,j,k+k0)>0.0) then
       work(i,j,k,2)=phi(i,j,k)+0.5*slope_lim(phi(i,j-1-j0,k),phi(i,j-j0,k),phi(i,j+1-j0,k))
     else
-      work(i,j,k,2)=phi(i,j+1-j0,k)-0.5*slope_lim(phi(i,j+2-j0,k),phi(i,j+1-j0,k),phi(i,j-j0,k))
+      work(i,j,k,2)=phi(i,j+1-j0,k)-0.5*slope_lim(phi(i,j-j0,k),phi(i,j+1-j0,k),phi(i,j+2-j0,k))
     endif
   enddo; enddo; enddo
 
@@ -1329,10 +1329,10 @@ subroutine momentumConvectionENO_x(u,v,w,phi,dphi,d)
   endif
 
   do k=is1(3),ie1(3); do j=is1(2),ie1(2); do i=is1(1),ie1(1)
-    if(w(i,j,k)+w(i+i0,j+j0,k-k0)>0.0) then
+    if(w(i,j,k-k0)+w(i+i0,j+j0,k)>0.0) then
       work(i,j,k,3)=phi(i,j,k)+0.5*slope_lim(phi(i,j,k-1-k0),phi(i,j,k-k0),phi(i,j,k+1-k0))
     else
-      work(i,j,k,3)=phi(i,j,k+1-k0)-0.5*slope_lim(phi(i,j,k+2-k0),phi(i,j,k+1-k0),phi(i,j,k-k0))
+      work(i,j,k,3)=phi(i,j,k+1-k0)-0.5*slope_lim(phi(i,j,k-k0),phi(i,j,k+1-k0),phi(i,j,k+2-k0))
     endif
   enddo; enddo; enddo
 
@@ -1348,7 +1348,7 @@ subroutine momentumConvectionENO_x(u,v,w,phi,dphi,d)
 
   do k=is1(3),ie1(3); do j=is1(2),ie1(2); do i=is1(1),ie1(1)
     dphi(i,j,k)= -0.5*((u(i,j  ,k  )+u(i+i0,j+j0,k+k0))*work(i+i0,j  ,k  ,1)- &
-                    (u(i-1+i0,j  ,k  )+u(i-1,j+j0,k  ))*work(i-1+i0 ,j  ,k  ,1))/dx(i) &
+                    (u(i-1+i0,j  ,k  )+u(i-1,j+j0,k+k0 ))*work(i-1+i0 ,j  ,k  ,1))/dx(i) &
               -0.5*((v(i,j  ,k  )+v(i+i0,j+j0,k+k0))*work(i  ,j+j0 ,k  ,2)-&
                     (v(i,j-1+j0,k  )+v(i+i0,j-1,k+k0 ))*work(i  ,j-1+j0,k  ,2))/dy(j)  &
               -0.5*((w(i,j  ,k  )+w(i+i0,j+j0,k+k0))*work(i  ,j  ,k+k0  ,3)-&
