@@ -337,7 +337,11 @@ Program paris
            call SetVelocityBC(u,v,w,umask,vmask,wmask,time)
            call do_ghost_vector(u,v,w)
            call my_timer(1)
-
+           if (DoVof .and. debug_par) then
+              call write_par_var("U-vel1    ",itimestep,u)
+              call write_par_var("V-vel1    ",itimestep,v)
+              call write_par_var("W-vel1    ",itimestep,w)
+           endif
 !-----------------------------------------PROJECTION STEP-----------------------------------------
            call SetPressureBC(umask,vmask,wmask)
            if (.not.FreeSurface) then
@@ -432,18 +436,24 @@ Program paris
               do k=ks,ke;  do j=js,je; do i=is,ieu    ! CORRECT THE u-velocity 
                  if (u_cmask(i,j,k)==1 .or. u_cmask(i,j,k)==2) then
                     u(i,j,k)=u(i,j,k)-(p_ext(i+1,j,k)-p_ext(i,j,k))/dxh(i)
+                 else if (u_cmask(i,j,k)==3) then
+                    u(i,j,k) = 0d0
                  endif
               enddo; enddo; enddo
-
+              
               do k=ks,ke;  do j=js,jev; do i=is,ie    ! CORRECT THE v-velocity
                  if (v_cmask(i,j,k)==1 .or. v_cmask(i,j,k)==2) then
                     v(i,j,k)=v(i,j,k)-(p_ext(i,j+1,k)-p_ext(i,j,k))/dyh(j)
+                 else if (v_cmask(i,j,k)==3) then
+                    v(i,j,k) = 0d0
                  endif
               enddo; enddo; enddo
 
               do k=ks,kew;  do j=js,je; do i=is,ie   ! CORRECT THE w-velocity
                  if (w_cmask(i,j,k)==1 .or. w_cmask(i,j,k)==2) then
                     w(i,j,k)=w(i,j,k)-(p_ext(i,j,k+1)-p_ext(i,j,k))/dzh(k)
+                 else if (w_cmask(i,j,k)==3) then
+                    w(i,j,k) = 0d0
                  endif
               enddo; enddo; enddo
               call SetVelocityBC(u,v,w,umask,vmask,wmask,time) !check this

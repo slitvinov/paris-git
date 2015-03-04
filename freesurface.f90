@@ -529,17 +529,11 @@ subroutine setuppoisson_fs2(utmp,vtmp,wtmp,dt,A,vof_phase,istep)
   do k=ks,ke; do j=js,je; do i=is,ie
      if (pcmask(i,j,k)==1 .or. pcmask(i,j,k)==2) then !rho is 1d0
         A(i,j,k,1) = 1d0/(dx(i)*dxh(i-1))
-        if (A(i,j,k,1) /= A(i,j,k,1)) write(*,'("ERROR: A1 NaN in fs2:",e14.5)')A(i,j,k,1)
         A(i,j,k,2) = 1d0/(dx(i)*dxh(i))
-        if (A(i,j,k,2) /= A(i,j,k,2)) write(*,'("ERROR: A2 NaN in fs2:",e14.5)')A(i,j,k,2)
         A(i,j,k,3) = 1d0/(dy(j)*dyh(j-1))
-        if (A(i,j,k,3) /= A(i,j,k,3)) write(*,'("ERROR: A3 NaN in fs2:",e14.5)')A(i,j,k,3)
         A(i,j,k,4) = 1d0/(dy(j)*dyh(j))
-        if (A(i,j,k,4) /= A(i,j,k,4)) write(*,'("ERROR: A4 NaN in fs2:",e14.5)')A(i,j,k,4)
         A(i,j,k,5) = 1d0/(dz(k)*dzh(k-1))
-        if (A(i,j,k,5) /= A(i,j,k,5)) write(*,'("ERROR: A5 NaN in fs2:",e14.5)')A(i,j,k,5)
         A(i,j,k,6) = 1d0/(dz(k)*dzh(k))
-        if (A(i,j,k,6) /= A(i,j,k,6)) write(*,'("ERROR: A6 NaN in fs2:",e14.5)')A(i,j,k,6)
 
         if (pcmask(i,j,k)==2 .and. vof_phase(i,j,k)/=1) call pariserror("Fatal topology error in FS 2nd projection")
 
@@ -563,7 +557,6 @@ subroutine setuppoisson_fs2(utmp,vtmp,wtmp,dt,A,vof_phase,istep)
         A(i,j,k,8) =  -1d0*((utmp(i,j,k)-utmp(i-1,j,k))/dx(i) &
              +  (vtmp(i,j,k)-vtmp(i,j-1,k))/dy(j) &
              +  (wtmp(i,j,k)-wtmp(i,j,k-1))/dz(k))
-        if (A(i,j,k,8) /= A(i,j,k,8)) write(*,'("ERROR: A8 NaN in fs2:",e14.5)')A(i,j,k,8) 
      endif
   enddo; enddo; enddo
 end subroutine setuppoisson_fs2
@@ -790,6 +783,11 @@ subroutine FreeSolver(A,p,maxError,beta,maxit,it,ierr,iout,time,tres2)
                A(i,j,k,3) * p(i,j-1,k) + A(i,j,k,4) * p(i,j+1,k) +            &
                A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8) )**norm
           cells = cells + 1d0
+          if (res2/=res2) then 
+             write(*,*)'ERROR: RES2 NaN'
+             call debug_details(i,j,k,A)
+             call pariserror('FreeSolver Res NaN')
+          endif
        endif
     enddo; enddo; enddo
     call MPI_WAITALL(12,req,sta,ierr)
@@ -915,7 +913,12 @@ subroutine RedBlackRelax_fs(A,p,beta)
                  p(i,j,k)=(1d0-beta)*p(i,j,k) + (beta/A(i,j,k,7))*(              &
                       A(i,j,k,1) * p(i-1,j,k) + A(i,j,k,2) * p(i+1,j,k) +        &
                       A(i,j,k,3) * p(i,j-1,k) + A(i,j,k,4) * p(i,j+1,k) +        &
-                      A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8))   
+                      A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8))
+                 if (p(i,j,k)/=p(i,j,k)) then
+                    write(*,*)'ERROR: P NaN'
+                    call debug_details(i,j,k,A)
+                    call pariserror('P NaN in FreeSolver')
+                 endif
               endif
            enddo
            isw=3-isw
@@ -1369,3 +1372,24 @@ subroutine initialize_P_RP(p)
   enddo; enddo; enddo
 end subroutine initialize_P_RP
 !====================================================================================================================================================
+subroutine debug_details(i,j,k,A)
+  use module_grid
+  use module_flow
+  use module_freesurface
+  implicit none
+  integer :: i,j,k
+  real(8), dimension(is:ie,js:je,ks:ke,8), intent(in) :: A
+  open(unit=40,file="details.txt",access="append")
+  write(40,'("Solver flag:",I5)')solver_flag
+  write(40,*) "p",  p(i,j,k)
+  write(40,'("A branches: ",8e14.5)')A(i,j,k,:)
+  write(40,'("P neighbours ",6e14.5)')p(i-1,j,k),p(i+1,j,k),p(i,j-1,k),p(i,j+1,k),&
+                  p(i,j,k-1),p(i,j,k+1)
+  write(40,'("Limits: ",6I8)')is,ie,js,je,ks,ke
+  write(40,*) "ijk rank",i,j,k,rank
+  write(40,'("Pcmask 1-7: ",7I8)')pcmask(i-1,j,k),pcmask(i+1,j,k),pcmask(i,j-1,k),pcmask(i,j+1,k),&
+       pcmask(i,j,k-1),pcmask(i,j,k+1),pcmask(i,j,k)
+  !write(40,'("Vof_phase 1-7: ",7I8)')vof_phase(i-1,j,k),vof_phase(i+1,j,k),vof_phase(i,j-1,k),vof_phase(i,j+1,k),&
+  !     vof_phase(i,j,k-1),vof_phase(i,j,k+1),vof_phase(i,j,k)
+  close(40)
+end subroutine debug_details
