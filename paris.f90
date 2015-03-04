@@ -1253,10 +1253,10 @@ subroutine momentumConvection()
   if (AdvectionScheme=='QUICK') then
     call momentumConvectionQUICK(u,v,w,du,dv,dw)
   elseif (AdvectionScheme=='ENO') then
-    call momentumConvectionENO(u,v,w,du,dv,dw)
-!    call momentumConvectionENO_x(u,v,w,u,du,1)
-!    call momentumConvectionENO_x(u,v,w,v,dv,2)
-!    call momentumConvectionENO_x(u,v,w,w,dw,3)
+!    call momentumConvectionENO(u,v,w,du,dv,dw)
+    call momentumConvectionENO_x(u,v,w,u,du,1)
+    call momentumConvectionENO_x(u,v,w,v,dv,2)
+    call momentumConvectionENO_x(u,v,w,w,dw,3)
   elseif (AdvectionScheme=='UpWind') then
     call momentumConvectionUpWind(u,v,w,du,dv,dw)
   elseif (AdvectionScheme=='Verstappen') then
@@ -1325,7 +1325,7 @@ subroutine momentumConvectionENO_x(u,v,w,phi,dphi,d)
 
   do k=is1(3),ie1(3); do j=is1(2),ie1(2); do i=is1(1),ie1(1)
     if(v(i,j-j0,k)+v(i+i0,j,k+k0)>0.0) then
-      work(i,j,k,2)=phi(i,j,k)+0.5*slope_lim(phi(i,j-1-j0,k),phi(i,j-j0,k),phi(i,j+1-j0,k))
+      work(i,j,k,2)=phi(i,j-j0,k)+0.5*slope_lim(phi(i,j-1-j0,k),phi(i,j-j0,k),phi(i,j+1-j0,k))
     else
       work(i,j,k,2)=phi(i,j+1-j0,k)-0.5*slope_lim(phi(i,j-j0,k),phi(i,j+1-j0,k),phi(i,j+2-j0,k))
     endif
@@ -1340,7 +1340,7 @@ subroutine momentumConvectionENO_x(u,v,w,phi,dphi,d)
 
   do k=is1(3),ie1(3); do j=is1(2),ie1(2); do i=is1(1),ie1(1)
     if(w(i,j,k-k0)+w(i+i0,j+j0,k)>0.0) then
-      work(i,j,k,3)=phi(i,j,k)+0.5*slope_lim(phi(i,j,k-1-k0),phi(i,j,k-k0),phi(i,j,k+1-k0))
+      work(i,j,k,3)=phi(i,j,k-k0)+0.5*slope_lim(phi(i,j,k-1-k0),phi(i,j,k-k0),phi(i,j,k+1-k0))
     else
       work(i,j,k,3)=phi(i,j,k+1-k0)-0.5*slope_lim(phi(i,j,k-k0),phi(i,j,k+1-k0),phi(i,j,k+2-k0))
     endif
@@ -1355,15 +1355,37 @@ subroutine momentumConvectionENO_x(u,v,w,phi,dphi,d)
   else
     ie1(3) = kew
   endif
-
-  do k=is1(3),ie1(3); do j=is1(2),ie1(2); do i=is1(1),ie1(1)
+  
+  if(d==1) then
+   do k=is1(3),ie1(3); do j=is1(2),ie1(2); do i=is1(1),ie1(1)
+    dphi(i,j,k)= -0.5*((u(i,j  ,k  )+u(i+i0,j+j0,k+k0))*work(i+i0,j  ,k  ,1)- &
+                    (u(i-1+i0,j  ,k  )+u(i-1,j+j0,k+k0 ))*work(i-1+i0 ,j  ,k  ,1))/dxh(i) &
+              -0.5*((v(i,j  ,k  )+v(i+i0,j+j0,k+k0))*work(i  ,j+j0 ,k  ,2)-&
+                    (v(i,j-1+j0,k  )+v(i+i0,j-1,k+k0 ))*work(i  ,j-1+j0,k  ,2))/dy(j)  &
+              -0.5*((w(i,j  ,k  )+w(i+i0,j+j0,k+k0))*work(i  ,j  ,k+k0  ,3)-&
+                    (w(i,j  ,k-1+k0)+w(i+i0,j+j0,k-1))*work(i  ,j  ,k-1+k0,3))/dz(k)
+   enddo; enddo; enddo
+  elseif(d==2) then
+   do k=is1(3),ie1(3); do j=is1(2),ie1(2); do i=is1(1),ie1(1)
+    dphi(i,j,k)= -0.5*((u(i,j  ,k  )+u(i+i0,j+j0,k+k0))*work(i+i0,j  ,k  ,1)- &
+                    (u(i-1+i0,j  ,k  )+u(i-1,j+j0,k+k0 ))*work(i-1+i0 ,j  ,k  ,1))/dx(i) &
+              -0.5*((v(i,j  ,k  )+v(i+i0,j+j0,k+k0))*work(i  ,j+j0 ,k  ,2)-&
+                    (v(i,j-1+j0,k  )+v(i+i0,j-1,k+k0 ))*work(i  ,j-1+j0,k  ,2))/dyh(j)  &
+              -0.5*((w(i,j  ,k  )+w(i+i0,j+j0,k+k0))*work(i  ,j  ,k+k0  ,3)-&
+                    (w(i,j  ,k-1+k0)+w(i+i0,j+j0,k-1))*work(i  ,j  ,k-1+k0,3))/dz(k)
+   enddo; enddo; enddo
+  else
+   do k=is1(3),ie1(3); do j=is1(2),ie1(2); do i=is1(1),ie1(1)
     dphi(i,j,k)= -0.5*((u(i,j  ,k  )+u(i+i0,j+j0,k+k0))*work(i+i0,j  ,k  ,1)- &
                     (u(i-1+i0,j  ,k  )+u(i-1,j+j0,k+k0 ))*work(i-1+i0 ,j  ,k  ,1))/dx(i) &
               -0.5*((v(i,j  ,k  )+v(i+i0,j+j0,k+k0))*work(i  ,j+j0 ,k  ,2)-&
                     (v(i,j-1+j0,k  )+v(i+i0,j-1,k+k0 ))*work(i  ,j-1+j0,k  ,2))/dy(j)  &
               -0.5*((w(i,j  ,k  )+w(i+i0,j+j0,k+k0))*work(i  ,j  ,k+k0  ,3)-&
-                    (w(i,j  ,k-1+k0)+w(i+i0,j+j0,k-1))*work(i  ,j  ,k-1+k0,3))/dz(k)
-  enddo; enddo; enddo
+                    (w(i,j  ,k-1+k0)+w(i+i0,j+j0,k-1))*work(i  ,j  ,k-1+k0,3))/dzh(k)
+   enddo; enddo; enddo
+  endif
+
+  
 
 end subroutine momentumConvectionENO_x
 
