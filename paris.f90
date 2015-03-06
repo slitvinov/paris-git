@@ -1249,14 +1249,21 @@ subroutine momentumConvection()
   use module_grid
   use module_tmpvar
   use module_IO
+  logical :: sbee
 
   if (AdvectionScheme=='QUICK') then
     call momentumConvectionQUICK(u,v,w,du,dv,dw)
   elseif (AdvectionScheme=='ENO') then
-!    call momentumConvectionENO(u,v,w,du,dv,dw)
-    call momentumConvectionENO_x(u,v,w,u,du,1)
-    call momentumConvectionENO_x(u,v,w,v,dv,2)
-    call momentumConvectionENO_x(u,v,w,w,dw,3)
+    sbee = .false.
+!   call momentumConvectionENO(u,v,w,du,dv,dw)
+    call momentumConvection_onedim(u,v,w,u,du,1,sbee)
+    call momentumConvection_onedim(u,v,w,v,dv,2,sbee)
+    call momentumConvection_onedim(u,v,w,w,dw,3,sbee)
+  elseif (AdvectionScheme=='Superbee') then
+    sbee = .true.
+    call momentumConvection_onedim(u,v,w,u,du,1,sbee)
+    call momentumConvection_onedim(u,v,w,v,dv,2,sbee)
+    call momentumConvection_onedim(u,v,w,w,dw,3,sbee)
   elseif (AdvectionScheme=='UpWind') then
     call momentumConvectionUpWind(u,v,w,du,dv,dw)
   elseif (AdvectionScheme=='Verstappen') then
@@ -1276,21 +1283,28 @@ end subroutine momentumConvection
 ! and returns them in du, dv, dw
 !-------------------------------------------------------------------------------------------------
 
-function slope_lim (val1,val2,val3)
+function slope_lim (val1,val2,val3,superbee)
   implicit none
-  real(8), external :: minabs
-  real (8) :: slope_lim,val1,val2,val3
-
-  slope_lim = minabs((val3-val2),(val2-val1))
+  real(8), external :: minabs, maxabs
+  real (8) :: slope_lim,val1,val2,val3, alpha1, alpha2
+  logical, intent(in) :: superbee
+  if (superbee) then
+     alpha1 = minabs(val3-val2,2*(val2-val1))
+     alpha2 = minabs(2*(val3-val2),val2-val1)
+     slope_lim = maxabs(alpha1, alpha2)
+  else
+     slope_lim = minabs((val3-val2),(val2-val1))
+  endif
 
 end function slope_lim
 
-subroutine momentumConvectionENO_x(u,v,w,phi,dphi,d)
+subroutine momentumConvection_onedim(u,v,w,phi,dphi,d,sb)
   use module_grid
   use module_tmpvar
   implicit none
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: u, v, w, phi
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: dphi
+  logical, intent(in) :: sb
   real(8), external :: slope_lim
   integer :: i,j,k,d
   integer, dimension(3) :: is0,is1,ie0,ie1
@@ -1310,9 +1324,9 @@ subroutine momentumConvectionENO_x(u,v,w,phi,dphi,d)
 
   do k=is1(3),ie1(3); do j=is1(2),ie1(2); do i=is1(1),ie1(1)
     if (u(i-i0,j,k)+u(i,j+j0,k+k0)>0.0) then
-      work(i,j,k,1)=phi(i-i0,j,k)+0.5*slope_lim(phi(i-1-i0,j,k),phi(i-i0,j,k),phi(i+1-i0,j,k))
+      work(i,j,k,1)=phi(i-i0,j,k)+0.5*slope_lim(phi(i-1-i0,j,k),phi(i-i0,j,k),phi(i+1-i0,j,k),sb)
     else
-      work(i,j,k,1)=phi(i+1-i0,j,k)-0.5*slope_lim(phi(i-i0,j,k),phi(i+1-i0,j,k),phi(i+2-i0,j,k))
+      work(i,j,k,1)=phi(i+1-i0,j,k)-0.5*slope_lim(phi(i-i0,j,k),phi(i+1-i0,j,k),phi(i+2-i0,j,k),sb)
     endif
   enddo; enddo; enddo
 
@@ -1325,9 +1339,9 @@ subroutine momentumConvectionENO_x(u,v,w,phi,dphi,d)
 
   do k=is1(3),ie1(3); do j=is1(2),ie1(2); do i=is1(1),ie1(1)
     if(v(i,j-j0,k)+v(i+i0,j,k+k0)>0.0) then
-      work(i,j,k,2)=phi(i,j-j0,k)+0.5*slope_lim(phi(i,j-1-j0,k),phi(i,j-j0,k),phi(i,j+1-j0,k))
+      work(i,j,k,2)=phi(i,j-j0,k)+0.5*slope_lim(phi(i,j-1-j0,k),phi(i,j-j0,k),phi(i,j+1-j0,k),sb)
     else
-      work(i,j,k,2)=phi(i,j+1-j0,k)-0.5*slope_lim(phi(i,j-j0,k),phi(i,j+1-j0,k),phi(i,j+2-j0,k))
+      work(i,j,k,2)=phi(i,j+1-j0,k)-0.5*slope_lim(phi(i,j-j0,k),phi(i,j+1-j0,k),phi(i,j+2-j0,k),sb)
     endif
   enddo; enddo; enddo
 
@@ -1340,9 +1354,9 @@ subroutine momentumConvectionENO_x(u,v,w,phi,dphi,d)
 
   do k=is1(3),ie1(3); do j=is1(2),ie1(2); do i=is1(1),ie1(1)
     if(w(i,j,k-k0)+w(i+i0,j+j0,k)>0.0) then
-      work(i,j,k,3)=phi(i,j,k-k0)+0.5*slope_lim(phi(i,j,k-1-k0),phi(i,j,k-k0),phi(i,j,k+1-k0))
+      work(i,j,k,3)=phi(i,j,k-k0)+0.5*slope_lim(phi(i,j,k-1-k0),phi(i,j,k-k0),phi(i,j,k+1-k0),sb)
     else
-      work(i,j,k,3)=phi(i,j,k+1-k0)-0.5*slope_lim(phi(i,j,k-k0),phi(i,j,k+1-k0),phi(i,j,k+2-k0))
+      work(i,j,k,3)=phi(i,j,k+1-k0)-0.5*slope_lim(phi(i,j,k-k0),phi(i,j,k+1-k0),phi(i,j,k+2-k0),sb)
     endif
   enddo; enddo; enddo
 
@@ -1356,38 +1370,16 @@ subroutine momentumConvectionENO_x(u,v,w,phi,dphi,d)
     ie1(3) = kew
   endif
   
-  if(d==1) then
-   do k=is1(3),ie1(3); do j=is1(2),ie1(2); do i=is1(1),ie1(1)
-    dphi(i,j,k)= -0.5*((u(i,j  ,k  )+u(i+i0,j+j0,k+k0))*work(i+i0,j  ,k  ,1)- &
-                    (u(i-1+i0,j  ,k  )+u(i-1,j+j0,k+k0 ))*work(i-1+i0 ,j  ,k  ,1))/dxh(i) &
-              -0.5*((v(i,j  ,k  )+v(i+i0,j+j0,k+k0))*work(i  ,j+j0 ,k  ,2)-&
-                    (v(i,j-1+j0,k  )+v(i+i0,j-1,k+k0 ))*work(i  ,j-1+j0,k  ,2))/dy(j)  &
-              -0.5*((w(i,j  ,k  )+w(i+i0,j+j0,k+k0))*work(i  ,j  ,k+k0  ,3)-&
-                    (w(i,j  ,k-1+k0)+w(i+i0,j+j0,k-1))*work(i  ,j  ,k-1+k0,3))/dz(k)
-   enddo; enddo; enddo
-  elseif(d==2) then
-   do k=is1(3),ie1(3); do j=is1(2),ie1(2); do i=is1(1),ie1(1)
-    dphi(i,j,k)= -0.5*((u(i,j  ,k  )+u(i+i0,j+j0,k+k0))*work(i+i0,j  ,k  ,1)- &
-                    (u(i-1+i0,j  ,k  )+u(i-1,j+j0,k+k0 ))*work(i-1+i0 ,j  ,k  ,1))/dx(i) &
-              -0.5*((v(i,j  ,k  )+v(i+i0,j+j0,k+k0))*work(i  ,j+j0 ,k  ,2)-&
-                    (v(i,j-1+j0,k  )+v(i+i0,j-1,k+k0 ))*work(i  ,j-1+j0,k  ,2))/dyh(j)  &
-              -0.5*((w(i,j  ,k  )+w(i+i0,j+j0,k+k0))*work(i  ,j  ,k+k0  ,3)-&
-                    (w(i,j  ,k-1+k0)+w(i+i0,j+j0,k-1))*work(i  ,j  ,k-1+k0,3))/dz(k)
-   enddo; enddo; enddo
-  else
    do k=is1(3),ie1(3); do j=is1(2),ie1(2); do i=is1(1),ie1(1)
     dphi(i,j,k)= -0.5*((u(i,j  ,k  )+u(i+i0,j+j0,k+k0))*work(i+i0,j  ,k  ,1)- &
                     (u(i-1+i0,j  ,k  )+u(i-1,j+j0,k+k0 ))*work(i-1+i0 ,j  ,k  ,1))/dx(i) &
               -0.5*((v(i,j  ,k  )+v(i+i0,j+j0,k+k0))*work(i  ,j+j0 ,k  ,2)-&
                     (v(i,j-1+j0,k  )+v(i+i0,j-1,k+k0 ))*work(i  ,j-1+j0,k  ,2))/dy(j)  &
               -0.5*((w(i,j  ,k  )+w(i+i0,j+j0,k+k0))*work(i  ,j  ,k+k0  ,3)-&
-                    (w(i,j  ,k-1+k0)+w(i+i0,j+j0,k-1))*work(i  ,j  ,k-1+k0,3))/dzh(k)
+                    (w(i,j  ,k-1+k0)+w(i+i0,j+j0,k-1))*work(i  ,j  ,k-1+k0,3))/dz(k)
    enddo; enddo; enddo
-  endif
-
-  
-
-end subroutine momentumConvectionENO_x
+ 
+end subroutine momentumConvection_onedim
 
 subroutine momentumConvectionENO(u,v,w,du,dv,dw)
   use module_grid
@@ -2644,7 +2636,22 @@ subroutine InitCondition
   iTimeStepRestart = iTimeStep
   timeLastOutput = DBLE(INT(time/tout))*tout
 end subroutine InitCondition
-
+!=================================================================================================
+! function maxabs
+!   used for ENO interpolations
+!   called in:    subroutine momentumConvection
+!                 subroutine density
+!-------------------------------------------------------------------------------------------------
+function maxabs(a,b)
+implicit none
+real(8) :: maxabs, a, b
+  if(abs(a)>abs(b)) then
+    maxabs=a
+  else
+    maxabs=b
+  endif
+!  minabs = 0.5*(sign(1.0,abs(b)-abs(a))*(a-b)+a+b)
+end function maxabs
 !=================================================================================================
 ! function minabs
 !   used for ENO interpolations
