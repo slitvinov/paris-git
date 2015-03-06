@@ -436,12 +436,23 @@ contains
     ! some stuff is missing here
   end subroutine PlotCutAreaCentroid
   
-  subroutine do_droplet_test(timestep,output_time)
+  ! Subroutine to perform several tests related to the falling droplet test
+  ! Outputs a file with different values
+  ! First column: time step
+  ! Second column: kinetic energy of phase 1
+  ! Third column: kinetic energy of phase 2
+  ! Fourth column: total kinetic energy
+  ! Fifth column: mass phase 1
+  ! Sixth column: mass phase 2
+  ! Seventh, eight and ninth: xg yg and zg of the droplet (Mass center)
+  ! Tenth, maximum of the pressure gradient norm
+  subroutine do_droplet_test(ts,output_time)
     use module_flow
     implicit none
     include 'mpif.h'
-    integer :: i,j,k,timestep, ierr
+    integer :: i,j,k,ts, ierr
     real(8) :: vol, uvel, vvel, wvel, output_time
+    real(8) :: grad1, grad2, grad3, norm_grad, local_norm, gn
     real(8), dimension(9):: local_data, bgd
     character*128 :: file_name
     LOGICAL :: Found
@@ -451,13 +462,18 @@ contains
     ! Compute Local Stats
     local_data = 0d0
     bgd = 0d0
-    
+    local_norm = 0d0
+    gn = 0d0
     
     do k=ks,ke; do j=js,je; do i=is,ie;
        vol = dx(i) * dy(j) * dz(k)
        uvel = 0.5*(u(i,j,k)+u(i-1,j,k))
        vvel = 0.5*(v(i,j,k)+v(i,j-1,k))
        wvel = 0.5*(w(i,j,k)+w(i,j,k-1))
+       grad1 = 0.5*(p(i+1,j,k)-p(i-1,j,k))/dx(i)
+       grad2 = 0.5*(p(i,j+1,k)-p(i,j-1,k))/dy(j)
+       grad3 = 0.5*(p(i,j,k+1)-p(i,j,k-1))/dx(k)
+       
     	
        !Computing kinetic energy of phase 1
        local_data(1) = local_data(1) + rho2*cvof(i,j,k)*(uvel**2 &
@@ -480,9 +496,14 @@ contains
        local_data(8) = local_data(8) + rho2*cvof(i,j,k)*vol*y(j)
        !Computing zgc
        local_data(9) = local_data(9) + rho2*cvof(i,j,k)*vol*z(k)
-     enddo; enddo; enddo	
+       !Computing norm grad P
+       norm_grad = (grad1**2 + grad2**2 + grad3**2)**0.5d0
+       if(norm_grad > local_norm) local_norm = norm_grad
+       
+    enddo; enddo; enddo	
     	
     call MPI_ALLREDUCE(local_data, bgd, 9, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr)
+    call MPI_ALLREDUCE(local_norm, gn, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_Comm_Cart, ierr)
     
     if(rank==0) then
     bgd(7) = bgd(7)/bgd(4)
@@ -490,18 +511,18 @@ contains
     bgd(9) = bgd(9)/bgd(4)
      if(first_open) then
        OPEN(UNIT=88,FILE=TRIM(out_path)//TRIM(file_name)//'.dat')
-       write(88,18) timestep,bgd(1),bgd(2),bgd(3),bgd(4),bgd(5),bgd(6),bgd(7),bgd(8),bgd(9)
+       write(88,18) ts,bgd(1),bgd(2),bgd(3),bgd(4),bgd(5),bgd(6),bgd(7),bgd(8),bgd(9),gn
        CLOSE(88)
        first_open = .false.
      else
        OPEN(UNIT=88,FILE=TRIM(out_path)//TRIM(file_name)//'.dat',POSITION='append')
-       write(88,18) timestep,bgd(1),bgd(2),bgd(3),bgd(4),bgd(5),bgd(6),bgd(7),bgd(8),bgd(9)
+       write(88,18) ts,bgd(1),bgd(2),bgd(3),bgd(4),bgd(5),bgd(6),bgd(7),bgd(8),bgd(9),gn
        CLOSE(88)
      endif
     endif
     
     call output_droplet(w,output_time)
-18     format(I8.8,E14.6,E14.6,E14.6,E14.6,E14.6,E14.6,E14.6,E14.6,E14.6)   
+18     format(I8.8,E14.6,E14.6,E14.6,E14.6,E14.6,E14.6,E14.6,E14.6,E14.6,E14.6)   
 end subroutine do_droplet_test
 
   subroutine h_of_KHI2D(timestep,output_time)
