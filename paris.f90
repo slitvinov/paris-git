@@ -726,6 +726,7 @@ subroutine TimeStepSize(deltaT)
   use module_grid
   use module_flow
   use module_2phase
+  use module_IO
   implicit none
   include "mpif.h"
   real(8) :: deltaT, h, vmax, dtadv, mydt
@@ -737,6 +738,8 @@ subroutine TimeStepSize(deltaT)
     h  = minval(dx)
     vmax = maxval(sqrt(u(is:ie,js:je,ks:ke)**2+v(is:ie,js:je,ks:ke)**2+w(is:ie,js:je,ks:ke)**2))
     if ( vmax > vmax_phys*1.d2 ) then
+       call output(99999,is,ie+1,js,je+1,ks,ke+1)
+       call mpi_barrier(MPI_COMM_WORLD, ierr)
        call pariserror("Max velocity 100 times larger than physical value, something wrong!") 
     else 
        dtadv  = h/(max(vmax,vmax_phys))
@@ -854,7 +857,7 @@ subroutine calcStats
         mystats(15)=mystats(15)+rho(i,j,k)*0.5d0*(v(i,j,k)+v(i,j+1,k))*vol*(1.d0-cvof(i,j,k))
      end if ! (DoVOF)
      ! interfacial area
-     if (DoVOF .and. test_PhaseInversion) then
+     if (DoVOF ) then
          ! MODEMI version of interface area 
 !        if (     max((cvof(i+1,j,k)-0.5d0)/abs(cvof(i+1,j,k)-0.5d0),0.d0) & 
 !             - max((cvof(i-1,j,k)-0.5d0)/abs(cvof(i-1,j,k)-0.5d0),0.d0) /= 0.d0 &
@@ -883,7 +886,7 @@ subroutine calcStats
         mystats(21)=mystats(21)+rho(i,j,k)*Gy*y(j)*vol*(1.d0-cvof(i,j,k))
      end if ! DoVOF
      ! enstrophy
-     if(DoVOF .and. test_PhaseInversion) then
+     if(DoVOF ) then
         vort2 = (0.5d0*(w(i,j+1,k)+w(i,j+1,k+1)-w(i,j-1,k)-w(i,j-1,k+1))/(y(j+1)-y(j-1)) & 
              -0.5d0*(v(i,j,k+1)+v(i,j+1,k+1)-v(i,j,k-1)-v(i,j+1,k-1))/(z(k+1)-z(k-1)))**2.d0 & 
              + (0.5d0*(u(i,j,k+1)+u(i+1,j,k+1)-u(i,j,k-1)-u(i+1,j,k-1))/(z(k+1)-z(k-1)) & 

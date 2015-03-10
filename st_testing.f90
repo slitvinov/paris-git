@@ -470,10 +470,29 @@ contains
        uvel = 0.5*(u(i,j,k)+u(i-1,j,k))
        vvel = 0.5*(v(i,j,k)+v(i,j-1,k))
        wvel = 0.5*(w(i,j,k)+w(i,j,k-1))
-       grad1 = 0.5*(p(i+1,j,k)-p(i-1,j,k))/dx(i)
-       grad2 = 0.5*(p(i,j+1,k)-p(i,j-1,k))/dy(j)
-       grad3 = 0.5*(p(i,j,k+1)-p(i,j,k-1))/dx(k)
+       if ( i == is ) then 
+         grad1 =     (p(i+1,j,k)-p(i  ,j,k))/dx(i)
+       else if ( i == ie ) then
+         grad1 =     (p(i  ,j,k)-p(i-1,j,k))/dx(i)
+       else 
+         grad1 = 0.5*(p(i+1,j,k)-p(i-1,j,k))/dx(i)
+       end if ! i
        
+       if ( j == js ) then 
+         grad2 =     (p(i,j+1,k)-p(i,j  ,k))/dy(j)
+       else if ( j == je ) then
+         grad2 =     (p(i,j  ,k)-p(i,j-1,k))/dy(j)
+       else 
+         grad2 = 0.5*(p(i,j+1,k)-p(i,j-1,k))/dy(j)
+       end if ! j
+
+       if ( k == ks ) then 
+         grad3 =     (p(i,j,k+1)-p(i,j,k  ))/dx(k)
+       else if ( k == ks ) then 
+         grad3 =     (p(i,j,k  )-p(i,j,k-1))/dx(k)
+       else  
+         grad3 = 0.5*(p(i,j,k+1)-p(i,j,k-1))/dx(k)
+       end if ! k 
     	
        !Computing kinetic energy of phase 1
        local_data(1) = local_data(1) + rho2*cvof(i,j,k)*(uvel**2 &
