@@ -110,23 +110,22 @@
   enddo
 
   !Count level 3
-  level3 = 0
-  do k=ks,ke; do j=js,je; do i=is,ie
-     if (pcmask(i,j,k)==3) level3 = level3 + 1
-  enddo; enddo; enddo
-  call MPI_ALLREDUCE(level3,l3sum, 1, MPI_INTEGER, MPI_SUM, MPI_COMM_Active, ierr)
-  !Check, set alarm
-  if (l3sum <= 10) then
-     imploding=.true.
-     if (rank==0) write(*,'("Total L3: ",I8)')level3   
-  endif
-
-  !if (rank==0) write(*,'(L4)')imploding
-
-  if (imploding) then
-     if (rank==0) write(*,'("Total L3: ",I8)') level3
-     pcmask = 0; u_cmask = 0; v_cmask = 0; w_cmask = 0 !Set masks to zero 
-  endif
+!!$  level3 = 0
+!!$  do k=ks,ke; do j=js,je; do i=is,ie
+!!$     if (pcmask(i,j,k)==3) level3 = level3 + 1
+!!$  enddo; enddo; enddo
+!!$  call MPI_ALLREDUCE(level3,l3sum, 1, MPI_INTEGER, MPI_SUM, MPI_COMM_Active, ierr)
+!!$  !Check, set alarm
+!!$  if (l3sum <= 10) then
+!!$     imploding=.true.
+!!$     if (rank==0) write(*,'("IMPLODING BUBBLE DETECTED")')
+!!$     !if (rank==0) write(*,'("Total L3: ",I8)')level3   
+!!$  endif
+!!$
+!!$  if (imploding) then
+!!$     if (rank==0) write(*,'("Total L3: ",I8)') level3
+!!$     pcmask = 0; u_cmask = 0; v_cmask = 0; w_cmask = 0 !Set masks to zero 
+!!$  endif
 end subroutine set_topology
 !-------------------------------------------------------------------------------------------------
 subroutine setuppoisson_fs(utmp,vtmp,wtmp,vof_phase,rhot,dt,A,cvof,n1,n2,n3,kap,iout)
@@ -806,8 +805,8 @@ subroutine FreeSolver(A,p,maxError,beta,maxit,it,ierr,iout,time,tres2)
     call catch_divergence_fs(res2,cells,ierr)
     call MPI_ALLREDUCE(res2, tres2, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr)
     call MPI_ALLREDUCE(cells, tcells, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr)
-    if (tcells>=1) tres2=tres2/tcells
     if(norm==2) tres2=sqrt(tres2)
+    tres2 = tres2/tcells
     if(rank==0.and.mod(it,10) == 0.and.recordconvergence) write(89,310) it, solver_flag, tres2
 310 format(2I6,'  ',(e14.5))
     if (tres2<maxError) then 
@@ -1030,7 +1029,6 @@ end subroutine VTK_scalar_struct
 !==============================================================================================================================
 ! Routine to numerically integrate the Rayleigh-Plesset equation
 subroutine Integrate_RP(dt,t)
-  !use module_2phase
   use module_freesurface
   implicit none 
   integer :: j
@@ -1077,7 +1075,6 @@ subroutine func(y,dydt)
     real(8) :: P_c
     real(8) :: y(2), dydt(2)
     P_c = P_ref*(R_ref/y(1))**(3d0*gamma)-2d0*sigma/y(1)
-
     dydt(2) = -3d0*(y(2)**2d0)/(2d0*y(1)) + (P_c - P_inf)/y(1)
     dydt(1) = y(2)
   end subroutine func
@@ -1105,197 +1102,6 @@ contains
          ddR_RK*R_RK + 3d0/2d0*dR_RK**2d0)
   end function pressure
 end subroutine write_RP_test
-!======================================================================================================================================
-! Idea is to set free outflow in the radial direction for the RP test case. In combination with variable Pressure bx's, we can have more
-! accurate results on a truncated domain.
-!
-subroutine set_RP_radial_velocity(u,v,w)
-  use module_grid
-  use module_2phase
-  use module_freesurface
-  implicit none
-  include 'mpif.h'
-  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: u, v, w
-  real(8) :: di1, di2
-  integer :: ih1, ih2
-  integer :: i,j,k
-
-  !x- face
-  if (coords(1)==0) then
-     !write(*,*)'x- face loop'
-     do j=js,je; do k=ks,ke
-        ! Components to be done independently, starting xith u on the boundary
-        if (y(j).ge.yc(1)) then 
-           ih1 = -1
-        else
-           ih1 = 1
-        endif
-        if (z(k).ge.zc(1)) then 
-           ih2 = -1
-        else
-           ih2 = 1
-        endif
-        !get cuts, will be non-dimensional if dx=dy=dz
-        di1 = ABS(yc(1)-y(j))/ABS(xc(1)-xh(is-1))
-        di2 = ABS(zc(1)-z(k))/ABS(xc(1)-xh(is-1))
-        !set
-        u(is-1,j,k)=u(is,j,k)*(1d0-di1)*(1d0-di2)+u(is,j+ih1,k)*di1*(1d0-di2)&
-             +u(is,j,k+ih2)*(1d0-di1)*di2+u(is,j+ih1,k+ih2)*di1*di2
-        !same for v
-        if (yh(j).ge.yc(1)) then 
-           ih1 = -1
-        else
-           ih1 = 1
-        endif
-        if (zh(k).ge.zc(1)) then 
-           ih2 = -1
-        else
-           ih2 = 1
-        endif
-        !get cuts, will be non-dimensional if dx=dy=dz
-        di1 = ABS(yc(1)-yh(j))/ABS(xc(1)-x(is-1))
-        di2 = ABS(zc(1)-zh(k))/ABS(xc(1)-x(is-1))
-        !set
-        v(is-1,j,k)=v(is,j,k)*(1d0-di1)*(1d0-di2)+v(is,j+ih1,k)*di1*(1d0-di2)&
-             +v(is,j,k+ih2)*(1d0-di1)*di2+v(is,j+ih1,k+ih2)*di1*di2
-        !same for w
-        w(is-1,j,k)=w(is,j,k)*(1d0-di1)*(1d0-di2)+w(is,j+ih1,k)*di1*(1d0-di2)&
-             +w(is,j,k+ih2)*(1d0-di1)*di2+w(is,j+ih1,k+ih2)*di1*di2
-        !set u(is-2) to allow cell is-1 to be divergence free
-     enddo; enddo
-  endif
-  !x+ face
-  if (coords(1)==nPx-1) then
-    !write(*,*)'x+ face loop' 
-     do j=js,je; do k=ks,ke
-        ! Components to be done independently, starting xith u on the boundary
-        if (y(j).ge.yc(1)) then 
-           ih1 = -1
-        else
-           ih1 = 1
-        endif
-        if (z(k).ge.zc(1)) then 
-           ih2 = -1
-        else
-           ih2 = 1
-        endif
-        !get cuts, will be non-dimensional if dx=dy=dz
-        di1 = ABS(yc(1)-y(j))/ABS(xc(1)-xh(ie))
-        di2 = ABS(zc(1)-z(k))/ABS(xc(1)-xh(ie))
-        !set
-        u(ie,j,k)=u(ie-1,j,k)*(1d0-di1)*(1d0-di2)+u(ie-1,j+ih1,k)*di1*(1d0-di2)&
-             +u(ie-1,j,k+ih2)*(1d0-di1)*di2+u(ie-1,j+ih1,k+ih2)*di1*di2
-        !same for v
-        if (yh(j).ge.yc(1)) then 
-           ih1 = -1
-        else
-           ih1 = 1
-        endif
-        if (zh(k).ge.zc(1)) then 
-           ih2 = -1
-        else
-           ih2 = 1
-        endif
-        !get cuts, will be non-dimensional if dx=dy=dz
-        di1 = ABS(yc(1)-yh(j))/ABS(xc(1)-x(ie+1))
-        di2 = ABS(zc(1)-zh(k))/ABS(xc(1)-x(ie+1))
-        !set
-        v(ie,j,k)=v(ie-1,j,k)*(1d0-di1)*(1d0-di2)+v(ie-1,j+ih1,k)*di1*(1d0-di2)&
-             +v(ie-1,j,k+ih2)*(1d0-di1)*di2+v(ie-1,j+ih1,k+ih2)*di1*di2
-        !same for w
-        w(ie,j,k)=w(ie-1,j,k)*(1d0-di1)*(1d0-di2)+w(ie-1,j+ih1,k)*di1*(1d0-di2)&
-             +w(ie-1,j,k+ih2)*(1d0-di1)*di2+w(ie-1,j+ih1,k+ih2)*di1*di2
-        !set u(ie+2) to allow cell to be divergence free
-     enddo; enddo
-  endif
-
-  !y-face
-  if (coords(2)==0) then
-     !write(*,*)'y- face loop'
-     do i=is,ie; do k=ks,ke
-        if (x(i).ge.xc(1)) then 
-           ih1 = -1
-        else
-           ih1 = 1
-        endif
-        if (z(k).ge.zc(1)) then 
-           ih2 = -1
-        else
-           ih2 = 1
-        endif
-        !get cuts, will be non-dimensional if dx=dy=dz
-        di1 = ABS(xc(1)-x(i))/ABS(yc(1)-yh(is-1))
-        di2 = ABS(zc(1)-z(k))/ABS(yc(1)-yh(is-1))
-        !set
-        v(i,js-1,k)=v(i,js,k)*(1d0-di1)*(1d0-di2)+v(is,js+ih1,k)*di1*(1d0-di2)&
-             +v(i,js,k+ih2)*(1d0-di1)*di2+v(i,js+ih1,k+ih2)*di1*di2
-        !same for v
-        if (xh(i).ge.xc(1)) then 
-           ih1 = -1
-        else
-           ih1 = 1
-        endif
-        if (zh(k).ge.zc(1)) then 
-           ih2 = -1
-        else
-           ih2 = 1
-        endif
-        !get cuts, will be non-dimensional if dx=dy=dz
-        di1 = ABS(xc(1)-xh(i))/ABS(yc(1)-y(is-1))
-        di2 = ABS(zc(1)-zh(k))/ABS(yc(1)-y(is-1))
-        !set
-        u(i,js-1,k)=u(i,js,k)*(1d0-di1)*(1d0-di2)+u(i+ih1,js,k)*di1*(1d0-di2)&
-             +u(i,js,k+ih2)*(1d0-di1)*di2+u(i+ih1,js,k+ih2)*di1*di2
-        !same for w
-        w(i,js-1,k)=w(i,js,k)*(1d0-di1)*(1d0-di2)+w(i+ih1,js,k)*di1*(1d0-di2)&
-             +w(i,js,k+ih2)*(1d0-di1)*di2+w(i+ih1,js,k+ih2)*di1*di2
-        !set u(is-2) to allow cell is-1 to be divergence free
-     enddo; enddo
-  endif
-  !y+ face
-  if (coords(2)==nPy-1) then
-     !write(*,*)'y+ face loop'
-     do i=is,ie; do k=ks,ke
-        if (x(i).ge.xc(1)) then 
-           ih1 = -1
-        else
-           ih1 = 1
-        endif
-        if (z(k).ge.zc(1)) then 
-           ih2 = -1
-        else
-           ih2 = 1
-        endif
-        !get cuts, will be non-dimensional if dx=dy=dz
-        di1 = ABS(xc(1)-x(i))/ABS(yc(1)-yh(je))
-        di2 = ABS(zc(1)-z(k))/ABS(yc(1)-yh(je))
-        !set
-        v(i,je,k)=v(i,je-1,k)*(1d0-di1)*(1d0-di2)+v(i+ih1,je-1,k)*di1*(1d0-di2)&
-             +v(i,je-1,k+ih2)*(1d0-di1)*di2+v(i+ih1,je-1,k+ih2)*di1*di2
-        !same for u
-        if (xh(i).ge.xc(1)) then 
-           ih1 = -1
-        else
-           ih1 = 1
-        endif
-        if (zh(k).ge.zc(1)) then 
-           ih2 = -1
-        else
-           ih2 = 1
-        endif
-        !get cuts, will be non-dimensional if dx=dy=dz
-        di1 = ABS(xc(1)-xh(i))/ABS(yc(1)-y(je+1))
-        di2 = ABS(zc(1)-zh(k))/ABS(yc(1)-y(je+1))
-        !set
-        u(i,je+1,k)=u(i,je,k)*(1d0-di1)*(1d0-di2)+u(i+ih1,je,k)*di1*(1d0-di2)&
-             +u(i,je,k+ih2)*(1d0-di1)*di2+u(i+ih1,je,k+ih2)*di1*di2
-        !same for w
-        w(i,je+1,k)=w(i,je,k)*(1d0-di1)*(1d0-di2)+w(i+ih1,je,k)*di1*(1d0-di2)&
-             +w(i,je,k+ih2)*(1d0-di1)*di2+w(i+ih1,je,k+ih2)*di1*di2
-        !set u(ie+2) to allow cell to be divergence free
-     enddo; enddo
-  endif
-end subroutine set_RP_radial_velocity
 !====================================================================================================================================================
 subroutine set_RP_pressure(p)
   use module_grid
@@ -1389,7 +1195,411 @@ subroutine debug_details(i,j,k,A)
   write(40,*) "ijk rank",i,j,k,rank
   write(40,'("Pcmask 1-7: ",7I8)')pcmask(i-1,j,k),pcmask(i+1,j,k),pcmask(i,j-1,k),pcmask(i,j+1,k),&
        pcmask(i,j,k-1),pcmask(i,j,k+1),pcmask(i,j,k)
-  !write(40,'("Vof_phase 1-7: ",7I8)')vof_phase(i-1,j,k),vof_phase(i+1,j,k),vof_phase(i,j-1,k),vof_phase(i,j+1,k),&
-  !     vof_phase(i,j,k-1),vof_phase(i,j,k+1),vof_phase(i,j,k)
   close(40)
 end subroutine debug_details
+!====================================================================================================================================================
+subroutine setuppoisson_fs_new(utmp,vtmp,wtmp,vof_phase,rhot,dt,A,cvof,n1,n2,n3,kap)
+  use module_grid
+  use module_freesurface
+  use module_IO
+  implicit none
+  include 'mpif.h'
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: utmp,vtmp,wtmp,rhot
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: kap
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: cvof,n1,n2,n3
+  real(8), dimension(is:ie,js:je,ks:ke,8), intent(inout) :: A
+  integer, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: vof_phase
+  real(8) :: dt
+  integer :: i,j,k,nbr
+  
+  if (.not.(solver_flag==1 .or. solver_flag==2)) call pariserror('Solver_flag FS needs to be either 1 or 2')
+
+  if (solver_flag == 1 .and. vof_phase(i,j,k)==0) then
+     call liq_gas()
+  else if (solver_flag == 2)   
+     do k=ks,ke; do j=js,je; do i=is,ie
+        if (pcmask(i,j,k)==1 .or. pcmask(i,j,k)==2) then !rho is 1d0
+           A(i,j,k,1) = 1.d0/(dx(i)*dxh(i-1))
+           A(i,j,k,2) = 1.d0/(dx(i)*dxh(i))
+           A(i,j,k,3) = 1.d0/(dy(j)*dyh(j-1))
+           A(i,j,k,4) = 1.d0/(dy(j)*dyh(j))
+           A(i,j,k,5) = 1.d0/(dz(k)*dzh(k-1))
+           A(i,j,k,6) = 1.d0/(dz(k)*dzh(k))
+
+           if (pcmask(i,j,k)==2 .and. vof_phase(i,j,k)/=1) call pariserror("Fatal topology error in FS 2nd projection")
+
+           if (pcmask(i,j,k)==1) then
+              if (vof_phase(i,j,k)/=1) call pariserror("Fatal topology error in FS 2nd projection")
+              do nbr=-1,1,2
+                 if (pcmask(i+nbr,j,k) == 0) then
+                    A(i,j,k,2+(nbr-1)/2) = 0d0
+                 endif
+                 if (pcmask(i,j+nbr,k) == 0) then
+                    A(i,j,k,4+(nbr-1)/2) = 0d0
+                 endif
+                 if (pcmask(i,j,k+nbr) == 0) then
+                    A(i,j,k,6+(nbr-1)/2) = 0d0
+                 endif
+              enddo
+           endif
+           A(i,j,k,7) = sum(A(i,j,k,1:6))
+           if (A(i,j,k,7)<1.d-12) pcmask(i,j,k) = 0 !Fix for isolated cav cells.
+
+           A(i,j,k,8) =  -1d0*((utmp(i,j,k)-utmp(i-1,j,k))/dx(i) &
+                +  (vtmp(i,j,k)-vtmp(i,j-1,k))/dy(j) &
+                +  (wtmp(i,j,k)-wtmp(i,j,k-1))/dz(k))
+        endif
+     enddo; enddo; enddo
+  endif
+  
+contains
+  subroutine liq_gas()
+    use module_grid
+    use module_freesurface
+    implicit none
+    real(8) :: limit, c_min
+    integer :: i,j,k
+
+    x_mod=dxh((is+ie)/2); y_mod=dyh((js+je)/2); z_mod=dzh((ks+ke)/2) !assumes an unstretched grid
+    P_gx = 0d0; P_gy = 0d0; P_gz = 0d0
+
+    limit = 1d-4/dx((is+ie)/2)
+    c_min = 1d-2
+
+    do k=ks,ke; do j=js,je; do i=is,ie
+
+       A(i,j,k,1) = dt/(dx(i)*dx(i)*rhot(i,j,k))
+       A(i,j,k,2) = dt/(dx(i)*dx(i)*rhot(i,j,k))
+       A(i,j,k,3) = dt/(dy(j)*dy(j)*rhot(i,j,k))
+       A(i,j,k,4) = dt/(dy(j)*dy(j)*rhot(i,j,k))
+       A(i,j,k,5) = dt/(dz(k)*dz(k)*rhot(i,j,k))
+       A(i,j,k,6) = dt/(dz(k)*dz(k)*rhot(i,j,k))
+       A(i,j,k,7) = sum(A(i,j,k,1:6))
+       A(i,j,k,8) =  -( (utmp(i,j,k)-utmp(i-1,j,k))/dx(i) &
+            +  (vtmp(i,j,k)-vtmp(i,j-1,k))/dy(j) &
+            +  (wtmp(i,j,k)-wtmp(i,j,k-1))/dz(k) )
+
+       !----Cav-liquid neighbours, set P_g in cavity cells
+       if(vof_phase(i,j,k)==1) then
+          do l=-1,1,2
+             if (vof_phase(i+l,j,k)==0) then
+                P_gx(i,j,k) = sigma*kap(i,j,k)/dx(i) !!filaments and droplets of one cell will be an issue here
+             endif
+             if (vof_phase(i,j+l,k)==0) then
+                P_gy(i,j,k) = sigma*kap(i,j,k)/dy(j)
+             endif
+             if (vof_phase(i,j,k+l)==0) then
+                P_gz(i,j,k) = sigma*kap(i,j,k)/dz(k)
+             endif
+          enddo
+          !Check x-neighbour         
+          if (vof_phase(i+1,j,k) == 0) then
+             !get_intersection for liq cell
+             nr(1)=n1(i+1,j,k); nr(2)=n2(i+1,j,k); nr(3)=n3(i+1,j,k)
+             alpha2 = al3dnew(nr,cvof(i+1,j,k))
+             x0(1) = 0d0; 
+             x0(2) = 0d0; x0(3) = 0d0
+             dc(1) = 0.5d0 
+             dc(2) = 1d0; dc(3) = 1d0
+             c0 = FL3DNEW(nr,alpha2,x0,dc)
+             !get_intersection for cav cell
+             nr(1) = n1(i,j,k); nr(2) = n2(i,j,k); nr(3) = n3(i,j,k)
+             alpha2 = al3dnew(nr,cvof(i,j,k))
+             x0(1) = 0.5d0; 
+             x0(2) = 0d0; x0(3) = 0d0
+             dc(1) = 0.5d0; 
+             dc(2) = 1d0; dc(3) = 1d0
+             c1 = FL3DNEW(nr,alpha2,x0,dc)
+             c_stag = c1+c0
+             if (c0>c_min) then
+                nr(1)=n1(i+1,j,k)*c0/c_stag + n1(i,j,k)*c1/c_stag
+                nr(2)=n2(i+1,j,k)*c0/c_stag + n2(i,j,k)*c1/c_stag
+                nr(3)=n3(i+1,j,k)*c0/c_stag + n3(i,j,k)*c1/c_stag
+                n_avg(1) = nr(1)/(ABS(nr(1))+ABS(nr(2))+ABS(nr(3)))
+                n_avg(2) = nr(2)/(ABS(nr(1))+ABS(nr(2))+ABS(nr(3)))
+                n_avg(3) = nr(3)/(ABS(nr(1))+ABS(nr(2))+ABS(nr(3)))
+             else
+                n_avg(1)= n1(i,j,k)
+                n_avg(2)= n2(i,j,k)
+                n_avg(3)= n3(i,j,k)
+             endif
+             if (ABS((ABS(n_avg(1))+ABS(n_avg(2))+ABS(n_avg(3)))-1d0) > 1d-12) then
+                write(*,*)'Normals not normalised'
+                call pariserror('Normals not normalised')
+             endif
+             alpha2=al3dnew(n_avg,c_stag)
+             if (ABS(n_avg(1))>1d-12) then
+                x_test2 = (alpha2 - (n_avg(2)+n_avg(3))/2d0)/n_avg(1)
+                x_mod(i,j,k) = dxh(i)*(1d0-x_test2)
+                if (x_mod(i,j,k)>dxh(i)) x_mod(i,j,k) = dxh(i)
+                if (x_mod(i,j,k)<limit*dxh(i)) x_mod(i,j,k) = limit*dxh(i)
+                if (x_mod(i,j,k) /= x_mod(i,j,k)) then
+                   write(*,'("x_mod NaN. c_st, n, vofs, phases:",6e14.5,5I8)')&
+                        c_stag,n_avg(1),n_avg(2),n_avg(3),cvof(i,j,k),cvof(i+1,j,k),vof_phase(i,j,k),vof_phase(i+1,j,k),i,j,k
+                endif
+             endif
+          endif
+          !-------Check y-neighbour
+          if (vof_phase(i,j+1,k) == 0) then
+             !get_intersection for liq cell
+             nr(1) = n1(i,j+1,k); nr(2) = n2(i,j+1,k); nr(3) = n3(i,j+1,k)
+             alpha2 = al3dnew(nr,cvof(i,j+1,k))
+             x0(1) = 0d0; x0(3) = 0d0 
+             x0(2) = 0d0
+             dc(1) = 1d0 
+             dc(2) = 0.5d0; dc(3) = 1d0
+             c0 = FL3DNEW(nr,alpha2,x0,dc)
+             !get_intersection for cav cell----------------------------------------
+             nr(1) = n1(i,j,k); nr(2) = n2(i,j,k); nr(3) = n3(i,j,k)
+             alpha2 = al3dnew(nr,cvof(i,j,k))
+             x0(2) = 0.5d0; 
+             x0(1) = 0d0; x0(3) = 0d0
+             dc(2) = 0.5d0; 
+             dc(1) = 1d0; dc(3) = 1d0
+             c1 = FL3DNEW(nr,alpha2,x0,dc)
+             c_stag = c1+c0
+             if (c0>c_min) then ! use weighted average if liq VOF is not small, otherwise use cav normals
+                nr(1)=n1(i,j+1,k)*c0/c_stag + n1(i,j,k)*c1/c_stag
+                nr(2)=n2(i,j+1,k)*c0/c_stag + n2(i,j,k)*c1/c_stag
+                nr(3)=n3(i,j+1,k)*c0/c_stag + n3(i,j,k)*c1/c_stag
+                n_avg(1) = nr(1)/(ABS(nr(1))+ABS(nr(2))+ABS(nr(3)))
+                n_avg(2) = nr(2)/(ABS(nr(1))+ABS(nr(2))+ABS(nr(3)))
+                n_avg(3) = nr(3)/(ABS(nr(1))+ABS(nr(2))+ABS(nr(3)))
+             else
+                n_avg(1)= n1(i,j,k)
+                n_avg(2)= n2(i,j,k)
+                n_avg(3)= n3(i,j,k)
+             endif
+             if (ABS((ABS(n_avg(1))+ABS(n_avg(2))+ABS(n_avg(3)))-1d0) > 1d-12) then
+                write(*,*)'Normals not normalised'
+                call pariserror('Normals not normalised')
+             endif
+             alpha2=al3dnew(n_avg,c_stag)
+             if (ABS(n_avg(2))>1d-12) then
+                y_test2 = (alpha2 - (n_avg(1)+n_avg(3))/2d0)/n_avg(2)
+                y_mod(i,j,k) = dyh(j)*(1d0-y_test2)
+                if (y_mod(i,j,k)>dyh(j)) y_mod(i,j,k) = dyh(j)
+                if (y_mod(i,j,k)<limit*dyh(j)) y_mod(i,j,k) = limit*dyh(j)
+                if (y_mod(i,j,k) /= y_mod(i,j,k)) write(*,'("y_mod NaN. c_st, n, vofs, phases:",4e14.5,2I8)')&
+                     c_stag,n_avg(2),cvof(i,j,k),cvof(i,j+1,k),vof_phase(i,j,k),vof_phase(i,j+1,k)
+             endif
+          endif
+          !-------Check z-neighbours
+          if (vof_phase(i,j,k+1) == 0) then
+             !vof fraction in half of liq cell
+             nr(1) = n1(i,j,k+1); nr(2) = n2(i,j,k+1); nr(3) = n3(i,j,k+1)
+             alpha2 = al3dnew(nr,cvof(i,j,k+1))
+             x0(1) = 0d0; x0(2) = 0d0 
+             x0(3) = 0d0
+             dc(3) = 0.5d0 
+             dc(1) = 1d0; dc(2) = 1d0
+             c0 = FL3DNEW(nr,alpha2,x0,dc)
+             !vof fraction in half of cav cell
+             nr(1) = n1(i,j,k); nr(2) = n2(i,j,k); nr(3) = n3(i,j,k)
+             alpha2 = al3dnew(nr,cvof(i,j,k))
+             x0(1) = 0d0; x0(2) = 0d0 
+             x0(3) = 0.5d0
+             dc(3) = 0.5d0 
+             dc(1) = 1d0; dc(2) = 1d0
+             c1 = FL3DNEW(nr,alpha2,x0,dc)
+             c_stag = c1+c0
+             if (c0>c_min) then ! use weighted average if liq VOF is not small, otherwise use cav normals
+                nr(1)=n1(i,j,k+1)*c0/c_stag + n1(i,j,k)*c1/c_stag
+                nr(2)=n2(i,j,k+1)*c0/c_stag + n2(i,j,k)*c1/c_stag
+                nr(3)=n3(i,j,k+1)*c0/c_stag + n3(i,j,k)*c1/c_stag
+                n_avg(1) = nr(1)/(ABS(nr(1))+ABS(nr(2))+ABS(nr(3)))
+                n_avg(2) = nr(2)/(ABS(nr(1))+ABS(nr(2))+ABS(nr(3)))
+                n_avg(3) = nr(3)/(ABS(nr(1))+ABS(nr(2))+ABS(nr(3)))
+             else
+                n_avg(1)= n1(i,j,k)
+                n_avg(2)= n2(i,j,k)
+                n_avg(3)= n3(i,j,k)
+             endif
+             if (ABS((ABS(n_avg(1))+ABS(n_avg(2))+ABS(n_avg(3)))-1d0) > 1d-12) then
+                write(*,*)'Normals not normalised'
+                call pariserror('Normals not normalised')
+             endif
+             alpha2=al3dnew(n_avg,c_stag)
+             if (ABS(n_avg(3))>1d-12) then
+                z_test2 = (alpha2 - (n_avg(1)+n_avg(2))/2d0)/n_avg(3)
+                !if (z_test2 < 0.5d0) P_gz(i,j,k) = sigma*kap(i,j,k+1)/dz(k+1)
+                z_mod(i,j,k) = dzh(k)*(1d0-z_test2)
+                if (z_mod(i,j,k)>dzh(k)) z_mod(i,j,k) = dzh(k)
+                if (z_mod(i,j,k)<limit*dzh(k)) z_mod(i,j,k) = limit*dzh(k)
+                if (z_mod(i,j,k) /= z_mod(i,j,k)) write(*,'("z_mod NaN. c_st, n, vofs, phases:",4e14.5,2I8)')&
+                     c_stag,n_avg(3),cvof(i,j,k),cvof(i,j,k+1),vof_phase(i,j,k),vof_phase(i,j,k+1)
+             endif
+          endif
+       endif
+       !----Liquid-cavity neighbours-----------------------------------------------------
+       if (vof_phase(i,j,k)==0) then
+
+          !Check x-neighbour
+          if (vof_phase(i+1,j,k) == 1) then
+             !vof fraction in half of cav cell
+             nr(1)=n1(i+1,j,k); nr(2)=n2(i+1,j,k); nr(3)=n3(i+1,j,k)
+             alpha2 = al3dnew(nr,cvof(i+1,j,k))
+             x0(1) = 0d0; 
+             x0(2) = 0d0; x0(3) = 0d0
+             dc(1) = 0.5d0 
+             dc(2) = 1d0; dc(3) = 1d0
+             c1 = FL3DNEW(nr,alpha2,x0,dc)
+             !vof fraction in half of liq cell
+             nr(1) = n1(i,j,k); nr(2) = n2(i,j,k); nr(3) = n3(i,j,k)
+             alpha2 = al3dnew(nr,cvof(i,j,k))
+             x0(1) = 0.5d0; 
+             x0(2) = 0d0; x0(3) = 0d0
+             dc(1) = 0.5d0; 
+             dc(2) = 1d0; dc(3) = 1d0
+             c0 = FL3DNEW(nr,alpha2,x0,dc)
+             c_stag = c1+c0
+             if (c0>c_min) then ! use weighted average if liq VOF is not small, otherwise use cav normals
+                nr(1)=n1(i,j,k)*c0/c_stag + n1(i+1,j,k)*c1/c_stag
+                nr(2)=n2(i,j,k)*c0/c_stag + n2(i+1,j,k)*c1/c_stag
+                nr(3)=n3(i,j,k)*c0/c_stag + n3(i+1,j,k)*c1/c_stag
+                n_avg(1) = nr(1)/(ABS(nr(1))+ABS(nr(2))+ABS(nr(3)))
+                n_avg(2) = nr(2)/(ABS(nr(1))+ABS(nr(2))+ABS(nr(3)))
+                n_avg(3) = nr(3)/(ABS(nr(1))+ABS(nr(2))+ABS(nr(3)))
+             else
+                n_avg(1)= n1(i+1,j,k)
+                n_avg(2)= n2(i+1,j,k)
+                n_avg(3)= n3(i+1,j,k)
+             endif
+             if (ABS((ABS(n_avg(1))+ABS(n_avg(2))+ABS(n_avg(3)))-1d0) > 1d-12) then
+                write(*,*)'Normals not normalised'
+                call pariserror('Normals not normalised')
+             endif
+             alpha2=al3dnew(n_avg,c_stag)
+             if (ABS(n_avg(1))>1d-12) then
+                x_test2 = (alpha2 - (n_avg(2)+n_avg(3))/2d0)/n_avg(1)
+                x_mod(i,j,k) = dxh(i)*x_test2
+                if (x_mod(i,j,k)>dxh(i)) x_mod(i,j,k) = dxh(i)
+                if (x_mod(i,j,k)<limit*dxh(i)) x_mod(i,j,k) = limit*dxh(i)
+                if (x_mod(i,j,k) /= x_mod(i,j,k)) write(*,'("x_mod NaN. c_st, n, vofs, phases:",4e14.5,2I8)')&
+                     c_stag,n_avg(1),cvof(i,j,k),cvof(i+1,j,k),vof_phase(i,j,k),vof_phase(i+1,j,k)
+             endif
+          endif
+          !-------Check y-neighbours in both directions 
+          if (vof_phase(i,j+1,k) == 1) then
+             !vof fraction in half of cav cell
+             nr(1) = n1(i,j+1,k); nr(2) = n2(i,j+1,k); nr(3) = n3(i,j+1,k)
+             alpha2 = al3dnew(nr,cvof(i,j+1,k))
+             x0(1) = 0d0; x0(3) = 0d0 
+             x0(2) = 0d0
+             dc(1) = 1d0 
+             dc(2) = 0.5d0; dc(3) = 1d0
+             c1 = FL3DNEW(nr,alpha2,x0,dc)
+             !vof fraction in half of liq cell----------------------------------------
+             nr(1) = n1(i,j,k); nr(2) = n2(i,j,k); nr(3) = n3(i,j,k)
+             alpha2 = al3dnew(nr,cvof(i,j,k))
+             x0(2) = 0.5d0; 
+             x0(1) = 0d0; x0(3) = 0d0
+             dc(2) = 0.5d0; 
+             dc(1) = 1d0; dc(3) = 1d0
+             c0 = FL3DNEW(nr,alpha2,x0,dc)
+             c_stag = c1+c0
+             if (c0>c_min) then ! use weighted average if liq VOF is not small, otherwise use cav normals
+                nr(1)=n1(i,j,k)*c0/c_stag + n1(i,j+1,k)*c1/c_stag
+                nr(2)=n2(i,j,k)*c0/c_stag + n2(i,j+1,k)*c1/c_stag
+                nr(3)=n3(i,j,k)*c0/c_stag + n3(i,j+1,k)*c1/c_stag
+                n_avg(1) = nr(1)/(ABS(nr(1))+ABS(nr(2))+ABS(nr(3)))
+                n_avg(2) = nr(2)/(ABS(nr(1))+ABS(nr(2))+ABS(nr(3)))
+                n_avg(3) = nr(3)/(ABS(nr(1))+ABS(nr(2))+ABS(nr(3)))
+             else
+                n_avg(1)= n1(i,j+1,k)
+                n_avg(2)= n2(i,j+1,k)
+                n_avg(3)= n3(i,j+1,k)
+             endif
+             if (ABS((ABS(n_avg(1))+ABS(n_avg(2))+ABS(n_avg(3)))-1d0) > 1d-12) then
+                write(*,*)'Normals not normalised'
+                call pariserror('Normals not normalised')
+             endif
+             alpha2=al3dnew(n_avg,c_stag)
+             if (ABS(n_avg(2))>1d-12) then
+                y_test2 = (alpha2 - (n_avg(1)+n_avg(3))/2d0)/n_avg(2)
+                y_mod(i,j,k) = dyh(j)*y_test2
+                if (y_mod(i,j,k)>dyh(j)) y_mod(i,j,k) = dyh(j)
+                if (y_mod(i,j,k)<limit*dyh(j)) y_mod(i,j,k) = limit*dyh(j)
+                if (y_mod(i,j,k) /= y_mod(i,j,k)) write(*,'("y_mod NaN. c_st, n, vofs, phases:",4e14.5,2I8)')&
+                     c_stag,n_avg(2),cvof(i,j,k),cvof(i,j+1,k),vof_phase(i,j,k),vof_phase(i,j+1,k)
+             endif
+          endif
+          !-------Check z-neighbours
+          if (vof_phase(i,j,k+1) == 1) then
+             !vof fraction in half of cav cell
+             nr(1) = n1(i,j,k+1); nr(2) = n2(i,j,k+1); nr(3) = n3(i,j,k+1)
+             alpha2 = al3dnew(nr,cvof(i,j,k+1))
+             x0(1) = 0d0; x0(2) = 0d0 
+             x0(3) = 0d0
+             dc(3) = 0.5d0 
+             dc(1) = 1d0; dc(2) = 1d0
+             c1 = FL3DNEW(nr,alpha2,x0,dc)
+             !vof fraction in half of liq cell
+             nr(1) = n1(i,j,k); nr(2) = n2(i,j,k); nr(3) = n3(i,j,k)
+             alpha2 = al3dnew(nr,cvof(i,j,k))
+             x0(1) = 0d0; x0(2) = 0d0 
+             x0(3) = 0.5d0
+             dc(3) = 0.5d0 
+             dc(1) = 1d0; dc(2) = 1d0
+             c0 = FL3DNEW(nr,alpha2,x0,dc)
+             c_stag = c1+c0
+             if (c0>c_min) then ! use weighted average if liq VOF is not small, otherwise use cav normals
+                nr(1)=n1(i,j,k)*c0/c_stag + n1(i,j,k+1)*c1/c_stag
+                nr(2)=n2(i,j,k)*c0/c_stag + n2(i,j,k+1)*c1/c_stag
+                nr(3)=n3(i,j,k)*c0/c_stag + n3(i,j,k+1)*c1/c_stag
+                n_avg(1) = nr(1)/(ABS(nr(1))+ABS(nr(2))+ABS(nr(3)))
+                n_avg(2) = nr(2)/(ABS(nr(1))+ABS(nr(2))+ABS(nr(3)))
+                n_avg(3) = nr(3)/(ABS(nr(1))+ABS(nr(2))+ABS(nr(3)))
+             else
+                n_avg(1)= n1(i,j,k+1)
+                n_avg(2)= n2(i,j,k+1)
+                n_avg(3)= n3(i,j,k+1)
+             endif
+             if (ABS((ABS(n_avg(1))+ABS(n_avg(2))+ABS(n_avg(3)))-1d0) > 1d-12) then
+                write(*,*)'Normals not normalised'
+                call pariserror('Normals not normalised')
+             endif
+             alpha2=al3dnew(n_avg,c_stag)
+             if (ABS(n_avg(3))>1d-12) then
+                z_test2 = (alpha2 - (n_avg(1)+n_avg(2))/2d0)/n_avg(3)
+                z_mod(i,j,k) = dzh(k)*z_test2
+                if (z_mod(i,j,k)>dzh(k)) z_mod(i,j,k) = dzh(k)
+                if (z_mod(i,j,k)<limit*dzh(k)) z_mod(i,j,k) = limit*dzh(k)
+                if (z_mod(i,j,k) /= z_mod(i,j,k)) write(*,'("z_mod NaN. c_st, n, vofs, phases:",4e14.5,2I8)')&
+                     c_stag,n_avg(3),cvof(i,j,k),cvof(i,j,k+1),vof_phase(i,j,k),vof_phase(i,j,k+1)
+             endif
+          endif
+       endif
+
+    enddo; enddo; enddo
+    call ghost_x(P_gx,1,req(1:4)); call ghost_y(P_gy,1,req(5:8)); call ghost_z(P_gz,1,req(9:12)) 
+    call ghost_x(x_mod,1,req(13:16)); call ghost_y(y_mod,1,req(17:20)); call ghost_z(z_mod,1,req(21:24)) 
+    call MPI_WAITALL(24,req(1:24),sta(:,1:24),ierr)
+    !--------------------------------------------------------------------------------------------------------
+    do k=ks,ke; do j=js,je; do i=is,ie
+       if (vof_phase(i,j,k)==0) then
+          A(i,j,k,1) = dt/(dx(i)*x_mod(i-1,j,k)*rhot(i,j,k))
+          A(i,j,k,2) = dt/(dx(i)*x_mod(i  ,j,k)*rhot(i,j,k))
+          A(i,j,k,3) = dt/(dy(j)*y_mod(i,j-1,k)*rhot(i,j,k))
+          A(i,j,k,4) = dt/(dy(j)*y_mod(i,j  ,k)*rhot(i,j,k))
+          A(i,j,k,5) = dt/(dz(k)*z_mod(i,j,k-1)*rhot(i,j,k))
+          A(i,j,k,6) = dt/(dz(k)*z_mod(i,j,k  )*rhot(i,j,k))
+          A(i,j,k,7) = sum(A(i,j,k,1:6))
+          A(i,j,k,8) = A(i,j,k,8) + dt/rhot(i,j,k)*&
+               (P_gx(i+1,j,k)/(dx(i)*x_mod(i,j,k))+P_gx(i-1,j,k)/(dx(i)*x_mod(i-1,j,k))&
+               +P_gy(i,j+1,k)/(dy(j)*y_mod(i,j,k))+P_gy(i,j-1,k)/(dy(j)*y_mod(i,j-1,k))&
+               +P_gz(i,j,k+1)/(dz(k)*z_mod(i,j,k))+P_gz(i,j,k-1)/(dz(k)*z_mod(i,j,k-1)))
+          if (A(i,j,k,8) /= A(i,j,k,8)) then
+             write(*,'("A8 NaN, error imminent. Neigbours mods :",6e14.5)')x_mod(i-1,j,k),x_mod(i,j,k),&
+                  y_mod(i,j-1,k),y_mod(i,j,k),z_mod(i,j,k-1),z_mod(i,j,k)
+             write(*,'("A8 NaN, error imminent. P_g :",6e14.5,2I8)')P_gx(i-1,j,k),P_gx(i+1,j,k),&
+                  P_gy(i,j-1,k),P_gy(i,j+1,k),P_gz(i,j,k-1),P_gz(i,j,k+1),i,k
+             write(*,'("rho :",e14.5)')rhot(i,j,k)
+          endif
+          if (pcmask(i,j,k).ne.0) write(*,'("Error topology, phase 0, pcmask :",i8)')pcmask(i,j,k)
+       endif
+    enddo;enddo;enddo
+
+    if (.not. RP_test) call Poisson_BCs(A)
+  end subroutine liq_gas
+end subroutine setuppoisson_fs_new

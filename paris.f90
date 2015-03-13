@@ -259,7 +259,6 @@ Program paris
               call my_timer(8)
               if (FreeSurface) then
                  call get_normals()
-                 !call get_all_curvatures(kappa_fs,itimestep)
                  call set_topology(vof_phase,itimestep) !vof_phase updated in vofsweeps
               elseif (.not.Freesurface .and. debug_par) then
                  call get_all_curvatures(tmp,itimestep)
@@ -352,7 +351,8 @@ Program paris
             endif
            else 
               call get_all_curvatures(kappa_fs,itimestep)
-              call Setuppoisson_fs(u,v,w,vof_phase,rho,dt,A,cvof,n1,n2,n3,kappa_fs,itimestep)
+              solver_flag = 1
+              call Setuppoisson_fs_new(u,v,w,vof_phase,rho,dt,A,cvof,n1,n2,n3,kappa_fs)
            endif
            ! (div u)*dt < epsilon => div u < epsilon/dt => maxresidual : maxerror/dt 
            if(HYPRE)then
@@ -360,10 +360,11 @@ Program paris
               call poi_solve(A,p,maxError/MaxDt*ErrorScaleHYPRE,maxit,it)
               call do_all_ghost(p)
            else
+!!$              if (FreeSurface .and. RP_test) call set_RP_pressure(p)
+!!$              call NewSolver(A,p,maxError/MaxDt,beta,maxit,it,ierr)
               if (FreeSurface) then
-                 solver_flag = 1
                  if (RP_test) call set_RP_pressure(p)
-                 call FreeSolver(A,p,maxError/MaxDt,beta,maxit,it,ierr,itimestep,time,residual)
+                 call FreeSolver(A,p,maxError/dt,beta,maxit,it,ierr,itimestep,time,residual)
               else
                  call NewSolver(A,p,maxError/MaxDt,beta,maxit,it,ierr)
               endif
@@ -416,13 +417,15 @@ Program paris
            if (DoVOF .and. FreeSurface) then
               !if (.not. imploding) then
               call extrapolate_velocities()
-              call setuppoisson_fs2(u,v,w,dt,A,vof_phase,itimestep)
+              !call setuppoisson_fs2(u,v,w,dt,A,vof_phase,itimestep)
               ! Solve for an intermediate pressure in gas
               solver_flag = 2
+              call setuppoisson_fs_new(u,v,w,vof_phase,rho,dt,A,cvof,n1,n2,n3,kappa_fs)
               if(HYPRE)then !HYPRE will not work with removed nodes from domain.
                  call pariserror("HYPRE solver not yet available for Free Surfaces")
               else
-                 call FreeSolver(A,p_ext,maxError/MaxDt,beta,maxit,it,ierr,itimestep,time,residual)
+                 !call NewSolver(A,p,maxError/MaxDt,beta,maxit,it,ierr)
+                 call FreeSolver(A,p_ext,maxError/dt,beta,maxit,it,ierr,itimestep,time,residual)
               endif
               if(mod(itimestep,termout)==0) then
                  !call calcresidual(A,p,residual)
