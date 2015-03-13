@@ -352,6 +352,7 @@ Program paris
            else 
               call get_all_curvatures(kappa_fs,itimestep)
               solver_flag = 1
+              !call setuppoisson_fs(u,v,w,vof_phase,rho,dt,A,cvof,n1,n2,n3,kappa_fs,itimestep)
               call Setuppoisson_fs_new(u,v,w,vof_phase,rho,dt,A,cvof,n1,n2,n3,kappa_fs)
            endif
            ! (div u)*dt < epsilon => div u < epsilon/dt => maxresidual : maxerror/dt 
@@ -360,10 +361,10 @@ Program paris
               call poi_solve(A,p,maxError/MaxDt*ErrorScaleHYPRE,maxit,it)
               call do_all_ghost(p)
            else
-!!$              if (FreeSurface .and. RP_test) call set_RP_pressure(p)
+!!$              if (FreeSurface .and. RP_test) call set_RP_pressure(p,rho1)
 !!$              call NewSolver(A,p,maxError/MaxDt,beta,maxit,it,ierr)
               if (FreeSurface) then
-                 if (RP_test) call set_RP_pressure(p)
+                 if (RP_test) call set_RP_pressure(p,rho1)
                  call FreeSolver(A,p,maxError/dt,beta,maxit,it,ierr,itimestep,time,residual)
               else
                  call NewSolver(A,p,maxError/MaxDt,beta,maxit,it,ierr)
@@ -485,7 +486,7 @@ Program paris
            if(DoFront)call GetFront('wait')
            call my_timer(13)
         enddo !itime_scheme
-        if (FreeSurface .and. RP_test) call Integrate_RP(dt,time)
+        if (FreeSurface .and. RP_test) call Integrate_RP(dt,time,rho1)
         if(itime_scheme==2) then
            u = 0.5*(u+uold)
            v = 0.5*(v+vold)
@@ -577,7 +578,7 @@ Program paris
         call my_timer(11)
         !output for scalar variables used in free surface
         if (FreeSurface) then
-           if (RP_test .and. (mod(itimestep,nstats)==0) .and. rank==0) call write_RP_test(time)
+           if (RP_test .and. (mod(itimestep,nstats)==0) .and. rank==0) call write_RP_test(time,rho1)
            do out_fs = 1,3
               if (VTK_OUT(out_fs)) then
                  if (mod(itimestep,NOUT_VTK(out_fs))==0) then
@@ -698,24 +699,21 @@ subroutine project_velocity ()
   else
     do k=ks,ke;  do j=js,je; do i=is,ieu    ! CORRECT THE u-velocity 
       if (u_cmask(i,j,k)==0) then
-        u(i,j,k)=u(i,j,k)-dt*2d0/(rho(i,j,k)+rho(i+1,j,k))&
-        *(p(i+1,j,k)+P_gx(i+1,j,k)-p(i,j,k)-P_gx(i,j,k))/x_mod(i,j,k)
+        u(i,j,k)=u(i,j,k)-dt/rho(i,j,k)*(p(i+1,j,k)+P_gx(i+1,j,k)-p(i,j,k)-P_gx(i,j,k))/x_mod(i,j,k)
         if (u(i,j,k) /= u(i,j,k)) write(*,'("WARNING u NaN :",2e14.5)')u(i,j,k), x_mod(i,j,k)
       endif
     enddo; enddo; enddo
 
     do k=ks,ke;  do j=js,jev; do i=is,ie    ! CORRECT THE v-velocity
       if (v_cmask(i,j,k)==0) then
-        v(i,j,k)=v(i,j,k)-dt*2d0/(rho(i,j,k)+rho(i,j+1,k))&
-        *(p(i,j+1,k)+P_gy(i,j+1,k)-p(i,j,k)-P_gy(i,j,k))/y_mod(i,j,k)
+        v(i,j,k)=v(i,j,k)-dt/rho(i,j,k)*(p(i,j+1,k)+P_gy(i,j+1,k)-p(i,j,k)-P_gy(i,j,k))/y_mod(i,j,k)
         if (v(i,j,k) /= v(i,j,k)) write(*,'("WARNING v NaN :",2e14.5)')v(i,j,k), y_mod(i,j,k)
       endif
     enddo; enddo; enddo
 
     do k=ks,kew;  do j=js,je; do i=is,ie   ! CORRECT THE w-velocity
       if (w_cmask(i,j,k)==0) then
-        w(i,j,k)=w(i,j,k)-dt*2d0/(rho(i,j,k)+rho(i,j,k+1))&
-        *(p(i,j,k+1)+P_gz(i,j,k+1)-p(i,j,k)-P_gz(i,j,k))/z_mod(i,j,k)
+        w(i,j,k)=w(i,j,k)-dt/rho(i,j,k)*(p(i,j,k+1)+P_gz(i,j,k+1)-p(i,j,k)-P_gz(i,j,k))/z_mod(i,j,k)
         if (w(i,j,k) /= w(i,j,k)) write(*,'("WARNING w NaN :",2e14.5)')w(i,j,k), z_mod(i,j,k)
       endif
     enddo; enddo; enddo
@@ -2491,7 +2489,7 @@ subroutine InitCondition
               call get_all_curvatures(kappa_fs,0)
               if (RP_test) then
                  call get_ref_volume !!! can rather call this init_RP_test
-                 call initialize_P_RP(p)  !initialize P field for RP test
+                 call initialize_P_RP(p,rho1)  !initialize P field for RP test
                  call ghost_x(p,1,req( 1: 4))
                  call ghost_y(p,1,req( 5: 8))
                  call ghost_z(p,1,req( 9:12))

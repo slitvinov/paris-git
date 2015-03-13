@@ -470,12 +470,6 @@ subroutine setuppoisson_fs(utmp,vtmp,wtmp,vof_phase,rhot,dt,A,cvof,n1,n2,n3,kap,
   call ghost_x(P_gx,1,req(1:4)); call ghost_y(P_gy,1,req(5:8)); call ghost_z(P_gz,1,req(9:12)) 
   call ghost_x(x_mod,1,req(13:16)); call ghost_y(y_mod,1,req(17:20)); call ghost_z(z_mod,1,req(21:24)) 
   call MPI_WAITALL(24,req(1:24),sta(:,1:24),ierr)
-!!$  call ghost_y(P_gx,1,req(1:4)); call ghost_y(P_gy,1,req(5:8)); call ghost_y(P_gz,1,req(9:12)) 
-!!$  call ghost_y(x_mod,1,req(13:16)); call ghost_y(y_mod,1,req(17:20)); call ghost_y(z_mod,1,req(21:24)) 
-!!$  call MPI_WAITALL(24,req(1:24),sta(:,1:24),ierr)
-!!$  call ghost_z(P_gx,1,req(1:4)); call ghost_z(P_gy,1,req(5:8)); call ghost_z(P_gz,1,req(9:12)) 
-!!$  call ghost_z(x_mod,1,req(13:16)); call ghost_z(y_mod,1,req(17:20)); call ghost_z(z_mod,1,req(21:24)) 
-!!$  call MPI_WAITALL(24,req(1:24),sta(:,1:24),ierr)
 !--------------------------------------------------------------------------------------------------------
   do k=ks,ke; do j=js,je; do i=is,ie
      if (vof_phase(i,j,k)==0) then
@@ -871,11 +865,7 @@ contains
     endif
   end subroutine catch_divergence_fs
   subroutine get_vol(Vol_RP)
-    !use module_grid
     use module_VOF
-    !use module_2phase
-    !implicit none
-    !include 'mpif.h'
     real(8) :: Vol_RP, bub_vol, vol_tot
     integer :: i,j,k,ierr
     bub_vol = 0d0
@@ -883,7 +873,7 @@ contains
        bub_vol = bub_vol + cvof(i,j,k)*dx(i)*dy(j)*dz(k)
     enddo; enddo; enddo
     call MPI_ALLREDUCE(bub_vol,vol_tot,1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr)
-    Vol_RP = vol_tot/(xLength*yLength*zLength)
+    Vol_RP = vol_tot!/(xLength*yLength*zLength)
   end subroutine get_vol
 end subroutine FreeSolver
 !--------------------------------------ONE RELAXATION ITERATION (SMOOTHER)----------------------------------
@@ -1028,14 +1018,14 @@ subroutine VTK_scalar_struct(index,iout,var)
 end subroutine VTK_scalar_struct
 !==============================================================================================================================
 ! Routine to numerically integrate the Rayleigh-Plesset equation
-subroutine Integrate_RP(dt,t)
+subroutine Integrate_RP(dt,t,rho)
   use module_freesurface
   implicit none 
   integer :: j
   real(8) :: dt, t, Volume
   real(8), parameter :: pi=3.141592653589793238462643383
   integer, parameter :: nvar = 2
-  real(8) :: y(nvar), ytmp(nvar)
+  real(8) :: y(nvar), ytmp(nvar),rho
   real(8) :: dydt1(nvar), dydt2(nvar),dydt3(nvar),dydt0(nvar),dydt4(nvar)
 
     ! start at previous RP values
@@ -1075,15 +1065,15 @@ subroutine func(y,dydt)
     real(8) :: P_c
     real(8) :: y(2), dydt(2)
     P_c = P_ref*(R_ref/y(1))**(3d0*gamma)-2d0*sigma/y(1)
-    dydt(2) = -3d0*(y(2)**2d0)/(2d0*y(1)) + (P_c - P_inf)/y(1)
+    dydt(2) = -3d0*(y(2)**2d0)/(2d0*y(1)) + (P_c - P_inf)/(y(1)*rho)
     dydt(1) = y(2)
   end subroutine func
 end subroutine Integrate_RP
 !=======================================================================================================================================
-subroutine write_RP_test(t) 
+subroutine write_RP_test(t,rho) 
   use module_freesurface
   implicit none
-  real(8) :: t, vol, p_mid, p_corner
+  real(8) :: t, vol, p_mid, p_corner, rho
   real(8), parameter :: pi=3.141592653589793238462643383
   vol = 4d0/3d0*pi*R_RK**3d0
   p_mid = pressure(0.5d0)
@@ -1098,47 +1088,42 @@ contains
     use module_freesurface
     real(8) :: r, P_l, pressure
     P_l = P_ref*(R_ref/R_RK)**(3d0*gamma)-2d0*sigma/R_RK
-    pressure = P_l - (dR_RK**2d0 * R_RK**4d0/(2d0*r**4d0) - (ddR_RK*R_RK**2d0 + 2d0*R_RK*dR_RK**2d0)/r +&
+    pressure = P_l - rho*(dR_RK**2d0 * R_RK**4d0/(2d0*r**4d0) - (ddR_RK*R_RK**2d0 + 2d0*R_RK*dR_RK**2d0)/r +&
          ddR_RK*R_RK + 3d0/2d0*dR_RK**2d0)
   end function pressure
 end subroutine write_RP_test
 !====================================================================================================================================================
-subroutine set_RP_pressure(p)
+subroutine set_RP_pressure(p,rho)
   use module_grid
   use module_2phase
   use module_freesurface
   implicit none
   include 'mpif.h'
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: p
-  real(8) :: r, P_l
+  real(8) :: r, rho
   integer :: i,j,k
-  P_l = P_ref*(R_ref/R_RK)**(3d0*gamma)-2d0*sigma/R_RK
   if (coords(1)==0) then 
      do k=ks-1,ke+1; do j=js-1,je+1
         r = sqrt((x(is-1)-xc(1))**2d0 + (y(j)-yc(1))**2d0 + (z(k)-zc(1))**2d0)
-        p(is-1,j,k) = P_l - (dR_RK**2d0 * R_RK**4d0/(2d0*r**4d0) - (ddR_RK*R_RK**2d0 + 2d0*R_RK*dR_RK**2d0)/r +&
-             ddR_RK*R_RK + 3d0/2d0*dR_RK**2d0)
+        p(is-1,j,k) = pressure(r)
      enddo; enddo
   endif
   if(coords(1)==Npx-1) then
      do k=ks-1,ke+1; do j=js-1,je+1
         r = sqrt((x(ie+1)-xc(1))**2d0 + (y(j)-yc(1))**2d0 + (z(k)-zc(1))**2d0)
-        p(ie+1,j,k) = P_l - (dR_RK**2d0 * R_RK**4d0/(2d0*r**4d0) - (ddR_RK*R_RK**2d0 + 2d0*R_RK*dR_RK**2d0)/r +&
-             ddR_RK*R_RK + 3d0/2d0*dR_RK**2d0)
+        p(ie+1,j,k) = pressure(r)
      enddo; enddo 
   endif
   if(coords(2)==0) then
      do k=ks-1,ke+1; do i=is-1,ie+1
         r = sqrt((x(i)-xc(1))**2d0 + (y(js-1)-yc(1))**2d0 + (z(k)-zc(1))**2d0)
-        p(i,js-1,k) = P_l - (dR_RK**2d0 * R_RK**4d0/(2d0*r**4d0) - (ddR_RK*R_RK**2d0 + 2d0*R_RK*dR_RK**2d0)/r +&
-             ddR_RK*R_RK + 3d0/2d0*dR_RK**2d0)
+        p(i,js-1,k) = pressure(r)
      enddo; enddo 
   endif
   if(coords(2)==Npy-1) then
     do k=ks-1,ke+1; do i=is-1,ie+1
         r = sqrt((x(i)-xc(1))**2d0 + (y(je+1)-yc(1))**2d0 + (z(k)-zc(1))**2d0)
-        p(i,je+1,k) = P_l - (dR_RK**2d0 * R_RK**4d0/(2d0*r**4d0) - (ddR_RK*R_RK**2d0 + 2d0*R_RK*dR_RK**2d0)/r +&
-             ddR_RK*R_RK + 3d0/2d0*dR_RK**2d0)
+        p(i,je+1,k) = pressure(r)
      enddo; enddo  
   endif
 
@@ -1146,33 +1131,38 @@ subroutine set_RP_pressure(p)
   if(coords(3)==0) then
      do j=js-1,je+1; do i=is-1,ie+1
         r = sqrt((x(i)-xc(1))**2d0 + (y(j)-yc(1))**2d0 + (z(ks-1)-zc(1))**2d0)
-        p(i,j,ks-1) = P_l - (dR_RK**2d0 * R_RK**4d0/(2d0*r**4d0) - (ddR_RK*R_RK**2d0 + 2d0*R_RK*dR_RK**2d0)/r +&
-             ddR_RK*R_RK + 3d0/2d0*dR_RK**2d0)
+        p(i,j,ks-1) = pressure(r)
      enddo; enddo 
   endif
   ! Pressure BC for z+
   if(coords(3)==Npz-1) then
      do j=js-1,je+1; do i=is-1,ie+1
         r = sqrt((x(i)-xc(1))**2d0 + (y(j)-yc(1))**2d0 + (z(ke+1)-zc(1))**2d0)
-        p(i,j,ke+1) = P_l - (dR_RK**2d0 * R_RK**4d0/(2d0*r**4d0) - (ddR_RK*R_RK**2d0 + 2d0*R_RK*dR_RK**2d0)/r +&
-             ddR_RK*R_RK + 3d0/2d0*dR_RK**2d0)
+        p(i,j,ke+1) = pressure(r)
      enddo; enddo 
   endif
+contains
+  function pressure(r)
+    real(8) :: P_l, pressure, r
+    P_l = P_ref*(R_ref/R_RK)**(3d0*gamma)-2d0*sigma/R_RK
+    pressure = P_l - rho*(dR_RK**2d0 * R_RK**4d0/(2d0*r**4d0) - (ddR_RK*R_RK**2d0 + 2d0*R_RK*dR_RK**2d0)/r +&
+         ddR_RK*R_RK + 3d0/2d0*dR_RK**2d0)
+  end function pressure
 end subroutine set_RP_pressure
 !====================================================================================================================================================
-subroutine initialize_P_RP(p)
+subroutine initialize_P_RP(p,rho)
   use module_grid
   use module_2phase
   use module_freesurface
   implicit none
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: p
-  real(8) :: r, P_l
+  real(8) :: r, P_l, rho
   integer :: i,j,k,ierr
   P_l = P_ref*(R_ref/R_RK)**(3d0*gamma)-2d0*sigma/R_RK
   do k=ks,ke; do j=js,je; do i=is,ie
      r = sqrt((x(i)-xc(1))**2d0 + (y(j)-yc(1))**2d0 + (z(k)-zc(1))**2d0)
      if (r .ge. rad(1)) then
-        p(i,j,k) = P_l - (dR_RK**2d0 * R_RK**4d0/(2d0*r**4d0) - (ddR_RK*R_RK**2d0 + 2d0*R_RK*dR_RK**2d0)/r +&
+        p(i,j,k) = P_l - rho*(dR_RK**2d0 * R_RK**4d0/(2d0*r**4d0) - (ddR_RK*R_RK**2d0 + 2d0*R_RK*dR_RK**2d0)/r +&
              ddR_RK*R_RK + 3d0/2d0*dR_RK**2d0)
      endif
   enddo; enddo; enddo
@@ -1211,12 +1201,13 @@ subroutine setuppoisson_fs_new(utmp,vtmp,wtmp,vof_phase,rhot,dt,A,cvof,n1,n2,n3,
   integer, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: vof_phase
   real(8) :: dt
   integer :: i,j,k,nbr
+  integer :: req(24),sta(MPI_STATUS_SIZE,24)
   
   if (.not.(solver_flag==1 .or. solver_flag==2)) call pariserror('Solver_flag FS needs to be either 1 or 2')
 
-  if (solver_flag == 1 .and. vof_phase(i,j,k)==0) then
+  if (solver_flag == 1) then
      call liq_gas()
-  else if (solver_flag == 2)   
+  else !(solver_flag == 2)   
      do k=ks,ke; do j=js,je; do i=is,ie
         if (pcmask(i,j,k)==1 .or. pcmask(i,j,k)==2) then !rho is 1d0
            A(i,j,k,1) = 1.d0/(dx(i)*dxh(i-1))
@@ -1254,11 +1245,16 @@ subroutine setuppoisson_fs_new(utmp,vtmp,wtmp,vof_phase,rhot,dt,A,cvof,n1,n2,n3,
   
 contains
   subroutine liq_gas()
+    use module_BC
+    use module_2phase
     use module_grid
     use module_freesurface
     implicit none
     real(8) :: limit, c_min
-    integer :: i,j,k
+    real(8) :: alpha2, x_test2, y_test2, z_test2
+    real(8) :: nr(3),al3dnew,x0(3),dc(3),FL3DNEW,n_avg(3)
+    real(8) :: c1, c0, c_stag
+    integer :: i,j,k,l,ierr
 
     x_mod=dxh((is+ie)/2); y_mod=dyh((js+je)/2); z_mod=dzh((ks+ke)/2) !assumes an unstretched grid
     P_gx = 0d0; P_gy = 0d0; P_gz = 0d0
@@ -1570,7 +1566,6 @@ contains
              endif
           endif
        endif
-
     enddo; enddo; enddo
     call ghost_x(P_gx,1,req(1:4)); call ghost_y(P_gy,1,req(5:8)); call ghost_z(P_gz,1,req(9:12)) 
     call ghost_x(x_mod,1,req(13:16)); call ghost_y(y_mod,1,req(17:20)); call ghost_z(z_mod,1,req(21:24)) 
