@@ -280,6 +280,8 @@ contains
     write(123,'("Allocated/proc ",T24,es16.5e2,"Gbytes")') alloc_size
     write(123,*) "   "
     write(123,'("Current and initial time steps:",2(I7,1X))') itimestep,iTimeStepRestart
+    write(123,*) "   "
+    write(123,'("Current and initial time:",2(E15.8,1X))') end_loop,start_loop
     close(123)
   end subroutine wrap_up_timer
 end module module_timer

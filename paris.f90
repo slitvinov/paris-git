@@ -1236,13 +1236,20 @@ end subroutine calcStats
       subroutine backup_turb_read
          integer ::i,j,k
          character(len=100) :: filename
+         logical :: file_exist
          filename = trim(out_path)//'/backup_turb_'//int2text(rank,padding)
-         OPEN(UNIT=101,FILE=trim(filename),status='unknown',action='read')
-         read(101,*) iSumTurbStats
-         do i=is,ie; do j=js,je
-            read(101,*) turb_vars(i,j,1:num_turb_vars)
-         enddo; enddo
-         CLOSE(UNIT=101)
+         inquire(FILE=filename,EXIST=file_exist)
+         if ( file_exist ) then 
+            OPEN(UNIT=101,FILE=trim(filename),status='unknown',action='read')
+            read(101,*) iSumTurbStats
+            do i=is,ie; do j=js,je
+               read(101,*) turb_vars(i,j,1:num_turb_vars)
+            enddo; enddo
+            CLOSE(UNIT=101)
+         else
+            turb_vars = 0.d0 
+            iSumTurbStats = 0 
+         end if ! file_exit
       end subroutine backup_turb_read
 
    end subroutine calcTurbStats
@@ -1252,21 +1259,16 @@ subroutine momentumConvection()
   use module_grid
   use module_tmpvar
   use module_IO
-  logical :: sbee
 
   if (AdvectionScheme=='QUICK') then
     call momentumConvectionQUICK(u,v,w,du,dv,dw)
-  elseif (AdvectionScheme=='ENO') then
-    sbee = .false.
+  elseif (  AdvectionScheme=='ENO' .or. & 
+            AdvectionScheme=='Superbee' .or. & 
+            AdvectionScheme=='WENO' ) then
 !   call momentumConvectionENO(u,v,w,du,dv,dw)
-    call momentumConvection_onedim(u,v,w,u,du,1,sbee)
-    call momentumConvection_onedim(u,v,w,v,dv,2,sbee)
-    call momentumConvection_onedim(u,v,w,w,dw,3,sbee)
-  elseif (AdvectionScheme=='Superbee') then
-    sbee = .true.
-    call momentumConvection_onedim(u,v,w,u,du,1,sbee)
-    call momentumConvection_onedim(u,v,w,v,dv,2,sbee)
-    call momentumConvection_onedim(u,v,w,w,dw,3,sbee)
+    call momentumConvection_onedim(u,v,w,u,du,1,AdvectionScheme)
+    call momentumConvection_onedim(u,v,w,v,dv,2,AdvectionScheme)
+    call momentumConvection_onedim(u,v,w,w,dw,3,AdvectionScheme)
   elseif (AdvectionScheme=='UpWind') then
     call momentumConvectionUpWind(u,v,w,du,dv,dw)
   elseif (AdvectionScheme=='Verstappen') then
@@ -1286,28 +1288,33 @@ end subroutine momentumConvection
 ! and returns them in du, dv, dw
 !-------------------------------------------------------------------------------------------------
 
-function slope_lim (val1,val2,val3,superbee)
+function slope_lim (val1,val2,val3,AdvScheme)
   implicit none
   real(8), external :: minabs, maxabs
-  real (8) :: slope_lim,val1,val2,val3, alpha1, alpha2
-  logical, intent(in) :: superbee
-  if (superbee) then
+  real (8) :: slope_lim,val1,val2,val3, alpha1, alpha2,alpha
+  character(20), intent(in) :: AdvScheme 
+  if ( AdvScheme == 'Superbee' ) then
      alpha1 = minabs(val3-val2,2*(val2-val1))
      alpha2 = minabs(2*(val3-val2),val2-val1)
      slope_lim = maxabs(alpha1, alpha2)
-  else
+  else if ( AdvScheme == 'ENO' ) then 
      slope_lim = minabs((val3-val2),(val2-val1))
+  else if ( AdvScheme == 'WENO' ) then 
+     alpha1 = 1.0d0/((val2-val1)**2.d0 + 1.d-16)
+     alpha2 = 1.0d0/((val3-val2)**2.d0 + 1.d-16) 
+     alpha  = alpha1 + alpha2
+     slope_lim = (alpha1*(val2-val1)+alpha2*(val3-val2))/alpha 
   endif
 
 end function slope_lim
 
-subroutine momentumConvection_onedim(u,v,w,phi,dphi,d,sb)
+subroutine momentumConvection_onedim(u,v,w,phi,dphi,d,AdvScheme)
   use module_grid
   use module_tmpvar
   implicit none
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: u, v, w, phi
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: dphi
-  logical, intent(in) :: sb
+  character(20), intent(in) :: AdvScheme 
   real(8), external :: slope_lim
   integer :: i,j,k,d
   integer, dimension(3) :: is0,is1,ie0,ie1
@@ -1327,9 +1334,9 @@ subroutine momentumConvection_onedim(u,v,w,phi,dphi,d,sb)
 
   do k=is1(3),ie1(3); do j=is1(2),ie1(2); do i=is1(1),ie1(1)
     if (u(i-i0,j,k)+u(i,j+j0,k+k0)>0.0) then
-      work(i,j,k,1)=phi(i-i0,j,k)+0.5*slope_lim(phi(i-1-i0,j,k),phi(i-i0,j,k),phi(i+1-i0,j,k),sb)
+      work(i,j,k,1)=phi(i-i0,j,k)+0.5*slope_lim(phi(i-1-i0,j,k),phi(i-i0,j,k),phi(i+1-i0,j,k),AdvScheme)
     else
-      work(i,j,k,1)=phi(i+1-i0,j,k)-0.5*slope_lim(phi(i-i0,j,k),phi(i+1-i0,j,k),phi(i+2-i0,j,k),sb)
+      work(i,j,k,1)=phi(i+1-i0,j,k)-0.5*slope_lim(phi(i-i0,j,k),phi(i+1-i0,j,k),phi(i+2-i0,j,k),AdvScheme)
     endif
   enddo; enddo; enddo
 
@@ -1342,9 +1349,9 @@ subroutine momentumConvection_onedim(u,v,w,phi,dphi,d,sb)
 
   do k=is1(3),ie1(3); do j=is1(2),ie1(2); do i=is1(1),ie1(1)
     if(v(i,j-j0,k)+v(i+i0,j,k+k0)>0.0) then
-      work(i,j,k,2)=phi(i,j-j0,k)+0.5*slope_lim(phi(i,j-1-j0,k),phi(i,j-j0,k),phi(i,j+1-j0,k),sb)
+      work(i,j,k,2)=phi(i,j-j0,k)+0.5*slope_lim(phi(i,j-1-j0,k),phi(i,j-j0,k),phi(i,j+1-j0,k),AdvScheme)
     else
-      work(i,j,k,2)=phi(i,j+1-j0,k)-0.5*slope_lim(phi(i,j-j0,k),phi(i,j+1-j0,k),phi(i,j+2-j0,k),sb)
+      work(i,j,k,2)=phi(i,j+1-j0,k)-0.5*slope_lim(phi(i,j-j0,k),phi(i,j+1-j0,k),phi(i,j+2-j0,k),AdvScheme)
     endif
   enddo; enddo; enddo
 
@@ -1357,9 +1364,9 @@ subroutine momentumConvection_onedim(u,v,w,phi,dphi,d,sb)
 
   do k=is1(3),ie1(3); do j=is1(2),ie1(2); do i=is1(1),ie1(1)
     if(w(i,j,k-k0)+w(i+i0,j+j0,k)>0.0) then
-      work(i,j,k,3)=phi(i,j,k-k0)+0.5*slope_lim(phi(i,j,k-1-k0),phi(i,j,k-k0),phi(i,j,k+1-k0),sb)
+      work(i,j,k,3)=phi(i,j,k-k0)+0.5*slope_lim(phi(i,j,k-1-k0),phi(i,j,k-k0),phi(i,j,k+1-k0),AdvScheme)
     else
-      work(i,j,k,3)=phi(i,j,k+1-k0)-0.5*slope_lim(phi(i,j,k-k0),phi(i,j,k+1-k0),phi(i,j,k+2-k0),sb)
+      work(i,j,k,3)=phi(i,j,k+1-k0)-0.5*slope_lim(phi(i,j,k-k0),phi(i,j,k+1-k0),phi(i,j,k+2-k0),AdvScheme)
     endif
   enddo; enddo; enddo
 

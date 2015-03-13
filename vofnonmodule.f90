@@ -191,6 +191,25 @@ subroutine swpz(us,c,f,d,vof1,vof2,vof3)
               deltax(d)=mm2
               vof2(i,j,k) = fl3dnew(nr,alpha,x0,deltax)
            endif
+
+           ! check vof contributions
+           if ( vof1(i,j,k) /= vof1(i,j,k) .or. & 
+                vof2(i,j,k) /= vof2(i,j,k) .or. &  
+                vof3(i,j,k) /= vof3(i,j,k) ) then 
+               OPEN(UNIT=88,FILE=TRIM(out_path)//'/message-rank-'//TRIM(int2text(rank,padding))//'.txt')
+               write(88,*) "vof is NaN at ijk + minmax = ",i,j,k,imin,imax,jmin,jmax,kmin,kmax
+               write(88,*) "vof1,vof2,vof3 = ",vof1(i,j,k),vof2(i,j,k),vof3(i,j,k)
+               write(88,*) "nr = ",nr
+               write(88,*) "alpha = ",alpha
+               write(88,*) "a1,a2 = ",a1,a2
+               write(88,*) "c = "
+               write(88,'(3(E25.16,1X))') c(i-1:i+1,j-1:j+1,k-1:k+1)
+               write(88,*) 
+               write(88,*) "us = "
+               write(88,'(3(E25.16,1X))') us(i-1:i+1,j-1:j+1,k-1:k+1)
+               close(88)
+               call pariserror("cvof is NaN!")
+           end if ! 
         enddo
      enddo
   enddo
