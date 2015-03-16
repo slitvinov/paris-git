@@ -29,12 +29,9 @@ if [ ${CGFONTGETGLYPH_PARIS_PROBLEM:=0} == 0 ]; then
 gnuplot <<EOF
 set xlabel "time"
 set ylabel "w(0,0,R)"
-set term pdf
-set out "tmp.pdf"
-load "plot.gp"
 set term png
 set out "tmp.png"
-replot
+load "plot.gp"
 EOF
 else
 gnuplot <<EOF
