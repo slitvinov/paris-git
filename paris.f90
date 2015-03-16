@@ -2831,7 +2831,7 @@ subroutine ReadParameters
      if ( abs(xLength*dble(Ny)/yLength/dble(Nx) - 1.d0) > 1.d-8 .or. &  
           abs(xLength*dble(Nz)/zLength/dble(Nx) - 1.d0) > 1.d-8 ) & 
           !call pariserror("Mesh is not cubic!")
-          call pariserror("*** WARNING: Mesh is not cubic, and non-uniform VOF is not ready! ***")
+          print *, "*** WARNING: Mesh is not cubic, and non-uniform VOF is not ready! ***"
   endif
 
   ! For jet setup
