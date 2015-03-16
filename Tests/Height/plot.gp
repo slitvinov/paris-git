@@ -6,7 +6,4 @@ set ylabel "height in grid units"
 set yrange [-8:8]
 set grid lt 9
 plot "out/reference.txt" t "expected values", 0 w l notitle, "out/output1a" w l t "calculated values in proc/subd above", "out/output1b" w l t "calculated values in proc/subd below"
-set term pdf
-set out "heights_test.pdf"
-replot
 
