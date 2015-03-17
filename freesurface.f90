@@ -722,10 +722,12 @@ subroutine FreeSolver(A,p,maxError,beta,maxit,it,ierr,iout,time,tres2)
   use module_BC
   use module_IO
   use module_freesurface
+  !use module_Lag_part
   implicit none
   include 'mpif.h'
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: p
   real(8), dimension(is:ie,js:je,ks:ke,8), intent(in) :: A
+  real(8), dimension(is:ie,js:je,ks:ke) :: P_gas
   real(8), intent(in) :: beta, maxError
   integer, intent(in) :: maxit
   integer, intent(out) :: it, ierr
@@ -742,15 +744,19 @@ subroutine FreeSolver(A,p,maxError,beta,maxit,it,ierr,iout,time,tres2)
      OPEN(UNIT=89,FILE=TRIM(out_path)//'/convergence_history-'//TRIM(int2text(itime,padding))//'.txt')
   endif
   itime=itime+1
-  if (RP_test) then
-     call get_vol(Vol)
-     p_c = P_ref*(V_0/Vol)**gamma
-     if(mod(iout,10)==0 .and. rank==0 .and. solver_flag==2) then
-        OPEN(unit=11,file='RP_volume',position='append')
-        write(11,2)time,Vol
+  if (solver_flag==1) then
+     if (RP_test) then
+        call get_vol(Vol)
+        p_c = P_ref*(V_0/Vol)**gamma
+        if(mod(iout,10)==0 .and. rank==0 .and. solver_flag==2) then
+           OPEN(unit=11,file='RP_volume',position='append')
+           write(11,2)time,Vol
+        endif
+     else
+        call get_bubble_pressure(iout,time,P_gas)
+        !call write_par_var("P_gas     ",iout,P_gas)
+        p_c = 0d0
      endif
-  else
-     p_c = 0d0
   endif
 2 format(2e14.5)
   if (solver_flag == 0) call pariserror("Free Surface solver flag needs to be 1 or 2")
@@ -1598,3 +1604,37 @@ contains
     if (.not. RP_test) call Poisson_BCs(A)
   end subroutine liq_gas
 end subroutine setuppoisson_fs_new
+!==================================================================================================================
+subroutine get_bubble_pressure(iout,time_send,P_g)
+  use module_grid
+  use module_Lag_part
+  use module_freesurface
+  implicit none
+  real(8), dimension(is:ie,js:je,ks:ke) :: P_g
+  real(8) :: time_send, volume
+  integer :: i,j,k,c,iout,index,prank,nr
+  P_g = 0d0
+  call tag_drop()
+  if ( nPdomain > 1 ) call tag_drop_all
+  call CreateTag2DropTable
+  if ( nPdomain > 1 ) call merge_drop_pieces
+  call output_tag(iout,is,ie+1,js,je+1,ks,ke+1)
+  
+  !do k=ks,ke; do j=js,je; do i=is,ie
+     !if (pcmask(i,j,k) /= 0) then
+  do nr = 1,num_drop_merge(rank)
+     volume=drops_merge(nr)%element%vol
+     write(*,'("Volume of merged bubble ",I4," in rank ",I4," :  ",e14.5)')&
+          drops_merge(nr)%element%id,rank,volume
+  enddo
+
+  do nr = 1,num_drop(rank)
+     volume=drops(nr)%element%vol
+     write(*,'("Volume of bubble ",I4," in rank ",I4," :  ",e14.5)')&
+          drops(nr)%element%id,rank,volume
+  enddo
+     !endif
+  !enddo;enddo;enddo
+  call ReleaseTag2DropTable
+end subroutine get_bubble_pressure
+!==================================================================================================================

@@ -432,7 +432,7 @@ Program paris
                  !call calcresidual(A,p,residual)
                  if(rank==0) then
                     write(*,'("FS2:          pressure residual:   ",e7.1,&
-                         &" maxerror: ",e7.1)') residual*MaxDt,maxerror
+                         &" maxerror: ",e7.1)') residual*dt,maxerror
                     write(*,'("              pressure iterations :",I9)')it
                  endif
               endif
@@ -3022,11 +3022,12 @@ subroutine write_par_var(varname,iout,var)
      OPEN(UNIT=21,FILE=TRIM(varname)//'-holder-'//TRIM(int2text(iout,padding))//'.txt')
      write(21,12)NpDomain
      do prank=0,NpDomain-1
-        write(21,13)TRIM(out_path)//'/'//TRIM(varname)//TRIM(int2text(prank,padding))//'-'//TRIM(int2text(iout,padding))//'.txt'
+        write(21,13)TRIM(out_path)//'/'//TRIM(varname)//TRIM(int2text(prank,padding))//'-'//TRIM(int2text(iout,padding))//'.3D'
      enddo
      close(21)
   endif
-  OPEN(UNIT=20,FILE=TRIM(out_path)//'/'//TRIM(varname)//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout,padding))//'.txt')
+  OPEN(UNIT=20,FILE=TRIM(out_path)//'/'//TRIM(varname)//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout,padding))//'.3D')
+  write(20,13)'X Y Z Var'
   do k=ks,ke; do j=js,je; do i=is,ie
      write(20,14)x(i),y(j),z(k),var(i,j,k)
   enddo;enddo;enddo
@@ -3034,6 +3035,6 @@ subroutine write_par_var(varname,iout,var)
 
 12 format('NPROCS',I4)
 13 format(A)
-14 format(4e14.5)
+14 format(4e17.8)
 
 end subroutine write_par_var
