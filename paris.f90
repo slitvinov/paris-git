@@ -2487,8 +2487,8 @@ subroutine InitCondition
               call set_topology(vof_phase,itimestep) !vof_phases are updated in initconditions_VOF called above
               call get_normals()
               call get_all_curvatures(kappa_fs,0)
-              if (RP_test) then
-                 call get_ref_volume !!! can rather call this init_RP_test
+              call get_ref_volume !!! can rather call this init_RP_test
+              if (RP_test) then       
                  call initialize_P_RP(p,rho1)  !initialize P field for RP test
                  call ghost_x(p,1,req( 1: 4))
                  call ghost_y(p,1,req( 5: 8))

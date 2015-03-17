@@ -699,7 +699,7 @@ subroutine get_ref_volume
   implicit none
   real(8), parameter :: pi=3.1415926535897932384626433833
 
-  if (NumBubble /= 1) call pariserror('For the Rayleigh-Plesset test, only a single bubble is allowed')
+  !if (NumBubble /= 1) call pariserror('For the Rayleigh-Plesset test, only a single bubble is allowed')
   V_0 = 4d0/3d0*pi*(R_ref**3d0)
   R_RK = rad(1)
   dR_RK = 0d0 
@@ -754,14 +754,14 @@ subroutine FreeSolver(A,p,maxError,beta,maxit,it,ierr,iout,time,tres2)
         endif
      else
         call get_bubble_pressure(iout,time,P_gas)
-        !call write_par_var("P_gas     ",iout,P_gas)
+        call write_par_var("P_gas     ",iout,P_gas)
         p_c = 0d0
      endif
   endif
 2 format(2e14.5)
   if (solver_flag == 0) call pariserror("Free Surface solver flag needs to be 1 or 2")
   do k=ks,ke; do j=js,je; do i=is,ie
-     if (solver_flag == 1 .and. pcmask(i,j,k) /= 0) p(i,j,k) = p_c
+     if (solver_flag == 1 .and. pcmask(i,j,k) /= 0) p(i,j,k) = P_gas(i,j,k)
      if (solver_flag == 2 .and. pcmask(i,j,k)==3) p(i,j,k) = 0d0
   enddo; enddo; enddo
   !--------------------------------------ITERATION LOOP--------------------------------------------  
@@ -1612,7 +1612,7 @@ subroutine get_bubble_pressure(iout,time_send,P_g)
   implicit none
   real(8), dimension(is:ie,js:je,ks:ke) :: P_g
   real(8) :: time_send, volume
-  integer :: i,j,k,c,iout,index,prank,nr
+  integer :: i,j,k,c,iout,index,prank,nr,dropid
   P_g = 0d0
   call tag_drop()
   if ( nPdomain > 1 ) call tag_drop_all
@@ -1620,21 +1620,43 @@ subroutine get_bubble_pressure(iout,time_send,P_g)
   if ( nPdomain > 1 ) call merge_drop_pieces
   call output_tag(iout,is,ie+1,js,je+1,ks,ke+1)
   
-  !do k=ks,ke; do j=js,je; do i=is,ie
-     !if (pcmask(i,j,k) /= 0) then
-  do nr = 1,num_drop_merge(rank)
-     volume=drops_merge(nr)%element%vol
-     write(*,'("Volume of merged bubble ",I4," in rank ",I4," :  ",e14.5)')&
-          drops_merge(nr)%element%id,rank,volume
-  enddo
+!!$  do nr = 1,num_drop_merge(rank)
+!!$     volume=drops_merge(nr)%element%vol
+!!$     write(*,'("Volume of merged bubble ",I4," in rank ",I4," :  ",e14.5)')&
+!!$          drops_merge(nr)%element%id,rank,volume
+!!$     write(*,'("Expected pressure in bub ",I4," in rank ",I4,": ",e14.5)')&
+!!$          tag_dropid(drops_merge(nr)%element%id),rank,P_ref*(V_0/volume)**gamma
+!!$  enddo
+!!$
+!!$  do nr = 1,num_drop(rank)
+!!$     volume=drops(nr)%element%vol
+!!$     write(*,'("Volume of bubble ",I4," in rank ",I4," :  ",e14.5)')&
+!!$          drops(nr)%element%id,rank,volume
+!!$     write(*,'("Expected pressure in bub ",I4," in rank ",I4,": ",e14.5)')&
+!!$          tag_dropid(drops(nr)%element%id),rank,P_ref*(V_0/volume)**gamma
+!!$  enddo
 
-  do nr = 1,num_drop(rank)
-     volume=drops(nr)%element%vol
-     write(*,'("Volume of bubble ",I4," in rank ",I4," :  ",e14.5)')&
-          drops(nr)%element%id,rank,volume
-  enddo
-     !endif
-  !enddo;enddo;enddo
+  write(*,'("Parametes for eqn of state. P_ref,V_ref,gamma: ",3e14.5)')P_ref,V_0,gamma
+  do k=ks,ke; do j=js,je; do i=is,ie
+     if (pcmask(i,j,k) /= 0) then
+        dropid = tag_dropid(tag_id(i,j,k))
+        if (.not.(tag_mergeflag(tag_id(i,j,k)) == 1 .or. tag_mergeflag(tag_id(i,j,k)) == 0)) then
+           call pariserror('Merge tag should be 0 or 1')
+        endif
+        if (tag_mergeflag(tag_id(i,j,k)) == 1) then
+           volume = drops_merge(dropid)%element%vol
+        else
+           volume = drops(dropid)%element%vol
+        endif
+        if (volume > 1d-6) then
+           P_g(i,j,k) = P_ref*(V_0/volume)**gamma
+           !write(*,'("Bubble volume calculated: ",e14.5)')volume
+           !write(*,'("Pressure calculated in bub ",I4," in rank ",I4,": ",e14.5)')dropid,rank,P_g(i,j,k)
+        else
+           write(*,'("Bubble volume error. Vol from table: ",e14.5)')volume
+        endif
+     endif
+  enddo;enddo;enddo
   call ReleaseTag2DropTable
 end subroutine get_bubble_pressure
 !==================================================================================================================
