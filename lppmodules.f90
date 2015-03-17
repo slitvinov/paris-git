@@ -654,13 +654,13 @@ contains
       implicit none
 
       integer :: idrop,iCell,idrop1
-      integer :: idiff_tag,tag,tag1
+      integer :: idiff_tag,tag,tag1,idiff_tag1,idiff_tag2,tag2
       real(8) :: vol_merge,xc_merge,yc_merge,zc_merge,uc_merge,vc_merge,wc_merge,vol1, &
                                                       duc_merge,dvc_merge,dwc_merge
       integer :: irank, irank1
       real(8) :: max_drop_merge_vol
       integer :: tag_max_drop_merge_vol
-      logical :: TagAlreadyListed
+      logical :: TagAlreadyListed,FinishUpdateTag
 
       ! Check ghost cells of droplet pieces
       if ( num_drop_merge(rank) > 0 ) then 
@@ -710,6 +710,38 @@ contains
 
       ! merge droplets pieces & calculate droplet properties
       if ( rank == 0 ) then 
+         ! Find complete list of different tags belonging to a drop
+         FinishUpdateTag = .false. 
+         do while (.not.FinishUpdateTag)
+            FinishUpdateTag = .true. 
+            do tag = 1,total_num_tag
+               idrop = tag_dropid(tag)
+               irank = tag_rank  (tag)
+               do idiff_tag = 1,drops_merge_comm(idrop,irank)%num_diff_tag
+                  tag1   = drops_merge_comm(idrop,irank)%diff_tag_list(idiff_tag)
+                  idrop1 = tag_dropid(tag1)
+                  irank1 = tag_rank  (tag1)
+                  do idiff_tag1 = 1,drops_merge_comm(idrop1,irank1)%num_diff_tag
+                     TagAlreadylisted = .false.
+                     tag2   = drops_merge_comm(idrop1,irank1)%diff_tag_list(idiff_tag1)
+                     if ( tag2 == tag ) TagAlreadyListed = .true.  
+                     do idiff_tag2 = 1,drops_merge_comm(idrop,irank)%num_diff_tag
+                        if ( tag2 == drops_merge_comm(idrop,irank)%diff_tag_list(idiff_tag2) ) & 
+                           TagAlreadylisted = .true.
+                     end do ! idiff_tag2
+                     if (.not. TagAlreadylisted) then 
+                        drops_merge_comm(idrop,irank)%num_diff_tag = & 
+                           drops_merge_comm(idrop,irank)%num_diff_tag + 1
+                        drops_merge_comm(idrop,irank)%diff_tag_list( & 
+                           drops_merge_comm(idrop,irank)%num_diff_tag) = tag2
+                        if ( FinishUpdateTag ) FinishUpdateTag = .false. 
+                     end if ! TagAlreadylist
+                  end do ! idiff_tag1
+               end do ! idff_tag
+            end do ! tag
+         end do ! update_tag_finish
+
+         ! Calculate merge drop properties by summing all pieces
          allocate( new_drop_id(1:total_num_tag) )
          new_drop_id(:) = 0
          num_new_drop = 0
