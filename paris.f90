@@ -173,7 +173,7 @@ Program paris
         if(test_control_droplet) call do_droplet_test(itimestep,time,REAL(nstats*dt,8))
         if(test_frdroplet.or.test_droplet) call output_droplet(w,time)
         call setvelocityBC(u,v,w,umask,vmask,wmask,time)
-        call write_vec_gnuplot(u,v,cvof,p,itimestep,DoVOF)
+        !call write_vec_gnuplot(u,v,cvof,p,itimestep,DoVOF)
         call calcstats
 
         if(dtFlag==2)call TimeStepSize(dt)

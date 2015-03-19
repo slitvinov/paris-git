@@ -1005,6 +1005,17 @@ end subroutine do_droplet_test
     !WRITE(*,*) "Every thing is fine! in proc: ", rank
     !210 format(e14.5)
 
+    ! zip and tar data
+    if ( zip_data ) then 
+       call system('gzip '//trim(file_name))
+       call MPI_BARRIER(MPI_COMM_WORLD, ierr2)
+       if ( rank == 0 ) then 
+         file_name = 'fbasic'//i2t(index,padd)
+         call system('tar cvf '//TRIM(file_name)//'.tar '//TRIM(path)//'/'//TRIM(file_name)//'*.silo*')
+         call system('rm '//TRIM(path)//'/'//TRIM(file_name)//'*.silo*')
+       end if ! rank 
+    end if ! zip_data
+
     ! Updating index
     index = index + 1
 #else

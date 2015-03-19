@@ -466,6 +466,17 @@ contains
 
     close(8)
     if(rank==0) call close_solid_visit_file()
+       
+    ! zip and tar data
+    if ( zip_data ) then
+       call system('gzip '//TRIM(rootname)//TRIM(int2text(rank,padding))//'.vtk')
+       call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+       if ( rank == 0 ) then 
+         call system('tar cvf solid.tar '//TRIM(out_path)//'/VTK/solid*.vtk.gz')
+         call system('rm '//TRIM(out_path)//'/VTK/solid*.vtk.gz')
+       end if ! rank 
+    end if ! zip_data
+
 end subroutine output_solids
 
   subroutine print_small_solid(solids)
