@@ -652,7 +652,9 @@ contains
 #endif
     implicit none
     integer ib
+#ifndef __INTEL_COMPILER
     real :: rand
+#endif
 
     if(NumBubble>2) then 
       do ib=1,NumBubble
