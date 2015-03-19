@@ -28,7 +28,7 @@ restartAverages = F
 nBackup = 90000   ! number of time steps between  backups are kept.
 
 NSTEP   = 50000     ! maximum number of time steps
-EndTime = 1.0       ! When to stop simulation
+EndTime = 0.3       ! When to stop simulation
 
 MaxDt   = 0.1  ! maximum size of time step
 dtFlag  = 1        ! 1: fixed dt;  2: fixed CFL

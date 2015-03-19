@@ -1,0 +1,23 @@
+&LPPPARAMETERS
+
+DropStatisticsMethod = 1
+DRAGMODEL = 1
+nTimeStepTag = 20
+DoConvertVOF2LPP = F 
+DoConvertLPP2VOF = F
+CriteriaConvertCase = 1
+VOL_CUT = 7.d-9
+XLPP_MIN = 0.d0
+XLPP_MAX = 1.d0
+YLPP_MIN = 0.3d-2
+YLPP_MAX = 0.7d-2
+ZLPP_MIN = 0.d0
+ZLPP_MAX = 1.d0
+max_num_drop = 30 
+maxnum_cell_drop = 10000 
+max_num_part = 30 
+max_num_part_cross = 30 
+
+!=================================================================================================
+/
+! end of the namelist
