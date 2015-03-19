@@ -5,8 +5,8 @@
 
 FC = mpif90
 
-FLAGS = -O3 -cpp # -ffpe-summary=invalid,zero,overflow -DOLD_BDRY_COND -fimplicit-none -fbounds-check # -g 
-FLAGSDEBUG = -cpp -g -gstabs -O2 # -ffpe-summary=invalid,zero,overflow
+FLAGS = -O3 -cpp  -fimplicit-none # -ffpe-summary=invalid,zero,overflow -DOLD_BDRY_COND -fimplicit-none -fbounds-check # -g 
+FLAGSDEBUG = -cpp -g -gstabs -O2  -fimplicit-none # -ffpe-summary=invalid,zero,overflow
 HARDFLAGS = -fbounds-check -ffpe-trap=invalid,zero,overflow # -Wall -ffpe-trap=invalid,zero,overflow,underflow,precision,denormal 
 
 CFLAGS = -O # -g -gstabs

@@ -687,6 +687,8 @@ subroutine project_velocity ()
   use module_freesurface
   use module_vof
   use module_surface_tension
+  implicit none
+  integer :: i,j,k
 
   if (.not.FreeSurface) then
     if (STGhost) then
