@@ -2570,6 +2570,7 @@ contains
       real(8) :: xp,yp,zp,fx,fy,fz,x2,y2,z2,s0,s1,dp
       real(8) :: massLPP, massVOF, mfLPP
       real(8), parameter :: mfLPPsmall = 1.0d-40
+      real :: erf
 
       if (TwoWayCouplingFlag == TwoWayCouplingFilterForce) then
          

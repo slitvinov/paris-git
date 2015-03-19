@@ -1390,6 +1390,7 @@ module module_BC
       real(8) :: uinject
       real(8) :: ryz, low_gas_radius, NozzleThickness
       real(8), parameter :: PI = 3.14159265359d0
+      real :: erf
       uinject=0d0
 
       if(radius_gap_liqgas==0d0) then

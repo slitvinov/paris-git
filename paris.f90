@@ -2454,6 +2454,7 @@ subroutine InitCondition
   include 'mpif.h'
   integer :: i,j,k, ierr, irank, req(12),sta(MPI_STATUS_SIZE,12)
   real(8) :: my_ave
+  real :: erf
   !---------------------------------------------Domain----------------------------------------------
   if(rank<nPdomain)then
      if(restart)then

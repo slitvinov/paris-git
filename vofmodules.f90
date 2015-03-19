@@ -652,6 +652,7 @@ contains
 #endif
     implicit none
     integer ib
+    real :: rand
 
     if(NumBubble>2) then 
       do ib=1,NumBubble
