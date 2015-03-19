@@ -152,6 +152,7 @@
    integer, parameter :: DropStatistics_PlotElement      = 1
    integer, parameter :: DropStatistics_ElementSizePDF   = 2
    integer, parameter :: DropStatistics_WriteElementData = 3
+   integer, parameter :: DropStatistics_WriteElementDataEachRank = 4
 
    integer :: DropStatisticsMethod 
    logical :: DoConvertVOF2LPP 
@@ -365,6 +366,7 @@ contains
 
    subroutine lppvofsweeps(tswap,time)
       implicit none
+      include 'mpif.h'
     
       integer, intent(in) :: tswap
       real(8), intent(in) :: time
@@ -715,6 +717,7 @@ contains
          do while (.not.FinishUpdateTag)
             FinishUpdateTag = .true. 
             do tag = 1,total_num_tag
+               if ( tag_mergeflag(tag) == 0 ) cycle
                idrop = tag_dropid(tag)
                irank = tag_rank  (tag)
                do idiff_tag = 1,drops_merge_comm(idrop,irank)%num_diff_tag
@@ -857,6 +860,8 @@ contains
       integer, parameter :: num_gaps = 1000
       real(8) :: gap,dmax,d
       integer :: igap,count_element(num_gaps)
+      logical :: file_exist
+      character(len=30) :: filename 
       type(element) :: element_NULL
       element_NULL%xc = 0.d0;element_NULL%yc = 0.d0;element_NULL%zc = 0.d0
       element_NULL%uc = 0.d0;element_NULL%vc = 0.d0;element_NULL%wc = 0.d0
@@ -866,19 +871,6 @@ contains
       num_element_estimate = num_drop+num_drop_merge+num_part
       maxnum_element = maxval(num_element_estimate) 
       allocate( element_stat(maxnum_element,0:nPdomain-1) )
-
-      !  Setup MPI derived type for element_type 
-      offsets (0) = 0 
-      oldtypes(0) = MPI_REAL8 
-      blockcounts(0) = 10 
-      call MPI_TYPE_EXTENT(MPI_REAL8, r8extent, ierr) 
-      offsets    (1) = blockcounts(0)*r8extent 
-      oldtypes   (1) = MPI_INTEGER  
-      blockcounts(1) = 1  
-
-      call MPI_TYPE_STRUCT(2, blockcounts, offsets, oldtypes, & 
-                           MPI_element_type, ierr) 
-      call MPI_TYPE_COMMIT(MPI_element_type, ierr)
 
       !  initialize element_stat
       num_element(:) = 0
@@ -935,8 +927,52 @@ contains
             element_stat(num_element(rank),rank)%id  = parts(idrop,rank)%element%id
          end do ! idrop
       end if ! num_drop(rank)
- 
-! Collect all discrete elements to rank 0
+
+      ! Output element stats without collective operation
+      if (DropStatisticsMethod == DropStatistics_WriteElementDataEachRank ) then
+         filename=TRIM(out_path)//'/element-stats_'//TRIM(int2text(rank,padding))//'.dat'
+         inquire(FILE=filename,EXIST=file_exist)
+         if ( file_exist ) then 
+            OPEN(UNIT=102,FILE=filename, STATUS='old', POSITION='append', ACTION='write')
+         else 
+            OPEN(UNIT=102,FILE=filename, STATUS='new', ACTION='write')
+         end if ! file_exist
+         if ( num_element(rank) > 0 ) then
+            do ielement = 1, num_element(rank)
+               write(102,'(11(E15.6,1X))')   time, & 
+                                             element_stat(ielement,rank)%xc, &
+                                             element_stat(ielement,rank)%yc, &
+                                             element_stat(ielement,rank)%zc, &
+                                             element_stat(ielement,rank)%uc, &
+                                             element_stat(ielement,rank)%vc, &
+                                             element_stat(ielement,rank)%wc, &
+                                             element_stat(ielement,rank)%duc, &
+                                             element_stat(ielement,rank)%dvc, &
+                                             element_stat(ielement,rank)%dwc, &
+                                             element_stat(ielement,rank)%vol
+            end do ! ielement
+         end if ! num_element(rank) 
+         close(102)
+        
+         deallocate( element_stat )
+         return
+      end if ! DropStatisticsMethod 
+
+      ! Collect all discrete elements to rank 0
+      
+      !  Setup MPI derived type for element_type 
+      offsets (0) = 0 
+      oldtypes(0) = MPI_REAL8 
+      blockcounts(0) = 10 
+      call MPI_TYPE_EXTENT(MPI_REAL8, r8extent, ierr) 
+      offsets    (1) = blockcounts(0)*r8extent 
+      oldtypes   (1) = MPI_INTEGER  
+      blockcounts(1) = 1  
+
+      call MPI_TYPE_STRUCT(2, blockcounts, offsets, oldtypes, & 
+                           MPI_element_type, ierr) 
+      call MPI_TYPE_COMMIT(MPI_element_type, ierr)
+
       num_element_rank= num_element(rank)
       call MPI_ALLGATHER(num_element_rank, 1, MPI_INTEGER, &
                          num_element(:),   1, MPI_INTEGER, MPI_Comm_World, ierr)
@@ -3720,6 +3756,8 @@ module module_output_lpp
       integer, parameter :: LPPformatPlot3D = 1
       integer, parameter :: LPPformatVOFVTK = 2
       integer, parameter :: LPPformatVTK = 3
+
+      if ( maxval(num_part) < 1 .and. .not.DoConvertVOF2LPP ) return 
 
       if ( outputlpp_format == LPPformatPlot3D ) then 
          call output_LPP_Plot3D(nf,i1,i2,j1,j2,k1,k2)
