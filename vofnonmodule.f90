@@ -377,9 +377,9 @@ subroutine swpzmom(us,c,d,mom1,mom2,mom3,mom,t)
            mm1 = dmax1(a1,0.0d0)
            mm2 = 1.d0 - mm1 + dmin1(0.d0,a2)
 
-           mom1(i,j,k)  = dmax1(-a1,0.d0)*mom(i,j,k)
-           mom3(i,j,k)  = dmax1(a2,0.d0) *mom(i,j,k)
-           mom2(i,j,k)  = mom(i,j,k) - mom1(i,j,k) - mom3(i,j,k)
+           mom1(i,j,k) = dmax1(-a1,0.d0)*mom(i,j,k)
+           mom3(i,j,k) = dmax1( a2,0.d0)*mom(i,j,k)
+           mom2(i,j,k) = mom(i,j,k) - mom1(i,j,k) - mom3(i,j,k)
            uavg = mom(i,j,k)/(rho2*c(i,j,k)+rho1*(1.d0-c(i,j,k)))
 !           if ((us(i,j,k)+us(i-i0,j-j0,k-k0)).gt.0.d0) then
 !               uavg = us(i-i0,j-j0,k-k0)

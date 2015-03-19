@@ -62,6 +62,7 @@ module module_VOF
   logical :: test_heights = .false.  
   logical :: test_capwave = .false.
   logical :: test_droplet = .false.  
+  logical :: test_control_droplet = .false.
   logical :: normal_up = .true.    ! used for the h
   logical :: test_curvature = .false.  
   logical :: test_curvature_2D = .false.  
@@ -403,6 +404,8 @@ contains
     end if ! itime_scheme
     if(test_type=='droplet') then
        test_droplet = .true.
+    else if(test_type=='control_droplet') then
+       test_control_droplet = .true.
     else if(test_type=='height_test') then
        test_heights = .true.
     else if(test_type=='Curvature_test') then

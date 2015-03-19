@@ -446,17 +446,20 @@ contains
   ! Sixth column: mass phase 2
   ! Seventh, eight and ninth: xg yg and zg of the droplet (Mass center)
   ! Tenth, maximum of the pressure gradient norm
-  subroutine do_droplet_test(ts,output_time)
+  subroutine do_droplet_test(ts,output_time,delta_time)
     use module_flow
     implicit none
     include 'mpif.h'
     integer :: i,j,k,ts, ierr
-    real(8) :: vol, uvel, vvel, wvel, output_time
+    real(8) :: vol, uvel, vvel, wvel, output_time, delta_v, delta_time
     real(8) :: grad1, grad2, grad3, norm_grad, local_norm, gn
     real(8), dimension(9):: local_data, bgd
     character*128 :: file_name
     LOGICAL :: Found
     LOGICAL, SAVE :: first_open = .true.
+    REAL(8), SAVE :: reference_vel
+    REAL(8), dimension(3), SAVE :: reference_pos
+    integer, SAVE :: counter = 0
     
     file_name = 'droplet_results'
     ! Compute Local Stats
@@ -464,6 +467,7 @@ contains
     bgd = 0d0
     local_norm = 0d0
     gn = 0d0
+
     
     do k=ks,ke; do j=js,je; do i=is,ie;
        vol = dx(i) * dy(j) * dz(k)
@@ -524,10 +528,11 @@ contains
     call MPI_ALLREDUCE(local_data, bgd, 9, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr)
     call MPI_ALLREDUCE(local_norm, gn, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_Comm_Cart, ierr)
     
-    if(rank==0) then
+    
     bgd(7) = bgd(7)/bgd(4)
     bgd(8) = bgd(8)/bgd(4)
     bgd(9) = bgd(9)/bgd(4)
+    if(rank==0) then
      if(first_open) then
        OPEN(UNIT=88,FILE=TRIM(out_path)//TRIM(file_name)//'.dat')
        write(88,18) ts,bgd(1),bgd(2),bgd(3),bgd(4),bgd(5),bgd(6),bgd(7),bgd(8),bgd(9),gn
@@ -540,6 +545,26 @@ contains
      endif
     endif
     
+    !**Control part******************************************************
+    
+    ! Saving reference velocity and inital position
+    if (counter == 1) reference_vel = WallVel(1,1)
+    if (counter == 1) then
+       reference_pos(1) = bgd(7)
+       reference_pos(2) = bgd(8)
+       reference_pos(3) = bgd(9)
+    endif
+
+    ! Starting linear control after 10 time steps
+    if (counter > 10) then
+      delta_v = -1.5*((bgd(7)-reference_pos(1))/reference_pos(1))*reference_vel
+    !  if(rank==0) write(*,*) counter,bgd(7)-reference_pos, delta_v
+      WallVel(1,1) = reference_vel + delta_v
+      gy = -((bgd(8)-reference_pos(2))/reference_pos(2))*9.81d0
+      gz = -((bgd(9)-reference_pos(3))/reference_pos(3))*9.81d0    
+    endif
+    counter = counter + 1
+        
     call output_droplet(w,output_time)
 18     format(I8.8,E14.6,E14.6,E14.6,E14.6,E14.6,E14.6,E14.6,E14.6,E14.6,E14.6)   
 end subroutine do_droplet_test
