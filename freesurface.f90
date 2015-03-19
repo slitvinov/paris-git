@@ -699,16 +699,11 @@ subroutine get_ref_volume
   implicit none
   real(8), parameter :: pi=3.1415926535897932384626433833
 
-  !if (NumBubble /= 1) call pariserror('For the Rayleigh-Plesset test, only a single bubble is allowed')
   V_0 = 4d0/3d0*pi*(R_ref**3d0)
   R_RK = rad(1)
   dR_RK = 0d0 
   P_inf = BoundaryPressure(1)
   ddR_RK = (P_ref*(R_ref/R_RK)**(3d0*gamma)-P_inf)/R_RK
-  !if (rank==0) then
-  !   write(*,'("RP test initial bubble volume:",e14.5)')V_0
-  !   write(*,'("Free surface ddR: ",e14.5)')ddR_RK
-  !endif
 end subroutine get_ref_volume
 !--------------------------------------------------------------------------------------------------------------------
 ! This is a straight copy of NewSolver. The idea is to not clutter NewSolver with all the FreeSurface flags and tests, 
@@ -727,7 +722,7 @@ subroutine FreeSolver(A,p,maxError,beta,maxit,it,ierr,iout,time,tres2)
   include 'mpif.h'
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: p
   real(8), dimension(is:ie,js:je,ks:ke,8), intent(in) :: A
-  real(8), dimension(is:ie,js:je,ks:ke) :: P_gas
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax) :: P_gas
   real(8), intent(in) :: beta, maxError
   integer, intent(in) :: maxit
   integer, intent(out) :: it, ierr
@@ -745,24 +740,13 @@ subroutine FreeSolver(A,p,maxError,beta,maxit,it,ierr,iout,time,tres2)
   endif
   itime=itime+1
   if (solver_flag==1) then
-     if (RP_test) then
-        call get_vol(Vol)
-        p_c = P_ref*(V_0/Vol)**gamma
-        if(mod(iout,10)==0 .and. rank==0 .and. solver_flag==2) then
-           OPEN(unit=11,file='RP_volume',position='append')
-           write(11,2)time,Vol
-        endif
-     else
-        call get_bubble_pressure(iout,time,P_gas)
-        call write_par_var("P_gas     ",iout,P_gas)
-        p_c = 0d0
-     endif
+     call get_bubble_pressure(iout,time,P_gas)
   endif
 2 format(2e14.5)
   if (solver_flag == 0) call pariserror("Free Surface solver flag needs to be 1 or 2")
   do k=ks,ke; do j=js,je; do i=is,ie
      if (solver_flag == 1 .and. pcmask(i,j,k) /= 0) p(i,j,k) = P_gas(i,j,k)
-     if (solver_flag == 2 .and. pcmask(i,j,k)==3) p(i,j,k) = 0d0
+     if (solver_flag == 2 .and. pcmask(i,j,k)==3) p(i,j,k) = 0.d0
   enddo; enddo; enddo
   !--------------------------------------ITERATION LOOP--------------------------------------------  
   do it=1,maxit
@@ -1108,6 +1092,7 @@ subroutine set_RP_pressure(p,rho)
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: p
   real(8) :: r, rho
   integer :: i,j,k
+
   if (coords(1)==0) then 
      do k=ks-1,ke+1; do j=js-1,je+1
         r = sqrt((x(is-1)-xc(1))**2d0 + (y(j)-yc(1))**2d0 + (z(k)-zc(1))**2d0)
@@ -1127,7 +1112,7 @@ subroutine set_RP_pressure(p,rho)
      enddo; enddo 
   endif
   if(coords(2)==Npy-1) then
-    do k=ks-1,ke+1; do i=is-1,ie+1
+     do k=ks-1,ke+1; do i=is-1,ie+1
         r = sqrt((x(i)-xc(1))**2d0 + (y(je+1)-yc(1))**2d0 + (z(k)-zc(1))**2d0)
         p(i,je+1,k) = pressure(r)
      enddo; enddo  
@@ -1201,6 +1186,7 @@ subroutine setuppoisson_fs_new(utmp,vtmp,wtmp,vof_phase,rhot,dt,A,cvof,n1,n2,n3,
   implicit none
   include 'mpif.h'
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: utmp,vtmp,wtmp,rhot
+  !real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: umask,vmask,wmask
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: kap
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: cvof,n1,n2,n3
   real(8), dimension(is:ie,js:je,ks:ke,8), intent(inout) :: A
@@ -1269,6 +1255,17 @@ contains
     c_min = 1d-2
 
     do k=ks,ke; do j=js,je; do i=is,ie
+
+!!$       A(i,j,k,1) = dt*umask(i-1,j,k)/(dx(i)*dx(i)*rhot(i,j,k))
+!!$       A(i,j,k,2) = dt*umask(i  ,j,k)/(dx(i)*dx(i)*rhot(i,j,k))
+!!$       A(i,j,k,3) = dt*vmask(i,j-1,k)/(dy(j)*dy(j)*rhot(i,j,k))
+!!$       A(i,j,k,4) = dt*vmask(i,j  ,k)/(dy(j)*dy(j)*rhot(i,j,k))
+!!$       A(i,j,k,5) = dt*wmask(i,j,k-1)/(dz(k)*dz(k)*rhot(i,j,k))
+!!$       A(i,j,k,6) = dt*wmask(i,j,k  )/(dz(k)*dz(k)*rhot(i,j,k))
+!!$       A(i,j,k,7) = sum(A(i,j,k,1:6))
+!!$       A(i,j,k,8) =  -( (utmp(i,j,k)-utmp(i-1,j,k))/dx(i) &
+!!$            +  (vtmp(i,j,k)-vtmp(i,j-1,k))/dy(j) &
+!!$            +  (wtmp(i,j,k)-wtmp(i,j,k-1))/dz(k) )
 
        A(i,j,k,1) = dt/(dx(i)*dx(i)*rhot(i,j,k))
        A(i,j,k,2) = dt/(dx(i)*dx(i)*rhot(i,j,k))
@@ -1610,7 +1607,7 @@ subroutine get_bubble_pressure(iout,time_send,P_g)
   use module_Lag_part
   use module_freesurface
   implicit none
-  real(8), dimension(is:ie,js:je,ks:ke) :: P_g
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax) :: P_g
   real(8) :: time_send, volume
   integer :: i,j,k,c,iout,index,prank,nr,dropid
   P_g = 0d0
@@ -1618,7 +1615,7 @@ subroutine get_bubble_pressure(iout,time_send,P_g)
   if ( nPdomain > 1 ) call tag_drop_all
   call CreateTag2DropTable
   if ( nPdomain > 1 ) call merge_drop_pieces
-  call output_tag(iout,is,ie+1,js,je+1,ks,ke+1)
+  !call output_tag(iout,is,ie+1,js,je+1,ks,ke+1)
   
 !!$  do nr = 1,num_drop_merge(rank)
 !!$     volume=drops_merge(nr)%element%vol
@@ -1636,7 +1633,7 @@ subroutine get_bubble_pressure(iout,time_send,P_g)
 !!$          tag_dropid(drops(nr)%element%id),rank,P_ref*(V_0/volume)**gamma
 !!$  enddo
 
-  write(*,'("Parametes for eqn of state. P_ref,V_ref,gamma: ",3e14.5)')P_ref,V_0,gamma
+  !write(*,'("Parametes for eqn of state. P_ref,V_ref,gamma: ",3e14.5)')P_ref,V_0,gamma
   do k=ks,ke; do j=js,je; do i=is,ie
      if (pcmask(i,j,k) /= 0) then
         dropid = tag_dropid(tag_id(i,j,k))
@@ -1648,10 +1645,8 @@ subroutine get_bubble_pressure(iout,time_send,P_g)
         else
            volume = drops(dropid)%element%vol
         endif
-        if (volume > 1d-6) then
+        if (volume > 1d-12) then
            P_g(i,j,k) = P_ref*(V_0/volume)**gamma
-           !write(*,'("Bubble volume calculated: ",e14.5)')volume
-           !write(*,'("Pressure calculated in bub ",I4," in rank ",I4,": ",e14.5)')dropid,rank,P_g(i,j,k)
         else
            write(*,'("Bubble volume error. Vol from table: ",e14.5)')volume
         endif

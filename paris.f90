@@ -353,7 +353,6 @@ Program paris
            else 
               call get_all_curvatures(kappa_fs,itimestep)
               solver_flag = 1
-              !call setuppoisson_fs(u,v,w,vof_phase,rho,dt,A,cvof,n1,n2,n3,kappa_fs,itimestep)
               call Setuppoisson_fs_new(u,v,w,vof_phase,rho,dt,A,cvof,n1,n2,n3,kappa_fs)
            endif
            ! (div u)*dt < epsilon => div u < epsilon/dt => maxresidual : maxerror/dt 
@@ -362,8 +361,6 @@ Program paris
               call poi_solve(A,p,maxError/MaxDt*ErrorScaleHYPRE,maxit,it)
               call do_all_ghost(p)
            else
-!!$              if (FreeSurface .and. RP_test) call set_RP_pressure(p,rho1)
-!!$              call NewSolver(A,p,maxError/MaxDt,beta,maxit,it,ierr)
               if (FreeSurface) then
                  if (RP_test) call set_RP_pressure(p,rho1)
                  call FreeSolver(A,p,maxError/dt,beta,maxit,it,ierr,itimestep,time,residual)
@@ -417,20 +414,15 @@ Program paris
 
 !----------------------------------EXTRAPOLATION FOR FREE SURFACE---------------------------------
            if (DoVOF .and. FreeSurface) then
-              !if (.not. imploding) then
               call extrapolate_velocities()
-              !call setuppoisson_fs2(u,v,w,dt,A,vof_phase,itimestep)
-              ! Solve for an intermediate pressure in gas
               solver_flag = 2
               call setuppoisson_fs_new(u,v,w,vof_phase,rho,dt,A,cvof,n1,n2,n3,kappa_fs)
               if(HYPRE)then !HYPRE will not work with removed nodes from domain.
                  call pariserror("HYPRE solver not yet available for Free Surfaces")
               else
-                 !call NewSolver(A,p,maxError/MaxDt,beta,maxit,it,ierr)
                  call FreeSolver(A,p_ext,maxError/dt,beta,maxit,it,ierr,itimestep,time,residual)
               endif
               if(mod(itimestep,termout)==0) then
-                 !call calcresidual(A,p,residual)
                  if(rank==0) then
                     write(*,'("FS2:          pressure residual:   ",e7.1,&
                          &" maxerror: ",e7.1)') residual*dt,maxerror
@@ -463,7 +455,6 @@ Program paris
               enddo; enddo; enddo
               call SetVelocityBC(u,v,w,umask,vmask,wmask,time) !check this
               call do_ghost_vector(u,v,w)
-              !endif
               if (mod(itimestep,nstats)==0 .and. mod(ii,itime_scheme)==0) call discrete_divergence(u,v,w,itimestep/nstats)
            endif !Extrapolation
 !------------------------------------------------------------------------------------------------
@@ -2500,7 +2491,7 @@ subroutine InitCondition
               call set_topology(vof_phase,itimestep) !vof_phases are updated in initconditions_VOF called above
               call get_normals()
               call get_all_curvatures(kappa_fs,0)
-              call get_ref_volume !!! can rather call this init_RP_test
+              call get_ref_volume
               if (RP_test) then       
                  call initialize_P_RP(p,rho1)  !initialize P field for RP test
                  call ghost_x(p,1,req( 1: 4))

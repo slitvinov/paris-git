@@ -1058,12 +1058,7 @@ module module_BC
 #endif
        u(:,:,ke+1)=u(:,:,ke)
        v(:,:,ke+1)=v(:,:,ke)    
-    endif
-
-    !Set zero radial velocity gradient for RP test in FreeSurface
-    !if (FreeSurface .and. RP_test) then
-    !   call set_RP_radial_velocity(u,v,w)
-    !endif    
+    endif 
   end subroutine SetVelocityBC
 
   !=================================================================================================
