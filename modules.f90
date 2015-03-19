@@ -1388,7 +1388,7 @@ module module_BC
       integer :: j,k
       real(8) :: t
       real(8) :: uinject
-      real(8) :: ryz, low_gas_radius, HalfNozzleThickness
+      real(8) :: ryz, low_gas_radius, NozzleThickness
       real(8), parameter :: PI = 3.14159265359d0
       uinject=0d0
 
@@ -1410,16 +1410,15 @@ module module_BC
             uinject=uliq_inject
          end if ! y(j)
       else if ( inject_type == 3 ) then ! 2d coflowing jet
-         HalfNozzleThickness = NozzleThick2Cell*0.5d0*dx(is) 
-         if ( y(j) <= radius_liq_inject-HalfNozzleThickness ) then 
+         NozzleThickness = NozzleThick2Cell*dx(is) 
+         if ( y(j) <= radius_liq_inject ) then 
             uinject = uliq_inject & 
-                     *erf( (radius_liq_inject - HalfNozzleThickness - y(j))/blayer_gas_inject ) &
+                     *erf( (radius_liq_inject - y(j))/blayer_gas_inject ) &
                      *(1.d0 + erf((time-tdelay_gas_inject*0.5d0)/(tdelay_gas_inject*0.25d0)) )*0.5d0
-         else if ( y(j) > radius_liq_inject+HalfNozzleThickness .and. y(j) <= radius_gas_inject ) then
+         else if ( y(j) > radius_liq_inject+NozzleThickness .and. y(j) <= radius_gas_inject ) then
             uinject = ugas_inject & 
-                     *erf( (y(j) -   radius_liq_inject - HalfNozzleThickness)/blayer_gas_inject ) & 
+                     *erf( (y(j) -   radius_liq_inject - NozzleThickness)/blayer_gas_inject ) & 
                      *erf( (radius_gas_inject - y(j))/blayer_gas_inject ) & 
-                     !*erf(max(time-tdelay_gas_inject,0.d0)/tdelay_gas_inject) 
                      *(1.d0 + erf((time-tdelay_gas_inject*0.5d0)/(tdelay_gas_inject*0.25d0)) )*0.5d0
          else 
             uinject = 0.d0 

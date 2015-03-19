@@ -1007,7 +1007,6 @@ end subroutine do_droplet_test
 
     ! Updating index
     index = index + 1
-
 #else
     call pariserror('For output type 5 Silo library is required')
 #endif

@@ -111,7 +111,7 @@ contains
     real(8) :: x0,y0,z0,radius,x2,y2,z2
     ! for 2d nozzle
     real(8), parameter :: PI = 3.14159265359d0
-    real(8) :: HalfNozzleThickness,ryz
+    real(8) :: NozzleThickness,ryz
 
     call ReadSolidParameters
     if(dosolids) then
@@ -145,10 +145,10 @@ contains
           else if (solid_type == 'BitMap') then
              s1 = read_bitmap(i,j,k)
           else if (solid_type == '2D_nozzle') then
-             HalfNozzleThickness = NozzleThick2Cell*0.5d0*dx(is)
+             NozzleThickness = NozzleThick2Cell*dx(is)
              if ( x(i) < NozzleLength .and. & 
-                  y(j) < radius_liq_inject+HalfNozzleThickness .and. & 
-                  y(j) > radius_liq_inject-HalfNozzleThickness ) then 
+                  y(j) < radius_liq_inject+NozzleThickness .and. & 
+                  y(j) > radius_liq_inject ) then 
                s1 = 1.d0 
              else
                s1 =-1.d0
@@ -156,10 +156,10 @@ contains
           else if (solid_type == '3D_nozzle') then
              ryz = sqrt( (y(j) - jetcenter_yc)**2.d0 + (z(k) - jetcenter_zc)**2.d0 )
              if(radius_gap_liqgas==0d0) then
-	             HalfNozzleThickness = xlength/dble(nx)*NozzleThick2Cell*0.5d0
+                NozzleThickness = NozzleThick2Cell*dx(is)
                 if ( x(i) < NozzleLength .and. & 
-                     ryz < radius_liq_inject+HalfNozzleThickness .and. & 
-                     ryz > radius_liq_inject-HalfNozzleThickness ) then 
+                     ryz < radius_liq_inject+NozzleThickness .and. & 
+                     ryz > radius_liq_inject ) then 
                   s1 = 1.d0 
                 else
                   s1 =-1.d0
@@ -172,7 +172,7 @@ contains
                 else
                   s1 =-1.d0
                 end if ! x(i),y(j)
-             endif
+             end if ! radius_gap_liqgas 
           else if (solid_type == 'pipe') then
              radius = 0.5d0*xLength
              s1 = ((x(i) - radius)*(x(i) -radius) + (z(k) - radius)*(z(k) - radius)) - radius*radius
@@ -424,7 +424,9 @@ contains
 !=================================================================================================
 !-------------------------------------------------------------------------------------------------
   subroutine output_solids(nf,i1,i2,j1,j2,k1,k2)
+    INCLUDE 'mpif.h'
     integer ::nf,i1,i2,j1,j2,k1,k2,i,j,k
+    integer :: ierr
     character(len=30) :: rootname
     rootname=trim(out_path)//'/VTK/solid'//TRIM(int2text(nf,padding))//'-'
     if(rank==0) call append_solid_visit_file(TRIM(rootname))

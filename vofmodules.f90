@@ -529,7 +529,7 @@ contains
     integer :: ipar
     integer, parameter :: root_rank = 0
     integer :: i,j,k
-    real(8) :: ryz, sine, HalfNozzleThickness
+    real(8) :: ryz, sine, NozzleThickness
     
     if( test_D2P ) then 
        if ( rank == root_rank ) call random_bubbles
@@ -565,10 +565,10 @@ contains
     ! hard code for initialized a short jet inside the nozzle
     if (test_jet ) then 
       if ( inject_type == 3 ) then
-         HalfNozzleThickness = NozzleThick2Cell*0.5d0*dx(is)
+         NozzleThickness = NozzleThick2Cell*dx(is)
          do i = is,ie; do j=js,je; do k = ks,ke
             if ( x(i) < NozzleLength .and. & 
-                 (y(j)-jetcenter_yc) < radius_liq_inject-HalfNozzleThickness ) then 
+                 (y(j)-jetcenter_yc) < radius_liq_inject ) then 
                cvof(i,j,k) = 1.d0
                vof_flag(i,j,k) = 1
             end if ! 
@@ -1505,12 +1505,10 @@ end subroutine vofandmomsweepsstaggered
       implicit none
       integer :: j,k
       integer :: inject
-      real(8) :: HalfNozzleThickness
       inject=0
       if ( inject_type == 2 .or. inject_type == 5 .or. inject_type == 4) then 
          if ((y(j) - jetcenter_yc)**2 + (z(k) - jetcenter_zc)**2.lt.radius_liq_inject**2) inject=1
       else if ( inject_type == 3 ) then
-         HalfNozzleThickness = NozzleThick2Cell*0.5d0*dx(is)
          if ((y(j) - jetcenter_yc) <= radius_liq_inject ) inject = 1 
       end if ! inject_type
     end function inject

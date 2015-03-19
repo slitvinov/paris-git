@@ -494,12 +494,15 @@ Program paris
            w = 0.5*(w+wold)
            rho = 0.5*(rho+rhoo)
            mu  = 0.5*(mu +muold)
+           call my_timer(2)
            if(DoVOF) cvof  = 0.5*(cvof +cvofold)
            if(DoVOF) then
               call get_flags_and_clip(cvof,vof_flag)
               call get_vof_phase(cvof) !cvof updated above from min to max
            endif
+           call my_timer(4)
            if ( DoLPP ) call AveragePartSol()
+           call my_timer(12)
         endif
         if (DoLPP) then
             call PartBCWrapper
