@@ -681,7 +681,8 @@ contains
     ! ipar = 0 spheres
     if(ipar < 0.and.NumBubble/=1) call pariserror("S: invalid NumBubbles")
     do ib=1,NumBubble
-       a = rad(ib)**2 - (cdir(1)*(xx-xc(ib))**2+cdir(2)*(yy-yc(ib))**2+cdir(3)*(zz-zc(ib))**2) !fixme
+! x-axis span: 2*rad/(sqrt cdir) = 2*rad*sqrt(1 + e(1)) etc... 
+       a = rad(ib)**2 - (cdir(1)*(xx-xc(ib))**2+cdir(2)*(yy-yc(ib))**2+cdir(3)*(zz-zc(ib))**2)
        shapes2ls = MAX(shapes2ls,a)
     end do
   end function shapes2ls

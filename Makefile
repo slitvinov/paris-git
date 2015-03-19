@@ -1,22 +1,13 @@
 #--------- paris-ParisSimulator main Makefile --------------------------
 
-# babbage
-
+# Change the following line to force openmpi to use another compiler
 #OMPI_FC=gfortran44
 
 FC = mpif90
 
-# remove funny cflags from my environment
-
-#FLAGS =  -O3 -cpp -Wall -ffpe-trap=invalid,zero,overflow,underflow,precision,denormal # -g -gstabs # -O3 #
-
-# trap invalid to catch signaling NaN s ? 
-
-#FLAGS = -g -cpp  -ffpe-trap=invalid,zero,overflow # -g -gstabs # -O3 #
-#FOPTS = -g -cpp -ffpe-trap=invalid,zero,overflow # -g -gstabs # -O3 #
-
-FLAGS = -O2 -cpp # -DOLD_BDRY_COND -fimplicit-none -fbounds-check # -g 
-
+FLAGS = -O3 -cpp # -ffpe-summary=invalid,zero,overflow -DOLD_BDRY_COND -fimplicit-none -fbounds-check # -g 
+FLAGSDEBUG = -cpp -g -gstabs -O2 # -ffpe-summary=invalid,zero,overflow
+HARDFLAGS = -fbounds-check -ffpe-trap=invalid,zero,overflow # -Wall -ffpe-trap=invalid,zero,overflow,underflow,precision,denormal 
 
 CFLAGS = -O # -g -gstabs
 BINDIR = $(HOME)/bin
@@ -77,6 +68,11 @@ distclean: clean
 	@rm -fR  session* *.xml TAGS tags input
 
 test:  install pariscompare parisdeconv pariscompare3D
+	@echo "The test suite takes less than 4 minutes on a 4-core intel i7 MacBookPro"
+	@cd Tests; chmod +x ./runtests.sh; ./runtests.sh
+
+hardtest:  pariscompare parisdeconv pariscompare3D
+	make clean install FLAGS:="$(FLAGSDEBUG) $(HARDFLAGS)"
 	@echo "The test suite takes less than 4 minutes on a 4-core intel i7 MacBookPro"
 	@cd Tests; chmod +x ./runtests.sh; ./runtests.sh
 

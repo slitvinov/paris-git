@@ -14,7 +14,8 @@ module module_front
             InitConditionFront, StoreOldFront, AverageFront, RegridFront, SmoothFront, &
             CorrectVolume, &
             amin, amax, aspmax, sigma, smooth, nsmooth, MaxPoint, MaxElem, MaxFront, &
-            maxErrorVol, FrontProps, nregrid
+            maxErrorVol, FrontProps, nregrid, &
+            test_frdroplet
 
   integer :: MaxPoint, MaxElem, MaxFront, FirstEmptyPoint, FirstEmptyElem, FirstEmptyFront, &
              FrontLength, FrontFirst, NumEmptyPoint, NumEmptyElem, NumEmptyFront, NumLocPoint
@@ -37,6 +38,7 @@ module module_front
   integer :: nsmooth, nregrid
   integer, allocatable, dimension(:,:) :: request
   integer, allocatable, dimension(:,:,:) :: status
+  logical :: test_frdroplet
   contains
 !=================================================================================================
 !=================================================================================================
@@ -103,6 +105,8 @@ module module_front
     implicit none
     include 'mpif.h'
     integer :: i, ierr, root !, numProcess
+
+    test_frdroplet=.true.
     FirstEmptyPoint = 1;  NumEmptyPoint = MaxPoint
     FirstEmptyElem  = 1;  NumEmptyElem  = MaxElem
     FirstEmptyFront = 1;  NumemptyFront = MaxFront
@@ -174,7 +178,7 @@ module module_front
     use module_grid
     implicit none
     integer :: front,nps
-    real(8) :: xc,yc,zc,radin, ee, rad
+    real(8) :: xc,yc,zc,radin, ee, rad, radx,rady,radz
     real(8) :: pi, dph, phi, theta, pt(4*nps*nps+2,3), xp(3)
     integer :: iq,i2,i1,iip,ist,iie,ia,ib,ic,id,icp(4*2*nps*nps,3),ine(4*2*nps*nps,3),iqq,ne,np, &
                indpt(4*nps*nps+2), indel(4*2*nps*nps), point, elem, i
@@ -183,13 +187,15 @@ module module_front
 !    ee is nonzero to create deformed bubbles
     ee=0.0d0
 !   set north and south pole----CHECK
-    rad=radin-ee
+    radx=radin*sqrt(1.+excentricity(1))
+    rady=radin*sqrt(1.+excentricity(2))
+    radz=radin*sqrt(1.+excentricity(3))
     pt(1,1)=xc
     pt(1,2)=yc
-    pt(1,3)=zc+rad
+    pt(1,3)=zc+radz
     pt(2,1)=xc
     pt(2,2)=yc
-    pt(2,3)=zc-rad
+    pt(2,3)=zc-radz
     do iq = 1,4
       do i2 = 1,nps
         do i1 = 1,nps
@@ -200,10 +206,9 @@ module module_front
           ist=i2-1
           if((i1-i2) .lt. 0)ist=i1-1    
           theta = 0.5d0*pi*(dfloat(iq-1)+dfloat(ist)/dfloat(nps-abs(i1-i2)) )
-          rad=radin+ee*cos(2d0*phi)
-          pt(iip,1)=xc+rad*cos(phi)*cos(theta)
-          pt(iip,2)=yc+rad*cos(phi)*sin(theta)
-          pt(iip,3)=zc+rad*sin(phi)
+          pt(iip,1)=xc+radx*cos(phi)*cos(theta)
+          pt(iip,2)=yc+rady*cos(phi)*sin(theta)
+          pt(iip,3)=zc+radz*sin(phi)
 ! set elements
           iie=2*i1+2*nps*(i2-1)+2*nps*nps*(iq-1)
           ia=iip

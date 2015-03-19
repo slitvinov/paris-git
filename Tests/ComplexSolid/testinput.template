@@ -28,7 +28,7 @@ nBackup = 10000   ! number of time steps between  backups are kept.
 NSTEP   = 4000       ! maximum number of time steps
 EndTime = 0.1     ! When to stop simulation
 
-MaxDt   = 0.1  ! maximum size of time step
+MaxDt   = DTTEMP  ! maximum size of time step
 dtFlag  = 1        ! 1: fixed dt;  2: fixed CFL
 dt      = DTTEMP    ! dt in case of dtFlag=1
 CFL     = 0.9

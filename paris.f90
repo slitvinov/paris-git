@@ -171,6 +171,7 @@ Program paris
         endif
         if(DoLPP .and. .not.restart) call output_LPP(0,is,ie+1,js,je+1,ks,ke+1)
         if(test_control_droplet) call do_droplet_test(itimestep,time,REAL(nstats*dt,8))
+        if(test_frdroplet.or.test_droplet) call output_droplet(w,time)
         call setvelocityBC(u,v,w,umask,vmask,wmask,time)
         call write_vec_gnuplot(u,v,cvof,p,itimestep,DoVOF)
         call calcstats
@@ -508,10 +509,10 @@ Program paris
         end if ! DoLPP
 !--------------------------------------------OUTPUT-----------------------------------------------
         if(mod(itimestep,nstats)==0) then
-        	call calcStats
-        	if(test_control_droplet) call do_droplet_test(itimestep,time,REAL(nstats*dt,8))
-         if ( DoTurbStats .and. time > timeStartTurbStats ) call calcTurbStats(itimestep)
-        	if( test_KHI2D .or. test_HF ) call h_of_KHI2D(itimestep,time)
+           call calcStats
+           if(test_control_droplet) call do_droplet_test(itimestep,time,REAL(nstats*dt,8))
+           if ( DoTurbStats .and. time > timeStartTurbStats ) call calcTurbStats(itimestep)
+           if( test_KHI2D .or. test_HF ) call h_of_KHI2D(itimestep,time)
         endif
         if(mod(itimestep,nsteps_probe)==0) then
            call probes
@@ -526,50 +527,56 @@ Program paris
               call wrap_up_timer(itimestep,iTimeStepRestart)
            end if ! DoFront, DoVOF
         end if ! itimestep
-!        if(mod(itimestep,noutuv)==0) then
+        !        if(mod(itimestep,noutuv)==0) then
         if ( tout > 0.d0 ) then  ! output based on time 
-            if ( (tout - (time-timeLastOutput)) < 0.9999*dt ) then 
-               nfile = NINT(time/tout)
-               call output(nfile,is,ie+1,js,je+1,ks,ke+1)
-               if(DoVOF) call output_VOF(nfile,is,ie+1,js,je+1,ks,ke+1)
-               if(DoVOF) call output_ALL(nfile,is,ie+1,js,je+1,ks,ke+1,itimestep)
-               if(DoLPP) call output_LPP(nfile,is,ie+1,js,je+1,ks,ke+1)
-               if(rank==0)then
-                  end_time =  MPI_WTIME()
-                  write(out,'("Output data at Step:",I9," and time:",f10.2)')itimestep,time
-               endif
-               timeLastOutput = time
-            end if! timeAfterOuput
+           if ( (tout - (time-timeLastOutput)) < 0.9999*dt ) then 
+              nfile = NINT(time/tout)
+! Standard outputs
+              if(test_frdroplet.or.test_droplet) call output_droplet(w,time)
+              call output(nfile,is,ie+1,js,je+1,ks,ke+1)
+              if(DoVOF) call output_VOF(nfile,is,ie+1,js,je+1,ks,ke+1)
+              if(DoVOF) call output_ALL(nfile,is,ie+1,js,je+1,ks,ke+1,itimestep)
+              if(DoLPP) call output_LPP(nfile,is,ie+1,js,je+1,ks,ke+1)
+              if(rank==0)then
+                 end_time =  MPI_WTIME()
+                 write(out,'("Output data at Step:",I9," and time:",f10.2)')itimestep,time
+              endif
+! End standard outputs ? 
+              timeLastOutput = time
+           end if! timeAfterOuput
         else                     ! output based on timestep
-            if(mod(itimestep-itimestepRestart,nout)==0) then 
-               nfile = ITIMESTEP/nout
-               if ( tout > 0.d0 .and. dtFlag == 1 ) nfile = NINT(time/tout)
-               call write_vec_gnuplot(u,v,cvof,p,itimestep,DoVOF)
-               call output(nfile,is,ie+1,js,je+1,ks,ke+1)
-               if(DoVOF) call output_VOF(nfile,is,ie+1,js,je+1,ks,ke+1)
-               if(DoVOF) call output_ALL(nfile,is,ie+1,js,je+1,ks,ke+1,itimestep)
-               if(DoLPP) call output_LPP(nfile,is,ie+1,js,je+1,ks,ke+1)
-               if(rank==0)then
-                  end_time =  MPI_WTIME()
-                  write(out,'("Step:",I9," Iterations:",I9," cpu(s):",f10.2)')itimestep,it,end_time-start_time
-               endif
-               if (DoVOF .and. debug_par) then
-                  !call get_all_curvatures(tmp,nfile)
-                  !call get_all_heights(nfile)
-                  call write_par_var("VOF       ",nfile,cvof)           
-                  if (FreeSurface) then
-                     call write_par_var("P_gx      ",nfile,P_gx)
-                     call write_par_var("P_gy      ",nfile,P_gy)
-                     call write_par_var("P_gz      ",nfile,P_gz)
-                  endif
-               endif
-            endif
+           if(mod(itimestep-itimestepRestart,nout)==0) then 
+              nfile = ITIMESTEP/nout
+              if ( tout > 0.d0 .and. dtFlag == 1 ) nfile = NINT(time/tout)
+! Standard outputs
+              if(test_frdroplet.or.test_droplet) call output_droplet(w,time)
+              call write_vec_gnuplot(u,v,cvof,p,itimestep,DoVOF)
+              call output(nfile,is,ie+1,js,je+1,ks,ke+1)
+              if(DoVOF) call output_VOF(nfile,is,ie+1,js,je+1,ks,ke+1)
+              if(DoVOF) call output_ALL(nfile,is,ie+1,js,je+1,ks,ke+1,itimestep)
+              if(DoLPP) call output_LPP(nfile,is,ie+1,js,je+1,ks,ke+1)
+              if(rank==0)then
+                 end_time =  MPI_WTIME()
+                 write(out,'("Step:",I9," Iterations:",I9," cpu(s):",f10.2)')itimestep,it,end_time-start_time
+              endif
+! End standard outputs ? 
+              if (DoVOF .and. debug_par) then
+                 !call get_all_curvatures(tmp,nfile)
+                 !call get_all_heights(nfile)
+                 call write_par_var("VOF       ",nfile,cvof)           
+                 if (FreeSurface) then
+                    call write_par_var("P_gx      ",nfile,P_gx)
+                    call write_par_var("P_gy      ",nfile,P_gy)
+                    call write_par_var("P_gz      ",nfile,P_gz)
+                 endif
+              endif
+           endif
         end if ! tout
         if(nstats==0) call pariserror(" *** Main: nstats = 0")
         if(mod(itimestep,nstats)==0.and.rank==0)then
-              !        open(unit=121,file='track')
-              !        write(121,'("Step:",I10," dt=",es16.5e2," time=",es16.5e2)')itimestep,dt,time
-              !        write(121,'("            Iterations:",I7," cpu(s):",f10.2)')it,end_time-start_time
+           !        open(unit=121,file='track')
+           !        write(121,'("Step:",I10," dt=",es16.5e2," time=",es16.5e2)')itimestep,dt,time
+           !        write(121,'("            Iterations:",I7," cpu(s):",f10.2)')it,end_time-start_time
               !        close(121)
            open(unit=121,file='stats',position='append')
            write(121,'(30es14.6e2)')time,stats(1:nstatarray),dpdx,(stats(8)-stats(9))/dt,end_time-start_time
