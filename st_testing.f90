@@ -925,7 +925,7 @@ end subroutine do_droplet_test
     ghosttop(1) = iee-ie
     ghosttop(2) = jee-je
     ghosttop(3) = kee-ke
- 
+    
     ! Writing multi mesh file
     if (rank == 0) call write_master(TRIM(path)//'/fbasic',index, time, timestep)
 
@@ -946,13 +946,13 @@ end subroutine do_droplet_test
     ierr2 = dbaddiopt(optlist, DBOPT_HI_OFFSET, ghosttop)
     ierr2 = dbaddiopt(optlist, DBOPT_LO_OFFSET, ghostlow)
 
-  
+
     ! Appending mesh to *.silo file
     ierr2 = dbputqm (dbfile, 'srm', 18, "x", 1, &
          "y", 1, "z", 1, x_axis, y_axis, z_axis, dims_mesh, 3, &
          DB_DOUBLE, DB_COLLINEAR, optlist, ierr2)
-         
-    
+
+
     do k=kse,kee; do j=jse,jee; do i=ise,iee;
        matrix_small(i,j,k)=cvof(i,j,k)
     enddo; enddo; enddo
@@ -961,43 +961,43 @@ end subroutine do_droplet_test
     ierr2 = dbputqv1 (dbfile, 'cvof', 4, 'srm', 3, &
          matrix_small, dims_vof, &
          3, DB_F77NULL, 0, DB_FLOAT, DB_ZONECENT, DB_F77NULL, ierr2) 
-      
+
     do k=kse,kee; do j=jse,jee; do i=ise,iee;
        matrix_small(i,j,k)=p(i,j,k)
     enddo; enddo; enddo    
-    
-	! Appending Pressure variable to *.silo file  
+
+    ! Appending Pressure variable to *.silo file  
     ierr2 = dbputqv1 (dbfile, 'pres', 4, 'srm', 3, &
          matrix_small, dims_vof, &
          3, DB_F77NULL, 0, DB_FLOAT, DB_ZONECENT, DB_F77NULL, ierr2)
-           
+
     do k=kse,kee; do j=jse,jee; do i=ise,iee;
        matrix_small(i,j,k)=0.5*(u(i,j,k)+u(i-1,j,k))
     enddo; enddo; enddo
-        
+
     ! Appending u_component variable to *.silo file  
     ierr2 = dbputqv1 (dbfile, 'uvel', 4, 'srm', 3, &
          matrix_small, dims_vof, &
          3, DB_F77NULL, 0, DB_FLOAT, DB_ZONECENT, DB_F77NULL, ierr2) 
-          
+
     do k=kse,kee; do j=jse,jee; do i=ise,iee;
        matrix_small(i,j,k)=0.5*(v(i,j,k)+v(i,j-1,k))
     enddo; enddo; enddo
-         
+
     ! Appending v_component variable to *.silo file  
     ierr2 = dbputqv1 (dbfile, 'vvel', 4, 'srm', 3, &
          matrix_small, dims_vof, &
          3, DB_F77NULL, 0, DB_FLOAT, DB_ZONECENT, DB_F77NULL, ierr2)
-          
-	do k=kse,kee; do j=jse,jee; do i=ise,iee;
+
+    do k=kse,kee; do j=jse,jee; do i=ise,iee;
        matrix_small(i,j,k)=0.5*(w(i,j,k)+w(i,j,k-1))
     enddo; enddo; enddo
-	
+
     ! Appending w_component variable to *.silo file  
     ierr2 = dbputqv1 (dbfile, 'wvel', 4, 'srm', 3, &
          matrix_small, dims_vof, &
          3, DB_F77NULL, 0, DB_FLOAT, DB_ZONECENT, DB_F77NULL, ierr2) 
-    
+
     ! Closing *.silo file		
     ierr2 = dbclose(dbfile)
 
@@ -1010,9 +1010,9 @@ end subroutine do_droplet_test
        call system('gzip '//trim(file_name))
        call MPI_BARRIER(MPI_COMM_WORLD, ierr2)
        if ( rank == 0 ) then 
-         file_name = 'fbasic'//i2t(index,padd)
-         call system('tar cvf '//TRIM(file_name)//'.tar '//TRIM(path)//'/'//TRIM(file_name)//'*.silo*')
-         call system('rm '//TRIM(path)//'/'//TRIM(file_name)//'*.silo*')
+          file_name = 'fbasic'//i2t(index,padd)
+          call system('tar cvf '//TRIM(file_name)//'.tar '//TRIM(path)//'/'//TRIM(file_name)//'*.silo*')
+          call system('rm '//TRIM(path)//'/'//TRIM(file_name)//'*.silo*')
        end if ! rank 
     end if ! zip_data
 
