@@ -29,8 +29,6 @@ else
   mv tmp inputshort
 fi
 
-exit
-
 rm -fR input out
 ln -s inputshort input
 mpirun -np 8 paris > tmpout
