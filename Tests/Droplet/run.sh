@@ -19,6 +19,18 @@ sed s/MOMCONSTEMP/$momconstrue/g inputvof.template | sed s/NFILTERTEMP/$nfilter/
 sed s/nonMOMCONS/$plotlabel/g plot.gp.template > plot.gp
 
 
+if [ "$HAVE_SILO" == 1 ]; then
+  echo "we have silo"
+  sed s/"output_format = 2"/"output_format = 5"/g inputshort > tmp
+  mv tmp inputshort
+else
+  echo "we do not have silo"
+  sed s/"output_format = 5"/"output_format = 2"/g inputshort > tmp
+  mv tmp inputshort
+fi
+
+exit
+
 rm -fR input out
 ln -s inputshort input
 mpirun -np 8 paris > tmpout
