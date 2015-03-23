@@ -1276,16 +1276,11 @@ contains
       integer :: i,j,k
       call output_VOF(0,is,ie+1,js,je+1,ks,ke+1)
       call tag_drop()
-      call output_tag(0,is,ie+1,js,je+1,ks,ke+1)
-      if (nPdomain > 1 ) then 
-         call tag_drop_all()
-         call output_tag(1,is,ie+1,js,je+1,ks,ke+1)
-         call hello_coucou  ! 12
-         call CreateTag2DropTable
-         call merge_drop_pieces
-         call ReleaseTag2DropTable
-         call output_tag(2,is,ie+1,js,je+1,ks,ke+1)
-      end if ! nPdomain
+      if ( nPdomain > 1 ) call tag_drop_all
+      call hello_coucou  ! 12
+      call CreateTag2DropTable
+      if ( nPdomain > 1 ) call merge_drop_pieces 
+      call ReleaseTag2DropTable
       if ( DropStatisticsMethod > 0 ) call drop_statistics(0,0.d0)
    end subroutine test_tagDrop
 
