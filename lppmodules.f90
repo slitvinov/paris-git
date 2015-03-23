@@ -514,15 +514,11 @@ contains
                duc  = duc  + cvof_scaled*sdu(isq,jsq,ksq)
                dvc  = dvc  + cvof_scaled*sdv(isq,jsq,ksq)
                dwc  = dwc  + cvof_scaled*sdw(isq,jsq,ksq)
-!               if ( num_cell_drop < maxnum_cell_drop ) then
+               if ( num_cell_drop == 0 ) then
                   num_cell_drop = num_cell_drop + 1
                   if ( num_cell_drop == 1) cell_list(1:3) = [isq,jsq,ksq]
-!               else
-!                  write(*,*) 'Warning: cell number of tag',current_id,'at rank',rank,'reaches max value!'
-!               end if ! num_cell_drop
-            else if ( isq >= Ng+1 .and. isq <= Ng+Nx .and. &     ! block ghost cells 
-                      jsq >= Ng+1 .and. jsq <= Ng+Ny .and. & 
-                      ksq >= Ng+1 .and. ksq <= Ng+Nz ) then
+               end if ! num_cell_drop
+            else  ! ghost cells
                tag_flag(isq,jsq,ksq) = 5
                if ( merge_drop .eqv. .false.) then 
                   merge_drop = .true.
@@ -539,8 +535,6 @@ contains
                else
                   write(*,*) 'Warning: ghost cell number of tag',current_id,'at rank',rank,'reaches max value!'
                end if ! drops_merge(num_drop_merge(rank))%num_gcell
-            else                                                        ! domain ghost cells 
-               ! Note: periodic bdry cond, to be added later
             end if ! isq, jsq, ksq
 
             imin_drop = MIN(isq,imin_drop)
