@@ -683,7 +683,7 @@ end subroutine do_droplet_test
     implicit none
     integer :: nf,i1,i2,j1,j2,k1,k2,timestep
     if(output_format==4) call output4(nf,i1,i2,j1,j2,k1,k2)
-    if(output_format==5) call output5(timestep)
+    if(output_format==5) call output5(nf,timestep)
   end subroutine output_ALL
   ! Visit file generation subroutine
   subroutine append_General_visit_file(rootname)
@@ -835,7 +835,7 @@ end subroutine do_droplet_test
     ! END TEMPORARY 
   end subroutine output4
 
-  subroutine output5(timestep)
+  subroutine output5(index,timestep)
     use module_flow
     use module_grid
     use module_surface_tension
@@ -845,7 +845,8 @@ end subroutine do_droplet_test
 #ifdef HAVE_SILO
     include 'silo_f9x.inc'
 #endif	
-    integer :: timestep	
+    integer :: timestep
+    integer :: index
 #ifdef HAVE_SILO
     ! Silo Util Variables
 
@@ -859,7 +860,7 @@ end subroutine do_droplet_test
     integer :: i, j, k, ierr2, dbfile, optlist, lfile_name
     integer, dimension(3) :: dims_mesh, dims_cpu, dims_vof, ghostlow, ghosttop
     real(8) :: deltaX
-    integer, save :: index = 0
+     
 
     padd = padding
     path = 'out/VTK'
@@ -1029,7 +1030,7 @@ end subroutine do_droplet_test
     end if ! zip_data
 
     ! Updating index
-    index = index + 1
+    !index = index + 1
 #else
     call pariserror('For output type 5 Silo library is required')
 #endif

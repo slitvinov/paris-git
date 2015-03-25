@@ -1748,6 +1748,7 @@ subroutine backup_VOF_write
   do k=kmin,kmax; do j=jmin,jmax; do i=imin,imax
     write(7,1200) u(i,j,k), v(i,j,k), w(i,j,k), p(i,j,k), cvof(i,j,k)
   enddo; enddo; enddo
+  CLOSE(7)
   if(rank==0)print*,'Backup written at t=',time
   1100 FORMAT(es17.8e3,7I10)
   !Note: to guarantee identical results, 16 digits are needed for real8 
@@ -1766,6 +1767,7 @@ subroutine backup_VOF_read
   do k=kmin,kmax; do j=jmin,jmax; do i=imin,imax
     read(7,*) u(i,j,k), v(i,j,k), w(i,j,k), p(i,j,k), cvof(i,j,k)
   enddo; enddo; enddo
+  CLOSE(7)
 end subroutine backup_VOF_read
 !=================================================================================================
 !-------------------------------------------------------------------------------------------------
