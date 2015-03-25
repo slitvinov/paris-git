@@ -805,16 +805,25 @@ module module_BC
   ! for walls set the mask to zero  ! @@@ Aijk coefficients should be changed too. 
     if(bdry_cond(1)==0 .or. bdry_cond(1)==2) then
       if(coords(1)==0    ) umask(is-1,js-1:je+1,ks-1:ke+1)=0d0
+    endif
+    
+    if(bdry_cond(4)==0 .or. bdry_cond(4)==2) then
       if(coords(1)==nPx-1) umask(ie,js-1:je+1,ks-1:ke+1)=0d0
     endif
 
     if(bdry_cond(2)==0 .or. bdry_cond(2)==2) then
       if(coords(2)==0    ) vmask(is-1:ie+1,js-1,ks-1:ke+1)=0d0
+    endif 
+    
+    if(bdry_cond(5)==0 .or. bdry_cond(5)==2) then
       if(coords(2)==nPy-1) vmask(is-1:ie+1,je,ks-1:ke+1)=0d0
     endif 
 
     if(bdry_cond(3)==0 .or. bdry_cond(3)==2) then
       if(coords(3)==0    ) wmask(is-1:ie+1,js-1:je+1,ks-1)=0d0
+    endif
+    
+    if(bdry_cond(6)==0 .or. bdry_cond(6)==2) then
       if(coords(3)==nPz-1) wmask(is-1:ie+1,js-1:je+1,ke)=0d0
     endif
   end subroutine SetPressureBC
@@ -822,7 +831,7 @@ module module_BC
 !=================================================================================================
 ! subroutine SetVelocityBC: Sets the velocity boundary condition
 !-------------------------------------------------------------------------------------------------
-  subroutine SetVelocityBC(u,v,w,umask,vmask,wmask,t)
+  subroutine SetVelocityBC(u,v,w,umask,vmask,wmask,t,dt)
     use module_grid
     use module_2phase
     use module_freesurface
@@ -830,20 +839,17 @@ module module_BC
     include 'mpif.h'
     real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: u, v, w
     real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: umask,vmask,wmask
-    real(8) :: t,flux,tflux,uaverage
+    real(8) :: t,dt,flux,tflux,uaverage
     integer :: i,j,k,ierr
     ! solid obstacles
     u = u*umask
     v = v*vmask
     w = w*wmask
 
-    ! wall boundary condition x-
-    if(bdry_cond(1)==0 .and. coords(1)==0    ) then
-        u(is-1,:,:)=0d0
-        u(is-2,:,:)=-u(is,:,:)
-        v(is-1,:,:)=2*WallVel(1,2)-v(is,:,:)
-        w(is-1,:,:)=2*WallVel(1,3)-w(is,:,:)
-    endif
+    ! --------------------------------------------------------------------------------------------
+    ! Inflow BC
+    ! --------------------------------------------------------------------------------------------
+    
     ! inflow boundary condition x- with injection
     flux=0
     if(bdry_cond(1)==3 .and. coords(1)==0    ) then
@@ -863,6 +869,7 @@ module module_BC
     endif
     call MPI_ALLREDUCE(flux, tflux, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr)
     uaverage=tflux/(ny*nz)
+
     ! inflow boundary condition y-
     if(bdry_cond(2)==3 .and. coords(2)==0    ) then
        do i=imin,imax
@@ -919,6 +926,17 @@ module module_BC
        enddo
     endif    
 
+    ! --------------------------------------------------------------------------------------------
+    ! Wall BC with velocity specified
+    ! --------------------------------------------------------------------------------------------
+    ! wall boundary condition x-
+    if(bdry_cond(1)==0 .and. coords(1)==0    ) then
+        u(is-1,:,:)=0d0
+        u(is-2,:,:)=-u(is,:,:)
+        v(is-1,:,:)=2*WallVel(1,2)-v(is,:,:)
+        w(is-1,:,:)=2*WallVel(1,3)-w(is,:,:)
+    endif
+    
     ! wall boundary condition x+
     if(bdry_cond(4)==0 .and. coords(1)==nPx-1) then  
         u(ie  ,:,:)=0d0
@@ -926,18 +944,6 @@ module module_BC
         v(ie+1,:,:)=2*WallVel(2,2)-v(ie,:,:)      ! second order extrapolation
         w(ie+1,:,:)=2*WallVel(2,3)-w(ie,:,:)      ! second order extrapolation
     endif
-    
-    ! outflow/velocity boundary condition
-    ! same velocity as opposing inflow. ! @generalize this !!
-    if(bdry_cond(4)==4 .and. coords(1)==nPx-1) then
-        u(ie  ,:,:)=uaverage
-#ifndef OLD_BDRY_COND
-        u(ie+1,:,:)=uaverage
-#endif
-        v(ie+1,:,:)=v(ie,:,:)
-        w(ie+1,:,:)=w(ie,:,:)
-    endif
-
 
     ! wall boundary condition y-
     if(bdry_cond(2)==0 .and. coords(2)==0    ) then
@@ -967,6 +973,10 @@ module module_BC
         u(:,:,ke+1)=2*WallVel(6,1)-u(:,:,ke)
         v(:,:,ke+1)=2*WallVel(6,2)-v(:,:,ke)
     endif
+    
+    ! --------------------------------------------------------------------------------------------
+    ! Wall BC with shear specified (Shear is by default zero then is eqv to slip-wall BC)
+    ! --------------------------------------------------------------------------------------------
     ! wall boundary condition: shear
     if(bdry_cond(1)==2 .and. coords(1)==0    ) then
         u(is-1,:,:)=0d0
@@ -1004,8 +1014,11 @@ module module_BC
         u(:,:,ke+1) = dzh(ke)*WallShear(6,1)+u(:,:,ke)
         v(:,:,ke+1) = dzh(ke)*WallShear(6,2)+v(:,:,ke)
     endif
-    
-    !Set zero normal velocity gradient for pressure boundary condition
+
+    ! --------------------------------------------------------------------------------------------
+    ! Outflow BC with pressure specified (by default zero)
+    ! Set zero normal velocity gradient 
+    ! --------------------------------------------------------------------------------------------
     if (bdry_cond(1)==5 .and. coords(1)==0)then
        u(is-1,:,:)=u(is,:,:)
 #ifndef OLD_BDRY_COND
@@ -1059,6 +1072,42 @@ module module_BC
        u(:,:,ke+1)=u(:,:,ke)
        v(:,:,ke+1)=v(:,:,ke)    
     endif 
+    
+    ! --------------------------------------------------------------------------------------------
+    ! Outflow BC with velocity specified
+    ! Pressure gradient is set to zero in Poisson_BC
+    ! same velocity as opposing inflow. ! @generalize this !!
+    ! --------------------------------------------------------------------------------------------
+    if(bdry_cond(4)==4 .and. coords(1)==nPx-1) then
+        u(ie  ,:,:)=uaverage
+#ifndef OLD_BDRY_COND
+        u(ie+1,:,:)=uaverage
+#endif
+        v(ie+1,:,:)=v(ie,:,:)
+        w(ie+1,:,:)=w(ie,:,:)
+    endif
+
+    ! --------------------------------------------------------------------------------------------
+    ! Outflow BC with convective form (dudt+Uave*dudn=0)
+    ! --------------------------------------------------------------------------------------------
+    flux = 0.d0 
+    if(bdry_cond(4)==6 .and. coords(1)==nPx-1) then
+       do j=js,je
+         do k=ks,ke
+            flux = flux + u(ie-1,j,k)
+         enddo
+       enddo
+    end if ! bdry_cond(4)==6
+
+    call MPI_ALLREDUCE(flux, tflux, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr)
+    uaverage=tflux/(ny*nz)
+
+    if(bdry_cond(4)==6 .and. coords(1)==nPx-1) then
+       u(ie  ,:,:)=u(ie  ,:,:)-dt*uaverage*(u(ie-1,:,:)-u(ie-2,:,:))/dx(ie-1)
+       v(ie+1,:,:)=v(ie+1,:,:)-dt*uaverage*(v(ie  ,:,:)-v(ie-1,:,:))/dx(ie-1)
+       w(ie+1,:,:)=w(ie+1,:,:)-dt*uaverage*(w(ie  ,:,:)-w(ie-1,:,:))/dx(ie-1)
+    end if ! bdry_cond(4)==6
+     
   end subroutine SetVelocityBC
 
   !=================================================================================================
@@ -2270,12 +2319,16 @@ subroutine Poisson_BCs(A)
         A(ie,:,:,7) = A(ie,:,:,7) - A(ie,:,:,2)
         A(ie,:,:,2) = 0d0
         ! pressure boundary condition
-     else if(bdry_cond(4)==5) then
-        A(ie,:,:,8) = (2d0/3d0)*BoundaryPressure(2)
-        A(ie,:,:,7) = 1d0  
-        A(ie,:,:,2:6) = 0d0
-        A(ie,:,:,1) = 1d0/3d0
-        P_bc(2) = 1d0
+!     else if(bdry_cond(4)==5) then
+!        A(ie,:,:,8) = (2d0/3d0)*BoundaryPressure(2)
+!        A(ie,:,:,7) = 1d0  
+!        A(ie,:,:,2:6) = 0d0
+!        A(ie,:,:,1) = 1d0/3d0
+!        P_bc(2) = 1d0
+        A(ie,:,:,7) = A(ie,:,:,7) + A(ie,:,:,1)/3.d0 + A(ie,:,:,2)*5.d0/3.d0
+        A(ie,:,:,8) = A(ie,:,:,8) + 8.d0/3.d0*A(ie,:,:,2)*BoundaryPressure(2)
+        A(ie,:,:,1) = A(ie,:,:,1)*4.d0/3.d0 
+        A(ie,:,:,2) = 0.d0 
      endif
   endif
 
