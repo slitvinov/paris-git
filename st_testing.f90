@@ -972,7 +972,11 @@ end subroutine do_droplet_test
          3, DB_F77NULL, 0, DB_FLOAT, DB_ZONECENT, DB_F77NULL, ierr2)
 
     do k=kse,kee; do j=jse,jee; do i=ise,iee;
-       matrix_small(i,j,k)=0.5*(u(i,j,k)+u(i-1,j,k))
+      if ( i == imin ) then 
+         matrix_small(i,j,k)=1.5*u(i,j,k)-0.5*u(i+1,j,k)
+      else 
+         matrix_small(i,j,k)=0.5*(u(i,j,k)+u(i-1,j,k))
+      end if ! i
     enddo; enddo; enddo
 
     ! Appending u_component variable to *.silo file  
@@ -981,7 +985,11 @@ end subroutine do_droplet_test
          3, DB_F77NULL, 0, DB_FLOAT, DB_ZONECENT, DB_F77NULL, ierr2) 
 
     do k=kse,kee; do j=jse,jee; do i=ise,iee;
-       matrix_small(i,j,k)=0.5*(v(i,j,k)+v(i,j-1,k))
+      if ( j == jmin ) then
+         matrix_small(i,j,k)=1.5*v(i,j,k)-0.5*v(i,j+1,k)
+      else 
+         matrix_small(i,j,k)=0.5*(v(i,j,k)+v(i,j-1,k))
+      end if ! j
     enddo; enddo; enddo
 
     ! Appending v_component variable to *.silo file  
@@ -990,7 +998,11 @@ end subroutine do_droplet_test
          3, DB_F77NULL, 0, DB_FLOAT, DB_ZONECENT, DB_F77NULL, ierr2)
 
     do k=kse,kee; do j=jse,jee; do i=ise,iee;
-       matrix_small(i,j,k)=0.5*(w(i,j,k)+w(i,j,k-1))
+      if ( k == kmin ) then
+         matrix_small(i,j,k)=1.5*w(i,j,k)-0.5*w(i,j,k+1)
+      else 
+         matrix_small(i,j,k)=0.5*(w(i,j,k)+w(i,j,k-1))
+      end if ! k
     enddo; enddo; enddo
 
     ! Appending w_component variable to *.silo file  
