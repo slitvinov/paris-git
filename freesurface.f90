@@ -1170,7 +1170,7 @@ subroutine get_bubble_pressure(iout,time_send,P_g)
   call CreateTag2DropTable
   if ( nPdomain > 1 ) call merge_drop_pieces
   !call output_tag(iout,is,ie+1,js,je+1,ks,ke+1)
-  
+  if ( MOD(iout,nstats) == 0 ) call drop_statistics(iout,time)
 !!$  do nr = 1,num_drop_merge(rank)
 !!$     volume=drops_merge(nr)%element%vol
 !!$     write(*,'("Volume of merged bubble ",I4," in rank ",I4," :  ",e14.5)')&
