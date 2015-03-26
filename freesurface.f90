@@ -118,14 +118,33 @@
   !Check, set alarm
   if (l3sum <= 10) then
      imploding=.true.
+     call divergence_l3(v_source)
      if (rank==0) write(*,'("IMPLODING BUBBLE DETECTED")')
      !if (rank==0) write(*,'("Total L3: ",I8)')level3   
   endif
 
   if (imploding) then
-     if (rank==0) write(*,'("Total L3: ",I8)') level3
      pcmask = 0; u_cmask = 0; v_cmask = 0; w_cmask = 0 !Set masks to zero 
+     v_source = 0.7*v_source
+     if (rank==0) write(*,'("Total L3, v_source: ",I8,e14.5)') level3,v_source
   endif
+contains 
+  subroutine divergence_l3(v_s)
+    use module_flow
+    implicit none
+    real(8) :: v_s
+    real(8) :: div3, totaldiv
+
+    div3 = 0.d0
+    do k=ks,ke; do j=js,je; do i=is,ie
+       if (pcmask(i,j,k) /= 0) then
+          div3 = div3+(u(i-1,j,k)-u(i,j,k))/dx(i)+&
+               (v(i,j-1,k)-v(i,j,k))/dy(j)+(w(i,j,k-1)-w(i,j,k))/dz(k)
+       endif
+    enddo; enddo; enddo
+    call MPI_ALLREDUCE(div3,totaldiv,4, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_Cart, ierr)
+    v_s = totaldiv
+  end subroutine divergence_l3
 end subroutine set_topology
 !-------------------------------------------------------------------------------------------------
 !=================================================================================================
@@ -809,7 +828,7 @@ contains
     real(8) :: limit, c_min
     real(8) :: alpha2, x_test2, y_test2, z_test2
     real(8) :: nr(3),al3dnew,x0(3),dc(3),FL3DNEW,n_avg(3)
-    real(8) :: c1, c0, c_stag
+    real(8) :: c1, c0, c_stag, Source
     integer :: i,j,k,l,ierr
 
     x_mod=dxh((is+ie)/2); y_mod=dyh((js+je)/2); z_mod=dzh((ks+ke)/2) !assumes an unstretched grid
@@ -818,8 +837,11 @@ contains
     limit = 1d-4/dx((is+ie)/2)
     c_min = 1d-2
 
-    do k=ks,ke; do j=js,je; do i=is,ie
+    Source = 0.d0
 
+    do k=ks,ke; do j=js,je; do i=is,ie
+       
+       if (imploding .and. pcmask(i,j,k) /= 0) Source = v_source
        A(i,j,k,1) = dt/(dx(i)*dx(i)*rhot(i,j,k))
        A(i,j,k,2) = dt/(dx(i)*dx(i)*rhot(i,j,k))
        A(i,j,k,3) = dt/(dy(j)*dy(j)*rhot(i,j,k))
@@ -827,7 +849,7 @@ contains
        A(i,j,k,5) = dt/(dz(k)*dz(k)*rhot(i,j,k))
        A(i,j,k,6) = dt/(dz(k)*dz(k)*rhot(i,j,k))
        A(i,j,k,7) = sum(A(i,j,k,1:6))
-       A(i,j,k,8) =  -( (utmp(i,j,k)-utmp(i-1,j,k))/dx(i) &
+       A(i,j,k,8) =  -(Source + (utmp(i,j,k)-utmp(i-1,j,k))/dx(i) &
             +  (vtmp(i,j,k)-vtmp(i,j-1,k))/dy(j) &
             +  (wtmp(i,j,k)-wtmp(i,j,k-1))/dz(k) )
 

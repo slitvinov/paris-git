@@ -373,6 +373,7 @@ module module_freesurface
   logical, dimension(1:3) :: VTK_OUT, vtk_open
   character(len=10) :: visit_file(1:3) = (/ "divergence", "curvature ", "deltaPfs  " /)
   character(len=3) :: file_short(1:3) = (/ "DIV", "KAP", "Pfs" /)
+  real(8) :: v_source
 end module module_freesurface
 !=================================================================================================
 !=================================================================================================

@@ -414,47 +414,49 @@ Program paris
 
 !----------------------------------EXTRAPOLATION FOR FREE SURFACE---------------------------------
            if (DoVOF .and. FreeSurface) then
-              call extrapolate_velocities()
-              solver_flag = 2
-              call setuppoisson_fs_new(u,v,w,vof_phase,rho,dt,A,cvof,n1,n2,n3,kappa_fs)
-              if(HYPRE)then !HYPRE will not work with removed nodes from domain.
-                 call pariserror("HYPRE solver not yet available for Free Surfaces")
-              else
-                 call FreeSolver(A,p_ext,maxError/dt,beta,maxit,it,ierr,itimestep,time,residual)
-              endif
-              if(mod(itimestep,termout)==0) then
-                 if(rank==0) then
-                    write(*,'("FS2:          pressure residual:   ",e7.1,&
-                         &" maxerror: ",e7.1)') residual*dt,maxerror
-                    write(*,'("              pressure iterations :",I9)')it
+              if (.not. imploding) then
+                 call extrapolate_velocities()
+                 solver_flag = 2
+                 call setuppoisson_fs_new(u,v,w,vof_phase,rho,dt,A,cvof,n1,n2,n3,kappa_fs)
+                 if(HYPRE)then !HYPRE will not work with removed nodes from domain.
+                    call pariserror("HYPRE solver not yet available for Free Surfaces")
+                 else
+                    call FreeSolver(A,p_ext,maxError/dt,beta,maxit,it,ierr,itimestep,time,residual)
                  endif
-              endif
-              ! Correct ONLY masked gas velocities at level 1 and 2
-              do k=ks,ke;  do j=js,je; do i=is,ieu    ! CORRECT THE u-velocity 
-                 if (u_cmask(i,j,k)==1 .or. u_cmask(i,j,k)==2) then
-                    u(i,j,k)=u(i,j,k)-(p_ext(i+1,j,k)-p_ext(i,j,k))/dxh(i)
-                 else if (u_cmask(i,j,k)==3) then
-                    u(i,j,k) = 0d0
+                 if(mod(itimestep,termout)==0) then
+                    if(rank==0) then
+                       write(*,'("FS2:          pressure residual:   ",e7.1,&
+                            &" maxerror: ",e7.1)') residual*dt,maxerror
+                       write(*,'("              pressure iterations :",I9)')it
+                    endif
                  endif
-              enddo; enddo; enddo
-              
-              do k=ks,ke;  do j=js,jev; do i=is,ie    ! CORRECT THE v-velocity
-                 if (v_cmask(i,j,k)==1 .or. v_cmask(i,j,k)==2) then
-                    v(i,j,k)=v(i,j,k)-(p_ext(i,j+1,k)-p_ext(i,j,k))/dyh(j)
-                 else if (v_cmask(i,j,k)==3) then
-                    v(i,j,k) = 0d0
-                 endif
-              enddo; enddo; enddo
+                 ! Correct ONLY masked gas velocities at level 1 and 2
+                 do k=ks,ke;  do j=js,je; do i=is,ieu    ! CORRECT THE u-velocity 
+                    if (u_cmask(i,j,k)==1 .or. u_cmask(i,j,k)==2) then
+                       u(i,j,k)=u(i,j,k)-(p_ext(i+1,j,k)-p_ext(i,j,k))/dxh(i)
+                    else if (u_cmask(i,j,k)==3) then
+                       u(i,j,k) = 0d0
+                    endif
+                 enddo; enddo; enddo
 
-              do k=ks,kew;  do j=js,je; do i=is,ie   ! CORRECT THE w-velocity
-                 if (w_cmask(i,j,k)==1 .or. w_cmask(i,j,k)==2) then
-                    w(i,j,k)=w(i,j,k)-(p_ext(i,j,k+1)-p_ext(i,j,k))/dzh(k)
-                 else if (w_cmask(i,j,k)==3) then
-                    w(i,j,k) = 0d0
-                 endif
-              enddo; enddo; enddo
-              call SetVelocityBC(u,v,w,umask,vmask,wmask,time,dt) !check this
-              call do_ghost_vector(u,v,w)
+                 do k=ks,ke;  do j=js,jev; do i=is,ie    ! CORRECT THE v-velocity
+                    if (v_cmask(i,j,k)==1 .or. v_cmask(i,j,k)==2) then
+                       v(i,j,k)=v(i,j,k)-(p_ext(i,j+1,k)-p_ext(i,j,k))/dyh(j)
+                    else if (v_cmask(i,j,k)==3) then
+                       v(i,j,k) = 0d0
+                    endif
+                 enddo; enddo; enddo
+
+                 do k=ks,kew;  do j=js,je; do i=is,ie   ! CORRECT THE w-velocity
+                    if (w_cmask(i,j,k)==1 .or. w_cmask(i,j,k)==2) then
+                       w(i,j,k)=w(i,j,k)-(p_ext(i,j,k+1)-p_ext(i,j,k))/dzh(k)
+                    else if (w_cmask(i,j,k)==3) then
+                       w(i,j,k) = 0d0
+                    endif
+                 enddo; enddo; enddo
+                 call SetVelocityBC(u,v,w,umask,vmask,wmask,time,dt) !check this
+                 call do_ghost_vector(u,v,w)
+              endif
               if (mod(itimestep,nstats)==0 .and. mod(ii,itime_scheme)==0) call discrete_divergence(u,v,w,itimestep/nstats)
            endif !Extrapolation
 !------------------------------------------------------------------------------------------------
