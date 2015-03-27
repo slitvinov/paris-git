@@ -842,12 +842,12 @@ module module_BC
     real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: umask,vmask,wmask
     integer, intent (in) :: AfterProjection
     real(8) :: t,dt,flux,tflux,uaverage
+    real(8) :: flux2,tflux2,fluxratio
     integer :: i,j,k,ierr
-    real(8) :: div
-    real(8) :: div_max_tol = 1.d0 
-    ! Note: divergence free cannot be perfectly satisfied for pressure BC
-    ! (p=p0,du/dn=0), a maximum tolerance of divergence is set, when go 
-    ! over it, the condiction du/dn=0 is relatixed. 
+    ! Note: local and global divergence free cannot be perfectly satisfied 
+    ! at the mean time for pressure BC (p=p0,du/dn=0), in BC=6, the global 
+    ! divergence free is guaranteed by matching the inflow condiction. 
+    ! Both local divergence and du/dn=0 are relatixed to achieve that. 
     ! Warning: Be CAUTIOUS when Pressure BC is used !!!  
     
     ! solid obstacles
@@ -1120,24 +1120,21 @@ module module_BC
     ! --------------------------------------------------------------------------------------------
     ! New pressure BC  (du/dn=0 & p=p0) 
     ! --------------------------------------------------------------------------------------------
-    if(bdry_cond(4)==6 .and. coords(1)==nPx-1) then
+    if(bdry_cond(4)==6 .and. coords(1)==nPx-1 .and. AfterProjection == 1) then
       ! Note: for pressure BC, vel-BC apply after projection 
-      if ( AfterProjection == 1 ) then 
        v(ie+1,:,:)=v(ie,:,:)
        w(ie+1,:,:)=w(ie,:,:)
-       if ( inject_type == 3 ) div_max_tol = 1.d3
        do j=js,je
          do k=ks,ke
-            div = (v(ie,j,k)-v(ie,j-1,k))/dy(j)   & 
-                + (w(ie,j,k)-w(ie,j,k-1))/dz(k)
-            if ( abs(div) < div_max_tol ) then 
-               u(ie,j,k) = u(ie-1,j,k) 
-            else
-               u(ie,j,k) = u(ie-1,j,k) + dxh(ie)*(div_max_tol*dsign(1.d0,div)-div)
-            end if ! div
+            flux2 = flux2 + u(ie-1,j,k)
          enddo
        enddo
-      end if ! AfterProjection 
+    endif
+    call MPI_ALLREDUCE(flux2, tflux2, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr)
+    fluxratio = min(max(tflux/tflux2,0.5d0),2.d0)
+
+    if(bdry_cond(4)==6 .and. coords(1)==nPx-1 .and. AfterProjection == 1) then
+       u(ie,:,:) = u(ie-1,:,:)*fluxratio 
     end if ! bdry_cond(4)==6
 
   end subroutine SetVelocityBC
