@@ -783,7 +783,7 @@ module module_BC
   ! bdry_cond(i) = is the type if boundary condition in i'th direction
   ! explicits the boundary condition codes
   !                                   12345678    12345678    12345678    12345678    12345678
-   character(len=8) :: expl(0:5) = (/ "wall    ", "periodic", "shear   ", "velocity", "outflow ", "pressure" /)
+   character(len=8) :: expl(0:6) = (/ "wall    ", "periodic", "shear   ", "vel-in  ", "vel-out ", "pressure", "pres-out" /)
   real(8) :: WallVel(6,3), WallShear(6,3), BoundaryPressure(6)
   ! Tangential velocities on the surfaces of domain. First index represent the 
   ! side on which the velocity in the direction of the second index is specified.
@@ -832,7 +832,7 @@ module module_BC
 !=================================================================================================
 ! subroutine SetVelocityBC: Sets the velocity boundary condition
 !-------------------------------------------------------------------------------------------------
-  subroutine SetVelocityBC(u,v,w,umask,vmask,wmask,t,dt)
+  subroutine SetVelocityBC(u,v,w,umask,vmask,wmask,t,dt,AfterProjection)
     use module_grid
     use module_2phase
     use module_freesurface
@@ -840,8 +840,16 @@ module module_BC
     include 'mpif.h'
     real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: u, v, w
     real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: umask,vmask,wmask
+    integer, intent (in) :: AfterProjection
     real(8) :: t,dt,flux,tflux,uaverage
     integer :: i,j,k,ierr
+    real(8) :: div
+    real(8) :: div_max_tol = 1.d0 
+    ! Note: divergence free cannot be perfectly satisfied for pressure BC
+    ! (p=p0,du/dn=0), a maximum tolerance of divergence is set, when go 
+    ! over it, the condiction du/dn=0 is relatixed. 
+    ! Warning: Be CAUTIOUS when Pressure BC is used !!!  
+    
     ! solid obstacles
     u = u*umask
     v = v*vmask
@@ -1089,26 +1097,49 @@ module module_BC
     endif
 
     ! --------------------------------------------------------------------------------------------
-    ! Outflow BC with convective form (dudt+Uave*dudn=0)
+    ! Convective BC  (du/dt+Un*du/dx =0) 
     ! --------------------------------------------------------------------------------------------
-    flux = 0.d0 
+    !flux = 0.d0 
+    !if(bdry_cond(4)==6 .and. coords(1)==nPx-1) then
+    !   do j=js,je
+    !     do k=ks,ke
+    !        flux = flux + u(ie-1,j,k)
+    !     enddo
+    !   enddo
+    !end if ! bdry_cond(4)==6
+
+    !call MPI_ALLREDUCE(flux, tflux, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr)
+    !uaverage=tflux/(ny*nz)
+
+    !if(bdry_cond(4)==6 .and. coords(1)==nPx-1) then
+    !   u(ie  ,:,:)=u(ie  ,:,:)-dt*uaverage*(u(ie-1,:,:)-u(ie-2,:,:))/dx(ie-1)
+    !   v(ie+1,:,:)=v(ie+1,:,:)-dt*uaverage*(v(ie  ,:,:)-v(ie-1,:,:))/dx(ie-1)
+    !   w(ie+1,:,:)=w(ie+1,:,:)-dt*uaverage*(w(ie  ,:,:)-w(ie-1,:,:))/dx(ie-1)
+    !end if ! bdry_cond(4)==6
+     
+    ! --------------------------------------------------------------------------------------------
+    ! New pressure BC  (du/dn=0 & p=p0) 
+    ! --------------------------------------------------------------------------------------------
     if(bdry_cond(4)==6 .and. coords(1)==nPx-1) then
+      ! Note: for pressure BC, vel-BC apply after projection 
+      if ( AfterProjection == 1 ) then 
+       v(ie+1,:,:)=v(ie,:,:)
+       w(ie+1,:,:)=w(ie,:,:)
+       if ( inject_type == 3 ) div_max_tol = 1.d3
        do j=js,je
          do k=ks,ke
-            flux = flux + u(ie-1,j,k)
+            div = (v(ie,j,k)-v(ie,j-1,k))/dy(j)   & 
+                + (w(ie,j,k)-w(ie,j,k-1))/dz(k)
+            if ( abs(div) < div_max_tol ) then 
+               u(ie,j,k) = u(ie-1,j,k) 
+            else
+               u(ie,j,k) = u(ie-1,j,k) + dxh(ie)*(div_max_tol*dsign(1.d0,div)-div)
+            end if ! div
          enddo
        enddo
+      end if ! AfterProjection 
     end if ! bdry_cond(4)==6
 
-    call MPI_ALLREDUCE(flux, tflux, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr)
-    uaverage=tflux/(ny*nz)
-
-    if(bdry_cond(4)==6 .and. coords(1)==nPx-1) then
-       u(ie  ,:,:)=u(ie  ,:,:)-dt*uaverage*(u(ie-1,:,:)-u(ie-2,:,:))/dx(ie-1)
-       v(ie+1,:,:)=v(ie+1,:,:)-dt*uaverage*(v(ie  ,:,:)-v(ie-1,:,:))/dx(ie-1)
-       w(ie+1,:,:)=w(ie+1,:,:)-dt*uaverage*(w(ie  ,:,:)-w(ie-1,:,:))/dx(ie-1)
-    end if ! bdry_cond(4)==6
-     
   end subroutine SetVelocityBC
 
   !=================================================================================================
@@ -2292,6 +2323,7 @@ subroutine Poisson_BCs(A)
 
   use module_grid
   use module_BC
+  use module_flow
   
   real(8), dimension(is:ie,js:je,ks:ke,8), intent(out) :: A
   real(8), dimension(4) :: P_bc
@@ -2320,16 +2352,19 @@ subroutine Poisson_BCs(A)
         A(ie,:,:,7) = A(ie,:,:,7) - A(ie,:,:,2)
         A(ie,:,:,2) = 0d0
         ! pressure boundary condition
-!     else if(bdry_cond(4)==5) then
-!        A(ie,:,:,8) = (2d0/3d0)*BoundaryPressure(2)
-!        A(ie,:,:,7) = 1d0  
-!        A(ie,:,:,2:6) = 0d0
-!        A(ie,:,:,1) = 1d0/3d0
-!        P_bc(2) = 1d0
-        A(ie,:,:,7) = A(ie,:,:,7) + A(ie,:,:,1)/3.d0 + A(ie,:,:,2)*5.d0/3.d0
-        A(ie,:,:,8) = A(ie,:,:,8) + 8.d0/3.d0*A(ie,:,:,2)*BoundaryPressure(2)
-        A(ie,:,:,1) = A(ie,:,:,1)*4.d0/3.d0 
-        A(ie,:,:,2) = 0.d0 
+     else if(bdry_cond(4)==5) then
+        A(ie,:,:,8) = (2d0/3d0)*BoundaryPressure(2)
+        A(ie,:,:,7) = 1d0  
+        A(ie,:,:,2:6) = 0d0
+        A(ie,:,:,1) = 1d0/3d0
+        P_bc(2) = 1d0
+     else if(bdry_cond(4)==6) then
+        ! p0 and du/dn right at the boundary
+        A(ie,:,:,7) = A(ie,:,:,7) - A(ie,:,:,1)*2.d0/3.d0 + A(ie,:,:,2)*5.d0/3.d0
+        A(ie,:,:,8) = A(ie,:,:,8) + 8.d0/3.d0*A(ie,:,:,2)*BoundaryPressure(2) & 
+                    + (u(ie,:,:)-u(ie-1,:,:))/dx(ie) ! remove dudx in source term 
+        A(ie,:,:,1) = A(ie,:,:,1)*1.d0/3.d0 
+        A(ie,:,:,2) = 0.d0
      endif
   endif
 

@@ -172,7 +172,7 @@ Program paris
         if(DoLPP .and. .not.restart) call output_LPP(0,is,ie+1,js,je+1,ks,ke+1)
         if(test_control_droplet) call do_droplet_test(itimestep,time,REAL(nstats*dt,8))
         if(test_frdroplet.or.test_droplet) call output_droplet(w,time)
-        call SetvelocityBC(u,v,w,umask,vmask,wmask,time,dt)
+        call SetVelocityBC(u,v,w,umask,vmask,wmask,time,dt,0)
         !call write_vec_gnuplot(u,v,cvof,p,itimestep,DoVOF)
         call calcstats
 
@@ -334,7 +334,7 @@ Program paris
            endif
 
            call my_timer(3)
-           call SetVelocityBC(u,v,w,umask,vmask,wmask,time,dt)
+           call SetVelocityBC(u,v,w,umask,vmask,wmask,time,dt,0)
            call do_ghost_vector(u,v,w)
            call my_timer(1)
            if (DoVof .and. debug_par) then
@@ -407,7 +407,7 @@ Program paris
            endif
            
            call my_timer(13)
-           call SetVelocityBC(u,v,w,umask,vmask,wmask,time,dt)
+           call SetVelocityBC(u,v,w,umask,vmask,wmask,time,dt,1)
            call do_ghost_vector(u,v,w)
            call do_all_ghost(color)
            call my_timer(1)        
@@ -439,24 +439,15 @@ Program paris
                     endif
                  enddo; enddo; enddo
 
-                 do k=ks,ke;  do j=js,jev; do i=is,ie    ! CORRECT THE v-velocity
-                    if (v_cmask(i,j,k)==1 .or. v_cmask(i,j,k)==2) then
-                       v(i,j,k)=v(i,j,k)-(p_ext(i,j+1,k)-p_ext(i,j,k))/dyh(j)
-                    else if (v_cmask(i,j,k)==3) then
-                       v(i,j,k) = 0d0
-                    endif
-                 enddo; enddo; enddo
-
-                 do k=ks,kew;  do j=js,je; do i=is,ie   ! CORRECT THE w-velocity
-                    if (w_cmask(i,j,k)==1 .or. w_cmask(i,j,k)==2) then
-                       w(i,j,k)=w(i,j,k)-(p_ext(i,j,k+1)-p_ext(i,j,k))/dzh(k)
-                    else if (w_cmask(i,j,k)==3) then
-                       w(i,j,k) = 0d0
-                    endif
-                 enddo; enddo; enddo
-                 call SetVelocityBC(u,v,w,umask,vmask,wmask,time,dt) !check this
-                 call do_ghost_vector(u,v,w)
-              endif
+              do k=ks,kew;  do j=js,je; do i=is,ie   ! CORRECT THE w-velocity
+                 if (w_cmask(i,j,k)==1 .or. w_cmask(i,j,k)==2) then
+                    w(i,j,k)=w(i,j,k)-(p_ext(i,j,k+1)-p_ext(i,j,k))/dzh(k)
+                 else if (w_cmask(i,j,k)==3) then
+                    w(i,j,k) = 0d0
+                 endif
+              enddo; enddo; enddo
+              call SetVelocityBC(u,v,w,umask,vmask,wmask,time,dt) !check this
+              call do_ghost_vector(u,v,w)
               if (mod(itimestep,nstats)==0 .and. mod(ii,itime_scheme)==0) call discrete_divergence(u,v,w,itimestep/nstats)
            endif !Extrapolation
 !------------------------------------------------------------------------------------------------
@@ -1825,7 +1816,7 @@ subroutine momentumConvectionBCG()
   call predict_velocity(v,dv,2,dt,v,u,w,work(:,:,:,2))
   call predict_velocity(w,dw,3,dt,w,u,v,work(:,:,:,3))
 
-  call SetVelocityBC(work(:,:,:,1),work(:,:,:,2),work(:,:,:,3),umask,vmask,wmask,time,dt)
+  call SetVelocityBC(work(:,:,:,1),work(:,:,:,2),work(:,:,:,3),umask,vmask,wmask,time,dt,0)
   call do_ghost_vector(work(:,:,:,1),work(:,:,:,2),work(:,:,:,3))
   !-----------------------------------------PROJECTION STEP-----------------------------------------
   tmp = p
@@ -2469,7 +2460,7 @@ subroutine InitCondition
            call SeedParticles
            if ( DoLPP .and. test_injectdrop ) call backup_LPP_write 
         end if ! DoLPP
-        call SetVelocityBC(u,v,w,umask,vmask,wmask,time,dt)
+        call SetVelocityBC(u,v,w,umask,vmask,wmask,time,dt,0)
         call ghost_x(u,2,req( 1: 4)); call ghost_x(v,2,req( 5: 8)); call ghost_x(w,2,req( 9:12))
         call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
         call ghost_y(u,2,req( 1: 4)); call ghost_y(v,2,req( 5: 8)); call ghost_y(w,2,req( 9:12))
