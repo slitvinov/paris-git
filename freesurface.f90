@@ -116,12 +116,12 @@
   enddo; enddo; enddo
   call MPI_ALLREDUCE(level3,l3sum, 1, MPI_INTEGER, MPI_SUM, MPI_COMM_Active, ierr)
   !Check, set alarm
-  if (l3sum <= 10) then
-     imploding=.true.
-     call divergence_l3(v_source)
-     if (rank==0) write(*,'("IMPLODING BUBBLE DETECTED")')
-     !if (rank==0) write(*,'("Total L3: ",I8)')level3   
-  endif
+!!$  if (l3sum <= 4) then
+!!$     imploding=.true.
+!!$     call divergence_l3(v_source)
+!!$     if (rank==0) write(*,'("IMPLODING BUBBLE DETECTED")')
+!!$     !if (rank==0) write(*,'("Total L3: ",I8)')level3   
+!!$  endif
 
   if (imploding) then
      pcmask = 0; u_cmask = 0; v_cmask = 0; w_cmask = 0 !Set masks to zero 

@@ -2345,7 +2345,7 @@ subroutine Poisson_BCs(A)
   ! dp/dn = 0 for outflow/fixed velocity bc on face 4 == x+
   ! outflow/fixed velocity bc on other faces not implemented yet.  
   if(coords(1)==Npx-1) then
-     if(bdry_cond(4)==4) then
+     if(bdry_cond(4)==4 .or. bdry_cond(4)==3) then
         A(ie,:,:,7) = A(ie,:,:,7) - A(ie,:,:,2)
         A(ie,:,:,2) = 0d0
         ! pressure boundary condition
