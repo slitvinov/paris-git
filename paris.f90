@@ -439,15 +439,24 @@ Program paris
                     endif
                  enddo; enddo; enddo
 
-              do k=ks,kew;  do j=js,je; do i=is,ie   ! CORRECT THE w-velocity
-                 if (w_cmask(i,j,k)==1 .or. w_cmask(i,j,k)==2) then
-                    w(i,j,k)=w(i,j,k)-(p_ext(i,j,k+1)-p_ext(i,j,k))/dzh(k)
-                 else if (w_cmask(i,j,k)==3) then
-                    w(i,j,k) = 0d0
-                 endif
-              enddo; enddo; enddo
-              call SetVelocityBC(u,v,w,umask,vmask,wmask,time,dt) !check this
-              call do_ghost_vector(u,v,w)
+                 do k=ks,ke;  do j=js,jev; do i=is,ie    ! CORRECT THE v-velocity
+                    if (v_cmask(i,j,k)==1 .or. v_cmask(i,j,k)==2) then
+                       v(i,j,k)=v(i,j,k)-(p_ext(i,j+1,k)-p_ext(i,j,k))/dyh(j)
+                    else if (v_cmask(i,j,k)==3) then
+                       v(i,j,k) = 0d0
+                    endif
+                 enddo; enddo; enddo
+
+                 do k=ks,kew;  do j=js,je; do i=is,ie   ! CORRECT THE w-velocity
+                    if (w_cmask(i,j,k)==1 .or. w_cmask(i,j,k)==2) then
+                       w(i,j,k)=w(i,j,k)-(p_ext(i,j,k+1)-p_ext(i,j,k))/dzh(k)
+                    else if (w_cmask(i,j,k)==3) then
+                       w(i,j,k) = 0d0
+                    endif
+                 enddo; enddo; enddo
+                 call SetVelocityBC(u,v,w,umask,vmask,wmask,time,dt,0) !check this
+                 call do_ghost_vector(u,v,w)
+              endif
               if (mod(itimestep,nstats)==0 .and. mod(ii,itime_scheme)==0) call discrete_divergence(u,v,w,itimestep/nstats)
            endif !Extrapolation
 !------------------------------------------------------------------------------------------------
