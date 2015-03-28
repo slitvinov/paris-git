@@ -841,8 +841,9 @@ module module_BC
     real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: u, v, w
     real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: umask,vmask,wmask
     integer, intent (in) :: AfterProjection
-    real(8) :: t,dt,flux,tflux,uaverage
-    real(8) :: flux2,tflux2,fluxratio
+    real(8) :: t,dt,fluxin,tfluxin,uaverage
+    real(8) :: fluxout(6),tfluxout(6),tfluxout_all,fluxratio
+    real(8) :: fluxratio_max = 0.8d0 
     integer :: i,j,k,ierr
     ! Note: local and global divergence free cannot be perfectly satisfied 
     ! at the mean time for pressure BC (p=p0,du/dn=0), in BC=6, the global 
@@ -860,7 +861,7 @@ module module_BC
     ! --------------------------------------------------------------------------------------------
     
     ! inflow boundary condition x- with injection
-    flux=0
+    fluxin=0
     if(bdry_cond(1)==3 .and. coords(1)==0    ) then
        do j=jmin,jmax
           do k=kmin,kmax
@@ -871,13 +872,13 @@ module module_BC
           enddo
        enddo
        do j=js,je
-       	do k=ks,ke
-       		flux = flux + u(is-1,j,k)
-       	enddo
+         do k=ks,ke
+            fluxin = fluxin + u(is-1,j,k)
+         enddo
        enddo
     endif
-    call MPI_ALLREDUCE(flux, tflux, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr)
-    uaverage=tflux/(ny*nz)
+    call MPI_ALLREDUCE(fluxin, tfluxin, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr)
+    uaverage=tfluxin/(ny*nz)
 
     ! inflow boundary condition y-
     if(bdry_cond(2)==3 .and. coords(2)==0    ) then
@@ -1120,22 +1121,77 @@ module module_BC
     ! --------------------------------------------------------------------------------------------
     ! New pressure BC  (du/dn=0 & p=p0) 
     ! --------------------------------------------------------------------------------------------
-    if(bdry_cond(4)==6 .and. coords(1)==nPx-1 .and. AfterProjection == 1) then
-      ! Note: for pressure BC, vel-BC apply after projection 
-       v(ie+1,:,:)=v(ie,:,:)
-       w(ie+1,:,:)=w(ie,:,:)
+    ! Note: for pressure BC, vel-BC apply after projection 
+    fluxout(:) = 0.d0 
+    if      (bdry_cond(1)==6 .and. coords(1)==0     .and. AfterProjection == 1) then
        do j=js,je
          do k=ks,ke
-            flux2 = flux2 + u(ie-1,j,k)
+            fluxout(1) = fluxout(1) + u(is  ,j,k)
+         enddo
+       enddo
+    else if (bdry_cond(4)==6 .and. coords(1)==nPx-1 .and. AfterProjection == 1) then
+       do j=js,je
+         do k=ks,ke
+            fluxout(4) = fluxout(4) + u(ie-1,j,k)
+         enddo
+       enddo
+    else if (bdry_cond(2)==6 .and. coords(2)==0     .and. AfterProjection == 1) then
+       do i=is,ie
+         do k=ks,ke
+            fluxout(2) = fluxout(2) + v(i,js  ,k)
+         enddo
+       enddo
+    else if (bdry_cond(5)==6 .and. coords(2)==nPy-1 .and. AfterProjection == 1) then
+       do i=is,ie
+         do k=ks,ke
+            fluxout(5) = fluxout(5) + v(i,je-1,k)
+         enddo
+       enddo
+    else if (bdry_cond(3)==6 .and. coords(3)==0     .and. AfterProjection == 1) then
+       do i=is,ie
+         do j=js,je
+            fluxout(3) = fluxout(3) + w(i,j,ks  )
+         enddo
+       enddo
+    else if (bdry_cond(6)==6 .and. coords(3)==nPz-1 .and. AfterProjection == 1) then
+       do i=is,ie
+         do j=js,je
+            fluxout(6) = fluxout(6) + w(i,j,ke-1)
          enddo
        enddo
     endif
-    call MPI_ALLREDUCE(flux2, tflux2, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr)
-    fluxratio = min(max(tflux/tflux2,0.5d0),2.d0)
-
-    if(bdry_cond(4)==6 .and. coords(1)==nPx-1 .and. AfterProjection == 1) then
+    call MPI_ALLREDUCE(fluxout, tfluxout, 6, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr)
+    tfluxout_all = sum(tfluxout)
+    if ( tfluxout_all == 0.d0 ) then 
+       fluxratio = 1.d0 
+    else 
+      fluxratio = min(tfluxin/tfluxout_all,fluxratio_max)  ! fluxratio is capped with 0.5
+    end if !tfluxout_all 
+    if      (bdry_cond(1)==6 .and. coords(1)==0     .and. AfterProjection == 1) then
+       u(is-1,:,:)=u(is,:,:)*fluxratio
+       v(is-1,:,:)=v(is,:,:)
+       w(is-1,:,:)=w(is,:,:)
+    else if (bdry_cond(4)==6 .and. coords(1)==nPx-1 .and. AfterProjection == 1) then
        u(ie,:,:) = u(ie-1,:,:)*fluxratio 
-    end if ! bdry_cond(4)==6
+       v(ie+1,:,:)=v(ie,:,:)
+       w(ie+1,:,:)=w(ie,:,:)
+    else if (bdry_cond(2)==6 .and. coords(2)==0     .and. AfterProjection == 1) then
+       v(:,js-1,:)=v(:,js,:)*fluxratio
+       u(:,js-1,:)=u(:,js,:)
+       w(:,js-1,:)=w(:,js,:)
+    else if (bdry_cond(5)==6 .and. coords(2)==nPy-1 .and. AfterProjection == 1) then
+       v(:,je,:)=v(:,je-1,:)*fluxratio
+       u(:,je+1,:)=u(:,je,:)
+       w(:,je+1,:)=w(:,je,:)
+    else if (bdry_cond(3)==6 .and. coords(3)==0     .and. AfterProjection == 1) then
+       w(:,:,ks-1)=w(:,:,ks)*fluxratio
+       u(:,:,ks-1)=u(:,:,ks)
+       v(:,:,ks-1)=v(:,:,ks)
+    else if (bdry_cond(6)==6 .and. coords(3)==nPz-1 .and. AfterProjection == 1) then
+       w(:,:,ke)=w(:,:,ke-1)*fluxratio
+       u(:,:,ke+1)=u(:,:,ke)
+       v(:,:,ke+1)=v(:,:,ke)    
+    end if ! bdry_cond()
 
   end subroutine SetVelocityBC
 
@@ -2359,7 +2415,7 @@ subroutine Poisson_BCs(A)
         ! p0 and du/dn right at the boundary
         A(ie,:,:,7) = A(ie,:,:,7) - A(ie,:,:,1)*2.d0/3.d0 + A(ie,:,:,2)*5.d0/3.d0
         A(ie,:,:,8) = A(ie,:,:,8) + 8.d0/3.d0*A(ie,:,:,2)*BoundaryPressure(2) & 
-                    + (u(ie,:,:)-u(ie-1,:,:))/dx(ie) ! remove dudx in source term 
+                    + (u(ie,js:je,ks:ke)-u(ie-1,js:je,ks:ke))/dx(ie) ! remove dudx in source term 
         A(ie,:,:,1) = A(ie,:,:,1)*1.d0/3.d0 
         A(ie,:,:,2) = 0.d0
      endif
