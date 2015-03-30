@@ -843,7 +843,7 @@ module module_BC
     integer, intent (in) :: AfterProjection
     real(8) :: t,dt,fluxin,tfluxin,uaverage
     real(8) :: fluxout(6),tfluxout(6),tfluxout_all,fluxratio
-    real(8) :: fluxratio_max = 0.8d0 
+    real(8) :: fluxratio_max = 0.7d0 
     integer :: i,j,k,ierr
     ! Note: local and global divergence free cannot be perfectly satisfied 
     ! at the mean time for pressure BC (p=p0,du/dn=0), in BC=6, the global 
@@ -1163,7 +1163,7 @@ module module_BC
     call MPI_ALLREDUCE(fluxout, tfluxout, 6, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr)
     tfluxout_all = sum(tfluxout)
     if ( tfluxout_all == 0.d0 ) then 
-       fluxratio = 1.d0 
+      fluxratio = fluxratio_max 
     else 
       fluxratio = min(tfluxin/tfluxout_all,fluxratio_max)  ! fluxratio is capped with 0.5
     end if !tfluxout_all 
