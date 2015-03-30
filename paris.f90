@@ -363,7 +363,7 @@ Program paris
            else
               if (FreeSurface) then
                  if (RP_test) call set_RP_pressure(p,rho1)
-                 call FreeSolver(A,p,maxError/dt,beta,maxit,it,ierr,itimestep,time,residual)
+                 call FreeSolver(A,p,maxError/MaxDt,beta,maxit,it,ierr,itimestep,time,residual)
               else
                  call NewSolver(A,p,maxError/MaxDt,beta,maxit,it,ierr)
               endif
@@ -421,7 +421,7 @@ Program paris
                  if(HYPRE)then !HYPRE will not work with removed nodes from domain.
                     call pariserror("HYPRE solver not yet available for Free Surfaces")
                  else
-                    call FreeSolver(A,p_ext,maxError/dt,beta,maxit,it,ierr,itimestep,time,residual)
+                    call FreeSolver(A,p_ext,maxError/MaxDt,beta,maxit,it,ierr,itimestep,time,residual)
                  endif
                  if(mod(itimestep,termout)==0) then
                     if(rank==0) then

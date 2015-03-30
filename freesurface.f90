@@ -321,12 +321,14 @@ subroutine FreeSolver(A,p,maxError,beta,maxit,it,ierr,iout,time,tres2)
   integer, intent(out) :: it, ierr
   real(8) :: res1,res2,resinf,intvol
   real(8) :: tres2, cells, p_c, Vol, time, tcells
+  real(8) :: res_local, resinf_all
   integer :: i,j,k, iout
   integer :: req(12),sta(MPI_STATUS_SIZE,12)
   logical :: mask(imin:imax,jmin:jmax,kmin:kmax)
   integer, parameter :: norm=2, relaxtype=1
   logical, parameter :: recordconvergence=.false.
   integer, save :: itime=0
+  logical :: use_L_inf = .true.
 ! Open file for convergence history
   if(rank==0.and.recordconvergence) then
      OPEN(UNIT=89,FILE=TRIM(out_path)//'/convergence_history-'//TRIM(int2text(itime,padding))//'.txt')
@@ -349,16 +351,18 @@ subroutine FreeSolver(A,p,maxError,beta,maxit,it,ierr,iout,time,tres2)
         call RedBlackRelax_fs(A,p,beta)
      endif
 !---------------------------------CHECK FOR CONVERGENCE-------------------------------------------
-    res1 = 0d0; res2=0.d0; resinf=0.d0; intvol=0.d0; cells = 0d0
+    res1 = 0d0; res2=0.d0; resinf=0.d0; intvol=0.d0; cells = 0d0; res_local=0.d0
     call ghost_x(p,1,req( 1: 4)); call ghost_y(p,1,req( 5: 8)); call ghost_z(p,1,req( 9:12))
     do k=ks+1,ke-1; do j=js+1,je-1; do i=is+1,ie-1
        if ((pcmask(i,j,k)==0 .and. solver_flag==1)&
             .or.((pcmask(i,j,k)==1 .or. pcmask(i,j,k)==2) .and. solver_flag==2)) then
-          res2=res2+abs(-p(i,j,k) * A(i,j,k,7) +                           &
+          res_local = abs(-p(i,j,k) * A(i,j,k,7) +                           &
                A(i,j,k,1) * p(i-1,j,k) + A(i,j,k,2) * p(i+1,j,k) +            &
                A(i,j,k,3) * p(i,j-1,k) + A(i,j,k,4) * p(i,j+1,k) +            &
-               A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8) )**norm
-          cells = cells + 1d0
+               A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8) )
+          res2=res2+res_local**norm
+          resinf=MAX(resinf,res_local)
+          cells = cells + 1.d0
           if (res2/=res2) then 
              write(*,*)'ERROR: RES2 NaN'
              call debug_details(i,j,k,A)
@@ -372,23 +376,33 @@ subroutine FreeSolver(A,p,maxError,beta,maxit,it,ierr,iout,time,tres2)
     do k=ks,ke; do j=js,je; do i=is,ie
        if(mask(i,j,k) .and. ((pcmask(i,j,k)==0 .and. solver_flag==1) .or. &
             ((pcmask(i,j,k)==1 .or. pcmask(i,j,k)==2) .and. solver_flag==2))) then
-          res2=res2+abs(-p(i,j,k) * A(i,j,k,7) +&
+          res_local=abs(-p(i,j,k) * A(i,j,k,7) +&
                A(i,j,k,1) * p(i-1,j,k) + A(i,j,k,2) * p(i+1,j,k) +            &
                A(i,j,k,3) * p(i,j-1,k) + A(i,j,k,4) * p(i,j+1,k) +            &
-               A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8) )**norm
+               A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8) )
+          res2=res2+res_local**norm
+          resinf=MAX(resinf,res_local)
           cells = cells + 1d0
        endif
     enddo; enddo; enddo
     call catch_divergence_fs(res2,cells,ierr)
     call MPI_ALLREDUCE(res2, tres2, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr)
+    call MPI_ALLREDUCE(resinf, resinf_all, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_Comm_Cart, ierr)
     call MPI_ALLREDUCE(cells, tcells, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr)
     if(norm==2) tres2=sqrt(tres2)
     tres2 = tres2/tcells
     if(rank==0.and.mod(it,10) == 0.and.recordconvergence) write(89,310) it, solver_flag, tres2
 310 format(2I6,'  ',(e14.5))
-    if (tres2<maxError) then 
-       if(rank==0.and.recordconvergence) close(89)
-       exit
+    if (.not. use_L_inf) then
+       if (tres2<maxError) then 
+          if(rank==0.and.recordconvergence) close(89)
+          exit
+       endif
+    else
+       if (resinf_all<maxError) then 
+          if(rank==0.and.recordconvergence) close(89)
+          exit
+       endif
     endif
   enddo
   if(rank==0.and.recordconvergence) close(89)
