@@ -684,46 +684,77 @@ subroutine project_velocity ()
   integer :: i,j,k
 
   if (.not.FreeSurface) then
-    if (STGhost) then
-      call project_velocity_staggered(u,umask,dt,p,1)
-      call project_velocity_staggered(v,vmask,dt,p,2)
-      call project_velocity_staggered(w,wmask,dt,p,3)
-    else
-      do k=ks,ke;  do j=js,je; do i=is,ieu    ! CORRECT THE u-velocity 
-        u(i,j,k)=u(i,j,k)-dt*(2.0*umask(i,j,k)/dxh(i))*(p(i+1,j,k)-p(i,j,k))/(rho(i+1,j,k)+rho(i,j,k))
-      enddo; enddo; enddo
+     if (STGhost) then
+        call project_velocity_staggered(u,umask,dt,p,1)
+        call project_velocity_staggered(v,vmask,dt,p,2)
+        call project_velocity_staggered(w,wmask,dt,p,3)
+     else
+        do k=ks,ke;  do j=js,je; do i=is,ieu    ! CORRECT THE u-velocity 
+           u(i,j,k)=u(i,j,k)-dt*(2.0*umask(i,j,k)/dxh(i))*(p(i+1,j,k)-p(i,j,k))/(rho(i+1,j,k)+rho(i,j,k))
+        enddo; enddo; enddo
 
-      do k=ks,ke;  do j=js,jev; do i=is,ie    ! CORRECT THE v-velocity
-        v(i,j,k)=v(i,j,k)-dt*(2.0*vmask(i,j,k)/dyh(j))*(p(i,j+1,k)-p(i,j,k))/(rho(i,j+1,k)+rho(i,j,k))
-      enddo; enddo; enddo
+        do k=ks,ke;  do j=js,jev; do i=is,ie    ! CORRECT THE v-velocity
+           v(i,j,k)=v(i,j,k)-dt*(2.0*vmask(i,j,k)/dyh(j))*(p(i,j+1,k)-p(i,j,k))/(rho(i,j+1,k)+rho(i,j,k))
+        enddo; enddo; enddo
 
-      do k=ks,kew;  do j=js,je; do i=is,ie   ! CORRECT THE w-velocity
-        w(i,j,k)=w(i,j,k)-dt*(2.0*wmask(i,j,k)/dzh(k))*(p(i,j,k+1)-p(i,j,k))/(rho(i,j,k+1)+rho(i,j,k))
-      enddo; enddo; enddo
-    endif
+        do k=ks,kew;  do j=js,je; do i=is,ie   ! CORRECT THE w-velocity
+           w(i,j,k)=w(i,j,k)-dt*(2.0*wmask(i,j,k)/dzh(k))*(p(i,j,k+1)-p(i,j,k))/(rho(i,j,k+1)+rho(i,j,k))
+        enddo; enddo; enddo
+     endif
   else
-    do k=ks,ke;  do j=js,je; do i=is,ieu    ! CORRECT THE u-velocity 
-      if (u_cmask(i,j,k)==0) then
-        u(i,j,k)=u(i,j,k)-dt/rho(i,j,k)*(p(i+1,j,k)+P_gx(i+1,j,k)-p(i,j,k)-P_gx(i,j,k))/x_mod(i,j,k)
-        if (u(i,j,k) /= u(i,j,k)) write(*,'("WARNING u NaN :",2e14.5)')u(i,j,k), x_mod(i,j,k)
-      endif
-    enddo; enddo; enddo
+     do k=ks,ke;  do j=js,je; do i=is,ieu    ! CORRECT THE u-velocity 
+        if (u_cmask(i,j,k)==0) then
+           u(i,j,k)=u(i,j,k)-dt/rho(i,j,k)*(p(i+1,j,k)+P_gx(i+1,j,k)-p(i,j,k)-P_gx(i,j,k))/x_mod(i,j,k)
+           if (u(i,j,k) /= u(i,j,k)) write(*,'("WARNING u NaN :",2e14.5)')u(i,j,k), x_mod(i,j,k)
+        endif
+     enddo; enddo; enddo
 
-    do k=ks,ke;  do j=js,jev; do i=is,ie    ! CORRECT THE v-velocity
-      if (v_cmask(i,j,k)==0) then
-        v(i,j,k)=v(i,j,k)-dt/rho(i,j,k)*(p(i,j+1,k)+P_gy(i,j+1,k)-p(i,j,k)-P_gy(i,j,k))/y_mod(i,j,k)
-        if (v(i,j,k) /= v(i,j,k)) write(*,'("WARNING v NaN :",2e14.5)')v(i,j,k), y_mod(i,j,k)
-      endif
-    enddo; enddo; enddo
+     do k=ks,ke;  do j=js,jev; do i=is,ie    ! CORRECT THE v-velocity
+        if (v_cmask(i,j,k)==0) then
+           v(i,j,k)=v(i,j,k)-dt/rho(i,j,k)*(p(i,j+1,k)+P_gy(i,j+1,k)-p(i,j,k)-P_gy(i,j,k))/y_mod(i,j,k)
+           if (v(i,j,k) /= v(i,j,k)) write(*,'("WARNING v NaN :",2e14.5)')v(i,j,k), y_mod(i,j,k)
+        endif
+     enddo; enddo; enddo
 
-    do k=ks,kew;  do j=js,je; do i=is,ie   ! CORRECT THE w-velocity
-      if (w_cmask(i,j,k)==0) then
-        w(i,j,k)=w(i,j,k)-dt/rho(i,j,k)*(p(i,j,k+1)+P_gz(i,j,k+1)-p(i,j,k)-P_gz(i,j,k))/z_mod(i,j,k)
-        if (w(i,j,k) /= w(i,j,k)) write(*,'("WARNING w NaN :",2e14.5)')w(i,j,k), z_mod(i,j,k)
-      endif
-    enddo; enddo; enddo
+     do k=ks,kew;  do j=js,je; do i=is,ie   ! CORRECT THE w-velocity
+        if (w_cmask(i,j,k)==0) then
+           w(i,j,k)=w(i,j,k)-dt/rho(i,j,k)*(p(i,j,k+1)+P_gz(i,j,k+1)-p(i,j,k)-P_gz(i,j,k))/z_mod(i,j,k)
+           if (w(i,j,k) /= w(i,j,k)) write(*,'("WARNING w NaN :",2e14.5)')w(i,j,k), z_mod(i,j,k)
+        endif
+     enddo; enddo; enddo
+     if (RP_test) then
+        if (coords(1)==0) then
+           do k=ks,ke;  do j=js,je
+              u(is-1,j,k)=u(is-1,j,k)-dt/rho(is-1,j,k)*(p(is,j,k)-p(is-1,j,k))/dx(is)
+           enddo; enddo
+        endif
+        if (coords(1)==nPx-1) then
+           do k=ks,ke;  do j=js,je
+              u(ie,j,k)=u(ie,j,k)-dt/rho(ie,j,k)*(p(ie+1,j,k)-p(ie,j,k))/dx(ie)
+           enddo; enddo
+        endif
+        if (coords(2)==0) then
+           do k=ks,ke;  do i=is,ie
+              v(i,js-1,k)=v(i,js-1,k)-dt/rho(i,js-1,k)*(p(i,js,k)-p(i,js-1,k))/dy(js)
+           enddo; enddo
+        endif
+        if (coords(2)==nPy-1) then
+           do k=ks,ke;  do i=is,ie
+              v(i,je,k)=v(i,je,k)-dt/rho(i,je,k)*(p(i,je+1,k)-p(i,je,k))/dy(je)
+           enddo; enddo
+        endif
+        if (coords(3)==0) then
+           do j=js,je;  do i=is,ie
+              w(i,j,ks-1)=w(i,j,ks-1)-dt/rho(i,j,ks-1)*(p(i,j,ks)-p(i,j,ks-1))/dz(ks)
+           enddo; enddo
+        endif
+        if (coords(3)==nPz-1) then
+           do j=js,je;  do i=is,ie
+              w(i,j,ke)=w(i,j,ke)-dt/rho(i,j,ke)*(p(i,j,ke+1)-p(i,j,ke))/dz(ke)
+           enddo; enddo
+        endif
+     endif
   endif
-
 end subroutine project_velocity
 !=================================================================================================
 ! subroutine TimeStepSize
