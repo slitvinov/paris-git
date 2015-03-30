@@ -22,6 +22,9 @@ let np=$nprocs
 
 mpirun -np $np paris > tmpout
 
+awk ' /Step:/ { cpu = $8 } END { print "cpu = " cpu } ' < tmpout
+awk -f awk_test.awk stats
+
 
 
 
