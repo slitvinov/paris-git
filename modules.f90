@@ -792,6 +792,9 @@ module module_BC
   ! LM: The same convention is used for BoundaryPressure
   ! SZ: alternately may contain the velocity of the flow for inflow boundary conditions on x+
   logical :: check_setup=.true.
+  logical :: OutVelSpecified
+  logical :: LateralBdry(6) ! A LateralBdry is defined as parallel to the main stream  
+  real(8) :: MaxFluxRatioPresBC  
   contains
 !=================================================================================================
 !=================================================================================================
@@ -843,7 +846,6 @@ module module_BC
     integer, intent (in) :: AfterProjection
     real(8) :: t,dt,fluxin,tfluxin,uaverage
     real(8) :: fluxout(6),tfluxout(6),tfluxout_all,fluxratio
-    real(8) :: fluxratio_max = 0.7d0 
     integer :: i,j,k,ierr
     ! Note: local and global divergence free cannot be perfectly satisfied 
     ! at the mean time for pressure BC (p=p0,du/dn=0), in BC=6, the global 
@@ -1089,10 +1091,16 @@ module module_BC
     ! same velocity as opposing inflow. ! @generalize this !!
     ! --------------------------------------------------------------------------------------------
     if(bdry_cond(4)==4 .and. coords(1)==nPx-1) then
-        u(ie  ,:,:)=uaverage
+        if ( OutVelSpecified ) then 
+           do j=js,je; do k=ks,ke
+              u(ie,j,k)=uout(j,k,t)
+           end do; end do
+        else 
+           u(ie  ,:,:)=uaverage
 #ifndef OLD_BDRY_COND
-        u(ie+1,:,:)=uaverage
+           u(ie+1,:,:)=uaverage
 #endif
+        end if ! OutVelSpecified
         v(ie+1,:,:)=v(ie,:,:)
         w(ie+1,:,:)=w(ie,:,:)
     endif
@@ -1123,37 +1131,43 @@ module module_BC
     ! --------------------------------------------------------------------------------------------
     ! Note: for pressure BC, vel-BC apply after projection 
     fluxout(:) = 0.d0 
-    if      (bdry_cond(1)==6 .and. coords(1)==0     .and. AfterProjection == 1) then
+    if      (bdry_cond(1)==6 .and. coords(1)==0     & 
+            .and. AfterProjection == 1 .and. .not.LateralBdry(1)) then
        do j=js,je
          do k=ks,ke
             fluxout(1) = fluxout(1) + u(is  ,j,k)
          enddo
        enddo
-    else if (bdry_cond(4)==6 .and. coords(1)==nPx-1 .and. AfterProjection == 1) then
+    else if (bdry_cond(4)==6 .and. coords(1)==nPx-1 & 
+            .and. AfterProjection == 1 .and. .not.LateralBdry(4)) then
        do j=js,je
          do k=ks,ke
             fluxout(4) = fluxout(4) + u(ie-1,j,k)
          enddo
        enddo
-    else if (bdry_cond(2)==6 .and. coords(2)==0     .and. AfterProjection == 1) then
+    else if (bdry_cond(2)==6 .and. coords(2)==0     & 
+            .and. AfterProjection == 1 .and. .not.LateralBdry(2)) then
        do i=is,ie
          do k=ks,ke
             fluxout(2) = fluxout(2) + v(i,js  ,k)
          enddo
        enddo
-    else if (bdry_cond(5)==6 .and. coords(2)==nPy-1 .and. AfterProjection == 1) then
+    else if (bdry_cond(5)==6 .and. coords(2)==nPy-1 & 
+            .and. AfterProjection == 1.and. .not.LateralBdry(5)) then
        do i=is,ie
          do k=ks,ke
             fluxout(5) = fluxout(5) + v(i,je-1,k)
          enddo
        enddo
-    else if (bdry_cond(3)==6 .and. coords(3)==0     .and. AfterProjection == 1) then
+    else if (bdry_cond(3)==6 .and. coords(3)==0     & 
+            .and. AfterProjection == 1 .and. .not.LateralBdry(3)) then
        do i=is,ie
          do j=js,je
             fluxout(3) = fluxout(3) + w(i,j,ks  )
          enddo
        enddo
-    else if (bdry_cond(6)==6 .and. coords(3)==nPz-1 .and. AfterProjection == 1) then
+    else if (bdry_cond(6)==6 .and. coords(3)==nPz-1 & 
+            .and. AfterProjection == 1 .and. .not.LateralBdry(6)) then
        do i=is,ie
          do j=js,je
             fluxout(6) = fluxout(6) + w(i,j,ke-1)
@@ -1162,12 +1176,9 @@ module module_BC
     endif
     call MPI_ALLREDUCE(fluxout, tfluxout, 6, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr)
     tfluxout_all = sum(tfluxout)
-    if ( tfluxout_all == 0.d0 ) then 
-      fluxratio = fluxratio_max 
-    else 
-      fluxratio = min(tfluxin/tfluxout_all,fluxratio_max)  ! fluxratio is capped with 0.5
-    end if !tfluxout_all 
-    if      (bdry_cond(1)==6 .and. coords(1)==0     .and. AfterProjection == 1) then
+    fluxratio = min(ABS(tfluxin/(tfluxout_all+1.d-16)),MaxFluxRatioPresBC)  ! fluxratio is capped 
+    if      (bdry_cond(1)==6 .and. coords(1)==0     & 
+      .and. AfterProjection == 1) then
        u(is-1,:,:)=u(is,:,:)*fluxratio
        v(is-1,:,:)=v(is,:,:)
        w(is-1,:,:)=w(is,:,:)
@@ -1570,6 +1581,27 @@ module module_BC
          end if  !
       end if ! y(j), z(k)
     end function uinject
+
+    function uout(j,k,t)
+      use module_2phase
+      use module_grid
+      use module_flow
+      implicit none
+      integer :: j,k
+      real(8) :: t
+      real(8) :: u0,y0,y1,uout
+      real(8), parameter :: SpreadRate = 0.1d0 
+      real(8), parameter :: alpha = 0.88d0 
+   
+      if ( inject_type == 3 ) then ! 2d jet
+         y0 = SpreadRate*xLength+radius_gas_inject
+         y1 = y(j)/y0
+         u0 = ugas_inject*(radius_gas_inject*radius_gas_inject  & 
+                         - radius_liq_inject*radius_liq_inject) & 
+                         /y0/y0
+         uout = u0/COSH(alpha*y1)/COSH(alpha*y1)
+      end if ! inject_type
+    end function uout
 !=================================================================================================
 !=================================================================================================
 ! subroutine SetVectorBC: Sets the boundary condition for vectors (called in Front routines)

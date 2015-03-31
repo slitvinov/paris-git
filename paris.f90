@@ -2793,7 +2793,8 @@ subroutine ReadParameters
                         nsteps_probe,  num_probes,    ijk_probe,                                 &
                         num_probes_cvof,  ijk_probe_cvof,                                        & 
                         DoTurbStats,   nStepOutputTurbStats, TurbStatsOrder,  timeStartTurbStats,&
-                        ResNormOrderPressure,ErrorScaleHYPRE
+                        ResNormOrderPressure,         ErrorScaleHYPRE,                           & 
+                        OutVelSpecified,  MaxFluxRatioPresBC, LateralBdry 
  
   Nx = 0; Ny = 4; Nz = 4 ! cause absurd input file that lack nx value to fail. 
   Ng=2;xLength=1d0;yLength=1d0;zLength=1d0
@@ -2830,6 +2831,9 @@ subroutine ReadParameters
   DoTurbStats = .false.; nStepOutputTurbStats = 1000; TurbStatsOrder = 2
   timeStartTurbStats = 0.d0
   ResNormOrderPressure = 100; ErrorScaleHYPRE = 1.d-2; 
+  OutVelSpecified = .false.
+  MaxFluxRatioPresBC = 0.7d0
+  LateralBdry = .false.
 
   in=1
   out=2
