@@ -51,7 +51,7 @@
       ! 3 marked as C node
       ! 4 marked as reference fluid 
       ! 5 marked as ghost layer
-   integer,parameter :: maxnum_diff_tag  = 50  ! ignore cases droplet spread over more than 1 block
+   integer,parameter :: maxnum_diff_tag = 200  
    integer :: total_num_tag,totalnum_drop,totalnum_drop_indep,num_new_drop
    integer, dimension(:), allocatable :: num_drop
    integer, dimension(:), allocatable :: num_drop_merge
@@ -727,10 +727,15 @@ contains
                            TagAlreadylisted = .true.
                      end do ! idiff_tag2
                      if (.not. TagAlreadylisted) then 
-                        drops_merge_comm(idrop,irank)%num_diff_tag = & 
-                           drops_merge_comm(idrop,irank)%num_diff_tag + 1
-                        drops_merge_comm(idrop,irank)%diff_tag_list( & 
-                           drops_merge_comm(idrop,irank)%num_diff_tag) = tag2
+                        if ( drops_merge_comm(idrop,irank)%num_diff_tag < maxnum_diff_tag ) then  
+                           drops_merge_comm(idrop,irank)%num_diff_tag = & 
+                              drops_merge_comm(idrop,irank)%num_diff_tag + 1
+                           drops_merge_comm(idrop,irank)%diff_tag_list( & 
+                              drops_merge_comm(idrop,irank)%num_diff_tag) = tag2
+                        else 
+                           write(*,*) "Number of diff tags exceeds the max number!",time,rank,idrop 
+                           call pariserror("number of tag goes over max number when finding complete list!")
+                        end if ! maxnum_diff_tag
                         if ( FinishUpdateTag ) FinishUpdateTag = .false. 
                      end if ! TagAlreadylist
                   end do ! idiff_tag1
