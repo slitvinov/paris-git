@@ -150,7 +150,7 @@ Program paris
            call output_VOF(0,is,ie+1,js,je+1,ks,ke+1)
            call output_ALL(0,is,ie+1,js,je+1,ks,ke+1,itimestep)
            if (FreeSurface) then
-              do out_fs = 1,3
+              do out_fs = 1,4
                  if (VTK_OUT(out_fs)) then
                     if (rank==0) call append_visit_fs(out_fs,0)
                     SELECT CASE (out_fs)
@@ -164,6 +164,8 @@ Program paris
                        call VTK_scalar_struct(out_fs,0,kappa_fs)
                     case(3)
                        call VTK_scalar_struct(out_fs,0,P_gx)
+                    case(4)
+                       call VTK_scalar_struct(out_fs,0,v_source)
                     end SELECT
                  endif
               enddo
@@ -480,7 +482,6 @@ Program paris
            if(DoFront)call GetFront('wait')
            call my_timer(13)
         enddo !itime_scheme
-        if (FreeSurface .and. RP_test) call Integrate_RP(dt,time,rho1)
         if(itime_scheme==2) then
            u = 0.5*(u+uold)
            v = 0.5*(v+vold)
@@ -496,6 +497,10 @@ Program paris
            call my_timer(4)
            if ( DoLPP ) call AveragePartSol()
            call my_timer(12)
+        endif
+        if (FreeSurface) then
+           if (RP_test) call Integrate_RP(dt,time,rho1)
+           call check_topology(vof_phase,itimestep)
         endif
         if (DoLPP) then
             call PartBCWrapper
@@ -582,7 +587,7 @@ Program paris
         !output for scalar variables used in free surface
         if (FreeSurface) then
            if (RP_test .and. (mod(itimestep,nstats)==0) .and. rank==0) call write_RP_test(time,rho1)
-           do out_fs = 1,3
+           do out_fs = 1,4
               if (VTK_OUT(out_fs)) then
                  if (mod(itimestep,NOUT_VTK(out_fs))==0) then
                     if (rank==0) call append_visit_fs(out_fs,itimestep/NOUT_VTK(out_fs))
@@ -597,6 +602,8 @@ Program paris
                        call VTK_scalar_struct(out_fs,itimestep/NOUT_VTK(out_fs),kappa_fs)
                     case(3)
                        call VTK_scalar_struct(out_fs,itimestep/NOUT_VTK(out_fs),P_gx)
+                    case(4)
+                       call VTK_scalar_struct(out_fs,itimestep/NOUT_VTK(out_fs),v_source)
                     end SELECT
                  endif
               endif
