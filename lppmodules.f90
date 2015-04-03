@@ -635,7 +635,7 @@ contains
       ! update tag_id from local to global id (Note: no need to change domain 0)
       if ( rank > 0 ) then 
          num_tag_accu = sum(num_tag(0:rank-1),1)
-         do i=is,ie; do j=js,je; do k=ks,ke
+         do i=imin,imax; do j=jmin,jmax; do k=kmin,kmax
             if ( tag_id(i,j,k) > 0 ) tag_id(i,j,k)=tag_id(i,j,k)+num_tag_accu
          end do; end do; end do
       end if ! rank
@@ -693,7 +693,8 @@ contains
                                  drops_merge_gcell_list(2,iCell,idrop), &
                                  drops_merge_gcell_list(3,iCell,idrop))
                   else
-                     write(*,*) "Number of diff tags exceeds the max number!",time,rank,idrop 
+                     write(*,*) "Number of diff tags exceeds the max number!",time,rank,idrop,& 
+                     drops_merge(idrop)%num_diff_tag, maxnum_diff_tag
                      call lpperror("Number of diff tags exceeds the max number!") 
                   end if ! maxnum_diff_tag
                end if ! idiff_tag
@@ -733,7 +734,8 @@ contains
                            drops_merge_comm(idrop,irank)%diff_tag_list( & 
                               drops_merge_comm(idrop,irank)%num_diff_tag) = tag2
                         else 
-                           write(*,*) "Number of diff tags exceeds the max number!",time,rank,idrop 
+                           write(*,*) "Number of diff tags exceeds the max number!",time,irank,idrop,&  
+                                    drops_merge_comm(idrop,irank)%num_diff_tag, maxnum_diff_tag
                            call pariserror("number of tag goes over max number when finding complete list!")
                         end if ! maxnum_diff_tag
                         if ( FinishUpdateTag ) FinishUpdateTag = .false. 
@@ -770,6 +772,7 @@ contains
                tag_max_drop_merge_vol = tag
                do idiff_tag = 1,drops_merge_comm(idrop,irank)%num_diff_tag
                   tag1   = drops_merge_comm(idrop,irank)%diff_tag_list(idiff_tag)
+                  if ( tag1 == tag ) cycle ! for some VOF-BC, tag in ghost cell may be the same as inside  
                   new_drop_id(tag1) = num_new_drop 
                   idrop1 = tag_dropid(tag1)
                   irank1 = tag_rank  (tag1)

@@ -2615,17 +2615,17 @@ subroutine InitCondition
             !   end do; end do; end do
             !end if ! inject_type
 
-            if ( inject_type == 3 ) then
-               NozzleThickness = NozzleThick2Cell*dx(is)
-               do i=imin,imax; do j=jmin,jmax; do k=kmin,kmax
-                  if ( y(j) > radius_liq_inject+NozzleThickness & 
-                     .and. y(j) <= radius_gas_inject ) then
-                     u(i,j,k) = ugas_inject & 
-                        *erf( (y(j) -   radius_liq_inject - NozzleThickness)/blayer_gas_inject ) & 
-                        *erf( (radius_gas_inject - y(j))/blayer_gas_inject )  
-                  end if ! 
-               end do; end do; end do 
-            end if ! inject_type
+            !if ( inject_type == 3 ) then
+            !   NozzleThickness = NozzleThick2Cell*dx(is)
+            !   do i=imin,imax; do j=jmin,jmax; do k=kmin,kmax
+            !      if ( y(j) > radius_liq_inject+NozzleThickness & 
+            !         .and. y(j) <= radius_gas_inject ) then
+            !         u(i,j,k) = ugas_inject & 
+            !            *erf( (y(j) -   radius_liq_inject - NozzleThickness)/blayer_gas_inject ) & 
+            !            *erf( (radius_gas_inject - y(j))/blayer_gas_inject )  
+            !      end if ! 
+            !   end do; end do; end do 
+            !end if ! inject_type
          end if ! test_jet
      
      endif
