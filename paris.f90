@@ -178,7 +178,7 @@ Program paris
         !call write_vec_gnuplot(u,v,cvof,p,itimestep,DoVOF)
         call calcstats
 
-        if(dtFlag==2)call TimeStepSize(dt)
+        if(dtFlag==2)call TimeStepSize(dt,vof_phase)
         cflmax = get_cfl_and_check(dt)
 
         if(rank==0) then
@@ -210,7 +210,7 @@ Program paris
 
      do while(time<EndTime .and. itimestep<nstep)
         if (test_capwave.and.mod(itimestep,nstats)==0) call interface_max_min
-        if(dtFlag==2)call TimeStepSize(dt)
+        if(dtFlag==2)call TimeStepSize(dt,vof_phase)
         time=time+dt
         itimestep=itimestep+1
         if(mod(itimestep,termout)==0) then
@@ -503,10 +503,10 @@ Program paris
            call check_topology(vof_phase,itimestep)
         endif
         if (DoLPP) then
-            call PartBCWrapper
-            call lppvofsweeps(itimestep,time)  
-            call SeedParticles
-            call my_timer(14)
+           call PartBCWrapper
+           call lppvofsweeps(itimestep,time)  
+           call SeedParticles
+           call my_timer(14)
         end if ! DoLPP
 !--------------------------------------------OUTPUT-----------------------------------------------
         if(mod(itimestep,nstats)==0) then
@@ -620,7 +620,7 @@ Program paris
      if(ICout) call print_fronts(0,time)
      !---------------------------------------MAIN TIME LOOP--------------------------------------------
      do while(time<EndTime .and. iTimeStep<nstep)
-        if(dtFlag==2)call TimeStepSize(dt)
+        if(dtFlag==2)call TimeStepSize(dt,vof_phase)
         time=time+dt
         itimestep=itimestep+1
         
@@ -766,32 +766,47 @@ end subroutine project_velocity
 !=================================================================================================
 ! subroutine TimeStepSize
 !-------------------------------------------------------------------------------------------------
-subroutine TimeStepSize(deltaT)
+subroutine TimeStepSize(deltaT,vof_phase)
   use module_grid
   use module_flow
   use module_2phase
   use module_IO
+  use module_freesurface
   implicit none
   include "mpif.h"
+  integer, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: vof_phase
   real(8) :: deltaT, h, vmax, dtadv, mydt
   real(8) :: vmax_phys
+  real(8) :: v_local
   integer :: ierr
+  integer :: i,j,k
 
   vmax_phys = max(1.d-3,max(ugas_inject,uliq_inject))
   if(rank<nPdomain)then
-    h  = minval(dx)
-    vmax = maxval(sqrt(u(is:ie,js:je,ks:ke)**2+v(is:ie,js:je,ks:ke)**2+w(is:ie,js:je,ks:ke)**2))
-    if ( vmax > vmax_phys*1.d2 ) then
-       call output(99999,is,ie+1,js,je+1,ks,ke+1)
-       call mpi_barrier(MPI_COMM_WORLD, ierr)
-       call pariserror("Max velocity 100 times larger than physical value, something wrong!") 
-    else 
-       dtadv  = h/(max(vmax,vmax_phys))
-    end if ! vmax
-    mydt = CFL*dtadv
-    mydt = min(mydt,MaxDt)
+     h  = minval(dx)
+     if (.not.FreeSurface) then
+        vmax = maxval(sqrt(u(is:ie,js:je,ks:ke)**2+v(is:ie,js:je,ks:ke)**2+w(is:ie,js:je,ks:ke)**2))
+     else
+        vmax_phys = 0.d0
+        vmax = 0.d0
+        do k=ks,ke; do j=js,je; do i=is,ie
+           if (vof_phase(i,j,k)==0) then
+              v_local = sqrt(u(i,j,k)**2 + v(i,j,k)**2 + w(i,j,k)**2)
+              vmax = MAX(vmax,v_local)
+           endif
+        enddo; enddo; enddo 
+     endif
+     if (.not.FreeSurface .and. vmax > vmax_phys*1.d2 ) then
+        call output(99999,is,ie+1,js,je+1,ks,ke+1)
+        call mpi_barrier(MPI_COMM_WORLD, ierr)
+        call pariserror("Max velocity 100 times larger than physical value, something wrong!") 
+     else 
+        dtadv  = h/(max(vmax,vmax_phys))
+     end if ! vmax
+     mydt = CFL*dtadv
+     mydt = min(mydt,MaxDt)
   else
-    mydt=1.0e10
+     mydt=1.0e10
   endif
   call MPI_ALLREDUCE(mydt, deltat, 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_Active, ierr)
 
@@ -800,11 +815,26 @@ end subroutine TimeStepSize
 function get_cfl_and_check(deltaT)
   use module_grid
   use module_flow
+  use module_VOF
+  use module_freesurface
   implicit none
   include 'mpif.h'
   integer :: ierr
+  integer :: i,j,k
   real(8) :: get_cfl_and_check,vmax,inbox_cfl,deltaT,h,glogcfl
-  vmax = maxval(sqrt(u(is:ie,js:je,ks:ke)**2 + v(is:ie,js:je,ks:ke)**2 + w(is:ie,js:je,ks:ke)**2))
+  real(8) :: v_local
+  
+  if (.not. Freesurface) then
+     vmax = maxval(sqrt(u(is:ie,js:je,ks:ke)**2 + v(is:ie,js:je,ks:ke)**2 + w(is:ie,js:je,ks:ke)**2))
+  else
+     vmax = 0.d0
+     do k=ks,ke; do j=js,je; do i=is,ie
+        if (vof_phase(i,j,k)==0) then
+           v_local = sqrt(u(i,j,k)**2 + v(i,j,k)**2 + w(i,j,k)**2)
+           vmax = MAX(vmax,v_local)
+        endif
+     enddo; enddo; enddo 
+  endif
   h  = minval(dx)
   inbox_cfl=vmax*deltaT/h
   call MPI_ALLREDUCE(inbox_cfl, glogcfl, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_Cart,ierr) 
