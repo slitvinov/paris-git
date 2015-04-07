@@ -543,8 +543,8 @@ subroutine backup_write
   integer ::i,j,k
   character(len=100) :: filename
   filename = trim(out_path)//'/backup_'//int2text(rank,padding)
-  call system('touch '//trim(filename)//'; mv '//trim(filename)//' '//trim(filename)//'.old')
-  OPEN(UNIT=7,FILE=trim(filename),status='unknown',action='write')
+  !call system('touch '//trim(filename)//'; mv '//trim(filename)//' '//trim(filename)//'.old')
+  OPEN(UNIT=7,FILE=trim(filename),status='REPLACE')
   write(7,1100)time,itimestep,is,ie,js,je,ks,ke
   do k=ks,ke; do j=js,je; do i=is,ie
     write(7,1200) u(i,j,k), v(i,j,k), w(i,j,k), p(i,j,k), color(i,j,k)

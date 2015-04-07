@@ -1,6 +1,19 @@
 SRC =  kozenycarman.c rockread.c compare_4cols.c
 CFLAGS = -O  # -g -gstabs
-BINDIR = $(HOME)/bin
+BINDIR = $(HOME)/TOMAS/bin
+FC = mpif90
+FLAGS = -O2 -cpp -fimplicit-none #-fbounds-check # -g 
+
+SILO_DIR = $(HOME)/cfd/libs/silo-4.10.2
+INC_SILO = -I$(SILO_DIR)/include
+INC = $(INC_SILO)
+
+ifdef HAVE_SILO
+FFLAGS = -DHAVE_SILO $(AFLAGS) $(INC)
+SILO_LIB = -L$(SILO_DIR)/lib -lsilo -lm -lstdc++
+endif
+
+LIBS = $(HYPRE_LIBS) $(VOFI_LIBS) $(SILO_LIB)
 
 all: kozenycarman rockread tags pariscompare3D
 
@@ -17,10 +30,20 @@ kozenycarman: kozenycarman.o
 
 rockread: rockread.o
 	$(CC) -o rockread rockread.o -lm
-	mv rockread $(BINDIR)
+	
 
+ 
+post_utility: post_utility.o
+	$(FC) -o post_utility post_utility.o $(LIBS)
+	mv post_utility $(BINDIR)
+
+post_utility.o: post_utility.f90 
+	$(FC) -c $(INC) $<
 clean:
 	rm *~ *.o
 
 .c.o:   $< 
 	cc -c $(CFLAGS)   $< 
+	
+%.o : %.f90
+	$(FC) -c $(FFLAGS) $<

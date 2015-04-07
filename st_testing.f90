@@ -684,6 +684,7 @@ end subroutine do_droplet_test
     integer :: nf,i1,i2,j1,j2,k1,k2,timestep
     if(output_format==4) call output4(nf,i1,i2,j1,j2,k1,k2)
     if(output_format==5) call output5(nf,timestep)
+    if(output_format==6) call output6(nf)
   end subroutine output_ALL
   ! Visit file generation subroutine
   subroutine append_General_visit_file(rootname)
@@ -834,6 +835,196 @@ end subroutine do_droplet_test
     end if ! zip_data
     ! END TEMPORARY 
   end subroutine output4
+  
+  subroutine output6(index)
+  use module_grid
+    use module_surface_tension
+    use module_flow
+    use module_tmpvar
+    use module_IO
+    implicit none
+    include 'mpif.h'
+    integer, intent(in) :: index
+    integer :: i, j, k
+    logical, save :: first_time = .true. 
+    integer, save :: nstart
+    real(kind=8), save :: tstart
+    
+    if(first_time) then
+    tstart = time
+    nstart = index
+    first_time = .false.
+    end if
+    
+    !
+    ! Writing input file for post processing
+    !
+    if( rank == 0) then
+     OPEN (UNIT = 2, FILE ='inputpost')  
+       write(2, *)  nx
+       write(2, *)  ny
+       write(2, *)  nz
+       write(2, *)  npx
+       write(2, *)  npy
+       write(2, *)  npz
+       write(2, *)  nstart
+       write(2, *)  index
+       write(2, *)  tstart
+       write(2, *)  dt*REAL(nout)
+       write(2, *)  xLength
+       write(2, *)  yLength
+       write(2, *)  zLength
+       write(2, *) '!Values nx, ny, nz, npx, npy, npz, start output cycle, last output cycle '
+       write(2, *) '!start time, output time interval, xLength, yLength, zLength'
+     close(2)    
+    end if
+    !
+    ! Output cvof
+    !
+    call output_MPI(index, 'cvof', cvof)
+    
+    !
+    ! Output p
+    !
+    call output_MPI(index, 'pres', p)
+    
+    !
+    ! Output u velocity
+    !
+    do k=kmin,kmax; do j=jmin,jmax; do i=imin,imax;
+      if ( i == imin ) then 
+         tmp(i,j,k)=1.5*u(i,j,k)-0.5*u(i+1,j,k)
+      else 
+         tmp(i,j,k)=0.5*(u(i,j,k)+u(i-1,j,k))
+      end if ! i
+    enddo; enddo; enddo
+    call output_MPI(index, 'uvel', tmp)
+    
+    !
+    ! Output v velocity
+    !
+    do k=kmin,kmax; do j=jmin,jmax; do i=imin,imax;
+      if ( j == jmin ) then
+         tmp(i,j,k)=1.5*v(i,j,k)-0.5*v(i,j+1,k)
+      else 
+         tmp(i,j,k)=0.5*(v(i,j,k)+v(i,j-1,k))
+      end if ! j
+    enddo; enddo; enddo
+    call output_MPI(index, 'vvel', tmp)
+    
+    !
+    ! Output w velocity
+    !
+    do k=kmin,kmax; do j=jmin,jmax; do i=imin,imax;
+            if ( k == kmin ) then
+         tmp(i,j,k)=1.5*w(i,j,k)-0.5*w(i,j,k+1)
+      else 
+         tmp(i,j,k)=0.5*(w(i,j,k)+w(i,j,k-1))
+      end if ! k
+    enddo; enddo; enddo
+    call output_MPI(index, 'wvel', tmp)
+    
+  end subroutine output6
+
+  ! Output module using MPI I/O for clusters use
+  subroutine output_MPI(index, v_name, out_array)
+    use module_grid
+    implicit none
+    include 'mpif.h'
+   
+    integer, dimension(MPI_STATUS_SIZE) :: status
+    real(kind=8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: out_array
+    integer, parameter :: array_rank=3
+    integer, dimension(array_rank) :: shape_array, shape_sub_array, start_coord
+    integer, dimension(array_rank) :: shape_view_array, shape_sub_view_array, start_view_coord
+    integer :: fh, ierr, index, i, j, k
+    integer :: type_sub_array, type_sub_view_array 
+    integer(kind = MPI_OFFSET_KIND) :: initial_displacement
+    !real(kind=4), dimension(imin:imax,jmin:jmax,kmin:kmax) :: small_matrix
+    character(len=23)::path, file_name
+    character(len=4) :: v_name
+       
+    path = 'out/VTK'
+    file_name = TRIM(path)//'/'//TRIM(v_name)//'-'//i2t(index,padding)//'.data'
+    !write(*,*) file_name
+    
+    ! Open file file.dat
+    call MPI_FILE_OPEN(MPI_COMM_WORLD,file_name, &
+                     MPI_MODE_RDWR + MPI_MODE_CREATE,MPI_INFO_NULL,fh,ierr)
+                     
+    ! Error checking
+    if (ierr /= MPI_SUCCESS) then
+       call pariserror('Error opening the file')
+       call MPI_ABORT(MPI_COMM_WORLD, 2, ierr)
+    end if  
+    
+	!
+    ! Creation of the derived datatype type_sub_array corresponding to the 
+    ! matrix u without ghost cells
+    !
+    !Shape  of the array 
+    shape_array(:)= SHAPE(out_array)
+
+    !Shape of the subarray
+    
+    shape_sub_array(:) = (/ie - is + 1, je - js + 1, ke - ks + 1/)
+
+    !Starting coordinates of the subarray
+    start_coord(:) = (/ 1, 1, 1  /)
+    !write(*, *) '1 sh ssa stc', shape_array, shape_sub_array, start_coord
+
+    !Creation of the derived datatype type_sub_array
+    call MPI_TYPE_CREATE_SUBARRAY(array_rank, shape_array, shape_sub_array, start_coord, &
+         MPI_ORDER_FORTRAN, MPI_REAL8, type_sub_array, ierr)
+
+    !Commit type_sub_array
+    call MPI_TYPE_COMMIT(type_sub_array, ierr)
+    !write(*,*) 'Commit 1 succesful at:', rank
+
+    !
+    !Creation of the derived datatype type_sub_view_array for the view on the file
+    !
+    !Shape of the array
+    shape_view_array(:)= (/ nx, ny, nz /)
+
+    !Shape of the subarray
+    shape_sub_view_array(:) = (/ie - is + 1, je - js + 1, ke - ks + 1/)
+
+    !Starting coordinates of the subarray
+    start_view_coord(:) =  (/ is - 3 , js - 3, ks - 3 /)
+    
+    !write(*, *) '2 sh ssa stc', shape_view_array, shape_sub_view_array, start_view_coord
+
+    !Creation of the derived datatype type_sub_view_array
+    call MPI_TYPE_CREATE_SUBARRAY(array_rank, shape_view_array, shape_sub_view_array, start_view_coord, &
+         MPI_ORDER_FORTRAN, MPI_REAL8, type_sub_view_array, ierr)
+
+    !Commit type_sub_view_array
+    call MPI_TYPE_COMMIT(type_sub_view_array, ierr)
+   ! write(*,*) 'Commit 2 succesful at:', rank
+
+    !
+    !Change the file view
+    !
+    initial_displacement = 0
+    call MPI_FILE_SET_VIEW(fh, 0_MPI_OFFSET_KIND, MPI_REAL8, &
+     type_sub_view_array, "native", MPI_STATUS_IGNORE, ierr)
+    !write(*, *) 'Before'
+    !do k=kmin,kmax; do j=jmin,jmax; do i=imin,imax
+    !   small_matrix(i,j,k) = REAL(cvof(i,j,k))
+    !enddo; enddo; enddo
+     
+     
+    !
+    !Write u for each process with the view
+    !
+    call MPI_FILE_WRITE_ALL(fh, out_array, 1, type_sub_array, status, ierr)                           
+    ! Close file file.dat                 
+    call MPI_FILE_CLOSE(fh,ierr)
+  
+  end subroutine output_MPI
+  
+  
 
   subroutine output5(index,timestep)
     use module_flow

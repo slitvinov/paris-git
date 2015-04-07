@@ -1741,8 +1741,8 @@ subroutine backup_VOF_write
   integer ::i,j,k
   character(len=100) :: filename
   filename = trim(out_path)//'/backup_'//int2text(rank,padding)
-  call system('touch '//trim(filename)//'; mv '//trim(filename)//' '//trim(filename)//'.old')
-  OPEN(UNIT=7,FILE=trim(filename),status='unknown',action='write')
+  !call system('touch '//trim(filename)//'; mv '//trim(filename)//' '//trim(filename)//'.old')
+  OPEN(UNIT=7,FILE=trim(filename),status='REPLACE',ACTION='write')
   !Note: p at ghost layers are needed for possion solver 
   write(7,1100)time,itimestep,imin,imax,jmin,jmax,kmin,kmax
   do k=kmin,kmax; do j=jmin,jmax; do i=imin,imax
