@@ -35,7 +35,6 @@ function A = vtk2array(folderloc, time, numprocesses)
 %
     
 for p=0:numprocesses-1
-    
     % import data from the current processor
     if p<10
         intProcessor=strcat('0000',int2str(p));
@@ -88,9 +87,9 @@ for p=0:numprocesses-1
     if p==0
     
         % find domain dimensions
-        xDomain=intXgriddim*matPoints(1,1);
-        yDomain=intYgriddim*matPoints(1,2);
-        zDomain=intZgriddim*matPoints(1,3);
+        xDomain=intXgriddim*((matPoints(1,1)*2)/proccube);
+        yDomain=intYgriddim*((matPoints(1,2)*2)/proccube);
+        zDomain=intZgriddim*((matPoints(1,3)*2)/proccube);
     
     end
     
