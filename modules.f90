@@ -170,6 +170,37 @@ contains
        call pariserror("coordlimit: wrong sign")
     endif
   end function coordlimit
+  
+  function slope_lim (val1,val2,val3,AdvScheme)
+  implicit none
+  real(8), external :: minabs, maxabs
+  real (8) :: slope_lim,val1,val2,val3, alpha1, alpha2,alpha
+  character(20), intent(in) :: AdvScheme 
+  if ( AdvScheme == 'Superbee' ) then
+     alpha1 = minabs(val3-val2,2*(val2-val1))
+     alpha2 = minabs(2*(val3-val2),val2-val1)
+     slope_lim = maxabs(alpha1, alpha2)
+  else if ( AdvScheme == 'ENO' ) then 
+     slope_lim = minabs((val3-val2),(val2-val1))
+  else if ( AdvScheme == 'WENO' ) then 
+     alpha1 = 1.0d0/((val2-val1)**2.d0 + 1.d-16)
+     alpha2 = 1.0d0/((val3-val2)**2.d0 + 1.d-16) 
+     alpha  = alpha1 + alpha2
+     slope_lim = (alpha1*(val2-val1)+alpha2*(val3-val2))/alpha 
+  endif
+  end function slope_lim 
+  
+  function interpole3 (val1,val2,val3,AdvScheme,delta_x)
+  implicit none
+  real (8) :: interpole3, val1, val2, val3, delta_x
+  character(20), intent(in) :: AdvScheme 
+  
+  interpole3 = val2 + slope_lim(val1,val2,val3,AdvScheme)*delta_x 
+  
+  end function interpole3 
+  
+  
+  
 end module module_grid
 !=================================================================================================
 ! module_timer: 
@@ -327,7 +358,9 @@ module module_flow
   logical :: DoTurbStats
   integer :: iSumTurbStats,nStepOutputTurbStats,TurbStatsOrder,num_turb_vars
   real(8) :: timeStartTurbStats
-  real(8), dimension(:,:,:), allocatable :: turb_vars !i,j,ivar 
+  real(8), dimension(:,:,:), allocatable :: turb_vars !i,j,ivar
+  
+
 end module module_flow
 !=================================================================================================
 !=================================================================================================
