@@ -447,6 +447,7 @@ subroutine swpzmom_stg(us,c,d,mom1,mom2,mom3,mom,dir,t)
   real(8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: mom1,mom2,mom3
   real(8) mm1,mm2,vof
   real(8) t,a1,a2,alpha,uavg
+  real(8) uadv1, uadv3, ro1, ro2, ro3
   REAL(8) deltax(3),x0(3),fl3dnew
   real(8) nr(3), stencil3x3(-1:1,-1:1,-1:1)
   intrinsic dmax1,dmin1
@@ -468,15 +469,39 @@ subroutine swpzmom_stg(us,c,d,mom1,mom2,mom3,mom,dir,t)
               a2 = 0.5d0*(us(i,j,k)+us(i+i2,j+j2,k+k2))*dt/dzh(k)
               a1 = 0.5d0*(us(i,j,k-1)+us(i+i2,j+j2,k+k2))*dt/dzh(k-1)
            endif
-            
+
+           ro1 = (rho2*c(i-i0,j-j0,k-k0)+rho1*(1.d0-c(i-i0,j-j0,k-k0)))
+           ro2 = (rho2*c(i,j,k)+rho1*(1.d0-c(i,j,k)))
+           ro3 = (rho2*c(i+i0,j+j0,k+k0)+rho1*(1.d0-c(i+i0,j+j0,k+k0)))
+           uadv1 = interpole3(mom(i-i0,j-j0,k-k0)/ro1,mom(i,j,k)/ro2,mom(i+i0,j+j0,k+k0)/ro3,AdvectionScheme,-a1)           
+           uadv3 = interpole3(mom(i-i0,j-j0,k-k0)/ro1,mom(i,j,k)/ro2,mom(i+i0,j+j0,k+k0)/ro3,AdvectionScheme,a2)           
+
+!           ro1 = (rho2*c(i-i0+i2,j-j0+j2,k-k0+k2)+rho1*(1.d0-c(i-i0+i2,j-j0+j2,k-k0+k2)))
+!           ro2 = (rho2*c(i+i2,j+j2,k+k2)+rho1*(1.d0-c(i+i2,j+j2,k+k2)))
+!           ro3 = (rho2*c(i+i0+i2,j+j0+j2,k+k0+k2)+ &
+!                 rho1*(1.d0-c(i+i0+i2,j+j0+j2,k+k0+k2)))
+!
+!           uadv1 = interpole3(mom(i-i0+i2,j-j0+j2,k-k0+k2)/ro1,mom(i+i2,j+j2,k+k2)/ro2, &
+!                              mom(i+i0+i2,j+j0+j2,k+k0+k2)/ro3,AdvectionScheme,-a1)           
+!           uadv3 = interpole3(mom(i-i0+i2,j-j0+j2,k-k0+k2)/ro1,mom(i+i2,j+j2,k+k2)/ro2, &
+!                              mom(i+i0+i2,j+j0+j2,k+k0+k2)/ro3,AdvectionScheme,a2)           
+
            !momentum for full cells
            mm1 = dmax1(a1,0.0d0)
            mm2 = 1.d0 - mm1 + dmin1(0.d0,a2)
 
+           uavg = mom(i,j,k)/(rho2*c(i,j,k)+rho1*(1.d0-c(i,j,k)))
+!           uadv1 = uavg
+!           uadv3 = uavg
+           if (uavg.ne.0.d0) then
+           mom1(i,j,k)  = dmax1(-a1,0.d0)*mom(i,j,k)/uavg*uadv1
+           mom3(i,j,k)  = dmax1(a2,0.d0) *mom(i,j,k)/uavg*uadv3
+           mom2(i,j,k)  = mom(i,j,k) - mom1(i,j,k) - mom3(i,j,k)
+           else
            mom1(i,j,k)  = dmax1(-a1,0.d0)*mom(i,j,k)
            mom3(i,j,k)  = dmax1(a2,0.d0) *mom(i,j,k)
            mom2(i,j,k)  = mom(i,j,k) - mom1(i,j,k) - mom3(i,j,k)
-           uavg = mom(i,j,k)/(rho2*c(i,j,k)+rho1*(1.d0-c(i,j,k)))
+           endif
 !           if ((us(i,j,k)+us(i-i0,j-j0,k-k0)).gt.0.d0) then
 !               uavg = us(i-i0,j-j0,k-k0)
 !           else
@@ -495,13 +520,13 @@ subroutine swpzmom_stg(us,c,d,mom1,mom2,mom3,mom,dir,t)
                  x0(d)=a1
                  deltax(d)=-a1
                  vof = fl3dnew(nr,alpha,x0,deltax)
-                 mom1(i,j,k) = (rho2*vof + rho1*(-a1 - vof))*uavg
+                 mom1(i,j,k) = (rho2*vof + rho1*(-a1 - vof))*uadv1
               endif
               if(a2.gt.0d0) then
                  x0(d)=1d0
                  deltax(d)=a2
                  vof = fl3dnew(nr,alpha,x0,deltax)
-                 mom3(i,j,k) = (rho2*vof + rho1*(a2 - vof))*uavg
+                 mom3(i,j,k) = (rho2*vof + rho1*(a2 - vof))*uadv3
               endif
               x0(d)=mm1
               deltax(d)=mm2
