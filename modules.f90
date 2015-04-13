@@ -1623,17 +1623,25 @@ module module_BC
       implicit none
       integer :: j,k
       real(8) :: t
-      real(8) :: u0,y0,y1,uout
+      real(8) :: u0,y0,y1,ycjet,uout
       real(8), parameter :: SpreadRate = 0.1d0 
       real(8), parameter :: alpha = 0.88d0 
    
       if ( inject_type == 3 ) then ! 2d jet
-         y0 = SpreadRate*xLength+radius_gas_inject
-         y1 = y(j)/y0
-         u0 = ugas_inject*(radius_gas_inject*radius_gas_inject  & 
-                         - radius_liq_inject*radius_liq_inject) & 
-                         /y0/y0
-         uout = u0/COSH(alpha*y1)/COSH(alpha*y1)
+         ! planar jet similar velocity profile u=u0*f(y1), Pope 2000
+         ! int(f^2(y1))=4/(3*alpha)
+         y0    = SpreadRate*xLength
+         ycjet = radius_liq_inject+0.5d0*radius_gas_inject
+         ! liquid jet is negelected when u0 is computed
+         u0    = sqrt( ugas_inject*ugas_inject*(radius_gas_inject  & 
+                                              - radius_liq_inject) &
+                      /(y0*4.d0/3.d0/alpha) )
+         if ( y(j) > ycjet ) then 
+            y1    = (y(j)-ycjet)/y0
+            uout = u0/COSH(alpha*y1)/COSH(alpha*y1)
+         else 
+            uout = u0
+         end if ! y(j)
       end if ! inject_type
     end function uout
 !=================================================================================================
