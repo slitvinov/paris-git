@@ -51,7 +51,7 @@
       ! 3 marked as C node
       ! 4 marked as reference fluid 
       ! 5 marked as ghost layer
-   integer,parameter :: maxnum_diff_tag = 200  
+   integer,parameter :: maxnum_diff_tag = 300  
    integer :: total_num_tag,totalnum_drop,totalnum_drop_indep,num_new_drop
    integer, dimension(:), allocatable :: num_drop
    integer, dimension(:), allocatable :: num_drop_merge
