@@ -341,6 +341,7 @@ module module_flow
   real(8) :: dpdx_stat, dpdy_stat, dpdz_stat
   real(8) :: beta, MaxError,ErrorScaleHYPRE
   integer :: ResNormOrderPressure
+  integer :: HYPRESolverType
   integer :: maxit, it, itime_scheme, BuoyancyCase, drive
   integer :: sbx, sby, Nstep
   integer :: maxStep, itmax, iTimeStep, iTimeStepRestart
@@ -2080,12 +2081,20 @@ module module_poisson
   private
   public :: poi_initialize, poi_solve, poi_finalize
   interface
-     FUNCTION GetNumIterations (isolver,inum) &
+     FUNCTION GetNumIterationsSMG (isolver,inum) &
           bind(C, name="HYPRE_StructSMGGetNumIterations")
-       integer :: GetNumIterations
+       integer :: GetNumIterationsSMG
        integer :: inum
        integer (kind = 8) , VALUE :: isolver
-     END FUNCTION GetNumIterations
+     END FUNCTION GetNumIterationsSMG
+  end interface
+  interface
+     FUNCTION GetNumIterationsPFMG (isolver,inum) &
+          bind(C, name="HYPRE_StructPFMGGetNumIterations")
+       integer :: GetNumIterationsPFMG
+       integer :: inum
+       integer (kind = 8) , VALUE :: isolver
+     END FUNCTION GetNumIterationsPFMG
   end interface
   interface
      FUNCTION GetFinalRelative (isolver,rnum) &
@@ -2157,7 +2166,7 @@ module module_poisson
 !=================================================================================================
 ! Solve Poisson equation. p is initial guess. 
 !=================================================================================================
-  subroutine poi_solve(A,p,maxError,maxit,num_iterations)
+  subroutine poi_solve(A,p,maxError,maxit,num_iterations,HYPRESolverType)
     use module_timer
     use module_grid
     use iso_c_binding, only: c_int,c_int8_t
@@ -2171,10 +2180,10 @@ module module_poisson
     real(8), intent(in) :: maxError
     integer, intent(in) :: maxit
     integer, intent(out):: num_iterations
+    integer, intent(in) :: HYPRESolverType
 !     real(8) :: final_res_norm
-    integer :: hypreSolver = 1 
-    integer, parameter :: hypreSolver_SMG  = 1 
-    integer, parameter :: hypreSolver_PFMG = 2
+    integer, parameter :: HYPRESolverSMG  = 1 
+    integer, parameter :: HYPRESolverPFMG = 2
 #ifdef DEBUG_HYPRE
     real(8) :: timeConstruct,timeSetup,timeSolve,timeCleanup,timeTotal
 #endif
@@ -2237,14 +2246,14 @@ module module_poisson
 #ifdef DEBUG_HYPRE
    if ( rank == 0 ) timeSetup=MPI_WTIME(ierr)
 #endif
-   if ( hypreSolver == hypreSolver_SMG ) then 
+   if ( HYPRESolverType == HYPRESolverSMG ) then 
     call HYPRE_StructSMGCreate(mpi_comm_poi, solver, ierr)
     call HYPRE_StructSMGSetMaxIter(solver, maxit, ierr)
     call HYPRE_StructSMGSetTol(solver, MaxError, ierr)
     call hypre_structSMGsetLogging(solver, 1, ierr)
     call HYPRE_StructSMGSetPrintLevel(solver,1,ierr) 
     call HYPRE_StructSMGSetup(solver, Amat, Bvec, Xvec, ierr)
-   else if ( hypreSolver == hypreSolver_PFMG ) then  
+   else if ( HYPRESolverType == HYPRESolverPFMG ) then  
     call HYPRE_StructPFMGCreate(mpi_comm_poi, solver, ierr)
     call HYPRE_StructPFMGSetMaxIter(solver, maxit, ierr)
     call HYPRE_StructPFMGSetTol(solver, MaxError, ierr)
@@ -2254,7 +2263,7 @@ module module_poisson
     call HYPRE_StructPFMGSetRelaxType(solver, 3, ierr) 
     !Red/Black Gauss-Seidel (nonsymmetric: RB pre- and post-relaxation)
     call HYPRE_StructPFMGSetup(solver, Amat, Bvec, Xvec, ierr)
-   end if ! hypreSolver
+   end if ! HYPRESolverType
 #ifdef DEBUG_HYPRE
    if (rank == 0 ) then
       timeSetup = MPI_WTIME(ierr)-timeSetup
@@ -2265,12 +2274,13 @@ module module_poisson
 #ifdef DEBUG_HYPRE
    if ( rank == 0 ) timeSolve=MPI_WTIME(ierr)
 #endif
-   if ( hypreSolver == hypreSolver_SMG ) then 
-    call HYPRE_StructSMGSolve(solver, Amat, Bvec, Xvec, ierr)
-   else if ( hypreSolver == hypreSolver_PFMG ) then  
-    call HYPRE_StructPFMGSolve(solver, Amat, Bvec, Xvec, ierr)
-   end if ! hypreSolver
-    ierr = GetNumIterations(solver, num_iterations)
+   if ( HYPRESolverType == HYPRESolverSMG ) then 
+      call HYPRE_StructSMGSolve(solver, Amat, Bvec, Xvec, ierr)
+      ierr = GetNumIterationsSMG(solver, num_iterations)
+   else if ( HYPRESolverType == HYPRESolverPFMG ) then  
+      call HYPRE_StructPFMGSolve(solver, Amat, Bvec, Xvec, ierr)
+      ierr = GetNumIterationsPFMG(solver, num_iterations)
+   end if ! HYPRESolverType
 #ifdef DEBUG_HYPRE
    if (rank == 0 ) then
       timeSolve = MPI_WTIME(ierr)-timeSolve
@@ -2286,7 +2296,11 @@ module module_poisson
     nvalues = mx * my * mz
     allocate(values(nvalues), stat=ierr)
     call HYPRE_StructVectorGetBoxValues(Xvec, ilower, iupper, values, ierr)
-    call HYPRE_StructSMGDestroy(solver, ierr)
+    if ( HYPRESolverType == HYPRESolverSMG ) then 
+      call HYPRE_StructSMGDestroy(solver, ierr)
+    else if ( HYPRESolverType == HYPRESolverPFMG ) then  
+      call HYPRE_StructPFMGDestroy(solver, ierr)
+    end if ! HYPRESolverType
 #ifdef DEBUG_HYPRE
    if (rank == 0 ) then
       timeCleanup = MPI_WTIME(ierr)-timeCleanup
