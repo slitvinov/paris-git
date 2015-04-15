@@ -6,7 +6,7 @@
 #include <string.h>
 #include <math.h>
 
-#define MAXLINES 100000
+#define MAXLINES 98777
 
 void write_diffs_file(double x, double y, double z, double out, int read_flag, char param[20]);
 
@@ -92,6 +92,7 @@ int main(int argc, char * argv[]) // argc: argument count, # of arguments read f
       short int found;
   
       n_lines++;
+      // printf("%lg %lg %lg %lg \n",ref[0],ref[1],ref[2],ref[3]);
       // Now match line in serial file and calculate difference
       found = 0;
       serial_line = fscanf(mono,"%lg %lg %lg %lg",&comp[0],&comp[1],&comp[2],&comp[3]);
@@ -133,6 +134,7 @@ int main(int argc, char * argv[]) // argc: argument count, # of arguments read f
     fclose(par_file);
   }
   if (total_found >= 1) {error2 = sqrt(error2/total_found);}
+  printf("Total points compared: %10d \n",total_found);
   printf("L2 norm: %14.9f L_inf norm: %14.9f \n",error2,errmax);
   fclose(mono);
   fclose(par_holder);

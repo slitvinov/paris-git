@@ -3099,7 +3099,7 @@ subroutine write_par_var(varname,iout,var)
      close(21)
   endif
   OPEN(UNIT=20,FILE=TRIM(out_path)//'/'//TRIM(varname)//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout,padding))//'.3D')
-  write(20,13)'X Y Z Var'
+  !write(20,13)'X Y Z Var'
   do k=ks,ke; do j=js,je; do i=is,ie
      write(20,14)x(i),y(j),z(k),var(i,j,k)
   enddo;enddo;enddo
