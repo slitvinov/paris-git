@@ -187,8 +187,8 @@ contains
      alpha2 = 1.0d0/((val3-val2)**2.d0 + 1.d-16) 
      alpha  = alpha1 + alpha2
      slope_lim = (alpha1*(val2-val1)+alpha2*(val3-val2))/alpha 
-  else  
-    call pariserror("slope limiter not defined");
+!  else  
+!    call pariserror("slope limiter not defined");
   endif
   end function slope_lim 
   
