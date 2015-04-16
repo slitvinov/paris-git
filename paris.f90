@@ -1298,8 +1298,8 @@ end subroutine calcStats
          integer ::i,j,k
          character(len=100) :: filename
          filename = trim(out_path)//'/backup_turb_'//int2text(rank,padding)
-         call system('touch '//trim(filename)//'; mv '//trim(filename)//' '//trim(filename)//'.old')
-         OPEN(UNIT=101,FILE=trim(filename),status='unknown',action='write')
+         !call system('touch '//trim(filename)//'; mv '//trim(filename)//' '//trim(filename)//'.old')
+         OPEN(UNIT=101,FILE=trim(filename),status='REPLACE')
          write(101,*) iSumTurbStats
          do i=is,ie; do j=js,je
             write(101,'(2(E15.8,1X),83(E25.16,1X))') turb_vars(i,j,1:num_turb_vars)

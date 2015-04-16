@@ -2272,8 +2272,14 @@ module module_poisson
     call HYPRE_structPFMGsetLogging(solver, 1, ierr)
     call HYPRE_StructPFMGSetPrintLevel(solver,1,ierr) 
     call HYPRE_StructPFMGSetRelChange(solver, 1, ierr) 
-    call HYPRE_StructPFMGSetRelaxType(solver, 3, ierr) 
-    !Red/Black Gauss-Seidel (nonsymmetric: RB pre- and post-relaxation)
+    ! Relaxiation Method: 2 is the fastest if symm matrix 
+    ! 0: Joacobi
+    ! 1: Weighted Joacobi (default)
+    ! 2: Red/Black Gauss-Seidel (symmetric: RB pre- and post-relaxation)
+    ! 3: Red/Black Gauss-Seidel (nonsymmetric: RB pre- and post-relaxation)
+    call HYPRE_StructPFMGSetRelaxType(solver, 2, ierr) 
+    call HYPRE_StructPFMGSetNumPreRelax(solver, 1, ierr)
+    call HYPRE_StructPFMGSetNumPostRelax(solver, 1, ierr)
     call HYPRE_StructPFMGSetup(solver, Amat, Bvec, Xvec, ierr)
    else if ( HYPRESolverType == HYPRESolverGMRES ) then  
     call HYPRE_StructGMRESCreate(mpi_comm_poi, solver,ierr)
@@ -2287,7 +2293,7 @@ module module_poisson
     call HYPRE_StructPFMGSetTol(precond, 0.0, ierr)
     call HYPRE_StructPFMGSetZeroGuess(precond, ierr)
     call HYPRE_StructPFMGSetRelChange(precond, 1, ierr) 
-    call HYPRE_StructPFMGSetRelaxType(precond, 3, ierr) 
+    call HYPRE_StructPFMGSetRelaxType(precond, 2, ierr) 
     precond_id = 1   ! Set PFMG as preconditioner
     call HYPRE_StructGMRESSetPrecond(solver,precond_id,precond,ierr)
     call HYPRE_StructGMRESSetup(solver, Amat, Bvec, Xvec, ierr)
