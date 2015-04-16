@@ -2099,6 +2099,14 @@ module module_poisson
      END FUNCTION GetNumIterationsPFMG
   end interface
   interface
+     FUNCTION GetNumIterationsGMRES (isolver,inum) &
+          bind(C, name="HYPRE_StructGMRESGetNumIterations")
+       integer :: GetNumIterationsGMRES
+       integer :: inum
+       integer (kind = 8) , VALUE :: isolver
+     END FUNCTION GetNumIterationsGMRES
+  end interface
+  interface
      FUNCTION GetFinalRelative (isolver,rnum) &
           bind(C, name="HYPRE_StructSMGGetFinalRelativeResidualNorm")
        integer :: GetFinalRelative
@@ -2108,7 +2116,8 @@ module module_poisson
   end interface
 
   integer :: nstencil
-  integer (kind = 8) :: grid_obj, stencil, Amat, Bvec, Xvec, solver
+  integer (kind = 8) :: grid_obj, stencil, Amat, Bvec, Xvec, solver, precond
+  integer :: precond_id
   integer, dimension(:), allocatable :: stencil_indices, ilower, iupper
   integer :: mpi_comm_poi,is,ie,js,je,ks,ke,Mx,My,Mz
   integer, parameter :: ndim=3
@@ -2186,6 +2195,7 @@ module module_poisson
 !     real(8) :: final_res_norm
     integer, parameter :: HYPRESolverSMG  = 1 
     integer, parameter :: HYPRESolverPFMG = 2
+    integer, parameter :: HYPRESolverGMRES = 3
 #ifdef DEBUG_HYPRE
     real(8) :: timeConstruct,timeSetup,timeSolve,timeCleanup,timeTotal
 #endif
@@ -2259,12 +2269,28 @@ module module_poisson
     call HYPRE_StructPFMGCreate(mpi_comm_poi, solver, ierr)
     call HYPRE_StructPFMGSetMaxIter(solver, maxit, ierr)
     call HYPRE_StructPFMGSetTol(solver, MaxError, ierr)
-    call hypre_structPFMGsetLogging(solver, 1, ierr)
+    call HYPRE_structPFMGsetLogging(solver, 1, ierr)
     call HYPRE_StructPFMGSetPrintLevel(solver,1,ierr) 
     call HYPRE_StructPFMGSetRelChange(solver, 1, ierr) 
     call HYPRE_StructPFMGSetRelaxType(solver, 3, ierr) 
     !Red/Black Gauss-Seidel (nonsymmetric: RB pre- and post-relaxation)
     call HYPRE_StructPFMGSetup(solver, Amat, Bvec, Xvec, ierr)
+   else if ( HYPRESolverType == HYPRESolverGMRES ) then  
+    call HYPRE_StructGMRESCreate(mpi_comm_poi, solver,ierr)
+    call HYPRE_StructGMRESSetMaxIter(solver, maxit,ierr)
+    call HYPRE_StructGMRESSetTol(solver, MaxError, ierr)
+    !call HYPRE_StructGMRESSetLogging(solver, 1 ,ierr)
+    
+    ! Use PFMG as preconditioner
+    call HYPRE_StructPFMGCreate(mpi_comm_poi, precond, ierr)
+    call HYPRE_StructPFMGSetMaxIter(precond, 10, ierr)
+    call HYPRE_StructPFMGSetTol(precond, 0.0, ierr)
+    call HYPRE_StructPFMGSetZeroGuess(precond, ierr)
+    call HYPRE_StructPFMGSetRelChange(precond, 1, ierr) 
+    call HYPRE_StructPFMGSetRelaxType(precond, 3, ierr) 
+    precond_id = 1   ! Set PFMG as preconditioner
+    call HYPRE_StructGMRESSetPrecond(solver,precond_id,precond,ierr)
+    call HYPRE_StructGMRESSetup(solver, Amat, Bvec, Xvec, ierr)
    end if ! HYPRESolverType
 #ifdef DEBUG_HYPRE
    if (rank == 0 ) then
@@ -2282,6 +2308,9 @@ module module_poisson
    else if ( HYPRESolverType == HYPRESolverPFMG ) then  
       call HYPRE_StructPFMGSolve(solver, Amat, Bvec, Xvec, ierr)
       ierr = GetNumIterationsPFMG(solver, num_iterations)
+   else if ( HYPRESolverType == HYPRESolverGMRES ) then  
+      call HYPRE_StructGMRESSolve(solver, Amat, Bvec, Xvec, ierr)
+      ierr = GetNumIterationsGMRES(solver, num_iterations)
    end if ! HYPRESolverType
 #ifdef DEBUG_HYPRE
    if (rank == 0 ) then
@@ -2302,6 +2331,9 @@ module module_poisson
       call HYPRE_StructSMGDestroy(solver, ierr)
     else if ( HYPRESolverType == HYPRESolverPFMG ) then  
       call HYPRE_StructPFMGDestroy(solver, ierr)
+    else if ( HYPRESolverType == HYPRESolverGMRES ) then  
+      call HYPRE_StructGMRESDestroy(solver, ierr)
+      call HYPRE_StructPFMGDestroy(precond, ierr)
     end if ! HYPRESolverType
 #ifdef DEBUG_HYPRE
    if (rank == 0 ) then
