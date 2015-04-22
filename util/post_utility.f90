@@ -503,25 +503,25 @@ CONTAINS
 
     !End subroutine
   END SUBROUTINE write_master
-  
-  subroutine progress(j,max)
-  implicit none
-  integer(kind=4)::j,k,max
-  character(len=19)::bar="?????% |          |"
-  write(unit=bar(1:4),fmt="(f5.1)") (100/REAL(max))*REAL(j)
-  do k=1, INT((10/REAL(max))*REAL(j))
-    bar(8+k:8+k)="*"
-  enddo
-  ! print the progress bar.
-  write(unit=6,fmt="(a1,a19)",advance="no") char(13), bar
-  if (j/=max) then
-    flush(unit=6)
-  else
-    write(unit=6,fmt=*)
-  endif
-  return
-end subroutine progress
+
+  SUBROUTINE progress(j,max)
+    IMPLICIT NONE
+    INTEGER(KIND=4)::j,k,max
+    CHARACTER(LEN=19)::bar="?????% |          |"
+    WRITE(unit=bar(1:5),fmt="(f5.1)") (100/REAL(max))*REAL(j)
+    DO k=1, INT((10/REAL(max))*REAL(j))
+       bar(8+k:8+k)="*"
+    ENDDO
+    ! print the progress bar.
+    WRITE(unit=6,fmt="(a1,a19)",advance="no") char(13), bar
+    IF(j/=max) THEN
+       FLUSH(unit=6)
+    ELSE
+       WRITE(unit=6,fmt=*)
+    ENDIF
+    RETURN
+  END SUBROUTINE progress
 
 END PROGRAM post_utility
 
-  
+
