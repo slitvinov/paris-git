@@ -448,13 +448,15 @@ contains
   ! Tenth, maximum of the pressure gradient norm
   subroutine do_droplet_test(ts,output_time,delta_time)
     use module_flow
+    use module_io
     implicit none
     include 'mpif.h'
     integer :: i,j,k,ts, ierr
     real(8) :: vol, uvel, vvel, wvel, output_time, delta_v, delta_time
     real(8) :: grad1, grad2, grad3, norm_grad, local_norm, gn
+    real(8) :: xgc, ygc, zgc, rx, ry, rz
     real(8), dimension(9):: local_data, bgd
-    character*128 :: file_name
+    character*128 :: file_name, file_name2
     LOGICAL :: Found
     LOGICAL, SAVE :: first_open = .true.
     REAL(8), SAVE :: reference_vel
@@ -462,6 +464,7 @@ contains
     integer, SAVE :: counter = 0
     
     file_name = 'droplet_results'
+    file_name2 = 'inertia_data'
     ! Compute Local Stats
     local_data = 0d0
     bgd = 0d0
@@ -533,19 +536,19 @@ contains
     bgd(8) = bgd(8)/bgd(4)
     bgd(9) = bgd(9)/bgd(4)
     if(rank==0) then
-     if(first_open) then
-       OPEN(UNIT=88,FILE=TRIM(out_path)//TRIM(file_name)//'.dat')
-       write(88,18) ts,bgd(1),bgd(2),bgd(3),bgd(4),bgd(5),bgd(6),bgd(7),bgd(8),bgd(9),gn
-       CLOSE(88)
-       first_open = .false.
+     if(first_open .and. (restart .eqv. .false.)) then
+       !write(*, *) 'Hello'
+       OPEN(UNIT=89,FILE=TRIM(file_name)//'.dat')
+       write(89,18) ts,bgd(1),bgd(2),bgd(3),bgd(4),bgd(5),bgd(6),bgd(7),bgd(8),bgd(9),gn
+       CLOSE(89)
      else
-       OPEN(UNIT=88,FILE=TRIM(out_path)//TRIM(file_name)//'.dat',POSITION='append')
-       write(88,18) ts,bgd(1),bgd(2),bgd(3),bgd(4),bgd(5),bgd(6),bgd(7),bgd(8),bgd(9),gn
-       CLOSE(88)
+       OPEN(UNIT=89,FILE=TRIM(file_name)//'.dat',POSITION='append')
+       write(89,18) ts,bgd(1),bgd(2),bgd(3),bgd(4),bgd(5),bgd(6),bgd(7),bgd(8),bgd(9),gn
+       CLOSE(89)
      endif
     endif
     
-    !**Control part******************************************************
+    !**Control part***********************************************************************
     
     ! Saving reference velocity and inital position
     if (counter == 1) reference_vel = WallVel(1,1)
@@ -564,6 +567,58 @@ contains
       gz = -((bgd(9)-reference_pos(3))/reference_pos(3))*9.81d0    
     endif
     counter = counter + 1
+    
+    !**Intertia tensor********************************************************************
+    
+        ! Compute Local Stats
+    xgc = bgd(7)
+    ygc = bgd(8)
+    zgc = bgd(9)
+    
+    local_data = 0d0
+    bgd = 0d0
+    
+    
+    do k=ks,ke; do j=js,je; do i=is,ie;
+       vol = dx(i) * dy(j) * dz(k)
+       rx = x(i) - xgc
+       ry = y(j) - ygc
+       rz = z(k) - zgc 
+    	
+       !Computing Ixx
+       local_data(1) = local_data(1) + cvof(i,j,k)*(ry*ry + rz*rz)*vol
+       !Computing Iyy
+       local_data(2) = local_data(2) + cvof(i,j,k)*(rx*rx + rz*rz)*vol
+       !Computing Izz
+       local_data(3) = local_data(3) + cvof(i,j,k)*(rx*rx + ry*ry)*vol
+       !Computing Ixy
+       local_data(4) = local_data(4) - cvof(i,j,k)*rx*ry*vol
+       !Computing Ixz
+       local_data(5) = local_data(5) - cvof(i,j,k)*rx*rz*vol
+       !Computing Iyz
+       local_data(6) = local_data(6) - cvof(i,j,k)*ry*rz*vol
+       
+       
+    enddo; enddo; enddo	
+    
+    call MPI_ALLREDUCE(local_data, bgd, 9, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr)
+    
+    if(rank==0) then
+     if(first_open .and. (restart .eqv. .false.)) then
+       !write(*,*) 'About to write!'
+       OPEN(UNIT=88,FILE=TRIM(file_name2)//'.dat')
+       write(88, *) 'Timestep Ixx Iyy Izz Ixy Ixz Iyz'
+       write(88,18) ts,bgd(1),bgd(2),bgd(3),bgd(4),bgd(5),bgd(6)
+       CLOSE(88)
+       first_open = .false.
+     else
+       OPEN(UNIT=88,FILE=TRIM(file_name2)//'.dat',POSITION='append')
+       write(88,18) ts,bgd(1),bgd(2),bgd(3),bgd(4),bgd(5),bgd(6)
+       CLOSE(88)
+     endif
+    endif
+    
+    
         
     call output_droplet(w,output_time)
 18     format(I8.8,E14.6,E14.6,E14.6,E14.6,E14.6,E14.6,E14.6,E14.6,E14.6,E14.6)   
