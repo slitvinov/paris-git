@@ -26,7 +26,6 @@ PROGRAM post_utility
   INTEGER :: i, j, k, ierr2, dbfile, optlist, lfile_name
   !***************************************************************************************
 
-
   !
   ! Read input parameters of the program
   !
@@ -82,7 +81,7 @@ PROGRAM post_utility
      time = time + dt
      !CALL appendVariable()
      !CALL closeSilo()
-
+     if (rank == 0) call progress(counter,endCounter)
 
   ENDDO
 
@@ -504,6 +503,24 @@ CONTAINS
 
     !End subroutine
   END SUBROUTINE write_master
+  
+  subroutine progress(j,max)
+  implicit none
+  integer(kind=4)::j,k,max
+  character(len=19)::bar="?????% |          |"
+  write(unit=bar(1:4),fmt="(f5.1)") (100/REAL(max))*REAL(j)
+  do k=1, INT((10/REAL(max))*REAL(j))
+    bar(8+k:8+k)="*"
+  enddo
+  ! print the progress bar.
+  write(unit=6,fmt="(a1,a19)",advance="no") char(13), bar
+  if (j/=max) then
+    flush(unit=6)
+  else
+    write(unit=6,fmt=*)
+  endif
+  return
+end subroutine progress
 
 END PROGRAM post_utility
 
