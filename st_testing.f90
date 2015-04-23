@@ -1063,7 +1063,7 @@ end subroutine do_droplet_test
     !
     initial_displacement = 0
     call MPI_FILE_SET_VIEW(fh, 0_MPI_OFFSET_KIND, MPI_REAL8, &
-     type_sub_view_array, "native", MPI_STATUS_IGNORE, ierr)
+     type_sub_view_array, "native", MPI_INFO_NULL, ierr)
     !write(*, *) 'Before'
     !do k=kmin,kmax; do j=jmin,jmax; do i=imin,imax
     !   small_matrix(i,j,k) = REAL(cvof(i,j,k))
