@@ -39,132 +39,201 @@
   u_cmask = 3; v_cmask = 3; w_cmask = 3; pcmask = 3
   !First loop to set level 0 velocities in liq-liq and liq-gas cells
   
-  if (.not. imploding) then
-     do k=ks,ke; do j=js,je; do i=is,ie
-        if (vof_phase(i,j,k) == 1) then
-           if (vof_phase(i+1,j,k) == 0) then
-              u_cmask(i,j,k) = 0
-           endif
-           if (vof_phase(i,j+1,k) == 0) then
-              v_cmask(i,j,k) = 0
-           endif
-           if (vof_phase(i,j,k+1) == 0) then 
-              w_cmask(i,j,k) = 0
-           endif
-        endif
-        if (vof_phase(i,j,k) == 0) then
-           pcmask(i,j,k)=0
+  do k=ks,ke; do j=js,je; do i=is,ie
+     if (vof_phase(i,j,k) == 1) then
+        if (vof_phase(i+1,j,k) == 0) then
            u_cmask(i,j,k) = 0
+        endif
+        if (vof_phase(i,j+1,k) == 0) then
            v_cmask(i,j,k) = 0
+        endif
+        if (vof_phase(i,j,k+1) == 0) then 
            w_cmask(i,j,k) = 0
         endif
+     endif
+     if (vof_phase(i,j,k) == 0 .or. implode(i,j,k)>0) then
+        pcmask(i,j,k)=0
+        u_cmask(i,j,k)=0
+        v_cmask(i,j,k)=0
+        w_cmask(i,j,k)=0
+     endif
+  enddo; enddo; enddo
+  !fill ghost layers for zero masks
+  !call set_topology_bc
+  call ighost_x(u_cmask,2,req(1:4)); call ighost_x(v_cmask,2,req(5:8)); call ighost_x(w_cmask,2,req(9:12))
+  call ighost_x(pcmask,2,req(13:16)); call MPI_WAITALL(16,req(1:16),sta(:,1:16),ierr)
+  call ighost_y(u_cmask,2,req(1:4)); call ighost_y(v_cmask,2,req(5:8)); call ighost_y(w_cmask,2,req(9:12))
+  call ighost_y(pcmask,2,req(13:16)); call MPI_WAITALL(16,req(1:16),sta(:,1:16),ierr)
+  call ighost_z(u_cmask,2,req(1:4)); call ighost_z(v_cmask,2,req(5:8)); call ighost_z(w_cmask,2,req(9:12))
+  call ighost_z(pcmask,2,req(13:16)); call MPI_WAITALL(16,req(1:16),sta(:,1:16),ierr)
+  !Set levels 1 to X_level
+  do level=1,X_level
+     do k=ks,ke; do j=js,je; do i=is,ie
+        !u-neighbours
+        if (u_cmask(i,j,k)==3) then
+           if ((u_cmask(i+1,j,k)==level-1).or.(u_cmask(i-1,j,k)==level-1)&
+                .or.(u_cmask(i,j+1,k)==level-1).or.(u_cmask(i,j-1,k)==level-1)&
+                .or.(u_cmask(i,j,k+1)==level-1).or.(u_cmask(i,j,k-1)==level-1)) then
+              u_cmask(i,j,k)=level
+           endif
+        endif
+        !v-neighbours
+        if (v_cmask(i,j,k)==3) then
+           if ((v_cmask(i+1,j,k)==level-1).or.(v_cmask(i-1,j,k)==level-1)&
+                .or.(v_cmask(i,j+1,k)==level-1).or.(v_cmask(i,j-1,k)==level-1)&
+                .or.(v_cmask(i,j,k+1)==level-1).or.(v_cmask(i,j,k-1)==level-1)) then
+              v_cmask(i,j,k)=level
+           endif
+        endif
+        !w-neighbours
+        if (w_cmask(i,j,k)==3) then
+           if ((w_cmask(i+1,j,k)==level-1).or.(w_cmask(i-1,j,k)==level-1)&
+                .or.(w_cmask(i,j+1,k)==level-1).or.(w_cmask(i,j-1,k)==level-1)&
+                .or.(w_cmask(i,j,k+1)==level-1).or.(w_cmask(i,j,k-1)==level-1)) then
+              w_cmask(i,j,k)=level
+           endif
+        endif
+        !p-neighbours
+        if (pcmask(i,j,k)==3) then
+           if ((pcmask(i+1,j,k)==level-1).or.(pcmask(i-1,j,k)==level-1)&
+                .or.(pcmask(i,j+1,k)==level-1).or.(pcmask(i,j-1,k)==level-1)&
+                .or.(pcmask(i,j,k+1)==level-1).or.(pcmask(i,j,k-1)==level-1)) then
+              pcmask(i,j,k)=level
+           endif
+        endif
      enddo; enddo; enddo
-     !fill ghost layers for zero masks
-     !call set_topology_bc
      call ighost_x(u_cmask,2,req(1:4)); call ighost_x(v_cmask,2,req(5:8)); call ighost_x(w_cmask,2,req(9:12))
      call ighost_x(pcmask,2,req(13:16)); call MPI_WAITALL(16,req(1:16),sta(:,1:16),ierr)
      call ighost_y(u_cmask,2,req(1:4)); call ighost_y(v_cmask,2,req(5:8)); call ighost_y(w_cmask,2,req(9:12))
      call ighost_y(pcmask,2,req(13:16)); call MPI_WAITALL(16,req(1:16),sta(:,1:16),ierr)
      call ighost_z(u_cmask,2,req(1:4)); call ighost_z(v_cmask,2,req(5:8)); call ighost_z(w_cmask,2,req(9:12))
      call ighost_z(pcmask,2,req(13:16)); call MPI_WAITALL(16,req(1:16),sta(:,1:16),ierr)
-     !Set levels 1 to X_level
-     do level=1,X_level
-        do k=ks,ke; do j=js,je; do i=is,ie
-           !u-neighbours
-           if (u_cmask(i,j,k)==3) then
-              if ((u_cmask(i+1,j,k)==level-1).or.(u_cmask(i-1,j,k)==level-1)&
-                   .or.(u_cmask(i,j+1,k)==level-1).or.(u_cmask(i,j-1,k)==level-1)&
-                   .or.(u_cmask(i,j,k+1)==level-1).or.(u_cmask(i,j,k-1)==level-1)) then
-                 u_cmask(i,j,k)=level
-              endif
-           endif
-           !v-neighbours
-           if (v_cmask(i,j,k)==3) then
-              if ((v_cmask(i+1,j,k)==level-1).or.(v_cmask(i-1,j,k)==level-1)&
-                   .or.(v_cmask(i,j+1,k)==level-1).or.(v_cmask(i,j-1,k)==level-1)&
-                   .or.(v_cmask(i,j,k+1)==level-1).or.(v_cmask(i,j,k-1)==level-1)) then
-                 v_cmask(i,j,k)=level
-              endif
-           endif
-           !w-neighbours
-           if (w_cmask(i,j,k)==3) then
-              if ((w_cmask(i+1,j,k)==level-1).or.(w_cmask(i-1,j,k)==level-1)&
-                   .or.(w_cmask(i,j+1,k)==level-1).or.(w_cmask(i,j-1,k)==level-1)&
-                   .or.(w_cmask(i,j,k+1)==level-1).or.(w_cmask(i,j,k-1)==level-1)) then
-                 w_cmask(i,j,k)=level
-              endif
-           endif
-           !p-neighbours
-           if (pcmask(i,j,k)==3) then
-              if ((pcmask(i+1,j,k)==level-1).or.(pcmask(i-1,j,k)==level-1)&
-                   .or.(pcmask(i,j+1,k)==level-1).or.(pcmask(i,j-1,k)==level-1)&
-                   .or.(pcmask(i,j,k+1)==level-1).or.(pcmask(i,j,k-1)==level-1)) then
-                 pcmask(i,j,k)=level
-              endif
-           endif
-        enddo; enddo; enddo
-        call ighost_x(u_cmask,2,req(1:4)); call ighost_x(v_cmask,2,req(5:8)); call ighost_x(w_cmask,2,req(9:12))
-        call ighost_x(pcmask,2,req(13:16)); call MPI_WAITALL(16,req(1:16),sta(:,1:16),ierr)
-        call ighost_y(u_cmask,2,req(1:4)); call ighost_y(v_cmask,2,req(5:8)); call ighost_y(w_cmask,2,req(9:12))
-        call ighost_y(pcmask,2,req(13:16)); call MPI_WAITALL(16,req(1:16),sta(:,1:16),ierr)
-        call ighost_z(u_cmask,2,req(1:4)); call ighost_z(v_cmask,2,req(5:8)); call ighost_z(w_cmask,2,req(9:12))
-        call ighost_z(pcmask,2,req(13:16)); call MPI_WAITALL(16,req(1:16),sta(:,1:16),ierr)
-     enddo
-
-  else
-     pcmask = 0; u_cmask = 0; v_cmask = 0; w_cmask = 0 !Set masks to zero 
-  endif
+  enddo
 end subroutine set_topology
 !-------------------------------------------------------------------------------------------------
-subroutine check_topology(vof_phase,iout)
+subroutine check_topology(c,phase,iout)
   use module_grid
+  use module_2phase
   use module_freesurface
   use module_IO
+  use module_flow
   use module_BC
+  use module_Lag_part
   implicit none
   include 'mpif.h' 
-  integer, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: vof_phase
-  integer :: i,j,k,iout,ierr
-  integer :: level3, l3sum
-  !Count level 3
-  level3 = 0
-  do k=ks,ke; do j=js,je; do i=is,ie
-     if (pcmask(i,j,k)==3) level3 = level3 + 1
-  enddo; enddo; enddo
-  call MPI_ALLREDUCE(level3,l3sum, 1, MPI_INTEGER, MPI_SUM, MPI_COMM_Active, ierr)
-  !Check, set alarm
-  if (l3sum <= 10) then
-     imploding=.true.
-     if (rank==0) write(*,'("IMPLODING BUBBLE DETECTED")')
-     !if (rank==0) write(*,'("Total L3: ",I8)')level3   
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: c
+  integer, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: phase
+  real(8) :: volume
+  integer :: dropid
+  integer :: i,j,k,iout,ierr,bub
+  logical :: remove,signal
+  !cycle through bubs first maybe? Use lagrangian approach rather than Eulerian, since there are much less bubble 
+  ! parts which may be imploding than discrete points!
+  signal = .false.
+!!$  write(*,'("Timestep: ",I4," Total gas segments: ",I4)')iout,total_num_tag
+!!$  do bub=1,total_num_tag 
+!!$     !write(*,'("BUB counter: ",I4," in rank:",I4)')bub,rank
+!!$     if (rank==tag_rank(bub)) then 
+!!$        dropid = tag_dropid(bub)
+!!$        if (.not.(tag_mergeflag(bub) == 1 .or. tag_mergeflag(bub) == 0)) then
+!!$           write(*,'("ERROR. Bub index, bub nr LPP, rank",3I8)')bub,dropid,rank
+!!$           call pariserror('Error in Lagrangian loop')
+!!$        endif
+!!$        if (tag_mergeflag(bub) == 1) then
+!!$           volume = drops_merge(dropid)%element%vol
+!!$        else
+!!$           volume = drops(dropid)%element%vol
+!!$        endif
+!!$        write(*,'("BUB IN RANK nr: ",I4," Bub # (rank local): ",I4," Bub counter: ",I4," Volume: ",e14.5)')rank,dropid,bub,volume
+!!$        if (volume > 1d-12) then
+!!$           if (volume < 125.0*dx(is)**3.d0) then
+!!$              call bub_implode(dropid)
+!!$           endif
+!!$        else
+!!$           write(*,'("Bubble volume error in topology check. Vol from table: ",e14.5)')volume
+!!$        endif
+!!$     endif
+!!$  enddo
+
+  if (num_drop(rank)>0) then
+     do bub=1,num_drop(rank)
+        dropid = drops(bub)%element%id
+        if (.not.(rank==tag_rank(dropid))) write(*,*)"Full bub loop issue"
+        if (.not.(tag_mergeflag(dropid) == 1 .or. tag_mergeflag(dropid) == 0)) then
+           write(*,'("ERROR. Bub index, rank",3I8)')bub,rank
+           call pariserror('Error in Lagrangian loop')
+        endif
+        volume = drops(bub)%element%vol
+!!$        write(*,'("Contained LOOP BUB IN RANK nr: ",I4," Bub counter: ",I4," Volume: ",e14.5)')&
+!!$             rank,bub,volume
+        if (volume > 1d-12) then
+           if (volume < 125.0*dx(is)**3.d0) then
+              
+              call bub_implode(bub)
+           endif
+        else
+           write(*,'("Bubble volume error in topology check. Vol from table: ",e14.5)')volume
+        endif
+     enddo
   endif
 
-  if (imploding) then
-     call divergence_l3(v_source,v_total)
-     pcmask = 0; u_cmask = 0; v_cmask = 0; w_cmask = 0 !Set masks to zero 
-     if (rank==0) write(*,'("Total L3, v_source: ",I8,e14.5)') level3,v_total
+  if ( num_drop_merge(rank) > 0 ) then 
+     do bub=1,num_drop_merge(rank)
+        dropid = drops_merge(bub)%element%id
+        if (.not.(rank==tag_rank(dropid))) write(*,*)"Merged bub loop issue"
+        if (.not.(tag_mergeflag(dropid) == 1 .or. tag_mergeflag(dropid) == 0)) then
+           write(*,'("ERROR. Bub index, rank",3I8)')bub,rank
+           call pariserror('Error in Lagrangian loop')
+        endif
+        volume = drops_merge(bub)%element%vol
+!!$        write(*,'("Merged loop BUB IN RANK nr: ",I4," Bub counter: ",I4," Volume: ",e14.5)')&
+!!$             rank,bub,volume
+        if (volume > 1d-12) then
+           if (volume < 125.0*dx(is)**3.d0) then
+              call bub_implode(bub)
+           endif
+        else
+           write(*,'("Bubble volume error in topology check. Vol from table: ",e14.5)')volume
+        endif
+     enddo
   endif
+  if (signal) write(*,'("COLLAPSING BUBBLE DETECTED IN RANK: ",I4)')rank
+  
 contains 
-  subroutine divergence_l3(v_source,v_s)
+  subroutine bub_implode(bub_id)
     use module_flow
     implicit none
-    real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(out) :: v_source
-    real(8) :: v_s
-    real(8) :: div3, totaldiv
+    integer :: i,j,k,bub_id,inbr,jnbr,knbr
 
-    div3 = 0.d0
-    v_source(i,j,k) = 0.d0
+    remove = .false.
     do k=ks,ke; do j=js,je; do i=is,ie
-       if (vof_phase(i,j,k)==1) then
-          div3 = div3+(u(i-1,j,k)-u(i,j,k))/dx(i)+&
-               (v(i,j-1,k)-v(i,j,k))/dy(j)+(w(i,j,k-1)-w(i,j,k))/dz(k)
-          v_source(i,j,k) = (u(i-1,j,k)-u(i,j,k))/dx(i)+&
-               (v(i,j-1,k)-v(i,j,k))/dy(j)+(w(i,j,k-1)-w(i,j,k))/dz(k)
+       if (phase(i,j,k)==0) v_source(i,j,k) = 0.d0 ! since source is Eulerian, the moving interface may cause source to move from gas to liq
+       if (phase(i,j,k)==1) then !check if gas phase
+          if (tag_dropid(tag_id(i,j,k))==bub_id) then !check if we are in the correct bubble
+             implode(i,j,k) = implode(i,j,k)+1
+             if (implode(i,j,k)==1) then !check if it is the first time step after implosion
+                v_source(i,j,k) = (u(i-1,j,k)-u(i,j,k))/dx(i)+&
+                     (v(i,j-1,k)-v(i,j,k))/dy(j)+(w(i,j,k-1)-w(i,j,k))/dz(k)
+                signal = .true.
+             else
+                v_source(i,j,k)=0.9*v_source(i,j,k)
+             endif
+             if (implode(i,j,k)==10) then ! after 10 steps, remove bubble
+                c(i,j,k) = 0.d0
+                remove =.true.
+             endif
+          endif
        endif
     enddo; enddo; enddo
-    call MPI_ALLREDUCE(div3,totaldiv,4, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_Cart, ierr)
-    v_s = totaldiv
-  end subroutine divergence_l3
+    if (remove) then
+       write(*,*)"BUBBLE VOF TRACES TO BE REMOVED"
+       do k=ks,ke; do j=js,je; do i=is,ie
+          if (tag_dropid(tag_id(i,j,k))==bub_id) then
+             c(i,j,k) = 0.d0
+          endif
+       enddo; enddo; enddo
+    endif
+  end subroutine bub_implode
 end subroutine check_topology
 !=================================================================================================
 !
@@ -353,14 +422,12 @@ subroutine FreeSolver(A,p,maxError,beta,maxit,it,ierr,iout,time,tres2)
      OPEN(UNIT=89,FILE=TRIM(out_path)//'/convergence_history-'//TRIM(int2text(itime,padding))//'.txt')
   endif
   itime=itime+1
-  if (solver_flag==1) then
-     call get_bubble_pressure(iout,time,P_gas)
-  endif
+  if (solver_flag==1) call get_bubble_pressure(P_gas)
 2 format(2e14.5)
   if (solver_flag == 0) call pariserror("Free Surface solver flag needs to be 1 or 2")
   do k=ks,ke; do j=js,je; do i=is,ie
-     if (solver_flag == 1 .and. pcmask(i,j,k) /= 0) p(i,j,k) = P_gas(i,j,k)
-     if (solver_flag == 2 .and. pcmask(i,j,k)==3) p(i,j,k) = 0.d0
+     if (solver_flag==1 .and. pcmask(i,j,k)/=0) p(i,j,k) = P_gas(i,j,k)
+     if (solver_flag==2 .and. pcmask(i,j,k)==3) p(i,j,k) = 0.d0
   enddo; enddo; enddo
   !--------------------------------------ITERATION LOOP--------------------------------------------  
   do it=1,maxit
@@ -409,7 +476,11 @@ subroutine FreeSolver(A,p,maxError,beta,maxit,it,ierr,iout,time,tres2)
     call MPI_ALLREDUCE(resinf, resinf_all, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_Comm_Cart, ierr)
     call MPI_ALLREDUCE(cells, tcells, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr)
     if(norm==2) tres2=sqrt(tres2)
-    tres2 = tres2/tcells
+    if (tcells >= 0) then
+       tres2 = tres2/tcells
+    else
+       tres2 = 0
+    endif
     if(rank==0.and.mod(it,10) == 0.and.recordconvergence) write(89,310) it, solver_flag, tres2
 310 format(2I6,'  ',(e14.5))
     if (.not. use_L_inf) then
@@ -794,19 +865,19 @@ subroutine debug_details(i,j,k,A)
   close(40)
 end subroutine debug_details
 !====================================================================================================================================================
-subroutine setuppoisson_fs_new(utmp,vtmp,wtmp,vof_phase,rhot,dt,A,cvof,n1,n2,n3,kap)
+subroutine setuppoisson_fs_new(utmp,vtmp,wtmp,vof_phase,rho,dt,A,cvof,n1,n2,n3,kap)
   use module_grid
   use module_freesurface
   use module_IO
   implicit none
   include 'mpif.h'
-  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: utmp,vtmp,wtmp,rhot
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: utmp,vtmp,wtmp
   !real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: umask,vmask,wmask
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: kap
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: cvof,n1,n2,n3
   real(8), dimension(is:ie,js:je,ks:ke,8), intent(inout) :: A
   integer, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: vof_phase
-  real(8) :: dt
+  real(8) :: dt, rho
   integer :: i,j,k,nbr
   integer :: req(24),sta(MPI_STATUS_SIZE,24)
   
@@ -816,8 +887,15 @@ subroutine setuppoisson_fs_new(utmp,vtmp,wtmp,vof_phase,rhot,dt,A,cvof,n1,n2,n3,
      call liq_gas()
   else !(solver_flag == 2)   
      if (.not.(solver_flag==2)) call pariserror('ERROR: Solver flag for FS must be set to either 1 or 2')
+     !if (solver_flag==2 .and. imploding) call pariserror('If imploding, 2nd projection should not be performed')
      do k=ks,ke; do j=js,je; do i=is,ie
         if (pcmask(i,j,k)==1 .or. pcmask(i,j,k)==2) then !rho is 1d0
+
+!!$           if (solver_flag==2 .and. imploding) then
+!!$              write(*,'("p mask, vof_phase",2I8)')pcmask(i,j,k),vof_phase(i,j,k)
+!!$              call pariserror('If imploding, 2nd projection should not be performed')
+!!$           endif
+              
            A(i,j,k,1) = 1.d0/(dx(i)*dxh(i-1))
            A(i,j,k,2) = 1.d0/(dx(i)*dxh(i))
            A(i,j,k,3) = 1.d0/(dy(j)*dyh(j-1))
@@ -843,7 +921,6 @@ subroutine setuppoisson_fs_new(utmp,vtmp,wtmp,vof_phase,rhot,dt,A,cvof,n1,n2,n3,
            endif
            A(i,j,k,7) = sum(A(i,j,k,1:6))
            if (A(i,j,k,7)<1.d-12) pcmask(i,j,k) = 0 !Fix for isolated cav cells.
-
            A(i,j,k,8) =  -1d0*((utmp(i,j,k)-utmp(i-1,j,k))/dx(i) &
                 +  (vtmp(i,j,k)-vtmp(i,j-1,k))/dy(j) &
                 +  (wtmp(i,j,k)-wtmp(i,j,k-1))/dz(k))
@@ -874,19 +951,19 @@ contains
 
     do k=ks,ke; do j=js,je; do i=is,ie
        
-       if (imploding .and. vof_phase(i,j,k) == 1) Source = -5.d-1*v_source(i,j,k)
-       A(i,j,k,1) = dt/(dx(i)*dx(i)*rhot(i,j,k))
-       A(i,j,k,2) = dt/(dx(i)*dx(i)*rhot(i,j,k))
-       A(i,j,k,3) = dt/(dy(j)*dy(j)*rhot(i,j,k))
-       A(i,j,k,4) = dt/(dy(j)*dy(j)*rhot(i,j,k))
-       A(i,j,k,5) = dt/(dz(k)*dz(k)*rhot(i,j,k))
-       A(i,j,k,6) = dt/(dz(k)*dz(k)*rhot(i,j,k))
+       !if (imploding .and. vof_phase(i,j,k) == 1) Source = v_source(i,j,k)
+       A(i,j,k,1) = dt/(dx(i)*dx(i)*rho)
+       A(i,j,k,2) = dt/(dx(i)*dx(i)*rho)
+       A(i,j,k,3) = dt/(dy(j)*dy(j)*rho)
+       A(i,j,k,4) = dt/(dy(j)*dy(j)*rho)
+       A(i,j,k,5) = dt/(dz(k)*dz(k)*rho)
+       A(i,j,k,6) = dt/(dz(k)*dz(k)*rho)
        A(i,j,k,7) = sum(A(i,j,k,1:6))
        A(i,j,k,8) =  -(Source + (utmp(i,j,k)-utmp(i-1,j,k))/dx(i) &
             +  (vtmp(i,j,k)-vtmp(i,j-1,k))/dy(j) &
             +  (wtmp(i,j,k)-wtmp(i,j,k-1))/dz(k) )
 
-       if (.not. imploding) then
+       !if (.not. imploding) then
           !----Cav-liquid neighbours, set P_g in cavity cells
           if(vof_phase(i,j,k)==1) then
              do l=-1,1,2
@@ -1178,22 +1255,22 @@ contains
                 endif
              endif
           endif
-       endif
+       !endif
     enddo; enddo; enddo
     call ghost_x(P_gx,1,req(1:4)); call ghost_y(P_gy,1,req(5:8)); call ghost_z(P_gz,1,req(9:12)) 
     call ghost_x(x_mod,1,req(13:16)); call ghost_y(y_mod,1,req(17:20)); call ghost_z(z_mod,1,req(21:24)) 
     call MPI_WAITALL(24,req(1:24),sta(:,1:24),ierr)
     !--------------------------------------------------------------------------------------------------------
     do k=ks,ke; do j=js,je; do i=is,ie
-       if (vof_phase(i,j,k)==0 .and. .not.(imploding)) then
-          A(i,j,k,1) = dt/(dx(i)*x_mod(i-1,j,k)*rhot(i,j,k))
-          A(i,j,k,2) = dt/(dx(i)*x_mod(i  ,j,k)*rhot(i,j,k))
-          A(i,j,k,3) = dt/(dy(j)*y_mod(i,j-1,k)*rhot(i,j,k))
-          A(i,j,k,4) = dt/(dy(j)*y_mod(i,j  ,k)*rhot(i,j,k))
-          A(i,j,k,5) = dt/(dz(k)*z_mod(i,j,k-1)*rhot(i,j,k))
-          A(i,j,k,6) = dt/(dz(k)*z_mod(i,j,k  )*rhot(i,j,k))
+       if (vof_phase(i,j,k)==0) then! .and. .not.(imploding)) then
+          A(i,j,k,1) = dt/(dx(i)*x_mod(i-1,j,k)*rho)
+          A(i,j,k,2) = dt/(dx(i)*x_mod(i  ,j,k)*rho)
+          A(i,j,k,3) = dt/(dy(j)*y_mod(i,j-1,k)*rho)
+          A(i,j,k,4) = dt/(dy(j)*y_mod(i,j  ,k)*rho)
+          A(i,j,k,5) = dt/(dz(k)*z_mod(i,j,k-1)*rho)
+          A(i,j,k,6) = dt/(dz(k)*z_mod(i,j,k  )*rho)
           A(i,j,k,7) = sum(A(i,j,k,1:6))
-          A(i,j,k,8) = A(i,j,k,8) + dt/rhot(i,j,k)*&
+          A(i,j,k,8) = A(i,j,k,8) + dt/rho*&
                (P_gx(i+1,j,k)/(dx(i)*x_mod(i,j,k))+P_gx(i-1,j,k)/(dx(i)*x_mod(i-1,j,k))&
                +P_gy(i,j+1,k)/(dy(j)*y_mod(i,j,k))+P_gy(i,j-1,k)/(dy(j)*y_mod(i,j-1,k))&
                +P_gz(i,j,k+1)/(dz(k)*z_mod(i,j,k))+P_gz(i,j,k-1)/(dz(k)*z_mod(i,j,k-1)))
@@ -1202,7 +1279,6 @@ contains
                   y_mod(i,j-1,k),y_mod(i,j,k),z_mod(i,j,k-1),z_mod(i,j,k)
              write(*,'("A8 NaN, error imminent. P_g :",6e14.5,2I8)')P_gx(i-1,j,k),P_gx(i+1,j,k),&
                   P_gy(i,j-1,k),P_gy(i,j+1,k),P_gz(i,j,k-1),P_gz(i,j,k+1),i,k
-             write(*,'("rho :",e14.5)')rhot(i,j,k)
           endif
           if (pcmask(i,j,k).ne.0) write(*,'("Error topology, phase 0, pcmask :",i8)')pcmask(i,j,k)
        endif
@@ -1212,57 +1288,53 @@ contains
   end subroutine liq_gas
 end subroutine setuppoisson_fs_new
 !==================================================================================================================
-subroutine get_bubble_pressure(iout,time_send,P_g)
+subroutine tag_bubbles(iout,time_stats)
+  use module_grid
+  use module_Lag_part
+  implicit none
+  real(8) :: time_stats
+  integer :: iout
+  
+  call tag_drop()
+  if ( nPdomain > 1 ) call tag_drop_all
+  call CreateTag2DropTable
+  if ( nPdomain > 1 ) call merge_drop_pieces
+  !call output_tag(iout,is,ie+1,js,je+1,ks,ke+1)
+  if ( MOD(iout,nstats) == 0 ) call drop_statistics(iout,time_stats)
+end subroutine tag_bubbles
+!==================================================================================================================
+subroutine get_bubble_pressure(P_g)
   use module_grid
   use module_Lag_part
   use module_freesurface
   use module_IO
   implicit none
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax) :: P_g
-  real(8) :: time_send, volume
-  integer :: i,j,k,c,iout,index,prank,nr,dropid
-  P_g = 0d0
-  call tag_drop()
-  if ( nPdomain > 1 ) call tag_drop_all
-  call CreateTag2DropTable
-  if ( nPdomain > 1 ) call merge_drop_pieces
-  !call output_tag(iout,is,ie+1,js,je+1,ks,ke+1)
-  if ( MOD(iout,nstats) == 0 ) call drop_statistics(iout,time)
-!!$  do nr = 1,num_drop_merge(rank)
-!!$     volume=drops_merge(nr)%element%vol
-!!$     write(*,'("Volume of merged bubble ",I4," in rank ",I4," :  ",e14.5)')&
-!!$          drops_merge(nr)%element%id,rank,volume
-!!$     write(*,'("Expected pressure in bub ",I4," in rank ",I4,": ",e14.5)')&
-!!$          tag_dropid(drops_merge(nr)%element%id),rank,P_ref*(V_0/volume)**gamma
-!!$  enddo
-!!$
-!!$  do nr = 1,num_drop(rank)
-!!$     volume=drops(nr)%element%vol
-!!$     write(*,'("Volume of bubble ",I4," in rank ",I4," :  ",e14.5)')&
-!!$          drops(nr)%element%id,rank,volume
-!!$     write(*,'("Expected pressure in bub ",I4," in rank ",I4,": ",e14.5)')&
-!!$          tag_dropid(drops(nr)%element%id),rank,P_ref*(V_0/volume)**gamma
-!!$  enddo
-
-  !write(*,'("Parametes for eqn of state. P_ref,V_ref,gamma: ",3e14.5)')P_ref,V_0,gamma
-  do k=ks,ke; do j=js,je; do i=is,ie
-     if (pcmask(i,j,k) /= 0) then
-        dropid = tag_dropid(tag_id(i,j,k))
-        if (.not.(tag_mergeflag(tag_id(i,j,k)) == 1 .or. tag_mergeflag(tag_id(i,j,k)) == 0)) then
-           call pariserror('Merge tag should be 0 or 1')
+  real(8) :: volume
+  integer :: i,j,k,dropid
+  
+  if (P_ref > 1.d-12) then
+     do k=ks,ke; do j=js,je; do i=is,ie
+        if (pcmask(i,j,k) /= 0) then
+           dropid = tag_dropid(tag_id(i,j,k))
+           if (.not.(tag_mergeflag(tag_id(i,j,k)) == 1 .or. tag_mergeflag(tag_id(i,j,k)) == 0)) then
+              call pariserror('Merge tag should be 0 or 1')
+           endif
+           if (tag_mergeflag(tag_id(i,j,k)) == 1) then
+              volume = drops_merge(dropid)%element%vol
+           else
+              volume = drops(dropid)%element%vol
+           endif
+           if (volume > 1d-12) then
+              P_g(i,j,k) = P_ref*(V_0/volume)**gamma
+           else
+              write(*,'("Bubble volume error in FreeSolver. Vol from table: ",e14.5)')volume
+           endif
         endif
-        if (tag_mergeflag(tag_id(i,j,k)) == 1) then
-           volume = drops_merge(dropid)%element%vol
-        else
-           volume = drops(dropid)%element%vol
-        endif
-        if (volume > 1d-12) then
-           P_g(i,j,k) = P_ref*(V_0/volume)**gamma
-        else
-           write(*,'("Bubble volume error. Vol from table: ",e14.5)')volume
-        endif
-     endif
-  enddo;enddo;enddo
+     enddo;enddo;enddo
+  else 
+     P_g = 0.d0
+  endif
   call ReleaseTag2DropTable
 end subroutine get_bubble_pressure
 !==================================================================================================================

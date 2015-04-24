@@ -384,12 +384,13 @@ contains
     vof_phase = 2
     !allocate matrices for Free Surface
     if(FreeSurface) then
-        allocate(u_cmask(imin:imax,jmin:jmax,kmin:kmax), v_cmask(imin:imax,jmin:jmax,kmin:kmax), &
+       allocate(u_cmask(imin:imax,jmin:jmax,kmin:kmax), v_cmask(imin:imax,jmin:jmax,kmin:kmax), &
             w_cmask(imin:imax,jmin:jmax,kmin:kmax), x_mod(imin:imax,jmin:jmax,kmin:kmax), &
             y_mod(imin:imax,jmin:jmax,kmin:kmax), z_mod(imin:imax,jmin:jmax,kmin:kmax), &
             P_gx(imin:imax,jmin:jmax,kmin:kmax), P_gy(imin:imax,jmin:jmax,kmin:kmax),&
             P_gz(imin:imax,jmin:jmax,kmin:kmax), pcmask(imin:imax,jmin:jmax,kmin:kmax), &
-            p_ext(imin:imax,jmin:jmax,kmin:kmax), v_source(imin:imax,jmin:jmax,kmin:kmax))
+            p_ext(imin:imax,jmin:jmax,kmin:kmax), v_source(imin:imax,jmin:jmax,kmin:kmax),&
+            implode(is:ie,js:je,ks:ke))
        u_cmask = 3; v_cmask = 3; w_cmask = 3
        v_source = 0.d0
        x_mod = dxh((is+ie)/2); y_mod = dyh((js+je)/2); z_mod = dzh((ks+ke)/2)
@@ -397,7 +398,8 @@ contains
        pcmask=3; p_ext=0d0
        initialize_fs = .true.
        vtk_open = .false.
-       imploding = .false.
+       !imploding = .false.; triggered = .false.
+       implode = 0
     endif
     if ( itime_scheme == 2 ) then  
       allocate(cvofold(imin:imax,jmin:jmax,kmin:kmax))

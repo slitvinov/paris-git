@@ -262,6 +262,8 @@ Program paris
               call my_timer(8)
               if (FreeSurface) then
                  call get_normals()
+                 call tag_bubbles(itimestep,time)
+                 call check_topology(cvof,vof_phase,itimestep)
                  call set_topology(vof_phase,itimestep) !vof_phase updated in vofsweeps
               elseif (.not.Freesurface .and. debug_par) then
                  call get_all_curvatures(tmp,itimestep)
@@ -355,7 +357,7 @@ Program paris
            else 
               call get_all_curvatures(kappa_fs,itimestep)
               solver_flag = 1
-              call Setuppoisson_fs_new(u,v,w,vof_phase,rho,dt,A,cvof,n1,n2,n3,kappa_fs)
+              call Setuppoisson_fs_new(u,v,w,vof_phase,rho1,dt,A,cvof,n1,n2,n3,kappa_fs)
            endif
            ! (div u)*dt < epsilon => div u < epsilon/dt => maxresidual : maxerror/dt 
            if(HYPRE)then
@@ -416,49 +418,47 @@ Program paris
 
 !----------------------------------EXTRAPOLATION FOR FREE SURFACE---------------------------------
            if (DoVOF .and. FreeSurface) then
-              if (.not. imploding) then
-                 call extrapolate_velocities()
-                 solver_flag = 2
-                 call setuppoisson_fs_new(u,v,w,vof_phase,rho,dt,A,cvof,n1,n2,n3,kappa_fs)
-                 if(HYPRE)then !HYPRE will not work with removed nodes from domain.
-                    call pariserror("HYPRE solver not yet available for Free Surfaces")
-                 else
-                    call FreeSolver(A,p_ext,maxError/MaxDt,beta,maxit,it,ierr,itimestep,time,residual)
-                 endif
-                 if(mod(itimestep,termout)==0) then
-                    if(rank==0) then
-                       write(*,'("FS2:          pressure residual:   ",e7.1,&
-                            &" maxerror: ",e7.1)') residual*dt,maxerror
-                       write(*,'("              pressure iterations :",I9)')it
-                    endif
-                 endif
-                 ! Correct ONLY masked gas velocities at level 1 and 2
-                 do k=ks,ke;  do j=js,je; do i=is,ieu    ! CORRECT THE u-velocity 
-                    if (u_cmask(i,j,k)==1 .or. u_cmask(i,j,k)==2) then
-                       u(i,j,k)=u(i,j,k)-(p_ext(i+1,j,k)-p_ext(i,j,k))/dxh(i)
-                    else if (u_cmask(i,j,k)==3) then
-                       u(i,j,k) = 0d0
-                    endif
-                 enddo; enddo; enddo
-
-                 do k=ks,ke;  do j=js,jev; do i=is,ie    ! CORRECT THE v-velocity
-                    if (v_cmask(i,j,k)==1 .or. v_cmask(i,j,k)==2) then
-                       v(i,j,k)=v(i,j,k)-(p_ext(i,j+1,k)-p_ext(i,j,k))/dyh(j)
-                    else if (v_cmask(i,j,k)==3) then
-                       v(i,j,k) = 0d0
-                    endif
-                 enddo; enddo; enddo
-
-                 do k=ks,kew;  do j=js,je; do i=is,ie   ! CORRECT THE w-velocity
-                    if (w_cmask(i,j,k)==1 .or. w_cmask(i,j,k)==2) then
-                       w(i,j,k)=w(i,j,k)-(p_ext(i,j,k+1)-p_ext(i,j,k))/dzh(k)
-                    else if (w_cmask(i,j,k)==3) then
-                       w(i,j,k) = 0d0
-                    endif
-                 enddo; enddo; enddo
-                 call SetVelocityBC(u,v,w,umask,vmask,wmask,time,dt,0) !check this
-                 call do_ghost_vector(u,v,w)
+              call extrapolate_velocities()
+              solver_flag = 2
+              call setuppoisson_fs_new(u,v,w,vof_phase,rho1,dt,A,cvof,n1,n2,n3,kappa_fs)
+              if(HYPRE)then !HYPRE will not work with removed nodes from domain.
+                 call pariserror("HYPRE solver not yet available for Free Surfaces")
+              else
+                 call FreeSolver(A,p_ext,maxError/MaxDt,beta,maxit,it,ierr,itimestep,time,residual)
               endif
+              if(mod(itimestep,termout)==0) then
+                 if(rank==0) then
+                    write(*,'("FS2:          pressure residual:   ",e7.1,&
+                         &" maxerror: ",e7.1)') residual*dt,maxerror
+                    write(*,'("              pressure iterations :",I9)')it
+                 endif
+              endif
+              ! Correct ONLY masked gas velocities at level 1 and 2
+              do k=ks,ke;  do j=js,je; do i=is,ieu    ! CORRECT THE u-velocity 
+                 if (u_cmask(i,j,k)==1 .or. u_cmask(i,j,k)==2) then
+                    u(i,j,k)=u(i,j,k)-(p_ext(i+1,j,k)-p_ext(i,j,k))/dxh(i)
+                 else if (u_cmask(i,j,k)==3) then
+                    u(i,j,k) = 0d0
+                 endif
+              enddo; enddo; enddo
+
+              do k=ks,ke;  do j=js,jev; do i=is,ie    ! CORRECT THE v-velocity
+                 if (v_cmask(i,j,k)==1 .or. v_cmask(i,j,k)==2) then
+                    v(i,j,k)=v(i,j,k)-(p_ext(i,j+1,k)-p_ext(i,j,k))/dyh(j)
+                 else if (v_cmask(i,j,k)==3) then
+                    v(i,j,k) = 0d0
+                 endif
+              enddo; enddo; enddo
+
+              do k=ks,kew;  do j=js,je; do i=is,ie   ! CORRECT THE w-velocity
+                 if (w_cmask(i,j,k)==1 .or. w_cmask(i,j,k)==2) then
+                    w(i,j,k)=w(i,j,k)-(p_ext(i,j,k+1)-p_ext(i,j,k))/dzh(k)
+                 else if (w_cmask(i,j,k)==3) then
+                    w(i,j,k) = 0d0
+                 endif
+              enddo; enddo; enddo
+              call SetVelocityBC(u,v,w,umask,vmask,wmask,time,dt,0) !check this
+              call do_ghost_vector(u,v,w)
               if (mod(itimestep,nstats)==0 .and. mod(ii,itime_scheme)==0) call discrete_divergence(u,v,w,itimestep/nstats)
            endif !Extrapolation
 !------------------------------------------------------------------------------------------------
@@ -500,7 +500,6 @@ Program paris
         endif
         if (FreeSurface) then
            if (RP_test) call Integrate_RP(dt,time,rho1)
-           call check_topology(vof_phase,itimestep)
         endif
         if (DoLPP) then
            call PartBCWrapper
@@ -2537,19 +2536,7 @@ subroutine InitCondition
         if(DoVOF) then
            call initconditions_VOF()
            call get_all_heights(0)
-           if (FreeSurface) then
-              call set_topology(vof_phase,itimestep) !vof_phases are updated in initconditions_VOF called above
-              call get_normals()
-              call get_all_curvatures(kappa_fs,0)
-              call get_ref_volume
-              if (RP_test) then       
-                 call initialize_P_RP(p,rho1)  !initialize P field for RP test
-                 call ghost_x(p,1,req( 1: 4))
-                 call ghost_y(p,1,req( 5: 8))
-                 call ghost_z(p,1,req( 9:12))
-                 call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr) 
-              endif
-           endif
+           if (FreeSurface) call init_FS()
         endif
         du = 0d0
 
@@ -2712,6 +2699,22 @@ subroutine InitCondition
   endif
   iTimeStepRestart = iTimeStep
   timeLastOutput = DBLE(INT(time/tout))*tout
+contains
+  subroutine init_FS()
+    implicit none
+    call set_topology(vof_phase,itimestep) !vof_phases are updated in initconditions_VOF called above
+    call get_normals()
+    call get_all_curvatures(kappa_fs,0)
+    !call tag_bubbles(itimestep,time)
+    call get_ref_volume
+    if (RP_test) then       
+       call initialize_P_RP(p,rho1)  !initialize P field for RP test
+       call ghost_x(p,1,req( 1: 4))
+       call ghost_y(p,1,req( 5: 8))
+       call ghost_z(p,1,req( 9:12))
+       call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr) 
+    endif
+  end subroutine init_FS
 end subroutine InitCondition
 !=================================================================================================
 ! function maxabs
