@@ -950,8 +950,7 @@ contains
     Source = 0.d0
 
     do k=ks,ke; do j=js,je; do i=is,ie
-       
-       !if (imploding .and. vof_phase(i,j,k) == 1) Source = v_source(i,j,k)
+       if (implode(i,j,k)>0 .and. vof_phase(i,j,k) == 1) Source = v_source(i,j,k)
        A(i,j,k,1) = dt/(dx(i)*dx(i)*rho)
        A(i,j,k,2) = dt/(dx(i)*dx(i)*rho)
        A(i,j,k,3) = dt/(dy(j)*dy(j)*rho)
@@ -963,8 +962,7 @@ contains
             +  (vtmp(i,j,k)-vtmp(i,j-1,k))/dy(j) &
             +  (wtmp(i,j,k)-wtmp(i,j,k-1))/dz(k) )
 
-       !if (.not. imploding) then
-          !----Cav-liquid neighbours, set P_g in cavity cells
+                 !----Cav-liquid neighbours, set P_g in cavity cells
           if(vof_phase(i,j,k)==1) then
              do l=-1,1,2
                 if (vof_phase(i+l,j,k)==0) then
@@ -1255,7 +1253,6 @@ contains
                 endif
              endif
           endif
-       !endif
     enddo; enddo; enddo
     call ghost_x(P_gx,1,req(1:4)); call ghost_y(P_gy,1,req(5:8)); call ghost_z(P_gz,1,req(9:12)) 
     call ghost_x(x_mod,1,req(13:16)); call ghost_y(y_mod,1,req(17:20)); call ghost_z(z_mod,1,req(21:24)) 
