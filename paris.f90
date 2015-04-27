@@ -374,7 +374,7 @@ Program paris
               endif
            endif
            if(mod(itimestep,termout)==0 .and. ii==1) then
-              call calcResidual(A,p,ResNormOrderPressure,residual)
+              if (.not.FreeSurface) call calcResidual(A,p,ResNormOrderPressure,residual)
               if (HYPRE .and. residual/(maxError/MaxDt) > 2.d0 ) then  
                  ErrorScaleHYPRE = ErrorScaleHYPRE*0.5d0
                  if (rank == 0) write(*,*) "ErrorScaleHYPRE is decreased.",ErrorScaleHYPRE

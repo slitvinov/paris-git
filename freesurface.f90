@@ -130,31 +130,7 @@ subroutine check_topology(c,phase,iout)
   !cycle through bubs first maybe? Use lagrangian approach rather than Eulerian, since there are much less bubble 
   ! parts which may be imploding than discrete points!
   signal = .false.
-!!$  write(*,'("Timestep: ",I4," Total gas segments: ",I4)')iout,total_num_tag
-!!$  do bub=1,total_num_tag 
-!!$     !write(*,'("BUB counter: ",I4," in rank:",I4)')bub,rank
-!!$     if (rank==tag_rank(bub)) then 
-!!$        dropid = tag_dropid(bub)
-!!$        if (.not.(tag_mergeflag(bub) == 1 .or. tag_mergeflag(bub) == 0)) then
-!!$           write(*,'("ERROR. Bub index, bub nr LPP, rank",3I8)')bub,dropid,rank
-!!$           call pariserror('Error in Lagrangian loop')
-!!$        endif
-!!$        if (tag_mergeflag(bub) == 1) then
-!!$           volume = drops_merge(dropid)%element%vol
-!!$        else
-!!$           volume = drops(dropid)%element%vol
-!!$        endif
-!!$        write(*,'("BUB IN RANK nr: ",I4," Bub # (rank local): ",I4," Bub counter: ",I4," Volume: ",e14.5)')rank,dropid,bub,volume
-!!$        if (volume > 1d-12) then
-!!$           if (volume < 125.0*dx(is)**3.d0) then
-!!$              call bub_implode(dropid)
-!!$           endif
-!!$        else
-!!$           write(*,'("Bubble volume error in topology check. Vol from table: ",e14.5)')volume
-!!$        endif
-!!$     endif
-!!$  enddo
-
+  v_source=0.d0
   if (num_drop(rank)>0) then
      do bub=1,num_drop(rank)
         dropid = drops(bub)%element%id
@@ -164,11 +140,8 @@ subroutine check_topology(c,phase,iout)
            call pariserror('Error in Lagrangian loop')
         endif
         volume = drops(bub)%element%vol
-!!$        write(*,'("Contained LOOP BUB IN RANK nr: ",I4," Bub counter: ",I4," Volume: ",e14.5)')&
-!!$             rank,bub,volume
         if (volume > 1d-12) then
-           if (volume < 125.0*dx(is)**3.d0) then
-              
+           if (volume < 125.0*dx(is)**3.d0) then              
               call bub_implode(bub)
            endif
         else
@@ -186,8 +159,6 @@ subroutine check_topology(c,phase,iout)
            call pariserror('Error in Lagrangian loop')
         endif
         volume = drops_merge(bub)%element%vol
-!!$        write(*,'("Merged loop BUB IN RANK nr: ",I4," Bub counter: ",I4," Volume: ",e14.5)')&
-!!$             rank,bub,volume
         if (volume > 1d-12) then
            if (volume < 125.0*dx(is)**3.d0) then
               call bub_implode(bub)
@@ -211,15 +182,14 @@ contains
        if (phase(i,j,k)==1) then !check if gas phase
           if (tag_dropid(tag_id(i,j,k))==bub_id) then !check if we are in the correct bubble
              implode(i,j,k) = implode(i,j,k)+1
-             if (implode(i,j,k)==1) then !check if it is the first time step after implosion
-                v_source(i,j,k) = (u(i-1,j,k)-u(i,j,k))/dx(i)+&
+             if (implode(i,j,k)>=1) then !check if it is the first time step after implosion
+                v_source(i,j,k) = 0.9*(u(i-1,j,k)-u(i,j,k))/dx(i)+&
                      (v(i,j-1,k)-v(i,j,k))/dy(j)+(w(i,j,k-1)-w(i,j,k))/dz(k)
-                signal = .true.
-             else
-                v_source(i,j,k)=0.9*v_source(i,j,k)
+                if (implode(i,j,k)==1) signal = .true.
              endif
-             if (implode(i,j,k)==10) then ! after 10 steps, remove bubble
+             if (implode(i,j,k)==30) then ! after indicated steps, remove bubble
                 c(i,j,k) = 0.d0
+                implode(i,j,k)=0
                 remove =.true.
              endif
           endif
@@ -230,6 +200,7 @@ contains
        do k=ks,ke; do j=js,je; do i=is,ie
           if (tag_dropid(tag_id(i,j,k))==bub_id) then
              c(i,j,k) = 0.d0
+             implode(i,j,k)=0
           endif
        enddo; enddo; enddo
     endif
@@ -887,14 +858,8 @@ subroutine setuppoisson_fs_new(utmp,vtmp,wtmp,vof_phase,rho,dt,A,cvof,n1,n2,n3,k
      call liq_gas()
   else !(solver_flag == 2)   
      if (.not.(solver_flag==2)) call pariserror('ERROR: Solver flag for FS must be set to either 1 or 2')
-     !if (solver_flag==2 .and. imploding) call pariserror('If imploding, 2nd projection should not be performed')
      do k=ks,ke; do j=js,je; do i=is,ie
         if (pcmask(i,j,k)==1 .or. pcmask(i,j,k)==2) then !rho is 1d0
-
-!!$           if (solver_flag==2 .and. imploding) then
-!!$              write(*,'("p mask, vof_phase",2I8)')pcmask(i,j,k),vof_phase(i,j,k)
-!!$              call pariserror('If imploding, 2nd projection should not be performed')
-!!$           endif
               
            A(i,j,k,1) = 1.d0/(dx(i)*dxh(i-1))
            A(i,j,k,2) = 1.d0/(dx(i)*dxh(i))
@@ -947,9 +912,8 @@ contains
     limit = 1d-4/dx((is+ie)/2)
     c_min = 1d-2
 
-    Source = 0.d0
-
     do k=ks,ke; do j=js,je; do i=is,ie
+       Source = 0.d0
        if (implode(i,j,k)>0 .and. vof_phase(i,j,k) == 1) Source = v_source(i,j,k)
        A(i,j,k,1) = dt/(dx(i)*dx(i)*rho)
        A(i,j,k,2) = dt/(dx(i)*dx(i)*rho)
@@ -962,7 +926,8 @@ contains
             +  (vtmp(i,j,k)-vtmp(i,j-1,k))/dy(j) &
             +  (wtmp(i,j,k)-wtmp(i,j,k-1))/dz(k) )
 
-                 !----Cav-liquid neighbours, set P_g in cavity cells
+       !----Cav-liquid neighbours, set P_g in cavity cells
+       if (implode(i,j,k)==0) then
           if(vof_phase(i,j,k)==1) then
              do l=-1,1,2
                 if (vof_phase(i+l,j,k)==0) then
@@ -1250,16 +1215,17 @@ contains
                    if (z_mod(i,j,k)<limit*dzh(k)) z_mod(i,j,k) = limit*dzh(k)
                    if (z_mod(i,j,k) /= z_mod(i,j,k)) write(*,'("z_mod NaN. c_st, n, vofs, phases:",4e14.5,2I8)')&
                         c_stag,n_avg(3),cvof(i,j,k),cvof(i,j,k+1),vof_phase(i,j,k),vof_phase(i,j,k+1)
-                endif
-             endif
-          endif
+                endif !finite normal
+             endif ! vof_phase test liq has gas neighbour
+          endif ! vof_phase is liq
+       endif ! we are not imploding
     enddo; enddo; enddo
     call ghost_x(P_gx,1,req(1:4)); call ghost_y(P_gy,1,req(5:8)); call ghost_z(P_gz,1,req(9:12)) 
     call ghost_x(x_mod,1,req(13:16)); call ghost_y(y_mod,1,req(17:20)); call ghost_z(z_mod,1,req(21:24)) 
     call MPI_WAITALL(24,req(1:24),sta(:,1:24),ierr)
     !--------------------------------------------------------------------------------------------------------
     do k=ks,ke; do j=js,je; do i=is,ie
-       if (vof_phase(i,j,k)==0) then! .and. .not.(imploding)) then
+       if (vof_phase(i,j,k)==0 .and. implode(i,j,k)==0) then
           A(i,j,k,1) = dt/(dx(i)*x_mod(i-1,j,k)*rho)
           A(i,j,k,2) = dt/(dx(i)*x_mod(i  ,j,k)*rho)
           A(i,j,k,3) = dt/(dy(j)*y_mod(i,j-1,k)*rho)
