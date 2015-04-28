@@ -2630,6 +2630,13 @@ subroutine InitCondition
             !   end do; end do; end do 
             !end if ! inject_type
          end if ! test_jet
+         ! Test: Shear Droplet
+         if (test_shear) then
+            do i=imin,imax; do j=jmin,jmax-1; do k=kmin,kmax-1
+               u(i,j,k) = 2*(Y(j) - yLength/2)*WallVel(1,1)/yLength
+            enddo; enddo; enddo
+         endif
+         
      
      endif
 

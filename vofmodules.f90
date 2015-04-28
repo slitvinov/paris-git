@@ -61,7 +61,8 @@ module module_VOF
   integer :: cylinder_dir = 0
   logical :: test_heights = .false.  
   logical :: test_capwave = .false.
-  logical :: test_droplet = .false.  
+  logical :: test_droplet = .false.
+  logical :: test_shear = .false.  
   logical :: test_control_droplet = .false.
   logical :: normal_up = .true.    ! used for the h
   logical :: test_curvature = .false.  
@@ -407,6 +408,9 @@ contains
     end if ! itime_scheme
     if(test_type=='droplet') then
        test_droplet = .true.
+    else if(test_type=='shear') then
+       test_droplet = .true.
+       test_shear = .true.
     else if(test_type=='control_droplet') then
        test_control_droplet = .true.
     else if(test_type=='height_test') then
