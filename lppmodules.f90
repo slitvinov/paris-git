@@ -940,9 +940,9 @@ contains
             OPEN(UNIT=102,FILE=filename, STATUS='new', ACTION='write')
          end if ! file_exist
          if ( num_element(rank) > 0 ) then
+            write(102,*) "#",tswap,time,num_element(rank)
             do ielement = 1, num_element(rank)
-               write(102,'(11(E15.6,1X))')   time, & 
-                                             element_stat(ielement,rank)%xc, &
+               write(102,'(10(E15.6,1X))')   element_stat(ielement,rank)%xc, &
                                              element_stat(ielement,rank)%yc, &
                                              element_stat(ielement,rank)%zc, &
                                              element_stat(ielement,rank)%uc, &
@@ -960,7 +960,8 @@ contains
          return
       end if ! DropStatisticsMethod 
 
-      ! Collect all discrete elements to rank 0
+      ! Collect all discrete elements to rank 0 
+      ! Warning: The collective operation is expensive when np is large
       
       !  Setup MPI derived type for element_type 
       offsets (0) = 0 
@@ -4055,8 +4056,8 @@ module module_output_lpp
       integer ::ipart
       character(len=100) :: filename
       filename = trim(out_path)//'/backuplpp_'//int2text(rank,padding)
-      call system('mv '//trim(filename)//' '//trim(filename)//'.old')
-      OPEN(UNIT=7,FILE=trim(filename),status='unknown',action='write')
+      !call system('mv '//trim(filename)//' '//trim(filename)//'.old')
+      OPEN(UNIT=7,FILE=trim(filename),status='REPLACE')
       write(7,1100)time,itimestep,num_part(rank)
       if ( num_part(rank) > 0 ) then 
          do ipart=1,num_part(rank)

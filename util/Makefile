@@ -1,6 +1,6 @@
 SRC =  kozenycarman.c rockread.c compare_4cols.c
 CFLAGS = -O  # -g -gstabs
-BINDIR = $(HOME)/TOMAS/bin
+BINDIR = $(HOME)/bin
 FC = mpif90
 FLAGS = -O2 -cpp -fimplicit-none #-fbounds-check # -g 
 
