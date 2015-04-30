@@ -264,6 +264,7 @@ Program paris
                  call get_normals()
                  call tag_bubbles(itimestep,time)
                  call check_topology(cvof,vof_phase,itimestep)
+                 if (fill_ghost) call do_all_ghost(cvof)
                  call set_topology(vof_phase,itimestep) !vof_phase updated in vofsweeps
               elseif (.not.Freesurface .and. debug_par) then
                  call get_all_curvatures(tmp,itimestep)

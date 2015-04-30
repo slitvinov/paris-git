@@ -396,7 +396,7 @@ contains
        v_source = 0.d0
        x_mod = dxh((is+ie)/2); y_mod = dyh((js+je)/2); z_mod = dzh((ks+ke)/2)
        P_gx = 0d0; P_gy = 0d0; P_gz = 0d0
-       pcmask=3; p_ext=0d0
+       pcmask=3; p_ext=0.d0
        initialize_fs = .true.
        vtk_open = .false.
        !imploding = .false.; triggered = .false.

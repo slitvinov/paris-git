@@ -120,7 +120,6 @@ subroutine check_topology(c,phase,iout)
   use module_BC
   use module_Lag_part
   implicit none
-  include 'mpif.h' 
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: c
   integer, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: phase
   real(8) :: volume
@@ -130,6 +129,7 @@ subroutine check_topology(c,phase,iout)
   !cycle through bubs first maybe? Use lagrangian approach rather than Eulerian, since there are much less bubble 
   ! parts which may be imploding than discrete points!
   signal = .false.
+  fill_ghost = .false.
   v_source=0.d0
   if (num_drop(rank)>0) then
      do bub=1,num_drop(rank)
@@ -140,7 +140,7 @@ subroutine check_topology(c,phase,iout)
            call pariserror('Error in Lagrangian loop')
         endif
         volume = drops(bub)%element%vol
-        if (volume > 1d-12) then
+        if (volume > 1d-20) then
            if (volume < 125.0*dx(is)**3.d0) then              
               call bub_implode(bub)
            endif
@@ -159,7 +159,7 @@ subroutine check_topology(c,phase,iout)
            call pariserror('Error in Lagrangian loop')
         endif
         volume = drops_merge(bub)%element%vol
-        if (volume > 1d-12) then
+        if (volume > 1d-20) then
            if (volume < 125.0*dx(is)**3.d0) then
               call bub_implode(bub)
            endif
@@ -178,31 +178,39 @@ contains
 
     remove = .false.
     do k=ks,ke; do j=js,je; do i=is,ie
-       if (phase(i,j,k)==0) v_source(i,j,k) = 0.d0 ! since source is Eulerian, the moving interface may cause source to move from gas to liq
+       if (phase(i,j,k)==0) then
+          v_source(i,j,k) = 0.d0 ! since source is Eulerian, the moving interface may cause source to move from gas to liq
+          implode(i,j,k) = 0
+       endif
        if (phase(i,j,k)==1) then !check if gas phase
           if (tag_dropid(tag_id(i,j,k))==bub_id) then !check if we are in the correct bubble
-             implode(i,j,k) = implode(i,j,k)+1
-             if (implode(i,j,k)>=1) then !check if it is the first time step after implosion
-                v_source(i,j,k) = 0.9*(u(i-1,j,k)-u(i,j,k))/dx(i)+&
-                     (v(i,j-1,k)-v(i,j,k))/dy(j)+(w(i,j,k-1)-w(i,j,k))/dz(k)
-                if (implode(i,j,k)==1) signal = .true.
-             endif
-             if (implode(i,j,k)==30) then ! after indicated steps, remove bubble
-                c(i,j,k) = 0.d0
-                implode(i,j,k)=0
-                remove =.true.
-             endif
+             implode(i,j,k) = 1!implode(i,j,k)+1
+             !if (implode(i,j,k)>=1) then !check if it is the first time step after implosion
+             v_source(i,j,k) = 0.95*(u(i-1,j,k)-u(i,j,k))/dx(i)+&
+                  (v(i,j-1,k)-v(i,j,k))/dy(j)+(w(i,j,k-1)-w(i,j,k))/dz(k)
+             !if (implode(i,j,k)==1) signal = .true.
+             if (volume < 64.0*dx(is)**3.d0) remove =.true.
           endif
        endif
     enddo; enddo; enddo
+    if (remove) write(*,*)"End of loop, to be removed"
+    !call do_all_ghost(c)
     if (remove) then
        write(*,*)"BUBBLE VOF TRACES TO BE REMOVED"
        do k=ks,ke; do j=js,je; do i=is,ie
           if (tag_dropid(tag_id(i,j,k))==bub_id) then
-             c(i,j,k) = 0.d0
-             implode(i,j,k)=0
+             c(i,j,k) =0.d0
+             implode(i,j,k) = 0
+             do inbr=-1,1; do jnbr=-1,1; do knbr=-1,1
+                if (c(i+inbr,j+jnbr,k+knbr) > 0.d0) then
+                   c(i+inbr,j+jnbr,k+knbr) = 0.d0
+                   implode(i+inbr,j+jnbr,k+knbr)=0
+                endif
+                !write(*,'("Cell vof cleared at: ",3I4)')i+inbr,j+jnbr,k+knbr
+             enddo;enddo;enddo
           endif
        enddo; enddo; enddo
+       write(*,*)"End of loop, removed, ghost layers filled"
     endif
   end subroutine bub_implode
 end subroutine check_topology
@@ -843,7 +851,6 @@ subroutine setuppoisson_fs_new(utmp,vtmp,wtmp,vof_phase,rho,dt,A,cvof,n1,n2,n3,k
   implicit none
   include 'mpif.h'
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: utmp,vtmp,wtmp
-  !real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: umask,vmask,wmask
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: kap
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: cvof,n1,n2,n3
   real(8), dimension(is:ie,js:je,ks:ke,8), intent(inout) :: A
@@ -897,8 +904,6 @@ contains
   subroutine liq_gas()
     use module_BC
     use module_2phase
-    use module_grid
-    use module_freesurface
     implicit none
     real(8) :: limit, c_min
     real(8) :: alpha2, x_test2, y_test2, z_test2

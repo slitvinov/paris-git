@@ -407,6 +407,7 @@ module module_freesurface
   integer :: X_level, solver_flag=0
   logical :: FreeSurface, debug=.false., initialize_fs = .false.
   logical :: RP_test
+  logical :: fill_ghost
   !logical :: imploding, triggered
   logical, dimension(1:4) :: VTK_OUT, vtk_open
   character(len=10) :: visit_file(1:4) = (/ "divergence", "curvature ", "deltaPfs  ", "vol_Source" /)

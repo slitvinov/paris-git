@@ -1,4 +1,4 @@
-SRC =  kozenycarman.c rockread.c compare_4cols.c
+SRC =  kozenycarman.c rockread.c
 CFLAGS = -O  # -g -gstabs
 BINDIR = $(HOME)/bin
 FC = mpif90
@@ -15,7 +15,7 @@ endif
 
 LIBS = $(HYPRE_LIBS) $(VOFI_LIBS) $(SILO_LIB)
 
-all: kozenycarman rockread tags pariscompare3D
+all: kozenycarman rockread tags
 
 tags:	$(SRC)
 # @SZ Create a tags file named TAGS for use by emacs
