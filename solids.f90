@@ -364,7 +364,7 @@ contains
       integer ierr,in
       logical file_is_there
       namelist /solidparameters/ dosolids, solid_type, solid_radius,NumSpheres,sxyzrad, &
-           remove_layers,NozzleThick2Cell,NozzleLength
+           remove_layers
       dosolids=.false.
       solid_type='SingleSphere'
       solid_radius=0.1d0

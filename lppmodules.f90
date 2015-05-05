@@ -956,6 +956,10 @@ contains
          end if ! num_element(rank) 
          close(102)
         
+         num_element_rank= num_element(rank)
+         call MPI_ALLGATHER(num_element_rank, 1, MPI_INTEGER, &
+                            num_element(:),   1, MPI_INTEGER, MPI_Comm_World, ierr)
+
          deallocate( element_stat )
          return
       end if ! DropStatisticsMethod 
