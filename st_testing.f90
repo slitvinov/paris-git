@@ -915,23 +915,23 @@ end subroutine do_droplet_test
     ! Writing input file for post processing
     !
     if( rank == 0) then
-     OPEN (UNIT = 2, FILE ='inputpost')  
-       write(2, *)  nx
-       write(2, *)  ny
-       write(2, *)  nz
-       write(2, *)  npx
-       write(2, *)  npy
-       write(2, *)  npz
-       write(2, *)  nstart
-       write(2, *)  index
-       write(2, *)  tstart
-       write(2, *)  dt*REAL(nout)
-       write(2, *)  xLength
-       write(2, *)  yLength
-       write(2, *)  zLength
-       write(2, *) '!Values nx, ny, nz, npx, npy, npz, start output cycle, last output cycle '
-       write(2, *) '!start time, output time interval, xLength, yLength, zLength'
-     close(2)    
+     OPEN (UNIT = 22, FILE ='inputpost')  
+       write(22, *)  nx
+       write(22, *)  ny
+       write(22, *)  nz
+       write(22, *)  npx
+       write(22, *)  npy
+       write(22, *)  npz
+       write(22, *)  nstart
+       write(22, *)  index
+       write(22, *)  tstart
+       write(22, *)  dt*REAL(nout)
+       write(22, *)  xLength
+       write(22, *)  yLength
+       write(22, *)  zLength
+       write(22, *) '!Values nx, ny, nz, npx, npy, npz, start output cycle, last output cycle '
+       write(22, *) '!start time, output time interval, xLength, yLength, zLength'
+     close(22)    
     end if
     !
     ! Output cvof
@@ -1009,6 +1009,7 @@ end subroutine do_droplet_test
                      
     ! Error checking
     if (ierr /= MPI_SUCCESS) then
+       write(*,'("Error opening MPI file, ierr, rank",2I4)')ierr,rank
        call pariserror('Error opening the file')
        call MPI_ABORT(MPI_COMM_WORLD, 2, ierr)
     end if  
