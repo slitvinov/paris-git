@@ -321,7 +321,7 @@ contains
       if (file_is_there) then
          if(ierr == 0) then
             read(UNIT=in,NML=lppparameters)
-            if(rank==0) write(out,*)'Largranian point-particle parameters read successfully'
+            if(rank==0) write(out,*)'Lagrangian point-particle parameters read successfully'
          else
             print *, 'rank=',rank,' has error ',ierr,' opening file inputlpp'
          endif

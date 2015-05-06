@@ -896,7 +896,7 @@ subroutine setuppoisson_fs_new(utmp,vtmp,wtmp,vof_phase,rho,dt,A,cvof,n1,n2,n3,k
            endif
            A(i,j,k,7) = sum(A(i,j,k,1:6))
            if (A(i,j,k,7)<1.d-12) pcmask(i,j,k) = 0 !Fix for isolated cav cells.
-           A(i,j,k,8) =  -1d0*((utmp(i,j,k)-utmp(i-1,j,k))/dx(i) &
+           A(i,j,k,8) =  -1.d0*((utmp(i,j,k)-utmp(i-1,j,k))/dx(i) &
                 +  (vtmp(i,j,k)-vtmp(i,j-1,k))/dy(j) &
                 +  (wtmp(i,j,k)-wtmp(i,j,k-1))/dz(k))
         endif
@@ -933,6 +933,18 @@ contains
        A(i,j,k,8) =  -(Source + (utmp(i,j,k)-utmp(i-1,j,k))/dx(i) &
             +  (vtmp(i,j,k)-vtmp(i,j-1,k))/dy(j) &
             +  (wtmp(i,j,k)-wtmp(i,j,k-1))/dz(k) )
+       if (A(i,j,k,8) /= A(i,j,k,8)) then
+          write(*,'("A8 NaN, liq_gas at x y z: ",3e14.5)')x(i),y(j),z(k)
+          write(*,'("A branches: ",8e14.5)')A(i,j,k,:)
+          write(*,'("Pcmask 1-7: ",7I8)')pcmask(i-1,j,k),pcmask(i+1,j,k),pcmask(i,j-1,k),pcmask(i,j+1,k),&
+               pcmask(i,j,k-1),pcmask(i,j,k+1),pcmask(i,j,k)
+          write(*,'("Implode_flags 1-7: ",7I8)')implode(i-1,j,k),implode(i+1,j,k),implode(i,j-1,k),implode(i,j+1,k),&
+               implode(i,j,k-1),implode(i,j,k+1),implode(i,j,k)
+          write(*,'("S_v 1-7: ",7e14.5)')v_source(i-1,j,k),v_source(i+1,j,k),v_source(i,j-1,k),v_source(i,j+1,k),&
+               v_source(i,j,k-1),v_source(i,j,k+1),v_source(i,j,k)
+          write(*,'("Velocities in div u: ",6e14.5)')utmp(i,j,k),utmp(i-1,j,k),vtmp(i,j,k),vtmp(i,j-1,k),&
+               wtmp(i,j,k),wtmp(i,j,k-1)
+       endif
 
        !----Cav-liquid neighbours, set P_g in cavity cells
        if (implode(i,j,k)==0) then
@@ -1309,3 +1321,71 @@ subroutine get_bubble_pressure(P_g)
   call ReleaseTag2DropTable
 end subroutine get_bubble_pressure
 !==================================================================================================================
+subroutine inflow_accelerate
+  use module_grid
+  use module_BC
+  use module_freesurface
+  use module_flow
+  implicit none
+  real(8) :: factor
+  real(8), parameter :: pi=3.141592653589793238462643383
+  integer :: i,j,k
+  
+  factor = (1.d0 + sin(-pi/2.d0 + DBLE(itimestep*1.0)/DBLE(step_max*1.0)*pi))/2.
+  !if (rank==0) Write(*,'("Factor: ",e14.5)')factor
+  ! inflow boundary condition x- with injection
+  if(bdry_cond(1)==3 .and. coords(1)==0    ) then
+     do j=jmin,jmax
+        do k=kmin,kmax
+           u(is-1,j,k)=u(is-1,j,k)*factor
+           u(is-2,j,k)=u(is-2,j,k)*factor
+        enddo
+     enddo
+  endif
+  ! inflow boundary condition y-
+  if(bdry_cond(2)==3 .and. coords(2)==0    ) then
+     do i=imin,imax
+        do k=kmin,kmax
+           v(i,js-1,k)=v(i,js-1,k)*factor
+           v(i,js-2,k)=v(i,js-2,k)*factor
+        enddo
+     enddo
+  endif
+  ! inflow on z-
+  if(bdry_cond(3)==3 .and. coords(3)==0   ) then
+     do i=imin,imax
+        do j=jmin,jmax
+           w(i,j,ks-1)= w(i,j,ks-1)*factor 
+           w(i,j,ks-2)= w(i,j,ks-2)*factor
+        enddo
+     enddo
+  endif
+  ! inflow on x+
+  if(bdry_cond(4)==3 .and. coords(1)==nPx-1   ) then
+     do j=jmin,jmax
+        do k=kmin,kmax
+           u(ie,j,k)= u(ie,j,k)*factor
+           u(ie+1,j,k)= u(ie+1,j,k)*factor
+        enddo
+     enddo
+  endif
+  ! inflow on y+
+  if(bdry_cond(5)==3 .and. coords(2)==nPy-1   ) then
+     do i=imin,imax
+        do k=kmin,kmax
+           v(i,je,k)=v(i,je,k)*factor
+           v(i,je+1,k)=v(i,je+1,k)*factor 
+        enddo
+     enddo
+  endif
+  ! inflow on z+
+  if(bdry_cond(6)==3 .and. coords(3)==nPz-1   ) then
+     do i=imin,imax
+        do j=jmin,jmax
+           w(i,j,ke)=w(i,j,ke)*factor 
+           w(i,j,ke+1)=w(i,j,ke+1)*factor
+        enddo
+     enddo
+  endif
+  
+end subroutine inflow_accelerate

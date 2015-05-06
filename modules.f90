@@ -405,11 +405,10 @@ module module_freesurface
   integer, dimension(1:4) :: NOUT_VTK
   real(8) :: P_ref, gamma, R_ref, V_0, P_inf !eq pressure and polytropic gas exponent
   real(8) :: R_RK, dR_RK, ddR_RK
-  integer :: X_level, solver_flag=0
+  integer :: X_level, solver_flag=0, step_max
   logical :: FreeSurface, debug=.false., initialize_fs = .false.
-  logical :: RP_test
+  logical :: RP_test, inflow
   logical :: fill_ghost
-  !logical :: imploding, triggered
   logical, dimension(1:4) :: VTK_OUT, vtk_open
   character(len=10) :: visit_file(1:4) = (/ "divergence", "curvature ", "deltaPfs  ", "vol_Source" /)
   character(len=3) :: file_short(1:4) = (/ "DIV", "KAP", "Pfs", "S_v" /)
@@ -901,6 +900,7 @@ module module_BC
     ! Inflow BC
     ! --------------------------------------------------------------------------------------------
     
+    
     ! inflow boundary condition x- with injection
     fluxin=0
     if(bdry_cond(1)==3 .and. coords(1)==0    ) then
@@ -913,14 +913,14 @@ module module_BC
           enddo
        enddo
        do j=js,je
-         do k=ks,ke
-            fluxin = fluxin + u(is-1,j,k)
-         enddo
+          do k=ks,ke
+             fluxin = fluxin + u(is-1,j,k)
+          enddo
        enddo
     endif
     call MPI_ALLREDUCE(fluxin, tfluxin, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr)
     uaverage=tfluxin/(ny*nz)
-
+    
     ! inflow boundary condition y-
     if(bdry_cond(2)==3 .and. coords(2)==0    ) then
        do i=imin,imax
@@ -954,7 +954,7 @@ module module_BC
           enddo
        enddo
     endif
-     ! inflow on y+
+    ! inflow on y+
     if(bdry_cond(5)==3 .and. coords(2)==nPy-1   ) then
        do i=imin,imax
           do k=kmin,kmax
@@ -975,7 +975,7 @@ module module_BC
              v(i,j,ke+1)=0d0
           enddo
        enddo
-    endif    
+    endif
 
     ! --------------------------------------------------------------------------------------------
     ! Wall BC with velocity specified

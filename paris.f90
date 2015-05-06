@@ -175,6 +175,9 @@ Program paris
         if(test_control_droplet) call do_droplet_test(itimestep,time,REAL(nstats*dt,8))
         if(test_frdroplet.or.test_droplet) call output_droplet(w,time)
         call SetVelocityBC(u,v,w,umask,vmask,wmask,time,dt,0)
+        if (FreeSurface) then
+           if (inflow .and. (itimestep<=step_max)) call inflow_accelerate  
+        endif
         !call write_vec_gnuplot(u,v,cvof,p,itimestep,DoVOF)
         call calcstats
 
@@ -263,8 +266,13 @@ Program paris
               if (FreeSurface) then
                  call get_normals()
                  call tag_bubbles(itimestep,time)
-                 call check_topology(cvof,vof_phase,itimestep)
-                 if (fill_ghost) call do_all_ghost(cvof)
+                 call check_topology()
+                 if (fill_ghost) then
+                    call do_all_ghost(cvof)
+                    !call do_all_ghost(v_source) 
+                    call get_flags_and_clip(cvof,vof_flag)
+                    call get_vof_phase(cvof) !cvof updated above from min to max 
+                 endif
                  call set_topology(vof_phase,itimestep) !vof_phase updated in vofsweeps
               elseif (.not.Freesurface .and. debug_par) then
                  call get_all_curvatures(tmp,itimestep)
@@ -340,6 +348,9 @@ Program paris
 
            call my_timer(3)
            call SetVelocityBC(u,v,w,umask,vmask,wmask,time,dt,0)
+           if (FreeSurface) then
+              if (inflow .and. (itimestep<=step_max)) call inflow_accelerate  
+           endif
            call do_ghost_vector(u,v,w)
            call my_timer(1)
            if (DoVof .and. debug_par) then

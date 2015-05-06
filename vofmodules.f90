@@ -261,9 +261,10 @@ contains
        use_full_heights, debug_par, STGhost
     ! Free Surface parameters to be read from a parameter file called "inputFS"
     namelist /FSparameters/ X_level, RP_test, gamma, R_ref, P_ref,&
-         VTK_OUT, NOUT_VTK
+         VTK_OUT, NOUT_VTK, step_max
     X_level = 2; RP_test = .false.; gamma = 1.4d0; R_ref = 1.d0; P_ref = 1.d0; 
     VTK_OUT = .false.; NOUT_VTK = 100000; vtk_open = .false.
+    step_max = 1
     vofbdry_cond=['undefined','undefined','undefined','undefined','undefined','undefined']
     test_type='droplet'
     VOF_advect='CIAM'
@@ -363,7 +364,7 @@ contains
     use module_freesurface
     implicit none
     include 'mpif.h'
-    integer :: ierr,dir,orientation
+    integer :: ierr,dir,orientation,bdry
     character :: dc(3) = (/ "x","y","z" /)
     call ReadVOFParameters
 ! Check grid
@@ -399,8 +400,12 @@ contains
        pcmask=3; p_ext=0.d0
        initialize_fs = .true.
        vtk_open = .false.
-       !imploding = .false.; triggered = .false.
        implode = 0
+
+       inflow=.true.
+       do bdry=1,6
+          if (.not.bdry_cond(bdry) == 3) inflow = .false.
+       enddo
     endif
     if ( itime_scheme == 2 ) then  
       allocate(cvofold(imin:imax,jmin:jmax,kmin:kmax))
