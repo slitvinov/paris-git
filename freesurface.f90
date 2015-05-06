@@ -30,15 +30,14 @@
   implicit none
   include 'mpif.h' 
   integer, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: vof_phase
-  integer :: req(16),sta(MPI_STATUS_SIZE,16)
-  integer :: i,j,k,level,iout,ierr
+  integer :: reqs(48),stat(MPI_STATUS_SIZE,48)
+  integer :: i,j,k,level,iout,ierr1
   integer :: level3, l3sum
 
   !initialize all masks to 3
   if (.not.initialize_fs) call pariserror("Error: Free surface variables not initialized")
   u_cmask = 3; v_cmask = 3; w_cmask = 3; pcmask = 3
   !First loop to set level 0 velocities in liq-liq and liq-gas cells
-  
   do k=ks,ke; do j=js,je; do i=is,ie
      if (vof_phase(i,j,k) == 1) then
         if (vof_phase(i+1,j,k) == 0) then
@@ -59,13 +58,13 @@
      endif
   enddo; enddo; enddo
   !fill ghost layers for zero masks
-  !call set_topology_bc
-  call ighost_x(u_cmask,2,req(1:4)); call ighost_x(v_cmask,2,req(5:8)); call ighost_x(w_cmask,2,req(9:12))
-  call ighost_x(pcmask,2,req(13:16)); call MPI_WAITALL(16,req(1:16),sta(:,1:16),ierr)
-  call ighost_y(u_cmask,2,req(1:4)); call ighost_y(v_cmask,2,req(5:8)); call ighost_y(w_cmask,2,req(9:12))
-  call ighost_y(pcmask,2,req(13:16)); call MPI_WAITALL(16,req(1:16),sta(:,1:16),ierr)
-  call ighost_z(u_cmask,2,req(1:4)); call ighost_z(v_cmask,2,req(5:8)); call ighost_z(w_cmask,2,req(9:12))
-  call ighost_z(pcmask,2,req(13:16)); call MPI_WAITALL(16,req(1:16),sta(:,1:16),ierr)
+  call ighost_x(u_cmask,2,reqs(1:4)); call ighost_x(v_cmask,2,reqs(5:8))
+  call ighost_x(w_cmask,2,reqs(9:12)); call ighost_x(pcmask,2,reqs(13:16))
+  call ighost_y(u_cmask,2,reqs(17:20)); call ighost_y(v_cmask,2,reqs(21:24))
+  call ighost_y(w_cmask,2,reqs(25:28)); call ighost_y(pcmask,2,reqs(29:32))
+  call ighost_z(u_cmask,2,reqs(33:36)); call ighost_z(v_cmask,2,reqs(37:40))
+  call ighost_z(w_cmask,2,reqs(41:44)); call ighost_z(pcmask,2,reqs(45:48))
+  call MPI_WAITALL(48,reqs(1:48),stat,ierr1)
   !Set levels 1 to X_level
   do level=1,X_level
      do k=ks,ke; do j=js,je; do i=is,ie
@@ -102,12 +101,13 @@
            endif
         endif
      enddo; enddo; enddo
-     call ighost_x(u_cmask,2,req(1:4)); call ighost_x(v_cmask,2,req(5:8)); call ighost_x(w_cmask,2,req(9:12))
-     call ighost_x(pcmask,2,req(13:16)); call MPI_WAITALL(16,req(1:16),sta(:,1:16),ierr)
-     call ighost_y(u_cmask,2,req(1:4)); call ighost_y(v_cmask,2,req(5:8)); call ighost_y(w_cmask,2,req(9:12))
-     call ighost_y(pcmask,2,req(13:16)); call MPI_WAITALL(16,req(1:16),sta(:,1:16),ierr)
-     call ighost_z(u_cmask,2,req(1:4)); call ighost_z(v_cmask,2,req(5:8)); call ighost_z(w_cmask,2,req(9:12))
-     call ighost_z(pcmask,2,req(13:16)); call MPI_WAITALL(16,req(1:16),sta(:,1:16),ierr)
+     call ighost_x(u_cmask,2,reqs(1:4)); call ighost_x(v_cmask,2,reqs(5:8))
+     call ighost_x(w_cmask,2,reqs(9:12)); call ighost_x(pcmask,2,reqs(13:16))
+     call ighost_y(u_cmask,2,reqs(17:20)); call ighost_y(v_cmask,2,reqs(21:24))
+     call ighost_y(w_cmask,2,reqs(25:28)); call ighost_y(pcmask,2,reqs(29:32))
+     call ighost_z(u_cmask,2,reqs(33:36)); call ighost_z(v_cmask,2,reqs(37:40))
+     call ighost_z(w_cmask,2,reqs(41:44)); call ighost_z(pcmask,2,reqs(45:48))
+     call MPI_WAITALL(48,reqs(1:48),stat,ierr1)
   enddo
 end subroutine set_topology
 !-------------------------------------------------------------------------------------------------
