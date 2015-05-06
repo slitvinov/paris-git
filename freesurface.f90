@@ -111,7 +111,7 @@
   enddo
 end subroutine set_topology
 !-------------------------------------------------------------------------------------------------
-subroutine check_topology(c,phase,iout)
+subroutine check_topology()
   use module_grid
   use module_2phase
   use module_freesurface
@@ -120,16 +120,16 @@ subroutine check_topology(c,phase,iout)
   use module_BC
   use module_Lag_part
   implicit none
-  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: c
-  integer, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: phase
+  include 'mpif.h' 
   real(8) :: volume
   integer :: dropid
-  integer :: i,j,k,iout,ierr,bub
+  integer :: i,j,k,bub,ierr
   logical :: remove,signal
   !cycle through bubs first maybe? Use lagrangian approach rather than Eulerian, since there are much less bubble 
   ! parts which may be imploding than discrete points!
   signal = .false.
   fill_ghost = .false.
+  remove = .false.
   v_source=0.d0
   if (num_drop(rank)>0) then
      do bub=1,num_drop(rank)
@@ -169,48 +169,51 @@ subroutine check_topology(c,phase,iout)
      enddo
   endif
   if (signal) write(*,'("COLLAPSING BUBBLE DETECTED IN RANK: ",I4)')rank
+  call MPI_ALLREDUCE(remove,fill_ghost, 1, MPI_LOGICAL, MPI_LOR, MPI_COMM_Active, ierr)
+  !write(*,'("Remove    : ",L8," in rank "I4)')remove,rank
+  !write(*,'("Fill_ghost: ",L8," in rank "I4)')fill_ghost,rank
   
 contains 
   subroutine bub_implode(bub_id)
+    use module_vof
     use module_flow
     implicit none
+    
     integer :: i,j,k,bub_id,inbr,jnbr,knbr
-
-    remove = .false.
+    integer :: req(4),sta(MPI_STATUS_SIZE,4),ierr
     do k=ks,ke; do j=js,je; do i=is,ie
-       if (phase(i,j,k)==0) then
+       if (vof_phase(i,j,k)==0) then
           v_source(i,j,k) = 0.d0 ! since source is Eulerian, the moving interface may cause source to move from gas to liq
           implode(i,j,k) = 0
        endif
-       if (phase(i,j,k)==1) then !check if gas phase
+       if (vof_phase(i,j,k)==1) then !check if gas phase
           if (tag_dropid(tag_id(i,j,k))==bub_id) then !check if we are in the correct bubble
-             implode(i,j,k) = 1!implode(i,j,k)+1
-             !if (implode(i,j,k)>=1) then !check if it is the first time step after implosion
+             implode(i,j,k) = implode(i,j,k)+1
              v_source(i,j,k) = 0.95*(u(i-1,j,k)-u(i,j,k))/dx(i)+&
                   (v(i,j-1,k)-v(i,j,k))/dy(j)+(w(i,j,k-1)-w(i,j,k))/dz(k)
-             !if (implode(i,j,k)==1) signal = .true.
-             if (volume < 64.0*dx(is)**3.d0) remove =.true.
+             if (implode(i,j,k)==1) signal = .true.
+             if ((volume < 64.0*dx(is)**3.d0) .or. implode(i,j,k)==20) remove =.true.
           endif
        endif
     enddo; enddo; enddo
-    if (remove) write(*,*)"End of loop, to be removed"
-    !call do_all_ghost(c)
     if (remove) then
-       write(*,*)"BUBBLE VOF TRACES TO BE REMOVED"
        do k=ks,ke; do j=js,je; do i=is,ie
           if (tag_dropid(tag_id(i,j,k))==bub_id) then
-             c(i,j,k) =0.d0
+             cvof(i,j,k) =0.d0
+             v_source(i,j,k) = 0.d0
+             if (itime_scheme==2) cvofold(i,j,k)=0.d0
              implode(i,j,k) = 0
-             do inbr=-1,1; do jnbr=-1,1; do knbr=-1,1
-                if (c(i+inbr,j+jnbr,k+knbr) > 0.d0) then
-                   c(i+inbr,j+jnbr,k+knbr) = 0.d0
+             do inbr=-2,2; do jnbr=-2,2; do knbr=-2,2
+                if (cvof(i+inbr,j+jnbr,k+knbr) > 0.d0) then !bubbles in very close proximity will be issue here
+                   cvof(i+inbr,j+jnbr,k+knbr) = 0.d0
+                   if (itime_scheme==2) cvofold(i+inbr,j+jnbr,k+knbr)=0.d0
                    implode(i+inbr,j+jnbr,k+knbr)=0
+                   v_source(i+inbr,j+jnbr,k+knbr) = 0.d0 !should not be necessary
                 endif
-                !write(*,'("Cell vof cleared at: ",3I4)')i+inbr,j+jnbr,k+knbr
              enddo;enddo;enddo
           endif
        enddo; enddo; enddo
-       write(*,*)"End of loop, removed, ghost layers filled"
+       write(*,'("BUBBLE TRACES REMOVED IN RANK: ",I4)')rank
     endif
   end subroutine bub_implode
 end subroutine check_topology
