@@ -125,6 +125,7 @@ subroutine check_topology()
   integer :: dropid
   integer :: i,j,k,bub,ierr
   logical :: remove,signal
+  real(8) :: xt,yt,zt
   !cycle through bubs first maybe? Use lagrangian approach rather than Eulerian, since there are much less bubble 
   ! parts which may be imploding than discrete points!
   signal = .false.
@@ -140,6 +141,9 @@ subroutine check_topology()
            call pariserror('Error in Lagrangian loop')
         endif
         volume = drops(bub)%element%vol
+        xt = drops(bub)%element%xc
+        yt = drops(bub)%element%yc
+        zt = drops(bub)%element%zc
         if (volume > 1d-20) then
            if (volume < 125.0*dx(is)**3.d0) then              
               call bub_implode(bub)
@@ -159,6 +163,9 @@ subroutine check_topology()
            call pariserror('Error in Lagrangian loop')
         endif
         volume = drops_merge(bub)%element%vol
+        xt = drops_merge(bub)%element%xc
+        yt = drops_merge(bub)%element%yc
+        zt = drops_merge(bub)%element%zc
         if (volume > 1d-20) then
            if (volume < 125.0*dx(is)**3.d0) then
               call bub_implode(bub)
@@ -170,8 +177,6 @@ subroutine check_topology()
   endif
   if (signal) write(*,'("COLLAPSING BUBBLE DETECTED IN RANK: ",I4)')rank
   call MPI_ALLREDUCE(remove,fill_ghost, 1, MPI_LOGICAL, MPI_LOR, MPI_COMM_Active, ierr)
-  !write(*,'("Remove    : ",L8," in rank "I4)')remove,rank
-  !write(*,'("Fill_ghost: ",L8," in rank "I4)')fill_ghost,rank
   
 contains 
   subroutine bub_implode(bub_id)
@@ -181,6 +186,8 @@ contains
     
     integer :: i,j,k,bub_id,inbr,jnbr,knbr
     integer :: req(4),sta(MPI_STATUS_SIZE,4),ierr
+    integer, dimension(is:ie,js:je,ks:ke) :: cleaned ! 0: not checked, 1: cleaned, 2: left as is 
+    real(8) :: d_clean 
     do k=ks,ke; do j=js,je; do i=is,ie
        if (vof_phase(i,j,k)==0) then
           v_source(i,j,k) = 0.d0 ! since source is Eulerian, the moving interface may cause source to move from gas to liq
@@ -197,23 +204,58 @@ contains
        endif
     enddo; enddo; enddo
     if (remove) then
+       !get effective cleaning radius
+       d_clean = 2.5d0*(volume/4.d0)**(1./3.)
+       write(*,'("Cleaning radius: ",e14.5)')d_clean
        do k=ks,ke; do j=js,je; do i=is,ie
-          if (tag_dropid(tag_id(i,j,k))==bub_id) then
-             cvof(i,j,k) =0.d0
-             v_source(i,j,k) = 0.d0
-             if (itime_scheme==2) cvofold(i,j,k)=0.d0
+          if (sqrt((x(i)-xt)**2.d0+(y(j)-yt)**2.d0+(z(k)-zt)**2.d0)<d_clean) then
+             cvof(i,j,k)=0.0d0
+             v_source(i,j,k) = 0.0d0
+             if (itime_scheme==2) cvofold(i,j,k)=0.0d0
              implode(i,j,k) = 0
-             do inbr=-2,2; do jnbr=-2,2; do knbr=-2,2
-                if (cvof(i+inbr,j+jnbr,k+knbr) > 0.d0) then !bubbles in very close proximity will be issue here
-                   cvof(i+inbr,j+jnbr,k+knbr) = 0.d0
-                   if (itime_scheme==2) cvofold(i+inbr,j+jnbr,k+knbr)=0.d0
-                   implode(i+inbr,j+jnbr,k+knbr)=0
-                   v_source(i+inbr,j+jnbr,k+knbr) = 0.d0 !should not be necessary
-                endif
-             enddo;enddo;enddo
           endif
        enddo; enddo; enddo
+!!$       cleaned = 0
+!!$       do k=ks,ke; do j=js,je; do i=is,ie
+!!$          if (cvof(i,j,k) < 5.e-14) then !cvof below threshold, liquid
+!!$             cleaned(i,j,k) = 2
+!!$          else
+!!$             if (tag_dropid(tag_id(i,j,k))==bub_id) then ! finite cvof in bubble to be removed
+!!$                cvof(i,j,k)=0.0d0
+!!$                v_source(i,j,k) = 0.0d0
+!!$                if (itime_scheme==2) cvofold(i,j,k)=0.0d0
+!!$                implode(i,j,k) = 0
+!!$                cleaned(i,j,k) = 1
+!!$             endif
+!!$          endif
+!!$       enddo; enddo; enddo
+!!$       do k=ks,ke; do j=js,je; do i=is,ie
+!!$          if (cleaned(i,j,k)==0) then !unchecked. should either be liquid from other bubs or small vof to be removed
+!!$             if ((cleaned(i+1,j,k)==1).or.(cleaned(i-1,j,k)==1)&
+!!$                  .or.(cleaned(i,j+1,k)==1).or.(cleaned(i,j-1,k)==1)&
+!!$                  .or.(cleaned(i,j,k+1)==1).or.(cleaned(i,j,k-1)==1)) then
+!!$                cvof(i,j,k)=0.d0
+!!$                v_source(i,j,k) = 0.d0
+!!$                if (itime_scheme==2) cvofold(i,j,k)=0.d0
+!!$                implode(i,j,k) = 0
+!!$                cleaned(i,j,k)=1
+!!$             else
+!!$                cleaned(i,j,k)=2 !must be liq from other bub. 
+!!$             endif
+!!$          endif
+!!$       enddo; enddo; enddo
+!!$
        write(*,'("BUBBLE TRACES REMOVED IN RANK: ",I4)')rank
+!!$       do k=ks,ke; do j=js,je; do i=is,ie
+!!$          if (cvof(i,j,k)/=cvof(i,j,k)) then
+!!$             write(*,'("CVOF NaN")')
+!!$             write(*,'("ijk rank",4I4)')i,j,k,rank
+!!$             write(*,'("Cvof 1-7: ",7e14.5)')cvof(i-1,j,k),cvof(i+1,j,k),cvof(i,j-1,k),cvof(i,j+1,k),&
+!!$                  cvof(i,j,k-1),cvof(i,j,k+1),cvof(i,j,k)
+!!$             write(*,'("Implode_flags 1-7: ",7I8)')implode(i-1,j,k),implode(i+1,j,k),implode(i,j-1,k),implode(i,j+1,k),&
+!!$                  implode(i,j,k-1),implode(i,j,k+1),implode(i,j,k) 
+!!$          endif
+!!$       enddo; enddo; enddo
     endif
   end subroutine bub_implode
 end subroutine check_topology

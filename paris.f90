@@ -269,9 +269,13 @@ Program paris
                  call check_topology()
                  if (fill_ghost) then
                     call do_all_ghost(cvof)
-                    !call do_all_ghost(v_source) 
+                    if (itime_scheme==2) call do_all_ghost(cvofold)
                     call get_flags_and_clip(cvof,vof_flag)
-                    call get_vof_phase(cvof) !cvof updated above from min to max 
+                    call get_vof_phase(cvof) !cvof updated above from min to max
+                    call ReleaseTag2DropTable
+                    call tag_bubbles(itimestep,time)
+                    call get_normals()
+                    call get_all_heights(itimestep)
                  endif
                  call set_topology(vof_phase,itimestep) !vof_phase updated in vofsweeps
               elseif (.not.Freesurface .and. debug_par) then
