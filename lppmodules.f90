@@ -51,7 +51,7 @@
       ! 3 marked as C node
       ! 4 marked as reference fluid 
       ! 5 marked as ghost layer
-   integer,parameter :: maxnum_diff_tag = 300  
+   integer,parameter :: maxnum_diff_tag = 100  
    integer :: total_num_tag,totalnum_drop,totalnum_drop_indep,num_new_drop
    integer, dimension(:), allocatable :: num_drop
    integer, dimension(:), allocatable :: num_drop_merge
@@ -201,6 +201,10 @@
    integer :: num_part_seed
    real(8) :: time_part_seed
    integer :: tag_opened=0
+
+   ! For merging drops
+   integer, dimension(:,:), allocatable :: num_diff_tag_complet
+   integer, dimension(:,:,:), allocatable :: diff_tag_list_complet
 contains
 !=================================================================================================
    subroutine initialize_LPP()
@@ -372,14 +376,14 @@ contains
       real(8), intent(in) :: time
 
       ! Only do tagging and conversion in specific time steps
-      if ( MOD(tswap,ntimestepTag) == 0 ) then 
+      if ( MOD(tswap,ntimestepTag) == 0 ) then
          call tag_drop()
          if ( nPdomain > 1 ) call tag_drop_all
          call CreateTag2DropTable
-         if ( nPdomain > 1 ) call merge_drop_pieces 
+         if ( nPdomain > 1 ) call merge_drop_pieces
 
-         if ( DropStatisticsMethod > 0 .and. & 
-              MOD(tswap,nstats) == 0 ) call drop_statistics(tswap,time) 
+         if ( DropStatisticsMethod > 0 .and. &
+              MOD(tswap,nstats) == 0 ) call drop_statistics(tswap,time)
 
          if ( (DoConvertVOF2LPP .or. DoConvertLPP2VOF) .and. & 
                CriteriaConvertCase == CriteriaInterface )  call MarkRegAwayInterface()
@@ -656,7 +660,10 @@ contains
       integer :: irank, irank1
       real(8) :: max_drop_merge_vol
       integer :: tag_max_drop_merge_vol
-      logical :: TagAlreadyListed,FinishUpdateTag
+      logical :: TagAlreadyListed
+      integer :: max_num_drop_merge_use
+
+      integer :: maxnum_diff_tag_complet = 500
 
       ! Check ghost cells of droplet pieces
       if ( num_drop_merge(rank) > 0 ) then 
@@ -687,15 +694,14 @@ contains
                   drops_merge(idrop)%num_diff_tag = &
                   drops_merge(idrop)%num_diff_tag + 1
                   if ( drops_merge(idrop)%num_diff_tag <= maxnum_diff_tag ) then  
-!                     call lpperror("Number of different tags of a droplet pieces exceeds the max number!") 
                      drops_merge(idrop)%diff_tag_list(drops_merge(idrop)%num_diff_tag) &
                         = tag_id(drops_merge_gcell_list(1,iCell,idrop), &
                                  drops_merge_gcell_list(2,iCell,idrop), &
                                  drops_merge_gcell_list(3,iCell,idrop))
                   else
-                     write(*,*) "Number of diff tags exceeds the max number!",time,rank,idrop,& 
+                     write(*,*) "Number of diff tags exceeds the max tag number!",time,rank,idrop,& 
                      drops_merge(idrop)%num_diff_tag, maxnum_diff_tag
-                     call lpperror("Number of diff tags exceeds the max number!") 
+                     call lpperror("Number of diff tags exceeds the max tag number when checking ghost cells!") 
                   end if ! maxnum_diff_tag
                end if ! idiff_tag
             end do ! iCell
@@ -706,44 +712,68 @@ contains
       call CollectDropMerge
 
       ! merge droplets pieces & calculate droplet properties
-      if ( rank == 0 ) then 
+      if ( rank == 0 ) then
+         ! Allocate memory & initialize
+         max_num_drop_merge_use = maxval(num_drop_merge)
+         allocate( num_diff_tag_complet(max_num_drop_merge_use,0:nPdomain-1) ) 
+         allocate( diff_tag_list_complet(maxnum_diff_tag_complet,max_num_drop_merge_use,0:nPdomain-1) )
+
+         num_diff_tag_complet = 0
+         diff_tag_list_complet = 123456789
+         do irank = 0,nPdomain-1
+            if ( num_drop_merge(irank) > 0 ) then 
+               do idrop = 1,num_drop_merge(irank)
+                  num_diff_tag_complet(idrop,irank) = drops_merge_comm(idrop,irank)%num_diff_tag
+                  if ( num_diff_tag_complet(idrop,irank) > 0 ) then 
+                     do idiff_tag = 1,num_diff_tag_complet(idrop,irank)
+                        diff_tag_list_complet(idiff_tag,idrop,irank) = & 
+                           drops_merge_comm(idrop,irank)%diff_tag_list(idiff_tag)
+                     end do ! idiff_tag
+                  end if ! num_diff_tag_complet(idrop,irank)
+               end do ! idrop
+            end if ! num_drop_merge(irank)
+         end do ! irank 
+
          ! Find complete list of different tags belonging to a drop
-         FinishUpdateTag = .false. 
-         do while (.not.FinishUpdateTag)
-            FinishUpdateTag = .true. 
-            do tag = 1,total_num_tag
-               if ( tag_mergeflag(tag) == 0 ) cycle
-               idrop = tag_dropid(tag)
-               irank = tag_rank  (tag)
-               do idiff_tag = 1,drops_merge_comm(idrop,irank)%num_diff_tag
-                  tag1   = drops_merge_comm(idrop,irank)%diff_tag_list(idiff_tag)
-                  idrop1 = tag_dropid(tag1)
-                  irank1 = tag_rank  (tag1)
-                  do idiff_tag1 = 1,drops_merge_comm(idrop1,irank1)%num_diff_tag
-                     TagAlreadylisted = .false.
-                     tag2   = drops_merge_comm(idrop1,irank1)%diff_tag_list(idiff_tag1)
-                     if ( tag2 == tag ) TagAlreadyListed = .true.  
-                     do idiff_tag2 = 1,drops_merge_comm(idrop,irank)%num_diff_tag
-                        if ( tag2 == drops_merge_comm(idrop,irank)%diff_tag_list(idiff_tag2) ) & 
-                           TagAlreadylisted = .true.
-                     end do ! idiff_tag2
-                     if (.not. TagAlreadylisted) then 
-                        if ( drops_merge_comm(idrop,irank)%num_diff_tag < maxnum_diff_tag ) then  
-                           drops_merge_comm(idrop,irank)%num_diff_tag = & 
-                              drops_merge_comm(idrop,irank)%num_diff_tag + 1
-                           drops_merge_comm(idrop,irank)%diff_tag_list( & 
-                              drops_merge_comm(idrop,irank)%num_diff_tag) = tag2
-                        else 
-                           write(*,*) "Number of diff tags exceeds the max number!",time,irank,idrop,&  
-                                    drops_merge_comm(idrop,irank)%num_diff_tag, maxnum_diff_tag
-                           call pariserror("number of tag goes over max number when finding complete list!")
-                        end if ! maxnum_diff_tag
-                        if ( FinishUpdateTag ) FinishUpdateTag = .false. 
-                     end if ! TagAlreadylist
-                  end do ! idiff_tag1
-               end do ! idff_tag
-            end do ! tag
-         end do ! update_tag_finish
+         do tag = 1,total_num_tag
+            if ( tag_mergeflag(tag) == 0 ) cycle
+            idrop = tag_dropid(tag)
+            irank = tag_rank  (tag)
+            idiff_tag = 1 
+            do while( idiff_tag <= num_diff_tag_complet(idrop,irank) )
+               tag1   = diff_tag_list_complet(idiff_tag,idrop,irank)
+               idrop1 = tag_dropid(tag1)
+               irank1 = tag_rank  (tag1)
+               idiff_tag1 = 1
+               do while( idiff_tag1 <= num_diff_tag_complet(idrop1,irank1) )
+                  TagAlreadylisted = .false.
+                  tag2   = diff_tag_list_complet(idiff_tag1,idrop1,irank1)
+                  if ( tag2 == tag ) TagAlreadyListed = .true.  
+                  idiff_tag2 = 1
+                  do while( idiff_tag2 <= num_diff_tag_complet(idrop,irank) )
+                     if ( tag2 == diff_tag_list_complet(idiff_tag2,idrop,irank) ) then  
+                        TagAlreadylisted = .true.
+                        exit 
+                     else 
+                        idiff_tag2 = idiff_tag2 + 1
+                     end if ! tag2
+                  end do ! idiff_tag2
+                  if (.not. TagAlreadylisted) then 
+                     if ( num_diff_tag_complet(idrop,irank) < maxnum_diff_tag_complet ) then  
+                        num_diff_tag_complet(idrop,irank) = & 
+                           num_diff_tag_complet(idrop,irank) + 1
+                        diff_tag_list_complet(num_diff_tag_complet(idrop,irank),idrop,irank) = tag2
+                     else 
+                        write(*,*) "Number of diff tags exceeds max tag number when finding complete list!",time,irank,idrop,&  
+                                 num_diff_tag_complet(idrop,irank), maxnum_diff_tag_complet
+                        call pariserror("Number of tags over max tag number when finding complete list!")
+                     end if ! maxnum_diff_tag
+                  end if ! TagAlreadylist
+                  idiff_tag1 = idiff_tag1 + 1
+               end do ! idiff_tag1
+               idiff_tag = idiff_tag + 1
+            end do ! idff_tag
+         end do ! tag
 
          ! Calculate merge drop properties by summing all pieces
          allocate( new_drop_id(1:total_num_tag) )
@@ -770,8 +800,8 @@ contains
 
                max_drop_merge_vol = drops_merge_comm(idrop,irank)%vol
                tag_max_drop_merge_vol = tag
-               do idiff_tag = 1,drops_merge_comm(idrop,irank)%num_diff_tag
-                  tag1   = drops_merge_comm(idrop,irank)%diff_tag_list(idiff_tag)
+               do idiff_tag = 1,num_diff_tag_complet(idrop,irank)
+                  tag1   = diff_tag_list_complet(idiff_tag,idrop,irank)
                   if ( tag1 == tag ) cycle ! for some VOF-BC, tag in ghost cell may be the same as inside  
                   new_drop_id(tag1) = num_new_drop 
                   idrop1 = tag_dropid(tag1)
@@ -816,8 +846,8 @@ contains
                drops_merge_comm(idrop,irank)%duc  = duc_merge
                drops_merge_comm(idrop,irank)%dvc  = dvc_merge
                drops_merge_comm(idrop,irank)%dwc  = dwc_merge
-               do idiff_tag = 1,drops_merge_comm(idrop,irank)%num_diff_tag
-                  tag1   = drops_merge_comm(idrop,irank)%diff_tag_list(idiff_tag)
+               do idiff_tag = 1,num_diff_tag_complet(idrop,irank)
+                  tag1   = diff_tag_list_complet(idiff_tag,idrop,irank)
                   idrop1 = tag_dropid(tag1)
                   irank1 = tag_rank  (tag1)
                   drops_merge_comm(idrop1,irank1)%vol = vol_merge
@@ -836,6 +866,10 @@ contains
          totalnum_drop_indep = sum(num_drop)
          new_drop_id = new_drop_id + totalnum_drop_indep
          totalnum_drop = totalnum_drop_indep + num_new_drop
+         
+         ! deallocate memory
+         deallocate( num_diff_tag_complet ) 
+         deallocate( diff_tag_list_complet )
       end if ! rank 
 
       call DistributeDropMerge
