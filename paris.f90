@@ -845,7 +845,7 @@ function get_cfl_and_check(deltaT)
   else
      vmax = 0.d0
      do k=ks,ke; do j=js,je; do i=is,ie
-        if (vof_phase(i,j,k)==0) then
+        if (vof_phase(i,j,k)==0 .and. implode(i,j,k)==0) then
            v_local = sqrt(u(i,j,k)**2 + v(i,j,k)**2 + w(i,j,k)**2)
            vmax = MAX(vmax,v_local)
         endif
