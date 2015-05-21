@@ -221,7 +221,7 @@ CONTAINS
     !
     initial_displacement = 0
     CALL MPI_FILE_SET_VIEW(fh, initial_displacement, MPI_REAL8, &
-         type_sub_array, "native", MPI_STATUS_IGNORE, code)
+         type_sub_array, "native", MPI_INFO_NULL, code)
 
 
     !
@@ -410,7 +410,7 @@ CONTAINS
   END FUNCTION i2t
 
   !
-  ! Subroutine to write the multi rood data file for visit
+  ! Subroutine to write the multi root data file for visit
   !
   SUBROUTINE write_master(rootname, step, time)
     IMPLICIT NONE
