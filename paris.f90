@@ -266,16 +266,18 @@ Program paris
               if (FreeSurface) then
                  call get_normals()
                  call tag_bubbles(itimestep,time)
-                 call check_topology()
-                 if (fill_ghost) then
-                    call do_all_ghost(cvof)
-                    if (itime_scheme==2) call do_all_ghost(cvofold)
-                    call get_flags_and_clip(cvof,vof_flag)
-                    call get_vof_phase(cvof) !cvof updated above from min to max
-                    call ReleaseTag2DropTable
-                    call tag_bubbles(itimestep,time)
-                    call get_normals()
-                    call get_all_heights(itimestep)
+                 if (.not. RP_test) then
+                    call check_topology()
+                    if (fill_ghost) then
+                       call do_all_ghost(cvof)
+                       if (itime_scheme==2) call do_all_ghost(cvofold)
+                       call get_flags_and_clip(cvof,vof_flag)
+                       call get_vof_phase(cvof) !cvof updated above from min to max
+                       call ReleaseTag2DropTable
+                       call tag_bubbles(itimestep,time)
+                       call get_normals()
+                       call get_all_heights(itimestep)
+                    endif
                  endif
                  call set_topology(vof_phase,itimestep) !vof_phase updated in vofsweeps
               elseif (.not.Freesurface .and. debug_par) then

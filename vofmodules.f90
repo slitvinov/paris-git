@@ -1750,6 +1750,7 @@ end subroutine output_VOF_VTKSG
 !=================================================================================================
 !-------------------------------------------------------------------------------------------------
 subroutine backup_VOF_write
+  use module_freesurface
   implicit none
   integer ::i,j,k
   character(len=100) :: filename
@@ -1761,16 +1762,21 @@ subroutine backup_VOF_write
   do k=kmin,kmax; do j=jmin,jmax; do i=imin,imax
     write(7,1200) u(i,j,k), v(i,j,k), w(i,j,k), p(i,j,k), cvof(i,j,k)
   enddo; enddo; enddo
+  if (FreeSurface) then
+     write(7,1201)R_RK,dR_RK,ddR_RK
+  endif
   CLOSE(7)
   if(rank==0)print*,'Backup written at t=',time
   1100 FORMAT(es17.8e3,7I10)
   !Note: to guarantee identical results, 16 digits are needed for real8 
   1200 FORMAT(5es25.16e3)
+  1201 FORMAT(4e14.5)
 end subroutine backup_VOF_write
 !=================================================================================================
 !=================================================================================================
 !-------------------------------------------------------------------------------------------------
 subroutine backup_VOF_read
+  use module_freesurface
   implicit none
   integer ::i,j,k,i1,i2,j1,j2,k1,k2
   OPEN(UNIT=7,FILE=trim(out_path)//'/backup_'//int2text(rank,padding),status='old',action='read')
@@ -1780,6 +1786,9 @@ subroutine backup_VOF_read
   do k=kmin,kmax; do j=jmin,jmax; do i=imin,imax
     read(7,*) u(i,j,k), v(i,j,k), w(i,j,k), p(i,j,k), cvof(i,j,k)
   enddo; enddo; enddo
+  if (FreeSurface) then
+     read(7,*)R_RK,dR_RK,ddR_RK
+  endif
   CLOSE(7)
 end subroutine backup_VOF_read
 !=================================================================================================
