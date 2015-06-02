@@ -544,7 +544,7 @@ contains
     real(8) :: ryz, sine, NozzleThickness
     
     if( test_D2P ) then 
-       if ( rank == root_rank ) call random_bubbles
+       if ( rank == root_rank ) call random_bubbles(0.02,0.03,0.15,0.70)
        call MPI_BCAST(rad, NumBubble, MPI_REAL8, &
                       root_rank, MPI_Comm_Cart, ierr)
        call MPI_BCAST(xc , NumBubble, MPI_REAL8, &
@@ -657,7 +657,7 @@ contains
   !=================================================================================================
   !   Generate random bubbles 
   !=================================================================================================
-  subroutine random_bubbles()
+  subroutine random_bubbles(rad_min, v_rad, coord_min, v_coord)
     use module_2phase
 #ifdef __INTEL_COMPILER
     use IFPORT
@@ -666,14 +666,15 @@ contains
     integer ib
 #ifndef __INTEL_COMPILER
     real :: rand
+    real, intent(in) :: rad_min, v_rad, coord_min, v_coord
 #endif
 
     if(NumBubble>2) then 
       do ib=1,NumBubble
-         rad(ib) = 0.02 + rand()*0.03
-         xc(ib)  = 0.15 + rand()*0.7
-         yc(ib)  = 0.15 + rand()*0.7
-         zc(ib)  = 0.15 + rand()*0.7
+         rad(ib) = rad_min + rand()*v_rad
+         xc(ib)  = coord_min + rand()*v_coord
+         yc(ib)  = coord_min + rand()*v_coord
+         zc(ib)  = coord_min + rand()*v_coord
       end do
     end if ! NumBubble
   end subroutine random_bubbles 
