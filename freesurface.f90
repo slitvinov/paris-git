@@ -1295,27 +1295,27 @@ contains
     !--------------------------------------------------------------------------------------------------------
     do k=ks,ke; do j=js,je; do i=is,ie
        if (vof_phase(i,j,k)==0 .and. implode(i,j,k)==0) then
-          A(i,j,k,1) = dt/(dx(i)*x_mod(i-1,j,k)*rho)
-          A(i,j,k,2) = dt/(dx(i)*x_mod(i  ,j,k)*rho)
-          A(i,j,k,3) = dt/(dy(j)*y_mod(i,j-1,k)*rho)
-          A(i,j,k,4) = dt/(dy(j)*y_mod(i,j  ,k)*rho)
-          A(i,j,k,5) = dt/(dz(k)*z_mod(i,j,k-1)*rho)
-          A(i,j,k,6) = dt/(dz(k)*z_mod(i,j,k  )*rho)
-          A(i,j,k,7) = sum(A(i,j,k,1:6))
-          A(i,j,k,8) = A(i,j,k,8) + dt/rho*&
-               (P_gx(i+1,j,k)/(dx(i)*x_mod(i,j,k))+P_gx(i-1,j,k)/(dx(i)*x_mod(i-1,j,k))&
-               +P_gy(i,j+1,k)/(dy(j)*y_mod(i,j,k))+P_gy(i,j-1,k)/(dy(j)*y_mod(i,j-1,k))&
-               +P_gz(i,j,k+1)/(dz(k)*z_mod(i,j,k))+P_gz(i,j,k-1)/(dz(k)*z_mod(i,j,k-1)))
-!!$          A(i,j,k,1) = 2.d0*dt/((dx(i)+x_mod(i-1,j,k))*x_mod(i-1,j,k)*rho)
-!!$          A(i,j,k,2) = 2.d0*dt/((dx(i)+x_mod(i  ,j,k))*x_mod(i  ,j,k)*rho)
-!!$          A(i,j,k,3) = 2.d0*dt/((dy(j)+y_mod(i,j-1,k))*y_mod(i,j-1,k)*rho)
-!!$          A(i,j,k,4) = 2.d0*dt/((dy(j)+y_mod(i,j  ,k))*y_mod(i,j  ,k)*rho)
-!!$          A(i,j,k,5) = 2.d0*dt/((dz(k)+z_mod(i,j,k-1))*z_mod(i,j,k-1)*rho)
-!!$          A(i,j,k,6) = 2.d0*dt/((dz(k)+z_mod(i,j,k  ))*z_mod(i,j,k  )*rho)
+!!$          A(i,j,k,1) = dt/(dx(i)*x_mod(i-1,j,k)*rho)
+!!$          A(i,j,k,2) = dt/(dx(i)*x_mod(i  ,j,k)*rho)
+!!$          A(i,j,k,3) = dt/(dy(j)*y_mod(i,j-1,k)*rho)
+!!$          A(i,j,k,4) = dt/(dy(j)*y_mod(i,j  ,k)*rho)
+!!$          A(i,j,k,5) = dt/(dz(k)*z_mod(i,j,k-1)*rho)
+!!$          A(i,j,k,6) = dt/(dz(k)*z_mod(i,j,k  )*rho)
 !!$          A(i,j,k,7) = sum(A(i,j,k,1:6))
-!!$          A(i,j,k,8) = A(i,j,k,8) + A(i,j,k,1)*P_gx(i-1,j,k) + A(i,j,k,2)*P_gx(i+1,j,k)&
-!!$               +A(i,j,k,3)*P_gy(i,j-1,k)+A(i,j,k,4)*P_gy(i,j+1,k)&
-!!$               +A(i,j,k,5)*P_gz(i,j,k-1)+A(i,j,k,6)*P_gz(i,j,k+1)
+!!$          A(i,j,k,8) = A(i,j,k,8) + dt/rho*&
+!!$               (P_gx(i+1,j,k)/(dx(i)*x_mod(i,j,k))+P_gx(i-1,j,k)/(dx(i)*x_mod(i-1,j,k))&
+!!$               +P_gy(i,j+1,k)/(dy(j)*y_mod(i,j,k))+P_gy(i,j-1,k)/(dy(j)*y_mod(i,j-1,k))&
+!!$               +P_gz(i,j,k+1)/(dz(k)*z_mod(i,j,k))+P_gz(i,j,k-1)/(dz(k)*z_mod(i,j,k-1)))
+          A(i,j,k,1) = 2.d0*dt/((dx(i)+x_mod(i-1,j,k))*x_mod(i-1,j,k)*rho)
+          A(i,j,k,2) = 2.d0*dt/((dx(i)+x_mod(i  ,j,k))*x_mod(i  ,j,k)*rho)
+          A(i,j,k,3) = 2.d0*dt/((dy(j)+y_mod(i,j-1,k))*y_mod(i,j-1,k)*rho)
+          A(i,j,k,4) = 2.d0*dt/((dy(j)+y_mod(i,j  ,k))*y_mod(i,j  ,k)*rho)
+          A(i,j,k,5) = 2.d0*dt/((dz(k)+z_mod(i,j,k-1))*z_mod(i,j,k-1)*rho)
+          A(i,j,k,6) = 2.d0*dt/((dz(k)+z_mod(i,j,k  ))*z_mod(i,j,k  )*rho)
+          A(i,j,k,7) = sum(A(i,j,k,1:6))
+          A(i,j,k,8) = A(i,j,k,8) + A(i,j,k,1)*P_gx(i-1,j,k) + A(i,j,k,2)*P_gx(i+1,j,k)&
+               +A(i,j,k,3)*P_gy(i,j-1,k)+A(i,j,k,4)*P_gy(i,j+1,k)&
+               +A(i,j,k,5)*P_gz(i,j,k-1)+A(i,j,k,6)*P_gz(i,j,k+1)
           if (A(i,j,k,8) /= A(i,j,k,8)) then
              write(*,'("A8 NaN, error imminent. Neigbours mods :",6e14.5)')x_mod(i-1,j,k),x_mod(i,j,k),&
                   y_mod(i,j-1,k),y_mod(i,j,k),z_mod(i,j,k-1),z_mod(i,j,k)
