@@ -693,10 +693,11 @@ contains
     call srand(NumBubble)
     if(NumBubble>2) then 
       do ib=1,NumBubble
-         rad(ib) = rad_min + rand()*v_rad
-         xc(ib)  = coord_min + rand()*v_coord
-         yc(ib)  = coord_min + rand()*v_coord
-         zc(ib)  = coord_min + rand()*v_coord
+         rad(ib) = r_min + rand()*var_r
+         xc(ib)  = coord_min + rand()*var_coord
+         yc(ib)  = coord_min + rand()*var_coord
+         zc(ib)  = coord_min + rand()*var_coord
+         if (NumBubble < 30) write(*,'("Random bub generated at ",3e10.2," with radius ",e10.2)')xc(ib),yc(ib),zc(ib),rad(ib)
       end do
     end if ! NumBubble
   end subroutine random_bubbles 
