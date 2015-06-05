@@ -80,6 +80,7 @@ module module_VOF
   logical :: test_KHI2D = .false.
   logical :: test_PhaseInversion = .false.
   logical :: test_fsdrop = .false.
+  logical :: test_randombubs = .false.
   logical :: linfunc_initialized = .false.
   logical :: DoMOMCONS = .false.
   logical :: STGhost = .false.
@@ -258,7 +259,8 @@ contains
        FreeSurface, ViscMeanIsArith, DensMeanIsArith, &
        output_filtered_VOF, DoMOMCONS, use_vofi,nfilter, &
        hshift, do_rotation, debug_curvature, mixed_heights, &
-       use_full_heights, debug_par, STGhost
+       use_full_heights, debug_par, STGhost, &
+       r_min, var_r, coord_min, var_coord
     ! Free Surface parameters to be read from a parameter file called "inputFS"
     namelist /FSparameters/ X_level, RP_test, gamma, R_ref, P_ref,&
          VTK_OUT, NOUT_VTK, step_max
@@ -286,7 +288,8 @@ contains
     mixed_heights = .true.
     use_full_heights = .true. 
     debug_par = .false.
-    
+    r_min=0.02; var_r=0.01; coord_min=0.2; var_coord=0.6
+
     in=31
 
     call MPI_COMM_RANK(MPI_COMM_WORLD, rank, ierr)
@@ -448,6 +451,8 @@ contains
        test_PhaseInversion = .true.
     else if(test_type=='droplet_fs') then
        test_fsdrop = .true.
+    else if(test_type=='random_bubs') then
+       test_randombubs = .true.   
     else
        write(*,*) test_type, rank
        call pariserror("unknown initialization")
@@ -544,7 +549,10 @@ contains
     real(8) :: ryz, sine, NozzleThickness
     
     if( test_D2P ) then 
-       if ( rank == root_rank ) call random_bubbles(0.02,0.03,0.15,0.70)
+       if ( rank == root_rank ) then
+          r_min=0.02; var_r=0.03; coord_min=0.15; var_coord=0.70
+          call random_bubbles
+       endif
        call MPI_BCAST(rad, NumBubble, MPI_REAL8, &
                       root_rank, MPI_Comm_Cart, ierr)
        call MPI_BCAST(xc , NumBubble, MPI_REAL8, &
@@ -554,6 +562,21 @@ contains
        call MPI_BCAST(zc , NumBubble, MPI_REAL8, &
                       root_rank, MPI_Comm_Cart, ierr)
     end if ! test_D2P
+    
+    if (test_randombubs) then
+       if ( rank == root_rank ) then
+          if (NumBubble <= 2) call pariserror('For random bubble test there has to be more than 2 bubbles')
+          call random_bubbles
+       endif
+       call MPI_BCAST(rad, NumBubble, MPI_REAL8, &
+                      root_rank, MPI_Comm_Cart, ierr)
+       call MPI_BCAST(xc , NumBubble, MPI_REAL8, &
+                      root_rank, MPI_Comm_Cart, ierr)
+       call MPI_BCAST(yc , NumBubble, MPI_REAL8, &
+                      root_rank, MPI_Comm_Cart, ierr)
+       call MPI_BCAST(zc , NumBubble, MPI_REAL8, &
+                      root_rank, MPI_Comm_Cart, ierr)
+    endif
 
     if(test_heights.or.test_capwave) then 
        if(cylinder_dir==0) then
@@ -657,7 +680,7 @@ contains
   !=================================================================================================
   !   Generate random bubbles 
   !=================================================================================================
-  subroutine random_bubbles(rad_min, v_rad, coord_min, v_coord)
+  subroutine random_bubbles()
     use module_2phase
 #ifdef __INTEL_COMPILER
     use IFPORT
@@ -666,9 +689,8 @@ contains
     integer ib
 #ifndef __INTEL_COMPILER
     real :: rand
-    real, intent(in) :: rad_min, v_rad, coord_min, v_coord
 #endif
-
+    call srand(NumBubble)
     if(NumBubble>2) then 
       do ib=1,NumBubble
          rad(ib) = rad_min + rand()*v_rad
