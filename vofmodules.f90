@@ -1545,10 +1545,13 @@ end subroutine vofandmomsweepsstaggered
       integer :: j,k
       integer :: inject
       inject=0
-      if ( inject_type == 2 .or. inject_type == 5 .or. inject_type == 4) then 
+      if ( inject_type == 2 .or. inject_type == 4) then 
          if ((y(j) - jetcenter_yc)**2 + (z(k) - jetcenter_zc)**2.lt.radius_liq_inject**2) inject=1
       else if ( inject_type == 3 ) then
          if ((y(j) - jetcenter_yc) <= radius_liq_inject ) inject = 1 
+      else if ( inject_type == 5 ) then
+         if ((y(j) - jetcenter_yc) > radius_gas_inject .and. &  
+             (y(j) - jetcenter_yc) < radius_liq_inject ) inject = 1 
       end if ! inject_type
     end function inject
     !

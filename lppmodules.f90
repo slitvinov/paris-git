@@ -2214,8 +2214,10 @@ contains
       real(8) :: ufnew,vfnew,wfnew,wt
       logical :: UseCreepingFlow, UseAddedMass
 ! TEMPORARY
-      real(8) :: expterm,term,cam
+!      real(8) :: expterm,term
 ! END TEMPORARY 
+      real(8) :: cam
+      real(8),parameter :: alpha = 4.d0 
 
 ! TEMPORARY  
          UseCreepingFlow = .false.
@@ -2302,7 +2304,7 @@ contains
                w(i,j,k) = wp
             end if ! cvof
          else if ( UseAddedMass ) then
-            cam = 1.d0 + 4.d0*rho1/rho2
+            cam = 1.d0 + alpha*rho1/rho2
             if((cvof(i,j,k) + cvof(i+1,j,k)) > 0.0d0) u(i,j,k) = cam*(up-uf)+uf
             if((cvof(i,j,k) + cvof(i,j+1,k)) > 0.0d0) v(i,j,k) = cam*(vp-vf)+vf
             if((cvof(i,j,k) + cvof(i,j,k+1)) > 0.0d0) w(i,j,k) = cam*(wp-wf)+wf

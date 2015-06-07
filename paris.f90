@@ -789,6 +789,7 @@ subroutine TimeStepSize(deltaT,vof_phase)
   use module_flow
   use module_2phase
   use module_IO
+  use module_BC
   use module_freesurface
   implicit none
   include "mpif.h"
@@ -814,7 +815,7 @@ subroutine TimeStepSize(deltaT,vof_phase)
            endif
         enddo; enddo; enddo 
      endif
-     if (.not.FreeSurface .and. vmax > vmax_phys*1.d2 ) then
+     if ( inject_type == 3  .and. vmax > vmax_phys*1.d2 ) then
         !write(*,*) "Error:Max velocity 100 times larger than physical value",rank, vmax,vmax_phys 
         call mpi_barrier(MPI_COMM_WORLD, ierr)
         call pariserror("Max velocity 100 times larger than physical value, something wrong!") 
@@ -1068,7 +1069,7 @@ end subroutine calcStats
             dat_probe(iprobe,3) = 0.5d0*(w(i,j,k)+w(i,j,k+1))
             dat_probe(iprobe,4) = cvof(i,j,k)
             dat_probe(iprobe,5) = p(i,j,k)
-            OPEN(UNIT=300+iprobe,FILE=TRIM(out_path)//'/probe-'//TRIM(int2text(iprobe,padding))//'.dat')
+            OPEN(UNIT=300+iprobe,FILE=TRIM(out_path)//'/probe-'//TRIM(int2text(iprobe,padding))//'.dat',POSITION='append')
             write(300+iprobe,'(6(E23.16,1X))') time,dat_probe(iprobe,:)
          end if       
       end do ! iprobe
@@ -1081,7 +1082,7 @@ end subroutine calcStats
                j >= js .and. j <= je .and. & 
                k >= ks .and. k <= ke ) then 
             dat_probe_cvof(iprobe) = cvof(i,j,k)
-            OPEN(UNIT=400+iprobe,FILE=TRIM(out_path)//'/probe_cvof-'//TRIM(int2text(iprobe,padding))//'.dat')
+            OPEN(UNIT=400+iprobe,FILE=TRIM(out_path)//'/probe_cvof-'//TRIM(int2text(iprobe,padding))//'.dat',POSITION='append')
             write(400+iprobe,'(2(E23.16,1X))') time,dat_probe_cvof(iprobe)
          end if       
       end do ! iprobe
@@ -2648,6 +2649,19 @@ subroutine InitCondition
             !      end if ! 
             !   end do; end do; end do 
             !end if ! inject_type
+
+            if ( inject_type == 3 ) then
+               do i=imin,imax; do j=jmin,jmax; do k=kmin,kmax
+                  if ( y(j) < radius_liq_inject & 
+                     .and. x(i) < radius_gas_inject*10.d0 ) then 
+                     u(i,j,k) = ugas_inject*y(j)/radius_gas_inject
+                  else if ( y(j) > radius_gas_inject & 
+                     .and.  y(j) > radius_liq_inject & 
+                     .and.  x(i) < radius_liq_inject*10.d0 )then
+                     u(i,j,k) = uliq_inject
+                  end if ! y(j)
+               end do; end do; end do
+            end if ! 
          end if ! test_jet
          ! Test: Shear Droplet
          if (test_shear) then

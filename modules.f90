@@ -352,7 +352,7 @@ module module_flow
   character(20) :: AdvectionScheme
   
   integer :: num_probes,num_probes_cvof
-  integer, parameter :: max_num_probes = 20 
+  integer, parameter :: max_num_probes = 50 
   real(8) :: dat_probe(max_num_probes,5)  !u,v,z,c,p
   integer :: ijk_probe(max_num_probes,3)  !i,j,k
   real(8) :: dat_probe_cvof(max_num_probes)  
@@ -1616,6 +1616,14 @@ module module_BC
                      *erf( (ryz - low_gas_radius)/blayer_gas_inject ) & 
                      *erf( (radius_gas_inject - ryz)/blayer_gas_inject ) & 
                      *(1.d0 + erf((time-tdelay_gas_inject*0.5d0)/(tdelay_gas_inject*0.25d0)) )*0.5d0
+         else 
+            uinject = 0.d0 
+         end if  !
+      else if ( inject_type == 5 ) then ! 2d coflowing with liquid on top of gas
+         if ( y(j) <= radius_gas_inject ) then 
+            uinject = ugas_inject*y(j)/radius_gas_inject
+         else if ( y(j) > radius_gas_inject .and. y(j) <= radius_liq_inject ) then
+            uinject = uliq_inject
          else 
             uinject = 0.d0 
          end if  !
