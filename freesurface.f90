@@ -437,6 +437,8 @@ subroutine FreeSolver(A,p,maxError,beta,maxit,it,ierr,iout,time,tres2)
   logical, parameter :: recordconvergence=.false.
   integer, save :: itime=0
   logical :: use_L_inf = .true.
+  integer :: div_count, cutcell, gas_nbrs, min_branch
+  !real(8) :: limit
 ! Open file for convergence history
   if(rank==0.and.recordconvergence) then
      OPEN(UNIT=89,FILE=TRIM(out_path)//'/convergence_history-'//TRIM(int2text(itime,padding))//'.txt')
@@ -560,14 +562,14 @@ contains
           endif
        end do; end do; end do
     endif
-    if ((res2*npx*npy*npz)>1.d16 ) then
-       if(rank<=30) then
+    if ((res2*npx*npy*npz)>1.d18 ) then
+       if(rank<=100) then
           print*,'Pressure solver diverged after',it,'iterations at rank ',rank
           write(*,'("Res2, cells, solver_flag :",2e14.5,I8)')res2,cells,solver_flag
        endif
        call pariserror("freesolver error")
     else if (res2 .ne. res2) then 
-       if(rank<=30) then
+       if(rank<=100) then
           print*, 'it:',it,'Pressure residual value is invalid at rank', rank
           write(*,'("Res2, cells, solver_flag :",2e14.5,I8)')res2,cells,solver_flag
        endif
@@ -951,7 +953,7 @@ contains
     use module_BC
     use module_2phase
     implicit none
-    real(8) :: limit, c_min
+    real(8) :: c_min
     real(8) :: alpha2, x_test2, y_test2, z_test2
     real(8) :: nr(3),al3dnew,x0(3),dc(3),FL3DNEW,n_avg(3)
     real(8) :: c1, c0, c_stag, Source
@@ -960,8 +962,8 @@ contains
     x_mod=dxh((is+ie)/2); y_mod=dyh((js+je)/2); z_mod=dzh((ks+ke)/2) !assumes an unstretched grid
     P_gx = 0d0; P_gy = 0d0; P_gz = 0d0
 
-    limit = 1d-4/dx((is+ie)/2)
-    c_min = 1d-2
+    limit = 1.d-3
+    c_min = 1.d-2
 
     do k=ks,ke; do j=js,je; do i=is,ie
        Source = 0.d0

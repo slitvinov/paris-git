@@ -406,6 +406,7 @@ module module_freesurface
   integer, dimension(1:4) :: NOUT_VTK
   real(8) :: P_ref, gamma, R_ref, V_0, P_inf !eq pressure and polytropic gas exponent
   real(8) :: R_RK, dR_RK, ddR_RK
+  real(8) :: limit
   integer :: X_level, solver_flag=0, step_max
   logical :: FreeSurface, debug=.false., initialize_fs = .false.
   logical :: RP_test, inflow
