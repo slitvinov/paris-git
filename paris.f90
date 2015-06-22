@@ -248,7 +248,7 @@ Program paris
            if( DoLPP ) call StoreBeforeConvectionTerms()
            if(.not.ZeroReynolds) call momentumConvection()
            if( DoLPP ) call StoreAfterConvectionTerms()
-           call my_timer(3)
+           call my_timer(9)
            if(DoVOF) then
               if (DoMOMCONS) then
                  call vofandmomsweepsstaggered(itimestep,time)
@@ -280,6 +280,7 @@ Program paris
                     endif
                  endif
                  call set_topology(vof_phase,itimestep) !vof_phase updated in vofsweeps
+                 call my_timer(15)
               elseif (.not.Freesurface .and. debug_par) then
                  call get_all_curvatures(tmp,itimestep)
               endif
@@ -479,6 +480,7 @@ Program paris
               call SetVelocityBC(u,v,w,umask,vmask,wmask,time,dt,0) !check this
               call do_ghost_vector(u,v,w)
               if (mod(itimestep,nstats)==0 .and. mod(ii,itime_scheme)==0) call discrete_divergence(u,v,w,itimestep/nstats)
+              call my_timer(15) 
            endif !Extrapolation
 !------------------------------------------------------------------------------------------------
 
