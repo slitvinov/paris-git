@@ -261,7 +261,7 @@ Program paris
               call my_timer(5)
               call linfunc(rho,rho1,rho2,DensMean)
               if ((.not.STGhost).and.(.not.FreeSurface).and.(sigma.gt.TINY_DOUBLE)) &
-                  call surfaceForce(du,dv,dw,rho)
+                   call surfaceForce(du,dv,dw,rho)
               call my_timer(8)
               if (FreeSurface) then
                  call get_normals()
@@ -291,40 +291,41 @@ Program paris
            end if ! DoLPP
 !------------------------------------FRONT TRACKING  ---------------------------------------------
            ! Receive front from master of front
-           if(DoFront) call GetFront('recv')
-           call my_timer(13)
-           if(Implicit) then
-              if(Twophase) then 
-                 call momentumDiffusion(u,v,w,rho,mu,du,dv,dw)  
+           if (.not. FreeSurface) then
+              if(DoFront) call GetFront('recv')
+              call my_timer(13)
+              if(Implicit) then
+                 if(Twophase) then 
+                    call momentumDiffusion(u,v,w,rho,mu,du,dv,dw)  
+                 endif
+              else
+                 call explicitMomDiff(u,v,w,rho,mu,du,dv,dw)
               endif
-           else
-              call explicitMomDiff(u,v,w,rho,mu,du,dv,dw)
-           endif
-           call my_timer(3)
+              call my_timer(3)
 
-           ! reset the surface tension force on the fixed grid (when surface tension from front)
-           fx = 0d0;    dIdx=0d0
-           fy = 0d0;    dIdy=0d0
-           fz = 0d0;    dIdz=0d0
-           ! Wait to finish receiving front
-           if(DoFront) then
-              call GetFront('wait')
-              call Front2GridVector(fx, fy, fz, dIdx, dIdy, dIdz)
-              call AdvanceFront2(u, v, w, color, dt)
-              
-              ! Send the updated front back
-              call GetFront('send')
+              ! reset the surface tension force on the fixed grid (when surface tension from front)
+              fx = 0d0;    dIdx=0d0
+              fy = 0d0;    dIdy=0d0
+              fz = 0d0;    dIdz=0d0
+              ! Wait to finish receiving front
+              if(DoFront) then
+                 call GetFront('wait')
+                 call Front2GridVector(fx, fy, fz, dIdx, dIdy, dIdz)
+                 call AdvanceFront2(u, v, w, color, dt)
+
+                 ! Send the updated front back
+                 call GetFront('send')
+              endif
+              call my_timer(13)
+
+              !------------------------------------END VOF STUFF------------------------------------------------ 
+              call volumeForce(rho,rho1,rho2,dpdx,dpdy,dpdz,BuoyancyCase,fx,fy,fz,gx,gy,gz,du,dv,dw, &
+                   rho_ave)
+              if(dosolids) then
+                 du = du*umask; dv = dv*vmask; dw = dw*wmask
+              endif
+              call my_timer(2)
            endif
-           call my_timer(13)
-           
-!------------------------------------END VOF STUFF------------------------------------------------ 
-           call volumeForce(rho,rho1,rho2,dpdx,dpdy,dpdz,BuoyancyCase,fx,fy,fz,gx,gy,gz,du,dv,dw, &
-                rho_ave)
-           if(dosolids) then
-              du = du*umask; dv = dv*vmask; dw = dw*wmask
-           endif
-           call my_timer(2)
-  
            if(Implicit) then   
               call SetupUvel(u,du,rho,mu,rho1,mu1,dt,A)
               if(hypre)then
@@ -357,6 +358,7 @@ Program paris
            call SetVelocityBC(u,v,w,umask,vmask,wmask,time,dt,0)
            if (FreeSurface) then
               if (inflow .and. (itimestep<=step_max)) call inflow_accelerate  
+              call my_timer(15)
            endif
            call do_ghost_vector(u,v,w)
            call my_timer(1)
@@ -603,7 +605,6 @@ Program paris
            write(121,'(30es14.6e2)')time,stats(1:nstatarray),dpdx,(stats(8)-stats(9))/dt,end_time-start_time
            close(121)
         endif
-        call my_timer(11)
         !output for scalar variables used in free surface
         if (FreeSurface) then
            if (RP_test .and. (mod(itimestep,nstats)==0) .and. rank==0) call write_RP_test(time,rho1)
@@ -629,6 +630,7 @@ Program paris
               endif
            enddo
         endif
+        call my_timer(11)
      enddo
      !-------------------------------------------------------------------------------------------------
      !--------------------------------------------End domain-------------------------------------------
