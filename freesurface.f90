@@ -686,7 +686,7 @@ subroutine FreeSolver(A,p,maxError,beta,maxit,it,ierr,iout,time,tres2)
   call ghost_x(p,1,req( 1: 4)); call ghost_y(p,1,req( 5: 8)); call ghost_z(p,1,req( 9:12))
   call MPI_WAITALL(12,req,sta,ierr)
   !--------------------------------------ITERATION LOOP--------------------------------------------  
-  div_count=0; cutcell=0; gas_nbrs=0; min_branch=0
+  !div_count=0; cutcell=0; gas_nbrs=0; min_branch=0
   do it=1,maxit
      if(relaxtype==2) then 
         call LineRelax_fs(A,p,beta)
@@ -712,26 +712,26 @@ subroutine FreeSolver(A,p,maxError,beta,maxit,it,ierr,iout,time,tres2)
              call debug_details(i,j,k,A)
              call pariserror('FreeSolver Res NaN')
           endif
-          if (res_local*npx-npy*npz>1.d15) then
-             !write(*,*)'WARNING: LOCAL RES HIGH!!'
-             !write(*,'("Res_local, res2: ",2e14.5)')res_local,res2
-             !call debug_details(i,j,k,A)
-             div_count=div_count+1
-             if (solver_flag==1) then
-                if (sum(pcmask(i-1:i+1,j-1:j+1,k-1:k+1))>0) then
-                   cutcell=cutcell+1
-                   if (ABS(limit*dx(is)-x_mod(i,j  ,k))<1.0d-8) min_branch = min_branch+1
-                   if (ABS(limit*dx(is)-x_mod(i-1,j,k))<1.0d-8) min_branch = min_branch+1
-                   if (ABS(limit*dx(is)-y_mod(i,j  ,k))<1.0d-8) min_branch = min_branch+1
-                   if (ABS(limit*dx(is)-y_mod(i,j-1,k))<1.0d-8) min_branch = min_branch+1
-                   if (ABS(limit*dx(is)-z_mod(i,j  ,k))<1.0d-8) min_branch = min_branch+1
-                   if (ABS(limit*dx(is)-z_mod(i,j,k-1))<1.0d-8) min_branch = min_branch+1
-                endif
-             endif
-             if (solver_flag==2) then
-                if (sum(pcmask(i-1:i+1,j-1:j+1,k-1:k+1))<=2) gas_nbrs=gas_nbrs+1
-             endif 
-          endif
+!!$          if (res_local*npx-npy*npz>1.d15) then
+!!$             !write(*,*)'WARNING: LOCAL RES HIGH!!'
+!!$             !write(*,'("Res_local, res2: ",2e14.5)')res_local,res2
+!!$             !call debug_details(i,j,k,A)
+!!$             div_count=div_count+1
+!!$             if (solver_flag==1) then
+!!$                if (sum(pcmask(i-1:i+1,j-1:j+1,k-1:k+1))>0) then
+!!$                   cutcell=cutcell+1
+!!$                   if (ABS(limit*dx(is)-x_mod(i,j  ,k))<1.0d-8) min_branch = min_branch+1
+!!$                   if (ABS(limit*dx(is)-x_mod(i-1,j,k))<1.0d-8) min_branch = min_branch+1
+!!$                   if (ABS(limit*dx(is)-y_mod(i,j  ,k))<1.0d-8) min_branch = min_branch+1
+!!$                   if (ABS(limit*dx(is)-y_mod(i,j-1,k))<1.0d-8) min_branch = min_branch+1
+!!$                   if (ABS(limit*dx(is)-z_mod(i,j  ,k))<1.0d-8) min_branch = min_branch+1
+!!$                   if (ABS(limit*dx(is)-z_mod(i,j,k-1))<1.0d-8) min_branch = min_branch+1
+!!$                endif
+!!$             endif
+!!$             if (solver_flag==2) then
+!!$                if (sum(pcmask(i-1:i+1,j-1:j+1,k-1:k+1))<=2) gas_nbrs=gas_nbrs+1
+!!$             endif 
+!!$          endif
        endif
     enddo; enddo; enddo
     call MPI_WAITALL(12,req,sta,ierr)
@@ -753,26 +753,26 @@ subroutine FreeSolver(A,p,maxError,beta,maxit,it,ierr,iout,time,tres2)
              call debug_details(i,j,k,A)
              call pariserror('FreeSolver Res NaN in proc border')
           endif
-          if (res_local*npx-npy*npz>1.d15) then
-             !write(*,*)'WARNING: LOCAL RES HIGH!!'
-             !write(*,'("Res_local, res2: ",2e14.5)')res_local,res2
-             !call debug_details(i,j,k,A)
-             div_count=div_count+1
-             if (solver_flag==1) then
-                if (sum(pcmask(i-1:i+1,j-1:j+1,k-1:k+1))>0) then
-                   cutcell=cutcell+1
-                   if (ABS(limit*dx(is)-x_mod(i,j  ,k))<1.0d-8) min_branch = min_branch+1
-                   if (ABS(limit*dx(is)-x_mod(i-1,j,k))<1.0d-8) min_branch = min_branch+1
-                   if (ABS(limit*dx(is)-y_mod(i,j  ,k))<1.0d-8) min_branch = min_branch+1
-                   if (ABS(limit*dx(is)-y_mod(i,j-1,k))<1.0d-8) min_branch = min_branch+1
-                   if (ABS(limit*dx(is)-z_mod(i,j  ,k))<1.0d-8) min_branch = min_branch+1
-                   if (ABS(limit*dx(is)-z_mod(i,j,k-1))<1.0d-8) min_branch = min_branch+1
-                endif
-             endif
-             if (solver_flag==2) then
-                if (sum(pcmask(i-1:i+1,j-1:j+1,k-1:k+1))<=2) gas_nbrs=gas_nbrs+1
-             endif 
-          endif
+!!$          if (res_local*npx-npy*npz>1.d15) then
+!!$             !write(*,*)'WARNING: LOCAL RES HIGH!!'
+!!$             !write(*,'("Res_local, res2: ",2e14.5)')res_local,res2
+!!$             !call debug_details(i,j,k,A)
+!!$             div_count=div_count+1
+!!$             if (solver_flag==1) then
+!!$                if (sum(pcmask(i-1:i+1,j-1:j+1,k-1:k+1))>0) then
+!!$                   cutcell=cutcell+1
+!!$                   if (ABS(limit*dx(is)-x_mod(i,j  ,k))<1.0d-8) min_branch = min_branch+1
+!!$                   if (ABS(limit*dx(is)-x_mod(i-1,j,k))<1.0d-8) min_branch = min_branch+1
+!!$                   if (ABS(limit*dx(is)-y_mod(i,j  ,k))<1.0d-8) min_branch = min_branch+1
+!!$                   if (ABS(limit*dx(is)-y_mod(i,j-1,k))<1.0d-8) min_branch = min_branch+1
+!!$                   if (ABS(limit*dx(is)-z_mod(i,j  ,k))<1.0d-8) min_branch = min_branch+1
+!!$                   if (ABS(limit*dx(is)-z_mod(i,j,k-1))<1.0d-8) min_branch = min_branch+1
+!!$                endif
+!!$             endif
+!!$             if (solver_flag==2) then
+!!$                if (sum(pcmask(i-1:i+1,j-1:j+1,k-1:k+1))<=2) gas_nbrs=gas_nbrs+1
+!!$             endif 
+!!$          endif
        endif
     enddo; enddo; enddo
     call catch_divergence_fs(res2,cells,ierr)
@@ -799,11 +799,11 @@ subroutine FreeSolver(A,p,maxError,beta,maxit,it,ierr,iout,time,tres2)
        endif
     endif
   enddo
-  if (div_count>0) then
-     write(*,'("Time step: ",I5,"  Iterations: ",I8)')iout,it
-     write(*,'("High Res in rank ",I5," with solver flag ",I5)')rank,solver_flag
-     write(*,'("High div cells, cut cells, limit branches, isolated cells: ",4I8)')div_count, cutcell, min_branch, gas_nbrs
-  endif
+!!$  if (div_count>0) then
+!!$     write(*,'("Time step: ",I5,"  Iterations: ",I8)')iout,it
+!!$     write(*,'("High Res in rank ",I5," with solver flag ",I5)')rank,solver_flag
+!!$     write(*,'("High div cells, cut cells, limit branches, isolated cells: ",4I8)')div_count, cutcell, min_branch, gas_nbrs
+!!$  endif
   if(rank==0.and.recordconvergence) close(89)
   if(it==maxit+1 .and. rank==0) then
      write(*,*) 'Warning: LinearSolver reached maxit: ||res||: ',tres2
