@@ -30,8 +30,8 @@
   implicit none
   include 'mpif.h' 
   integer, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: vof_phase
-  integer :: reqs(48),stat(MPI_STATUS_SIZE,48)
-  integer :: i,j,k,level,iout,ierr1
+  integer :: req(4),sta(MPI_STATUS_SIZE,4)
+  integer :: i,j,k,level,iout,ierr
   integer :: level3, l3sum
 
   !initialize all masks to 3
@@ -58,13 +58,25 @@
      endif
   enddo; enddo; enddo
   !fill ghost layers for zero masks
-  call ighost_x(u_cmask,2,reqs(1:4)); call ighost_x(v_cmask,2,reqs(5:8))
-  call ighost_x(w_cmask,2,reqs(9:12)); call ighost_x(pcmask,2,reqs(13:16))
-  call ighost_y(u_cmask,2,reqs(17:20)); call ighost_y(v_cmask,2,reqs(21:24))
-  call ighost_y(w_cmask,2,reqs(25:28)); call ighost_y(pcmask,2,reqs(29:32))
-  call ighost_z(u_cmask,2,reqs(33:36)); call ighost_z(v_cmask,2,reqs(37:40))
-  call ighost_z(w_cmask,2,reqs(41:44)); call ighost_z(pcmask,2,reqs(45:48))
-  call MPI_WAITALL(48,reqs(1:48),stat,ierr1)
+!!$  call ighost_x(u_cmask,2,reqs(1:4)); call ighost_x(v_cmask,2,reqs(5:8))
+!!$  call ighost_x(w_cmask,2,reqs(9:12)); call ighost_x(pcmask,2,reqs(13:16))
+!!$  call ighost_y(u_cmask,2,reqs(17:20)); call ighost_y(v_cmask,2,reqs(21:24))
+!!$  call ighost_y(w_cmask,2,reqs(25:28)); call ighost_y(pcmask,2,reqs(29:32))
+!!$  call ighost_z(u_cmask,2,reqs(33:36)); call ighost_z(v_cmask,2,reqs(37:40))
+!!$  call ighost_z(w_cmask,2,reqs(41:44)); call ighost_z(pcmask,2,reqs(45:48))
+!!$  call MPI_WAITALL(48,reqs(1:48),stat,ierr1)
+  call ighost_x(u_cmask,2,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+  call ighost_y(u_cmask,2,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+  call ighost_z(u_cmask,2,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+  call ighost_x(v_cmask,2,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+  call ighost_y(v_cmask,2,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+  call ighost_z(v_cmask,2,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+  call ighost_x(w_cmask,2,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+  call ighost_y(w_cmask,2,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+  call ighost_z(w_cmask,2,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+  call ighost_x(pcmask,2,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+  call ighost_y(pcmask,2,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+  call ighost_z(pcmask,2,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr) 
   !Set levels 1 to X_level
   do level=1,X_level
      do k=ks,ke; do j=js,je; do i=is,ie
@@ -101,13 +113,25 @@
            endif
         endif
      enddo; enddo; enddo
-     call ighost_x(u_cmask,2,reqs(1:4)); call ighost_x(v_cmask,2,reqs(5:8))
-     call ighost_x(w_cmask,2,reqs(9:12)); call ighost_x(pcmask,2,reqs(13:16))
-     call ighost_y(u_cmask,2,reqs(17:20)); call ighost_y(v_cmask,2,reqs(21:24))
-     call ighost_y(w_cmask,2,reqs(25:28)); call ighost_y(pcmask,2,reqs(29:32))
-     call ighost_z(u_cmask,2,reqs(33:36)); call ighost_z(v_cmask,2,reqs(37:40))
-     call ighost_z(w_cmask,2,reqs(41:44)); call ighost_z(pcmask,2,reqs(45:48))
-     call MPI_WAITALL(48,reqs(1:48),stat,ierr1)
+!!$     call ighost_x(u_cmask,2,reqs(1:4)); call ighost_x(v_cmask,2,reqs(5:8))
+!!$     call ighost_x(w_cmask,2,reqs(9:12)); call ighost_x(pcmask,2,reqs(13:16))
+!!$     call ighost_y(u_cmask,2,reqs(17:20)); call ighost_y(v_cmask,2,reqs(21:24))
+!!$     call ighost_y(w_cmask,2,reqs(25:28)); call ighost_y(pcmask,2,reqs(29:32))
+!!$     call ighost_z(u_cmask,2,reqs(33:36)); call ighost_z(v_cmask,2,reqs(37:40))
+!!$     call ighost_z(w_cmask,2,reqs(41:44)); call ighost_z(pcmask,2,reqs(45:48))
+!!$     call MPI_WAITALL(48,reqs(1:48),stat,ierr1)
+     call ighost_x(u_cmask,2,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+     call ighost_y(u_cmask,2,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+     call ighost_z(u_cmask,2,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+     call ighost_x(v_cmask,2,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+     call ighost_y(v_cmask,2,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+     call ighost_z(v_cmask,2,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+     call ighost_x(w_cmask,2,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+     call ighost_y(w_cmask,2,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+     call ighost_z(w_cmask,2,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+     call ighost_x(pcmask,2,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+     call ighost_y(pcmask,2,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
+     call ighost_z(pcmask,2,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr) 
   enddo
 end subroutine set_topology
 !-------------------------------------------------------------------------------------------------
