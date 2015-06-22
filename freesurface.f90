@@ -476,6 +476,7 @@ subroutine FreeSolver(A,p,maxError,beta,maxit,it,ierr,iout,time,tres2)
      if (solver_flag==2 .and. pcmask(i,j,k)==3) p(i,j,k) = 0.d0
   enddo; enddo; enddo
   !--------------------------------------ITERATION LOOP--------------------------------------------  
+  div_count=0; cutcell=0; gas_nbrs=0; min_branch=0
   do it=1,maxit
      if(relaxtype==2) then 
         call LineRelax_fs(A,p,beta)
@@ -495,10 +496,31 @@ subroutine FreeSolver(A,p,maxError,beta,maxit,it,ierr,iout,time,tres2)
           res2=res2+res_local**norm
           resinf=MAX(resinf,res_local)
           cells = cells + 1.d0
-          if (res2/=res2) then 
+          if (res2/=res2) then  
              write(*,*)'ERROR: RES2 NaN'
+             write(*,'("Res_local, res2: ",2e14.5)')res_local,res2
              call debug_details(i,j,k,A)
              call pariserror('FreeSolver Res NaN')
+          endif
+          if (res_local*npx-npy*npz>1.d15) then
+             !write(*,*)'WARNING: LOCAL RES HIGH!!'
+             !write(*,'("Res_local, res2: ",2e14.5)')res_local,res2
+             !call debug_details(i,j,k,A)
+             div_count=div_count+1
+             if (solver_flag==1) then
+                if (sum(pcmask(i-1:i+1,j-1:j+1,k-1:k+1))>0) then
+                   cutcell=cutcell+1
+                   if (ABS(limit*dx(is)-x_mod(i,j  ,k))<1.0d-8) min_branch = min_branch+1
+                   if (ABS(limit*dx(is)-x_mod(i-1,j,k))<1.0d-8) min_branch = min_branch+1
+                   if (ABS(limit*dx(is)-y_mod(i,j  ,k))<1.0d-8) min_branch = min_branch+1
+                   if (ABS(limit*dx(is)-y_mod(i,j-1,k))<1.0d-8) min_branch = min_branch+1
+                   if (ABS(limit*dx(is)-z_mod(i,j  ,k))<1.0d-8) min_branch = min_branch+1
+                   if (ABS(limit*dx(is)-z_mod(i,j,k-1))<1.0d-8) min_branch = min_branch+1
+                endif
+             endif
+             if (solver_flag==2) then
+                if (sum(pcmask(i-1:i+1,j-1:j+1,k-1:k+1))<=2) gas_nbrs=gas_nbrs+1
+             endif 
           endif
        endif
     enddo; enddo; enddo
@@ -516,9 +538,30 @@ subroutine FreeSolver(A,p,maxError,beta,maxit,it,ierr,iout,time,tres2)
           resinf=MAX(resinf,res_local)
           cells = cells + 1d0
           if (res2/=res2) then 
-             write(*,*)'ERROR: RES2 NaN'
+             write(*,*)'ERROR: RES2 NaN, proc border'
+             write(*,'("Res_local, res2: ",e14.5)')res_local,res2
              call debug_details(i,j,k,A)
-             call pariserror('FreeSolver Res NaN')
+             call pariserror('FreeSolver Res NaN in proc border')
+          endif
+          if (res_local*npx-npy*npz>1.d15) then
+             !write(*,*)'WARNING: LOCAL RES HIGH!!'
+             !write(*,'("Res_local, res2: ",2e14.5)')res_local,res2
+             !call debug_details(i,j,k,A)
+             div_count=div_count+1
+             if (solver_flag==1) then
+                if (sum(pcmask(i-1:i+1,j-1:j+1,k-1:k+1))>0) then
+                   cutcell=cutcell+1
+                   if (ABS(limit*dx(is)-x_mod(i,j  ,k))<1.0d-8) min_branch = min_branch+1
+                   if (ABS(limit*dx(is)-x_mod(i-1,j,k))<1.0d-8) min_branch = min_branch+1
+                   if (ABS(limit*dx(is)-y_mod(i,j  ,k))<1.0d-8) min_branch = min_branch+1
+                   if (ABS(limit*dx(is)-y_mod(i,j-1,k))<1.0d-8) min_branch = min_branch+1
+                   if (ABS(limit*dx(is)-z_mod(i,j  ,k))<1.0d-8) min_branch = min_branch+1
+                   if (ABS(limit*dx(is)-z_mod(i,j,k-1))<1.0d-8) min_branch = min_branch+1
+                endif
+             endif
+             if (solver_flag==2) then
+                if (sum(pcmask(i-1:i+1,j-1:j+1,k-1:k+1))<=2) gas_nbrs=gas_nbrs+1
+             endif 
           endif
        endif
     enddo; enddo; enddo
@@ -546,6 +589,11 @@ subroutine FreeSolver(A,p,maxError,beta,maxit,it,ierr,iout,time,tres2)
        endif
     endif
   enddo
+  if (div_count>0) then
+     write(*,'("Time step: ",I5,"  Iterations: ",I8)')iout,it
+     write(*,'("High Res in rank ",I5," with solver flag ",I5)')rank,solver_flag
+     write(*,'("High div cells, cut cells, limit branches, isolated cells: ",4I8)')div_count, cutcell, min_branch, gas_nbrs
+  endif
   if(rank==0.and.recordconvergence) close(89)
   if(it==maxit+1 .and. rank==0) then
      write(*,*) 'Warning: LinearSolver reached maxit: ||res||: ',tres2
@@ -909,6 +957,8 @@ subroutine debug_details(i,j,k,A)
   write(40,'("A branches: ",8e14.5)')A(i,j,k,:)
   write(40,'("P neighbours ",6e14.5)')p(i-1,j,k),p(i+1,j,k),p(i,j-1,k),p(i,j+1,k),&
                   p(i,j,k-1),p(i,j,k+1)
+  write(40,'("Mods ",6e14.5)')x_mod(i-1,j,k),x_mod(i,j,k),y_mod(i,j-1,k),y_mod(i,j,k),&
+                  z_mod(i,j,k-1),z_mod(i,j,k)
   write(40,'("Limits: ",6I8)')is,ie,js,je,ks,ke
   write(40,*) "ijk rank",i,j,k,rank
   write(40,'("Pcmask 1-7: ",7I8)')pcmask(i-1,j,k),pcmask(i+1,j,k),pcmask(i,j-1,k),pcmask(i,j+1,k),&
