@@ -428,6 +428,7 @@ module module_front
     real(8) :: time
     if(output_format==1) call print_fronts1(nf,time) !tecplot format
     if(output_format==2) call print_fronts2(nf,time) !vtk format
+    if(output_format==3) call print_fronts3(nf,time) !silo forma
   end subroutine print_fronts
 !-------------------------------------------------------------------------------------------------
   subroutine print_fronts1(nf,time)
@@ -507,6 +508,77 @@ module module_front
     enddo
     close(iunit)
   end subroutine print_fronts2
+
+!-------------------------------------------------------------------------------------------------
+  subroutine print_fronts3(nf,time)
+    use module_grid
+    use module_IO
+    implicit none
+    include "silo_f9x.inc"
+
+    integer :: nf, front, elem, point, ifr, i, j
+    real(8) :: time, xp0(3)
+
+    integer :: dbfile, err, ierr, lname
+    integer :: ndims, nzones, nnodes, Lnodelist
+    integer :: shapesize, shapecount
+    integer, parameter :: TotalPoint=4000000, TotalElem=8000000
+    real   , dimension(TotalPoint) :: xp, yp, zp
+    integer, dimension(3*TotalElem)  :: nodelist
+    character(len=30) :: outfile
+
+    nnodes = 0
+    nzones = 0
+    Lnodelist=0
+
+    front = FrontFirst
+    do ifr = 1, FrontLength
+
+       point = PointFirst(front)
+       do i = 1, PointLength(front)
+          call GetCoords(xp0,point)
+          xp(i +nnodes) = xp0(1)
+          yp(i +nnodes) = xp0(2)
+          zp(i +nnodes) = xp0(3)
+          LocalPointIndex(point) = i +nnodes
+          point = PointConnect(point,1)
+       enddo
+
+       elem = ElemFirst(front)
+       do i = 1, ElemLength(front)
+          do j = 1, 3
+             Lnodelist=Lnodelist+1
+             nodelist(Lnodelist) = LocalPointIndex(ElemCorner(elem,j))
+          enddo
+          elem = ElemConnect(elem,1)
+       enddo
+
+       nnodes = nnodes + PointLength(front) 
+       nzones = nzones + ElemLength(front)
+       front = FrontConnect(front,1)
+    enddo
+
+    ndims = 3
+    shapesize = 3
+    shapecount=nzones
+
+    outfile=trim(out_path)//'/front'//int2text(nf,3)//'.silo'
+    outfile=trim(adjustl(outfile))
+    lname=len_trim(outfile)
+
+    ierr= dbcreate(outfile, lname, 0, DB_LOCAL, "Front3D", 7, DB_PDB, dbfile)
+    if(dbfile== -1) then
+       write(*,*) 'Could not create Silo file!\n'
+       stop
+    endif
+
+    err = dbputzl2(dbfile, "zonelist", 8, nzones, ndims, nodelist, Lnodelist, 1, 0, 0, &
+                   DB_ZONETYPE_TRIANGLE, shapesize, shapecount, 1, DB_F77NULL, ierr)
+    err = dbputum(dbfile, "front", 5, ndims, xp, yp, zp, "X", 1, "Y", 1, "Z", 1, DB_FLOAT, &
+                  nnodes, nzones, "zonelist", 8, DB_F77NULL, 0, DB_F77NULL, ierr)
+    ierr = dbclose(dbfile)
+
+  end subroutine print_fronts3
 !=================================================================================================
 !=================================================================================================
 ! writes 3 or 4 integer number to an output file without extra blanks
