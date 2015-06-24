@@ -1056,6 +1056,7 @@ end subroutine calcStats
       use module_VOF
 
       integer :: iprobe,i,j,k
+      character(len=30) :: filename 
 
       do iprobe = 1,num_probes
          i = ijk_probe(iprobe,1)
@@ -1071,6 +1072,7 @@ end subroutine calcStats
             dat_probe(iprobe,5) = p(i,j,k)
             OPEN(UNIT=300+iprobe,FILE=TRIM(out_path)//'/probe-'//TRIM(int2text(iprobe,padding))//'.dat',POSITION='append')
             write(300+iprobe,'(6(E23.16,1X))') time,dat_probe(iprobe,:)
+            CLOSE(300+iprobe)
          end if       
       end do ! iprobe
 
@@ -1084,9 +1086,24 @@ end subroutine calcStats
             dat_probe_cvof(iprobe) = cvof(i,j,k)
             OPEN(UNIT=400+iprobe,FILE=TRIM(out_path)//'/probe_cvof-'//TRIM(int2text(iprobe,padding))//'.dat',POSITION='append')
             write(400+iprobe,'(2(E23.16,1X))') time,dat_probe_cvof(iprobe)
+            CLOSE(400+iprobe)
          end if       
       end do ! iprobe
 
+      do iprobe = 1,num_probes_linez ! in z direction only
+         i = ijk_probe_cvof(iprobe,1)
+         j = ijk_probe_cvof(iprobe,2)
+         if (  i >= is .and. i <= ie .and. & 
+               j >= js .and. j <= je ) then
+            filename=TRIM(out_path)//'/probe_linez-'//TRIM(int2text(iprobe,padding))//'-'
+            OPEN(UNIT=500+iprobe,FILE=TRIM(filename)//TRIM(int2text(rank,padding))//'.dat',POSITION='append')
+            do k = ks,ke
+               write(500+iprobe,'(7(E23.16,1X))') time,z(k),& 
+                  u(i,j,k),v(i,j,k),w(i,j,k),cvof(i,j,k),p(i,j,k)
+            end do !k 
+            CLOSE(500+iprobe)
+         end if ! i,j
+      end do ! iprobe
    end subroutine probes
 
 !=================================================================================================
@@ -2851,7 +2868,7 @@ subroutine ReadParameters
                         NozzleThick2Cell,             NozzleLength,                              &
                         cflmax_allowed,               AdvectionScheme, out_mom,   output_fields, & 
                         nsteps_probe,  num_probes,    ijk_probe,                                 &
-                        num_probes_cvof,  ijk_probe_cvof,                                        & 
+                        num_probes_cvof,  ijk_probe_cvof,   num_probes_linez, ij_probe_linez,    & 
                         DoTurbStats,   nStepOutputTurbStats, TurbStatsOrder,  timeStartTurbStats,&
                         ResNormOrderPressure,         ErrorScaleHYPRE,                           & 
                         OutVelSpecified,  MaxFluxRatioPresBC, LateralBdry,                       & 
