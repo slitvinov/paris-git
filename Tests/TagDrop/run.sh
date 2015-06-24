@@ -16,7 +16,8 @@ if [ $# -gt 0 ]; then
     fi
 else
     ln -s testinput input
-    precision=1e-5
+    precision1=1e-5
+    precision2=1e-3
 fi
 
 mpirun -np $npstart paris > tmpout 2>&1
@@ -28,7 +29,9 @@ NORMAL="\\033[0m"
 
 if [ -d out ]; then
       awk '{print $10}' out/element-stats_00000.dat | sort -g | tail -n 4 > vol-list.txt
-      pariscompare vol-list.txt ref-vol-list.txt $precision
+      awk '{print $11}' out/element-stats_00000.dat | sort -g | tail -n 4 > sur-list.txt
+      pariscompare vol-list.txt ref-vol-list.txt $precision1
+      pariscompare sur-list.txt ref-sur-list.txt $precision2
 else
     RED="\\033[1;31m"
     NORMAL="\\033[0m"

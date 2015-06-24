@@ -65,7 +65,7 @@
    real(8) :: tag_threshold=1d-9
 
    type element 
-      real(8) :: xc,yc,zc,uc,vc,wc,duc,dvc,dwc,vol
+      real(8) :: xc,yc,zc,uc,vc,wc,duc,dvc,dwc,vol,sur
       integer :: id 
    end type element
    type (element), dimension(:,:), allocatable :: element_stat
@@ -91,7 +91,7 @@
    integer, dimension(:,:,:), allocatable :: drops_merge_gcell_list
 
    type drop_merge_comm
-      real(8) :: xc,yc,zc,uc,vc,wc,duc,dvc,dwc,vol
+      real(8) :: xc,yc,zc,uc,vc,wc,duc,dvc,dwc,vol,sur
       integer :: id
       integer :: num_diff_tag 
       integer :: diff_tag_list(maxnum_diff_tag)
@@ -420,13 +420,15 @@ contains
     real(8) :: volcell,cvof_scaled
 
     integer :: num_cell_drop,cell_list(3)
-    real(8) :: xc,yc,zc,uc,vc,wc,duc,dvc,dwc,vol 
+    real(8) :: xc,yc,zc,uc,vc,wc,duc,dvc,dwc,vol,sur 
 
     logical :: merge_drop
 
     integer :: imin_drop,imax_drop,jmin_drop,jmax_drop,kmin_drop,kmax_drop
     integer :: idif_drop,jdif_drop,kdif_drop
 
+    real(8) :: stencil3x3(-1:1,-1:1,-1:1),mxyz(3),AREA3D
+  
     if (.not. LPP_initialized) then 
       call initialize_LPP()
       LPP_initialized = .true.
@@ -457,6 +459,7 @@ contains
         s_queue(ns_queue,3) = k
   
         vol = 0.d0
+        sur = 0.d0
         xc  = 0.d0
         yc  = 0.d0
         zc  = 0.d0
@@ -506,6 +509,16 @@ contains
                   ksq >= ks .and. ksq <= ke ) then
                tag_flag(isq,jsq,ksq) = 1 ! mark S node as tagged
                ! perform droplet calculation
+
+               if ( cvof(isq,jsq,ksq) > 0.d0 .and. cvof(isq,jsq,ksq) < 1.d0 ) then 
+                  do i0=-1,1; do j0=-1,1; do k0=-1,1
+                     stencil3x3(i0,j0,k0) =cvof(isq+i0,jsq+j0,ksq+k0)
+                  enddo;enddo;enddo
+                  call mycs(stencil3x3,mxyz)
+                  if ( mxyz(1)/=0.d0 .or. mxyz(2)/=0.d0 .or. mxyz(3)/=0.d0 ) then  
+                     sur = sur + AREA3D(mxyz,cvof(isq,jsq,ksq))*dx(isq)*dy(jsq)
+                  end if ! mxyz(1,2,3)
+               end if ! cvof(isq,jsq,ksq) only caculate area at cut cell
                volcell = dx(isq)*dy(jsq)*dz(ksq)
                cvof_scaled = cvof(isq,jsq,ksq)*volcell
                vol = vol + cvof_scaled
@@ -561,6 +574,7 @@ contains
         if ( vol > 0.d0 ) then  
           if ( merge_drop ) then
             drops_merge(num_drop_merge(rank))%element%id  = current_id
+            drops_merge(num_drop_merge(rank))%element%sur = sur 
             drops_merge(num_drop_merge(rank))%element%vol = vol 
             drops_merge(num_drop_merge(rank))%element%xc  = xc/vol 
             drops_merge(num_drop_merge(rank))%element%yc  = yc/vol 
@@ -575,6 +589,7 @@ contains
             drops_merge_cell_list(:,num_drop_merge(rank)) = cell_list
           else 
             drops(num_drop(rank))%element%id  = current_id
+            drops(num_drop(rank))%element%sur = sur 
             drops(num_drop(rank))%element%vol = vol 
             drops(num_drop(rank))%element%xc  = xc/vol
             drops(num_drop(rank))%element%yc  = yc/vol
@@ -655,8 +670,10 @@ contains
 
       integer :: idrop,iCell,idrop1
       integer :: idiff_tag,tag,tag1,idiff_tag1,idiff_tag2,tag2
-      real(8) :: vol_merge,xc_merge,yc_merge,zc_merge,uc_merge,vc_merge,wc_merge,vol1, &
-                                                      duc_merge,dvc_merge,dwc_merge
+      real(8) :: sur_merge,vol_merge,xc_merge,yc_merge,zc_merge,& 
+                  uc_merge,vc_merge,wc_merge, & 
+                  duc_merge,dvc_merge,dwc_merge,&
+                  vol1,sur1 
       integer :: irank, irank1
       real(8) :: max_drop_merge_vol
       integer :: tag_max_drop_merge_vol
@@ -786,6 +803,8 @@ contains
                new_drop_id(tag) = num_new_drop
                idrop = tag_dropid(tag)
                irank = tag_rank  (tag)
+               sur1   = drops_merge_comm(idrop,irank)%sur
+               sur_merge = drops_merge_comm(idrop,irank)%sur
                vol1   = drops_merge_comm(idrop,irank)%vol
                vol_merge = drops_merge_comm(idrop,irank)%vol
                xc_merge  = drops_merge_comm(idrop,irank)%xc*vol1
@@ -806,6 +825,8 @@ contains
                   new_drop_id(tag1) = num_new_drop 
                   idrop1 = tag_dropid(tag1)
                   irank1 = tag_rank  (tag1)
+                  sur1   = drops_merge_comm(idrop1,irank1)%sur
+                  sur_merge = sur_merge + sur1
                   vol1   = drops_merge_comm(idrop1,irank1)%vol
                   vol_merge = vol_merge + vol1
                   xc_merge  = xc_merge  + drops_merge_comm(idrop1,irank1)%xc*vol1
@@ -836,6 +857,7 @@ contains
                irank1 = tag_rank  (tag_max_drop_merge_vol)
                drops_merge_comm(idrop1,irank1)%flag_center_mass = 1
 
+               drops_merge_comm(idrop,irank)%sur = sur_merge
                drops_merge_comm(idrop,irank)%vol = vol_merge
                drops_merge_comm(idrop,irank)%xc  = xc_merge
                drops_merge_comm(idrop,irank)%yc  = yc_merge
@@ -850,6 +872,7 @@ contains
                   tag1   = diff_tag_list_complet(idiff_tag,idrop,irank)
                   idrop1 = tag_dropid(tag1)
                   irank1 = tag_rank  (tag1)
+                  drops_merge_comm(idrop1,irank1)%sur = sur_merge
                   drops_merge_comm(idrop1,irank1)%vol = vol_merge
                   drops_merge_comm(idrop1,irank1)%xc  = xc_merge
                   drops_merge_comm(idrop1,irank1)%yc  = yc_merge
@@ -902,7 +925,7 @@ contains
       element_NULL%xc = 0.d0;element_NULL%yc = 0.d0;element_NULL%zc = 0.d0
       element_NULL%uc = 0.d0;element_NULL%vc = 0.d0;element_NULL%wc = 0.d0
       element_NULL%duc = 0.d0;element_NULL%dvc = 0.d0;element_NULL%dwc = 0.d0
-      element_NULL%vol = 0.d0;element_NULL%id = CRAZY_INT
+      element_NULL%vol = 0.d0;element_NULL%sur = 0.d0;element_NULL%id = CRAZY_INT
 
       num_element_estimate = num_drop+num_drop_merge+num_part
       maxnum_element = maxval(num_element_estimate) 
@@ -914,6 +937,7 @@ contains
       if ( num_drop(rank) > 0 ) then 
          do idrop = 1,num_drop(rank) 
             num_element(rank) = num_element(rank) + 1
+            element_stat(num_element(rank),rank)%sur = drops(idrop)%element%sur
             element_stat(num_element(rank),rank)%vol = drops(idrop)%element%vol
             element_stat(num_element(rank),rank)%xc  = drops(idrop)%element%xc
             element_stat(num_element(rank),rank)%yc  = drops(idrop)%element%yc
@@ -932,6 +956,7 @@ contains
          do idrop = 1,num_drop_merge(rank)
             if ( drops_merge(idrop)%flag_center_mass == 1 ) then  
                num_element(rank) = num_element(rank) + 1
+               element_stat(num_element(rank),rank)%sur = drops_merge(idrop)%element%sur
                element_stat(num_element(rank),rank)%vol = drops_merge(idrop)%element%vol
                element_stat(num_element(rank),rank)%xc  = drops_merge(idrop)%element%xc
                element_stat(num_element(rank),rank)%yc  = drops_merge(idrop)%element%yc
@@ -950,6 +975,7 @@ contains
       if ( num_part(rank) > 0 ) then  
          do idrop = 1,num_part(rank) 
             num_element(rank) = num_element(rank) + 1
+            element_stat(num_element(rank),rank)%sur = parts(idrop,rank)%element%sur
             element_stat(num_element(rank),rank)%vol = parts(idrop,rank)%element%vol
             element_stat(num_element(rank),rank)%xc  = parts(idrop,rank)%element%xc
             element_stat(num_element(rank),rank)%yc  = parts(idrop,rank)%element%yc
@@ -976,7 +1002,7 @@ contains
          if ( num_element(rank) > 0 ) then
             write(102,*) "#",tswap,time,num_element(rank)
             do ielement = 1, num_element(rank)
-               write(102,'(10(E15.6,1X))')   element_stat(ielement,rank)%xc, &
+               write(102,'(11(E15.6,1X))')   element_stat(ielement,rank)%xc, &
                                              element_stat(ielement,rank)%yc, &
                                              element_stat(ielement,rank)%zc, &
                                              element_stat(ielement,rank)%uc, &
@@ -985,7 +1011,8 @@ contains
                                              element_stat(ielement,rank)%duc, &
                                              element_stat(ielement,rank)%dvc, &
                                              element_stat(ielement,rank)%dwc, &
-                                             element_stat(ielement,rank)%vol
+                                             element_stat(ielement,rank)%vol, &
+                                             element_stat(ielement,rank)%sur
             end do ! ielement
          end if ! num_element(rank) 
          close(102)
@@ -1004,7 +1031,7 @@ contains
       !  Setup MPI derived type for element_type 
       offsets (0) = 0 
       oldtypes(0) = MPI_REAL8 
-      blockcounts(0) = 10 
+      blockcounts(0) = 11 
       call MPI_TYPE_EXTENT(MPI_REAL8, r8extent, ierr) 
       offsets    (1) = blockcounts(0)*r8extent 
       oldtypes   (1) = MPI_INTEGER  
@@ -1041,7 +1068,7 @@ contains
                      do ielement = 1, num_element(irank) 
                         ielem_plot = ielem_plot + 1 
                         OPEN(UNIT=200+ielem_plot,FILE=TRIM(out_path)//'/element-'//TRIM(int2text(ielem_plot,padding))//'.dat')
-                        write(200+ielem_plot,'(11(E15.6,1X))') time,element_stat(ielement,irank)%xc, & 
+                        write(200+ielem_plot,'(12(E15.6,1X))') time,element_stat(ielement,irank)%xc, & 
                                                       element_stat(ielement,irank)%yc, &
                                                       element_stat(ielement,irank)%zc, &
                                                       element_stat(ielement,irank)%uc, &
@@ -1050,7 +1077,8 @@ contains
                                                       element_stat(ielement,irank)%duc, &
                                                       element_stat(ielement,irank)%dvc, &
                                                       element_stat(ielement,irank)%dwc, &
-                                                      element_stat(ielement,irank)%vol
+                                                      element_stat(ielement,irank)%vol, &
+                                                      element_stat(ielement,irank)%sur
                      end do ! ielement
                   end if ! num_element_irank) 
                end do ! irank
@@ -1093,7 +1121,8 @@ contains
                                                       element_stat(ielement,irank)%duc, &
                                                       element_stat(ielement,irank)%dvc, &
                                                       element_stat(ielement,irank)%dwc, &
-                                                      element_stat(ielement,irank)%vol
+                                                      element_stat(ielement,irank)%vol, &
+                                                      element_stat(ielement,irank)%sur
                      end do ! ielement
                   end if ! num_element_irank) 
                end do ! irank
@@ -1125,7 +1154,7 @@ contains
       !  Setup MPI derived type for drop_merge_comm
       offsets (0) = 0 
       oldtypes(0) = MPI_REAL8 
-      blockcounts(0) = 10 
+      blockcounts(0) = 11 
       call MPI_TYPE_EXTENT(MPI_REAL8, r8extent, ierr) 
       offsets    (1) = blockcounts(0)*r8extent 
       oldtypes   (1) = MPI_INTEGER  
@@ -1141,6 +1170,7 @@ contains
             drops_merge_comm(idrop,rank)%id            = drops_merge(idrop)%element%id
             drops_merge_comm(idrop,rank)%num_diff_tag  = drops_merge(idrop)%num_diff_tag
             drops_merge_comm(idrop,rank)%diff_tag_list = drops_merge(idrop)%diff_tag_list
+            drops_merge_comm(idrop,rank)%sur           = drops_merge(idrop)%element%sur
             drops_merge_comm(idrop,rank)%vol           = drops_merge(idrop)%element%vol
             drops_merge_comm(idrop,rank)%xc            = drops_merge(idrop)%element%xc
             drops_merge_comm(idrop,rank)%yc            = drops_merge(idrop)%element%yc
@@ -1188,7 +1218,7 @@ contains
       !  Setup MPI derived type for drop_merge_comm
       offsets (0) = 0 
       oldtypes(0) = MPI_REAL8 
-      blockcounts(0) = 10 
+      blockcounts(0) = 11 
       call MPI_TYPE_EXTENT(MPI_REAL8, r8extent, ierr) 
       offsets    (1) = blockcounts(0)*r8extent 
       oldtypes   (1) = MPI_INTEGER  
@@ -1217,6 +1247,7 @@ contains
 
       if ( num_drop_merge(rank) > 0 ) then
          do idrop = 1, num_drop_merge(rank)
+            drops_merge(idrop)%element%sur = drops_merge_comm(idrop,rank)%sur
             drops_merge(idrop)%element%vol = drops_merge_comm(idrop,rank)%vol
             drops_merge(idrop)%element%xc  = drops_merge_comm(idrop,rank)%xc
             drops_merge(idrop)%element%yc  = drops_merge_comm(idrop,rank)%yc
@@ -3044,7 +3075,7 @@ contains
       call MPI_TYPE_EXTENT(MPI_INTEGER, intextent, ierr) 
       offsets    (0) = 0 
       oldtypes   (0) = MPI_REAL8 
-      blockcounts(0) = 10 
+      blockcounts(0) = 11 
       offsets    (1) = offsets(0) + blockcounts(0)*r8extent 
       oldtypes   (1) = MPI_INTEGER  
       blockcounts(1) = 1  
@@ -3854,7 +3885,7 @@ module module_output_lpp
       write(8,*) time,num_part(rank) 
       if ( num_part(rank) > 0 ) then 
          do ipart = 1,num_part(rank) 
-            write(8,'(10(E15.8,1X))') & 
+            write(8,'(11(E15.8,1X))') & 
             parts(ipart,rank)%element%xc,& 
             parts(ipart,rank)%element%yc, & 
             parts(ipart,rank)%element%zc, &  
@@ -3864,7 +3895,8 @@ module module_output_lpp
             parts(ipart,rank)%uf, &  
             parts(ipart,rank)%vf, &  
             parts(ipart,rank)%wf, &  
-            parts(ipart,rank)%element%vol
+            parts(ipart,rank)%element%vol, &
+            parts(ipart,rank)%element%sur
          enddo
       end if ! num_part(rank)
       close(8)
@@ -3971,7 +4003,8 @@ module module_output_lpp
             parts(ipart,rank)%uf, &  
             parts(ipart,rank)%vf, &  
             parts(ipart,rank)%wf, &  
-            parts(ipart,rank)%element%vol
+            parts(ipart,rank)%element%vol, &
+            parts(ipart,rank)%element%sur
          enddo
       end if ! num_part(rank)
       close(8)
@@ -4111,6 +4144,7 @@ module module_output_lpp
                           parts(ipart,rank)%element%dvc, & 
                           parts(ipart,rank)%element%dwc, & 
                           parts(ipart,rank)%element%vol, &  
+                          parts(ipart,rank)%element%sur, &  
                           parts(ipart,rank)%ic, & 
                           parts(ipart,rank)%jc, & 
                           parts(ipart,rank)%kc 
@@ -4118,7 +4152,7 @@ module module_output_lpp
       end if ! num_part(rank)
       if(rank==0)print*,'Backup LPP written at t=',time
       1100 FORMAT(es17.8e3,2I10)
-      1200 FORMAT(10es17.8e3,3I5)
+      1200 FORMAT(11es17.8e3,3I5)
       CLOSE(7)
    end subroutine backup_LPP_write
 
@@ -4142,6 +4176,7 @@ module module_output_lpp
                           parts(ipart,rank)%element%dvc, & 
                           parts(ipart,rank)%element%dwc, & 
                           parts(ipart,rank)%element%vol, &  
+                          parts(ipart,rank)%element%sur, &  
                           parts(ipart,rank)%ic, & 
                           parts(ipart,rank)%jc, & 
                           parts(ipart,rank)%kc 
