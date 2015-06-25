@@ -1118,9 +1118,13 @@ end subroutine calcStats
       
       integer, intent(in) :: istep
       real(8) :: uc(is:ie,js:je,ks:ke),  vc(is:ie,js:je,ks:ke), & 
-                 wc(is:ie,js:je,ks:ke),area(is:ie,js:je,ks:ke)
+                 wc(is:ie,js:je,ks:ke),area(is:ie,js:je,ks:ke), & 
+                 n1(is:ie,js:je,ks:ke),  n2(is:ie,js:je,ks:ke), & 
+                 n3(is:ie,js:je,ks:ke) 
+                 
       integer :: i0,j0,k0
-      real(8) :: stencil3x3(-1:1,-1:1,-1:1),mxyz(3),AREA3D
+      real(8) :: stencil3x3(-1:1,-1:1,-1:1),mxyz(3),AREA3D,nm
+      real(8) :: dudx,dvdy,dwdz,dvdx,dwdx,dudy,dwdy,dudz,dvdz
       integer :: counts,cx,cy,i,j,k
       integer :: req(2),sta(MPI_STATUS_SIZE,2),ierr,irank,irank_sum
       character(len=30) :: filename 
@@ -1137,6 +1141,8 @@ end subroutine calcStats
             num_turb_vars = 27 
          else if ( TurbStatsOrder == 3 ) then
             num_turb_vars = 33   !83
+         else if ( TurbStatsOrder == 4 ) then
+            num_turb_vars = 72   !83
          else 
             call pariserror("Statistics of turbulence over 3rd order!")
          end if ! TurbStatsOrder
@@ -1151,7 +1157,7 @@ end subroutine calcStats
       end if ! calcTurbStats_initialized
 
       ! simulation variables at cell centers
-      uc=0.d0;vc=0.d0;wc=0.d0;area=0.d0
+      uc=0.d0;vc=0.d0;wc=0.d0;area=0.d0;n1=0.d0;n2=0.d0;n3=0.d0
       do i= is,ie; do j=js,je; do k=ks,ke
          uc(i,j,k) = 0.5d0*(u(i,j,k) + u(i+1,j,k))
          vc(i,j,k) = 0.5d0*(v(i,j,k) + v(i,j+1,k))
@@ -1163,8 +1169,14 @@ end subroutine calcStats
                stencil3x3(i0,j0,k0) =cvof(i+i0,j+j0,k+k0)
             enddo;enddo;enddo
             call mycs(stencil3x3,mxyz)
-            if ( mxyz(1)/=0.d0 .or. mxyz(2)/=0.d0 .or. mxyz(3)/=0.d0 ) &  
-               area(i,j,k) = AREA3D(mxyz,cvof(i,j,k))*dx(i)
+            if ( mxyz(1)/=0.d0 .or. mxyz(2)/=0.d0 .or. mxyz(3)/=0.d0 ) then  
+               area(i,j,k) = AREA3D(mxyz,cvof(i,j,k))*dx(i)*dy(j)
+               nm = mxyz(1)*mxyz(1) + mxyz(2)*mxyz(2) + mxyz(3)*mxyz(3)
+               nm = sqrt(nm)
+               n1(i,j,k) = abs(mxyz(1)/nm)
+               n2(i,j,k) = abs(mxyz(2)/nm)
+               n3(i,j,k) = abs(mxyz(3)/nm)
+            end if ! mxyz
          end if ! cvof
       end do; end do; end do
       
@@ -1241,6 +1253,80 @@ end subroutine calcStats
                                    + uc(is:ie,js:je,k)*wc(is:ie,js:je,k)*cvof(is:ie,js:je,k)
          turb_vars(is:ie,js:je,33) = turb_vars(is:ie,js:je,33) & 
                                    + vc(is:ie,js:je,k)*wc(is:ie,js:je,k)*cvof(is:ie,js:je,k)
+         end if ! TurbStatsOrder
+
+         ! 4th order stats
+         if ( TurbStatsOrder >= 4 ) then 
+         do i=is,ie; do j=js,je
+            dudx = (u(i,j,k) - u(i-1,j,k))/dx(i)
+            dvdy = (v(i,j,k) - v(i,j-1,k))/dy(j)
+            dwdz = (w(i,j,k) - w(i,j,k-1))/dz(k)
+
+            dvdx = (v(i+1,j,k)+v(i+1,j-1,k)-v(i-1,j,k)-v(i-1,j-1,k))*0.25d0/dx(i)
+            dwdx = (w(i+1,j,k)+w(i+1,j,k-1)-w(i-1,j,k)-w(i-1,j,k-1))*0.25d0/dx(i)
+            dudy = (u(i,j+1,k)+u(i-1,j+1,k)-u(i,j-1,k)-u(i-1,j-1,k))*0.25d0/dy(j)
+            dwdy = (w(i,j+1,k)+w(i,j+1,k-1)-w(i,j-1,k)-w(i,j-1,k-1))*0.25d0/dy(j)
+            dudz = (u(i,j,k+1)+u(i-1,j,k+1)-u(i,j,k-1)-u(i-1,j,k-1))*0.25d0/dz(k)
+            dvdz = (v(i,j,k+1)+v(i,j-1,k+1)-v(i,j,k-1)-v(i,j-1,k-1))*0.25d0/dz(k)
+         
+            turb_vars(i,j,34) = turb_vars(i,j,34) + dudx
+            turb_vars(i,j,35) = turb_vars(i,j,35) + dvdy
+            turb_vars(i,j,36) = turb_vars(i,j,36) + dwdz
+            turb_vars(i,j,37) = turb_vars(i,j,37) + dvdx
+            turb_vars(i,j,38) = turb_vars(i,j,38) + dwdx
+            turb_vars(i,j,39) = turb_vars(i,j,39) + dudy
+            turb_vars(i,j,40) = turb_vars(i,j,40) + dwdy
+            turb_vars(i,j,41) = turb_vars(i,j,41) + dudz
+            turb_vars(i,j,42) = turb_vars(i,j,42) + dvdz
+            turb_vars(i,j,43) = turb_vars(i,j,43) + dudx*dudx
+            turb_vars(i,j,44) = turb_vars(i,j,44) + dvdy*dvdy
+            turb_vars(i,j,45) = turb_vars(i,j,45) + dwdz*dwdz
+            turb_vars(i,j,46) = turb_vars(i,j,46) + dvdx*dvdx
+            turb_vars(i,j,47) = turb_vars(i,j,47) + dwdx*dwdx
+            turb_vars(i,j,48) = turb_vars(i,j,48) + dudy*dudy
+            turb_vars(i,j,49) = turb_vars(i,j,49) + dwdy*dwdy
+            turb_vars(i,j,50) = turb_vars(i,j,50) + dudz*dudz
+            turb_vars(i,j,51) = turb_vars(i,j,51) + dvdz*dvdz
+            turb_vars(i,j,52) = turb_vars(i,j,52) + dvdx*dudy
+            turb_vars(i,j,53) = turb_vars(i,j,53) + dwdy*dvdz
+            turb_vars(i,j,54) = turb_vars(i,j,54) + dudz*dwdx
+         end do; end do !i,j
+         turb_vars(is:ie,js:je,55) = turb_vars(is:ie,js:je,55) &
+                                   + uc(is:ie,js:je,k)*uc(is:ie,js:je,k)*uc(is:ie,js:je,k)
+         turb_vars(is:ie,js:je,56) = turb_vars(is:ie,js:je,56) &
+                                   + uc(is:ie,js:je,k)*vc(is:ie,js:je,k)*vc(is:ie,js:je,k)
+         turb_vars(is:ie,js:je,57) = turb_vars(is:ie,js:je,57) &
+                                   + uc(is:ie,js:je,k)*wc(is:ie,js:je,k)*wc(is:ie,js:je,k)
+         turb_vars(is:ie,js:je,58) = turb_vars(is:ie,js:je,58) &
+                                   + vc(is:ie,js:je,k)*uc(is:ie,js:je,k)*uc(is:ie,js:je,k)
+         turb_vars(is:ie,js:je,59) = turb_vars(is:ie,js:je,59) &
+                                   + vc(is:ie,js:je,k)*vc(is:ie,js:je,k)*vc(is:ie,js:je,k)
+         turb_vars(is:ie,js:je,60) = turb_vars(is:ie,js:je,60) &
+                                   + vc(is:ie,js:je,k)*wc(is:ie,js:je,k)*wc(is:ie,js:je,k)
+         turb_vars(is:ie,js:je,61) = turb_vars(is:ie,js:je,61) &
+                                   + wc(is:ie,js:je,k)*uc(is:ie,js:je,k)*uc(is:ie,js:je,k)
+         turb_vars(is:ie,js:je,62) = turb_vars(is:ie,js:je,62) &
+                                   + wc(is:ie,js:je,k)*vc(is:ie,js:je,k)*vc(is:ie,js:je,k)
+         turb_vars(is:ie,js:je,63) = turb_vars(is:ie,js:je,63) &
+                                   + wc(is:ie,js:je,k)*wc(is:ie,js:je,k)*wc(is:ie,js:je,k)
+         turb_vars(is:ie,js:je,64) = turb_vars(is:ie,js:je,64) &
+                                   + area(is:ie,js:je,k)*n1(is:ie,js:je,k)
+         turb_vars(is:ie,js:je,65) = turb_vars(is:ie,js:je,65) &
+                                   + area(is:ie,js:je,k)*n2(is:ie,js:je,k)
+         turb_vars(is:ie,js:je,66) = turb_vars(is:ie,js:je,66) &
+                                   + area(is:ie,js:je,k)*n3(is:ie,js:je,k)
+         turb_vars(is:ie,js:je,67) = turb_vars(is:ie,js:je,67) &
+                                   + area(is:ie,js:je,k)**2.d0*n1(is:ie,js:je,k)*n1(is:ie,js:je,k)
+         turb_vars(is:ie,js:je,68) = turb_vars(is:ie,js:je,68) &
+                                   + area(is:ie,js:je,k)**2.d0*n2(is:ie,js:je,k)*n2(is:ie,js:je,k)
+         turb_vars(is:ie,js:je,69) = turb_vars(is:ie,js:je,69) &
+                                   + area(is:ie,js:je,k)**2.d0*n3(is:ie,js:je,k)*n3(is:ie,js:je,k)
+         turb_vars(is:ie,js:je,70) = turb_vars(is:ie,js:je,70) &
+                                   + area(is:ie,js:je,k)**2.d0*n1(is:ie,js:je,k)*n2(is:ie,js:je,k)
+         turb_vars(is:ie,js:je,71) = turb_vars(is:ie,js:je,71) &
+                                   + area(is:ie,js:je,k)**2.d0*n1(is:ie,js:je,k)*n3(is:ie,js:je,k)
+         turb_vars(is:ie,js:je,72) = turb_vars(is:ie,js:je,72) &
+                                   + area(is:ie,js:je,k)**2.d0*n2(is:ie,js:je,k)*n3(is:ie,js:je,k)
          end if ! TurbStatsOrder
       end do ! 
 
