@@ -263,7 +263,7 @@ contains
        r_min, var_r, coord_min, var_coord
     ! Free Surface parameters to be read from a parameter file called "inputFS"
     namelist /FSparameters/ X_level, RP_test, gamma, R_ref, P_ref,&
-         VTK_OUT, NOUT_VTK, step_max
+         VTK_OUT, NOUT_VTK, step_max, limit
     X_level = 2; RP_test = .false.; gamma = 1.4d0; R_ref = 1.d0; P_ref = 1.d0; 
     VTK_OUT = .false.; NOUT_VTK = 100000; vtk_open = .false.
     step_max = 1
@@ -289,6 +289,7 @@ contains
     use_full_heights = .true. 
     debug_par = .false.
     r_min=0.02; var_r=0.01; coord_min=0.2; var_coord=0.6
+    limit = 5.0d-2
 
     in=31
 

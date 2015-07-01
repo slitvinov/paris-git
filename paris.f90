@@ -265,18 +265,20 @@ Program paris
               call my_timer(8)
               if (FreeSurface) then
                  call get_normals()
-                 call tag_bubbles(itimestep,time)
-                 if (.not. RP_test) then
-                    call check_topology()
-                    if (fill_ghost) then
-                       call do_all_ghost(cvof)
-                       if (itime_scheme==2) call do_all_ghost(cvofold)
-                       call get_flags_and_clip(cvof,vof_flag)
-                       call get_vof_phase(cvof) !cvof updated above from min to max
-                       call ReleaseTag2DropTable
-                       call tag_bubbles(itimestep,time)
-                       call get_normals()
-                       call get_all_heights(itimestep)
+                 if (.not. test_capwave) then
+                    call tag_bubbles(itimestep,time)
+                    if (.not. RP_test) then
+                       call check_topology()
+                       if (fill_ghost) then
+                          call do_all_ghost(cvof)
+                          if (itime_scheme==2) call do_all_ghost(cvofold)
+                          call get_flags_and_clip(cvof,vof_flag)
+                          call get_vof_phase(cvof) !cvof updated above from min to max
+                          call ReleaseTag2DropTable
+                          call tag_bubbles(itimestep,time)
+                          call get_normals()
+                          call get_all_heights(itimestep)
+                       endif
                     endif
                  endif
                  call set_topology(vof_phase,itimestep) !vof_phase updated in vofsweeps
@@ -626,10 +628,10 @@ Program paris
                     case(4)
                        call VTK_scalar_struct(out_fs,itimestep/NOUT_VTK(out_fs),v_source)
                     end SELECT
-                 endif
-              endif
+                 endif !output interval
+              endif ! VTK_OUT(fs)
            enddo
-        endif
+        endif !FreeSurface
         call my_timer(11)
      enddo
      !-------------------------------------------------------------------------------------------------
@@ -2856,6 +2858,7 @@ contains
     !call tag_bubbles(itimestep,time)
     if (RP_test) then
        call get_ref_volume
+       call Integrate_RP(dt,time,rho1)
        call initialize_P_RP(p,rho1)  !initialize P field for RP test
        call ghost_x(p,1,req( 1: 4))
        call ghost_y(p,1,req( 5: 8))

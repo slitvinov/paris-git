@@ -985,8 +985,6 @@ contains
 
     x_mod=dxh((is+ie)/2); y_mod=dyh((js+je)/2); z_mod=dzh((ks+ke)/2) !assumes an unstretched grid
     P_gx = 0d0; P_gy = 0d0; P_gz = 0d0
-
-    limit = 1.d-3
     c_min = 1.d-2
 
     do k=ks,ke; do j=js,je; do i=is,ie
@@ -1362,7 +1360,7 @@ subroutine tag_bubbles(iout,time_stats)
   implicit none
   real(8) :: time_stats
   integer :: iout
-  
+ 
   call tag_drop()
   if ( nPdomain > 1 ) call tag_drop_all
   call CreateTag2DropTable
@@ -1393,7 +1391,7 @@ subroutine get_bubble_pressure(P_g)
            else
               volume = drops(dropid)%element%vol
            endif
-           if (volume > 1d-12) then
+           if (volume > 1.0d-1*dx(is)**3.0d0) then
               P_g(i,j,k) = P_ref*(V_0/volume)**gamma
            else
               write(*,'("Bubble volume error in FreeSolver. Vol from table: ",e14.5)')volume
@@ -1403,7 +1401,7 @@ subroutine get_bubble_pressure(P_g)
   else 
      P_g = 0.d0
   endif
-  call ReleaseTag2DropTable
+  if (.not. test_capwave) call ReleaseTag2DropTable
 end subroutine get_bubble_pressure
 !==================================================================================================================
 subroutine inflow_accelerate
