@@ -1104,8 +1104,8 @@ end subroutine calcStats
       end do ! iprobe
 
       do iprobe = 1,num_probes_linez ! in z direction only
-         i = ijk_probe_cvof(iprobe,1)
-         j = ijk_probe_cvof(iprobe,2)
+         i = ij_probe_linez(iprobe,1)
+         j = ij_probe_linez(iprobe,2)
          if (  i >= is .and. i <= ie .and. & 
                j >= js .and. j <= je ) then
             filename=TRIM(out_path)//'/probe_linez-'//TRIM(int2text(iprobe,padding))//'-'

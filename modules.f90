@@ -353,7 +353,7 @@ module module_flow
   character(20) :: AdvectionScheme
   
   integer :: num_probes,num_probes_cvof,num_probes_linez
-  integer, parameter :: max_num_probes = 50 
+  integer, parameter :: max_num_probes = 20 
   real(8) :: dat_probe(max_num_probes,5)  !u,v,z,c,p
   integer :: ijk_probe(max_num_probes,3)  !i,j,k
   real(8) :: dat_probe_cvof(max_num_probes)  

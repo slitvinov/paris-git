@@ -903,7 +903,7 @@ subroutine debug_details(i,j,k,A)
   implicit none
   integer :: i,j,k
   real(8), dimension(is:ie,js:je,ks:ke,8), intent(in) :: A
-  open(unit=40,file="details.txt",access="append")
+  open(unit=40,file="details.txt",position="append")
   write(40,'("Solver flag:",I5)')solver_flag
   write(40,*) "p",  p(i,j,k)
   write(40,'("A branches: ",8e14.5)')A(i,j,k,:)

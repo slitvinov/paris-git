@@ -342,8 +342,6 @@ contains
          call pariserror("Particle drag law is used for bubbles!")
       if ( (dragmodel == dragmodel_MKL) .and. mu1<mu2 ) & 
          call pariserror("Bubble drag law is used for particles!")
-      if ( MOD(nstats,nTimeStepTag) /= 0 ) & 
-         call pariserror("nstats must be integer times fo nTimeStepTag!")
 
       do i=1,6
          if(lppbdry_cond(i) == 'undefined') then 
@@ -382,8 +380,7 @@ contains
          call CreateTag2DropTable
          if ( nPdomain > 1 ) call merge_drop_pieces
 
-         if ( DropStatisticsMethod > 0 .and. &
-              MOD(tswap,nstats) == 0 ) call drop_statistics(tswap,time)
+         if ( DropStatisticsMethod > 0 ) call drop_statistics(tswap,time)
 
          if ( (DoConvertVOF2LPP .or. DoConvertLPP2VOF) .and. & 
                CriteriaConvertCase == CriteriaInterface )  call MarkRegAwayInterface()
@@ -2447,7 +2444,7 @@ contains
                partforce(3) = relvel(3)/taup*phi(dragmodel,Rep) + (1.d0-rhof/rhop)*Gz 
             end if ! UnsteadyPartForce 
 
-            if ( output_lpp_evolution .and. mod(tswap,nstats)==0 ) then
+            if ( output_lpp_evolution ) then
                call output_LPP_parameter(rank,ipart,xp,yp,zp,up,vp,wp,uf,vf,wf,dp,time)
             end if ! 
 

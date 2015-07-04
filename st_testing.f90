@@ -998,9 +998,10 @@ end subroutine do_droplet_test
     !real(kind=4), dimension(imin:imax,jmin:jmax,kmin:kmax) :: small_matrix
     character(len=23)::path, file_name
     character(len=4) :: v_name
+    integer, parameter :: padding_mpiIO = 5
        
     path = 'out/VTK'
-    file_name = TRIM(path)//'/'//TRIM(v_name)//'-'//i2t(index,padding)//'.data'
+    file_name = TRIM(path)//'/'//TRIM(v_name)//'-'//i2t(index,padding_mpiIO)//'.data'
     !write(*,*) file_name
     
     ! Open file file.dat
