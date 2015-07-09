@@ -148,6 +148,7 @@ Program paris
         if (.not.restart) call output(0,is,ie+1,js,je+1,ks,ke+1)
         if(DoVOF .and. .not.restart) then
            call output_VOF(0,is,ie+1,js,je+1,ks,ke+1)
+           if(out_centroid) call output_centroids(0)
            call output_ALL(0,is,ie+1,js,je+1,ks,ke+1,itimestep)
            if (FreeSurface) then
               do out_fs = 1,4
@@ -559,8 +560,11 @@ Program paris
 ! Standard outputs
               if(test_frdroplet.or.test_droplet) call output_droplet(w,time)
               call output(nfile,is,ie+1,js,je+1,ks,ke+1)
-              if(DoVOF) call output_VOF(nfile,is,ie+1,js,je+1,ks,ke+1)
-              if(DoVOF) call output_ALL(nfile,is,ie+1,js,je+1,ks,ke+1,itimestep)
+              if (DoVOF) then
+                 call output_VOF(nfile,is,ie+1,js,je+1,ks,ke+1)
+                 call output_ALL(nfile,is,ie+1,js,je+1,ks,ke+1,itimestep)
+                 if(out_centroid) call output_centroids(nfile)
+              endif
               if(DoLPP) call output_LPP(nfile,is,ie+1,js,je+1,ks,ke+1)
               if(rank==0)then
                  end_time =  MPI_WTIME()
@@ -577,8 +581,11 @@ Program paris
               if(test_frdroplet.or.test_droplet) call output_droplet(w,time)
               call write_vec_gnuplot(u,v,cvof,p,itimestep,DoVOF)
               call output(nfile,is,ie+1,js,je+1,ks,ke+1)
-              if(DoVOF) call output_VOF(nfile,is,ie+1,js,je+1,ks,ke+1)
-              if(DoVOF) call output_ALL(nfile,is,ie+1,js,je+1,ks,ke+1,itimestep)
+              if (DoVOF) then
+                 call output_VOF(nfile,is,ie+1,js,je+1,ks,ke+1)
+                 call output_ALL(nfile,is,ie+1,js,je+1,ks,ke+1,itimestep)
+                 if(out_centroid) call output_centroids(nfile)
+              endif
               if(DoLPP) call output_LPP(nfile,is,ie+1,js,je+1,ks,ke+1)
               if(rank==0)then
                  end_time =  MPI_WTIME()

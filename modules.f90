@@ -433,6 +433,7 @@ module module_IO
   character(len=20) :: out_path, x_file, y_file, z_file
   logical :: read_x, read_y, read_z, restart, ICOut, restartFront, restartAverages, zip_data
   logical :: out_mom, output_fields(5)
+  logical :: out_centroid, opened_cent
   real(8) :: tout,timeLastOutput
 contains
     !=================================================================================================
@@ -563,6 +564,29 @@ contains
   subroutine close_visit_file()
     close(90)
   end subroutine close_visit_file
+!=================================================================================================
+  SUBROUTINE append_3d_file(rootname)
+    use module_grid
+    implicit none
+    character(*) :: rootname
+    integer prank
+    if(rank.ne.0) call pariserror("rank.ne.0 in append")
+    
+    if(.not. opened_cent) then
+       OPEN(UNIT=110,FILE='centroid.visit')
+       write(110,10) nPdomain
+10     format('!NBLOCKS ',I4)
+       opened_cent = .true.
+    else
+    	OPEN(UNIT=110,FILE='centroid.visit',position='append')
+    endif
+    
+    do prank=0,NpDomain-1
+       write(110,11) TRIM(rootname)//TRIM(int2text(prank,padding))//'.3D'
+11     format(A)
+    enddo
+    close(110)
+  end subroutine append_3d_file
 !=================================================================================================
 ! function int2text
 !   Returns 'number' as a string with length of 'length'

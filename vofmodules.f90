@@ -260,7 +260,8 @@ contains
        output_filtered_VOF, DoMOMCONS, use_vofi,nfilter, &
        hshift, do_rotation, debug_curvature, mixed_heights, &
        use_full_heights, debug_par, STGhost, &
-       r_min, var_r, coord_min, var_coord
+       r_min, var_r, coord_min, var_coord, &
+       out_centroid
     ! Free Surface parameters to be read from a parameter file called "inputFS"
     namelist /FSparameters/ X_level, RP_test, gamma, R_ref, P_ref,&
          VTK_OUT, NOUT_VTK, step_max, limit
@@ -274,6 +275,7 @@ contains
     cylinder_dir=0 ! redundant
     normal_up=.true. ! redundant
     DoLPP=.false.
+    out_centroid=.false.
     FreeSurface=.false.
     STGhost=.false.
     ViscMeanIsArith=.true.; DensMeanIsArith=.true.
@@ -290,7 +292,7 @@ contains
     debug_par = .false.
     r_min=0.02; var_r=0.01; coord_min=0.2; var_coord=0.6
     limit = 5.0d-2
-
+    
     in=31
 
     call MPI_COMM_RANK(MPI_COMM_WORLD, rank, ierr)
@@ -388,6 +390,7 @@ contains
     cvof = 0.d0
     vof_flag = 3
     vof_phase = 2
+    if (out_centroid) opened_cent=.false.
     !allocate matrices for Free Surface
     if(FreeSurface) then
        allocate(u_cmask(imin:imax,jmin:jmax,kmin:kmax), v_cmask(imin:imax,jmin:jmax,kmin:kmax), &

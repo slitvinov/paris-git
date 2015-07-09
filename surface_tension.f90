@@ -1667,6 +1667,28 @@ subroutine SetupPoissonGhost(utmp,vtmp,wtmp,umask,vmask,wmask,dt,A,pmask,VolumeS
 
 end subroutine SetupPoissonGhost
 
+subroutine output_centroids(nf)
+  use module_grid
+  implicit none
+  real(8) :: cent(3)
+  integer :: i,j,k,nf
+  character(len=30) :: rootname
+
+  rootname=TRIM(out_path)//'/centroid-'//TRIM(int2text(nf,padding))//'-'
+  if (rank==0) call append_3d_file(TRIM(rootname))
+
+  OPEN(UNIT=111,FILE=TRIM(rootname)//TRIM(int2text(rank,padding))//'.3D')
+  write(111,'("X Y Z Centroid")')
+  do i=is,ie; do j=js,je; do k=ks,ke
+     if (vof_flag(i,j,k)==2) then
+        call NewFindCutAreaCentroid(i,j,k,cent)
+        write(111,'(4es17.8e3)')x(i)+cent(1)*dx(i),y(j)+cent(2)*dy(j),z(k)+cent(3)*dz(k),1.000
+     endif
+  enddo; enddo; enddo
+  CLOSE(111)
+end subroutine output_centroids
+!=================================================================================================
+
 end module module_surface_tension
 
 
