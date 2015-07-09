@@ -391,6 +391,8 @@ module module_2phase
   real(8) :: jetcenter_yc2yLength, jetcenter_zc2zLength 
   real(8) :: jetcenter_yc,         jetcenter_zc
   real(8) :: sigma
+  real(8) :: plane
+  real(8) :: n_p(3)
   integer :: NumBubble
   real(8) :: NozzleThick2Cell,NozzleLength
 end module module_2phase
