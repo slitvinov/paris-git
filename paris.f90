@@ -265,7 +265,7 @@ Program paris
               call my_timer(8)
               if (FreeSurface) then
                  call get_normals()
-                 if (.not. test_capwave) then
+                 if (.not. (test_capwave .or. test_plane)) then
                     call tag_bubbles(itimestep,time)
                     if (.not. RP_test) then
                        call check_topology()
@@ -2965,7 +2965,7 @@ subroutine ReadParameters
                         DoTurbStats,   nStepOutputTurbStats, TurbStatsOrder,  timeStartTurbStats,&
                         ResNormOrderPressure,         ErrorScaleHYPRE,                           & 
                         OutVelSpecified,  MaxFluxRatioPresBC, LateralBdry,                       & 
-                        HYPRESolverType 
+                        HYPRESolverType, plane, n_p
  
   Nx = 0; Ny = 4; Nz = 4 ! cause absurd input file that lack nx value to fail. 
   Ng=2;xLength=1d0;yLength=1d0;zLength=1d0
@@ -3006,6 +3006,7 @@ subroutine ReadParameters
   MaxFluxRatioPresBC = 0.7d0
   LateralBdry = .false.
   HYPRESolverType = 1
+  plane = 0.5d0; n_p = 0.0d0
 
   in=1
   out=2

@@ -81,6 +81,7 @@ module module_VOF
   logical :: test_PhaseInversion = .false.
   logical :: test_fsdrop = .false.
   logical :: test_randombubs = .false.
+  logical :: test_plane = .false.
   logical :: linfunc_initialized = .false.
   logical :: DoMOMCONS = .false.
   logical :: STGhost = .false.
@@ -91,7 +92,6 @@ module module_VOF
   logical :: mixed_heights
   logical :: use_full_heights
   logical :: debug_par
-
 
   real(8) :: b1,b2,b3,b4,hshift
   integer :: nfilter
@@ -453,7 +453,9 @@ contains
     else if(test_type=='droplet_fs') then
        test_fsdrop = .true.
     else if(test_type=='random_bubs') then
-       test_randombubs = .true.   
+       test_randombubs = .true.
+    else if(test_type=='plane') then
+       test_plane = .true.   
     else
        write(*,*) test_type, rank
        call pariserror("unknown initialization")
@@ -671,6 +673,11 @@ contains
        !call get_vof_phase
     endif
 
+    if (test_plane) then
+       call levelset2vof(plane2ls,1)
+       call get_flags_and_clip(cvof,vof_flag)
+    endif
+
     call do_all_ghost(cvof)
     call do_all_ighost(vof_flag)
     call setVOFBC(cvof,vof_flag)
@@ -767,6 +774,16 @@ contains
          + hdir(2)*yy/yLength + hdir(3)*zz/zLength))
     wave2ls = wave2ls*dble(normalsign) + hshift*dx(nx/2+2)
   end function wave2ls
+  !=================================================================================================
+  !  Planar interface
+  !=================================================================================================
+  function plane2ls(xx,yy,zz,ipar)
+    use module_2phase
+    implicit none
+    real(8) plane2ls
+    real(8), intent(in) :: xx,zz,yy,ipar
+    plane2ls = plane -xx*n_p(1) -yy*n_p(2) -zz*n_p(3)
+  end function plane2ls
   !=================================================================================================
   !   Converts a level-set field into a VOF field
   !=================================================================================================

@@ -1374,12 +1374,13 @@ subroutine get_bubble_pressure(P_g)
   use module_Lag_part
   use module_freesurface
   use module_IO
+  use module_2phase
   implicit none
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax) :: P_g
   real(8) :: volume
   integer :: i,j,k,dropid
   
-  if (P_ref > 1.d-12) then
+  if ((NumBubble>0) .and. (P_ref > 1.d-14)) then
      do k=ks,ke; do j=js,je; do i=is,ie
         if (pcmask(i,j,k) /= 0) then
            dropid = tag_dropid(tag_id(i,j,k))
@@ -1399,9 +1400,9 @@ subroutine get_bubble_pressure(P_g)
         endif
      enddo;enddo;enddo
   else 
-     P_g = 0.d0
+     P_g = P_ref
   endif
-  if (.not. test_capwave) call ReleaseTag2DropTable
+  if (.not. (test_capwave .or. test_plane)) call ReleaseTag2DropTable
 end subroutine get_bubble_pressure
 !==================================================================================================================
 subroutine inflow_accelerate
