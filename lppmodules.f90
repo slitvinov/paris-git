@@ -209,6 +209,9 @@
    integer, dimension(:), allocatable :: tag2tagmerge
    integer :: maxnum_diff_tag_complet 
 
+   logical :: do_clean_debris
+   integer :: clean_debris_method 
+   integer :: nsteps_clean_debris
 contains
 !=================================================================================================
    subroutine initialize_LPP()
@@ -282,7 +285,8 @@ contains
          xmax_part_seed, ymax_part_seed, zmax_part_seed, dmax_part_seed, &
          umin_part_seed, vmin_part_seed, wmin_part_seed, & 
          umax_part_seed, vmax_part_seed, wmax_part_seed, & 
-         maxnum_diff_tag_complet
+         maxnum_diff_tag_complet, & 
+         do_clean_debris,clean_debris_method,nsteps_clean_debris
 
       in=32
 
@@ -324,6 +328,9 @@ contains
       umin_part_seed=0.0; vmin_part_seed=0.0; wmin_part_seed=0.0
       umax_part_seed=0.0; vmax_part_seed=0.0; wmax_part_seed=0.0; 
       maxnum_diff_tag_complet = 500
+      do_clean_debris = .false.
+      clean_debris_method = 1 
+      nsteps_clean_debris = 10 
 
       call MPI_COMM_RANK(MPI_COMM_WORLD, rank, ierr)
       inquire(file='inputlpp',exist=file_is_there)
@@ -379,6 +386,9 @@ contains
       integer, intent(in) :: tswap
       real(8), intent(in) :: time
 
+      if ( MOD(tswap,nsteps_clean_debris) == 0 .and. do_clean_debris ) & 
+         call clean_debris
+
       ! Only do tagging and conversion in specific time steps
       if ( MOD(tswap,ntimestepTag) == 0 ) then
          call tag_drop()
@@ -410,6 +420,82 @@ contains
 !      end if ! tswap
 
    end subroutine lppvofsweeps
+
+  subroutine clean_debris()
+    implicit none
+
+    integer :: i,j,k,i0,j0,k0
+    integer :: ni,nj,nk
+    real(8) :: cvof_min,sum_cvof_min,sum1,sum_cvof
+    
+    if (.not. LPP_initialized) then 
+      call initialize_LPP()
+      LPP_initialized = .true.
+    end if ! LPP_initialized
+   
+    ! -1:gas, 1:liquid
+    tag_id(:,:,:) = -1 
+    ! -1:set to pure gas; 0:not changed; 1:set to pure liquid 
+    tag_flag(:,:,:) = 0
+
+    if ( clean_debris_method == 1 ) then 
+       ! **********************************************************
+       ! Stephane's approach
+       ! **********************************************************
+      
+       ! Binary map of liquid and gas cells
+       do i=imin,imax; do j=jmin,jmax; do k=kmin,kmax
+         if ( cvof(i,j,k) > 0.5 ) tag_id(i,j,k) = 1
+       end do; end do; end do
+
+       ! flag debris
+       ni=2;nj=2;nk=2
+       if (Nz == 2) nk = 0 !assume Nz=2 for 2d case 
+       do i=is,ie; do j=js,je; do k=ks,ke
+         tag_flag(i,j,k) = tag_id(i,j,k)
+         do i0=-ni,ni; do j0=-nj,nj; do k0=-nk,nk
+            if ( tag_id(i,j,k)*tag_id(i+i0,j+j0,k+k0) == -1 ) then
+               tag_flag(i,j,k) = 0 
+               exit
+            end if ! tag_id
+         enddo; enddo; enddo
+       end do; end do; end do
+
+    else if ( clean_debris_method == 2 ) then 
+       ! **********************************************************
+       ! Ruben's approach
+       ! **********************************************************
+       ! User defined parameter
+       cvof_min      = 0.1d0 
+       sum_cvof_min  = 0.3d0
+
+       ni=1;nj=1;nk=1
+       if (Nz == 2) nk = 0 !assume Nz=2 for 2d case
+       sum1 = (1+ni*2)*(1+nj*2)*(1+nk*2)
+       do i=is,ie; do j=js,je; do k=ks,ke
+         sum_cvof = 0.d0 
+         do i0=-ni,ni; do j0=-nj,nj; do k0=-nk,nk
+            sum_cvof = sum_cvof + cvof(i+i0,j+j0,k+k0) 
+         enddo; enddo; enddo
+         if ( cvof(i,j,k) <      cvof_min .and. & 
+              sum_cvof    <  sum_cvof_min ) tag_flag(i,j,k) = -1 
+         if ( cvof(i,j,k) > 1.d0-cvof_min .and. & 
+              sum_cvof    > sum1-sum_cvof_min ) tag_flag(i,j,k) = 1 
+       end do; end do; end do
+    end if ! clean_debris_method
+    
+    ! remove debris
+    do i=is,ie; do j=js,je; do k=ks,ke
+      if ( tag_flag(i,j,k) == -1 .and. cvof(i,j,k) > 0.d0 ) then 
+         cvof(i,j,k) = 0.d0
+      else if ( tag_flag(i,j,k) ==  1 .and. cvof(i,j,k) < 1.d0 ) then 
+         cvof(i,j,k) = 1.d0
+      end if ! tag_flag 
+    end do; end do; end do
+
+    
+  end subroutine clean_debris
+
 
   subroutine tag_drop()
     implicit none
@@ -1374,6 +1460,7 @@ contains
       implicit none
       integer :: i,j,k
       call output_VOF(0,is,ie+1,js,je+1,ks,ke+1)
+      if ( do_clean_debris ) call clean_debris
       call tag_drop()
       if ( nPdomain > 1 ) call tag_drop_all
       call hello_coucou  ! 12
