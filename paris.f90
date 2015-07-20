@@ -1145,6 +1145,8 @@ end subroutine calcStats
       real(8), dimension(:,:,:,:), allocatable :: turb_vars_all !i,j,ivar,rank 
       real(8), dimension(:,:,:), allocatable :: turb_vars_map !i,j,ivar
 
+      integer :: rootout 
+
       ! initialize
       if ( .not. calcTurbStats_initialized ) then
          calcTurbStats_initialized = .true.
@@ -1351,8 +1353,8 @@ end subroutine calcStats
       ! Output turbulence statistics
      if ( mod(iStep,nStepOutputTurbStats) == 0 ) then 
 
-
-      if ( rank == 0 ) then 
+      rootout = nPdomain-1
+      if ( rank == rootout ) then 
          filename=TRIM(out_path)//'/turb-vars.dat'
          inquire(FILE=filename,EXIST=file_exist)
          if ( file_exist ) then 
@@ -1364,7 +1366,7 @@ end subroutine calcStats
       end if ! rank 
 
       if ( nPdomain > 1 ) then 
-         if ( rank == 0 ) then 
+         if ( rank == rootout ) then 
             allocate(turb_vars_all(Mx,My,num_turb_vars,0:nPdomain-1))
             allocate(turb_vars_map(Nx,Ny,num_turb_vars))
             turb_vars_all = 0.d0 
@@ -1372,21 +1374,23 @@ end subroutine calcStats
          end if ! rank 
          ! collect all data to root
          counts = Mx*My*num_turb_vars   ! assuming same number of cells in each block
-         if ( rank > 0 ) then
+         if ( rank /= rootout ) then
             call MPI_ISEND(turb_vars(is,js,1),counts, & 
-                           MPI_DOUBLE_PRECISION, 0, 14, MPI_COMM_WORLD, req(1), ierr)
+                           MPI_DOUBLE_PRECISION, rootout, 14, MPI_COMM_WORLD, req(1), ierr)
             call MPI_WAIT(req(1),sta(:,1),ierr)
          else
-            do irank = 1,nPdomain-1
-               call MPI_IRECV(turb_vars_all(1,1,1,irank),counts, & 
-                              MPI_DOUBLE_PRECISION, irank, 14, MPI_COMM_WORLD, req(2), ierr)
-               call MPI_WAIT(req(2),sta(:,2),ierr)
+            do irank = 0,nPdomain-1
+               if ( irank /= rootout ) then 
+                  call MPI_IRECV(turb_vars_all(1,1,1,irank),counts, & 
+                                 MPI_DOUBLE_PRECISION, irank, 14, MPI_COMM_WORLD, req(2), ierr)
+                  call MPI_WAIT(req(2),sta(:,2),ierr)
+               end if ! irank
             end do ! irank
          end if ! rank
 
          ! sum over z direction and map to global 
-         if ( rank == 0 ) then
-            turb_vars_all(:,:,:,0) = turb_vars(:,:,:)
+         if ( rank == rootout ) then
+            turb_vars_all(:,:,:,rootout) = turb_vars(:,:,:)
             do irank = 0,nPdomain-1,nPz
                do irank_sum = 0,npz-1
                   cx = irank/(nPy*nPz)
@@ -1401,7 +1405,7 @@ end subroutine calcStats
          end if ! nPz
             
          ! output
-         if ( rank == 0 ) then 
+         if ( rank == rootout ) then 
             do i=1,Nx
                do j=1,Ny
                   write(101,'(2(E15.8,1X),83(E25.16,1X))') & 
@@ -1421,7 +1425,7 @@ end subroutine calcStats
             write(101,*)
          end do ! i
       end if ! nPdomain
-      if ( rank == 0 ) then  
+      if ( rank == rootout ) then  
          CLOSE(UNIT=101)
          deallocate(turb_vars_all)
          deallocate(turb_vars_map)

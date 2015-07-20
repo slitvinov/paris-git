@@ -203,8 +203,12 @@
    integer :: tag_opened=0
 
    ! For merging drops
-   integer, dimension(:,:), allocatable :: num_diff_tag_complet
-   integer, dimension(:,:,:), allocatable :: diff_tag_list_complet
+   integer, dimension(:), allocatable :: num_diff_tag_complet
+   integer, dimension(:,:), allocatable :: diff_tag_list_complet
+   integer, dimension(:), allocatable :: tagmerge2tag
+   integer, dimension(:), allocatable :: tag2tagmerge
+   integer :: maxnum_diff_tag_complet 
+
 contains
 !=================================================================================================
    subroutine initialize_LPP()
@@ -277,7 +281,8 @@ contains
          xmin_part_seed, ymin_part_seed, zmin_part_seed, dmin_part_seed, & 
          xmax_part_seed, ymax_part_seed, zmax_part_seed, dmax_part_seed, &
          umin_part_seed, vmin_part_seed, wmin_part_seed, & 
-         umax_part_seed, vmax_part_seed, wmax_part_seed
+         umax_part_seed, vmax_part_seed, wmax_part_seed, & 
+         maxnum_diff_tag_complet
 
       in=32
 
@@ -318,6 +323,7 @@ contains
       xmax_part_seed=0.0; ymax_part_seed=0.0; zmax_part_seed=0.0; dmax_part_seed=0.0
       umin_part_seed=0.0; vmin_part_seed=0.0; wmin_part_seed=0.0
       umax_part_seed=0.0; vmax_part_seed=0.0; wmax_part_seed=0.0; 
+      maxnum_diff_tag_complet = 500
 
       call MPI_COMM_RANK(MPI_COMM_WORLD, rank, ierr)
       inquire(file='inputlpp',exist=file_is_there)
@@ -396,7 +402,7 @@ contains
             call linfunc(mu,mu1,mu2,ViscMean)
          end if ! DoConvertVOF2LPP,DoConvertLPP2VOF 
          
-         if ( rank == 0 ) write(*,*) 'Total num of particles/elements:',time,sum(num_part),sum(num_element)
+         if ( rank == 0 ) write(*,*) 'Total num of tags/particles/elements:',time,sum(num_tag),sum(num_part),sum(num_element)
       end if ! tswap
 
 !      if ( MOD(tswap,termout) == 0 ) then 
@@ -676,8 +682,8 @@ contains
       integer :: tag_max_drop_merge_vol
       logical :: TagAlreadyListed
       integer :: max_num_drop_merge_use
-
-      integer :: maxnum_diff_tag_complet = 500
+      logical :: WarningFlag, over_maxnum_diff_tag
+      integer :: total_num_tagmerge,tagmerge,tagmerge1
 
       ! Check ghost cells of droplet pieces
       if ( num_drop_merge(rank) > 0 ) then 
@@ -727,20 +733,34 @@ contains
 
       ! merge droplets pieces & calculate droplet properties
       if ( rank == 0 ) then
+         ! Find tags belonging to a merge_drop
+         allocate( tagmerge2tag(total_num_tag) ) 
+         allocate( tag2tagmerge(total_num_tag) ) 
+         total_num_tagmerge  = 0 
+         tagmerge2tag        = 0 
+         do tag = 1,total_num_tag
+            if ( tag_mergeflag(tag) == 1 ) then 
+               total_num_tagmerge = total_num_tagmerge + 1
+               tagmerge2tag(total_num_tagmerge) = tag
+               tag2tagmerge(tag) = total_num_tagmerge 
+            end if ! tag_mergeflag
+         end do !tag 
+         
          ! Allocate memory & initialize
          max_num_drop_merge_use = maxval(num_drop_merge)
-         allocate( num_diff_tag_complet(max_num_drop_merge_use,0:nPdomain-1) ) 
-         allocate( diff_tag_list_complet(maxnum_diff_tag_complet,max_num_drop_merge_use,0:nPdomain-1) )
+         allocate( num_diff_tag_complet(total_num_tagmerge) ) 
+         allocate( diff_tag_list_complet(maxnum_diff_tag_complet,total_num_tagmerge) )
 
-         num_diff_tag_complet = 0
+         num_diff_tag_complet  = 0
          diff_tag_list_complet = 123456789
          do irank = 0,nPdomain-1
             if ( num_drop_merge(irank) > 0 ) then 
                do idrop = 1,num_drop_merge(irank)
-                  num_diff_tag_complet(idrop,irank) = drops_merge_comm(idrop,irank)%num_diff_tag
-                  if ( num_diff_tag_complet(idrop,irank) > 0 ) then 
-                     do idiff_tag = 1,num_diff_tag_complet(idrop,irank)
-                        diff_tag_list_complet(idiff_tag,idrop,irank) = & 
+                  tagmerge = tag2tagmerge(drops_merge_comm(idrop,irank)%id)
+                  num_diff_tag_complet(tagmerge) = drops_merge_comm(idrop,irank)%num_diff_tag
+                  if ( num_diff_tag_complet(tagmerge) > 0 ) then 
+                     do idiff_tag = 1,num_diff_tag_complet(tagmerge)
+                        diff_tag_list_complet(idiff_tag,tagmerge) = & 
                            drops_merge_comm(idrop,irank)%diff_tag_list(idiff_tag)
                      end do ! idiff_tag
                   end if ! num_diff_tag_complet(idrop,irank)
@@ -749,23 +769,22 @@ contains
          end do ! irank 
 
          ! Find complete list of different tags belonging to a drop
-         do tag = 1,total_num_tag
-            if ( tag_mergeflag(tag) == 0 ) cycle
-            idrop = tag_dropid(tag)
-            irank = tag_rank  (tag)
+         WarningFlag = .false. 
+         do tagmerge = 1,total_num_tagmerge
+            tag   = tagmerge2tag(tagmerge)
             idiff_tag = 1 
-            do while( idiff_tag <= num_diff_tag_complet(idrop,irank) )
-               tag1   = diff_tag_list_complet(idiff_tag,idrop,irank)
-               idrop1 = tag_dropid(tag1)
-               irank1 = tag_rank  (tag1)
+            over_maxnum_diff_tag = .false.  
+            do while( idiff_tag <= num_diff_tag_complet(tagmerge) )
+               tag1      = diff_tag_list_complet(idiff_tag,tagmerge)
+               tagmerge1 = tag2tagmerge(tag1) 
                idiff_tag1 = 1
-               do while( idiff_tag1 <= num_diff_tag_complet(idrop1,irank1) )
+               do while( idiff_tag1 <= num_diff_tag_complet(tagmerge1) )
                   TagAlreadylisted = .false.
-                  tag2   = diff_tag_list_complet(idiff_tag1,idrop1,irank1)
-                  if ( tag2 == tag ) TagAlreadyListed = .true.  
+                  tag2   = diff_tag_list_complet(idiff_tag1,tagmerge1)
+                  if ( tag2 == tag ) TagAlreadyListed = .true.
                   idiff_tag2 = 1
-                  do while( idiff_tag2 <= num_diff_tag_complet(idrop,irank) )
-                     if ( tag2 == diff_tag_list_complet(idiff_tag2,idrop,irank) ) then  
+                  do while( idiff_tag2 <= num_diff_tag_complet(tagmerge) )
+                     if ( tag2 == diff_tag_list_complet(idiff_tag2,tagmerge) ) then  
                         TagAlreadylisted = .true.
                         exit 
                      else 
@@ -773,18 +792,26 @@ contains
                      end if ! tag2
                   end do ! idiff_tag2
                   if (.not. TagAlreadylisted) then 
-                     if ( num_diff_tag_complet(idrop,irank) < maxnum_diff_tag_complet ) then  
-                        num_diff_tag_complet(idrop,irank) = & 
-                           num_diff_tag_complet(idrop,irank) + 1
-                        diff_tag_list_complet(num_diff_tag_complet(idrop,irank),idrop,irank) = tag2
-                     else 
-                        write(*,*) "Number of diff tags exceeds max tag number when finding complete list!",time,irank,idrop,&  
-                                 num_diff_tag_complet(idrop,irank), maxnum_diff_tag_complet
-                        call pariserror("Number of tags over max tag number when finding complete list!")
+                     if ( num_diff_tag_complet(tagmerge) < maxnum_diff_tag_complet ) then  
+                        num_diff_tag_complet(tagmerge) = num_diff_tag_complet(tagmerge) + 1
+                        diff_tag_list_complet(num_diff_tag_complet(tagmerge),tagmerge) = tag2
+                     else
+                        if ( .not. WarningFlag ) then 
+                           write(*,*) " ***************** " 
+                           write(*,*) "Warning: Number of diff tags exceeds max tag number when finding complete list!" 
+                           write(*,*) "The total volume and surface of large liquid structures may be incorrect!"  
+                           write(*,*) time,tag,tagmerge,num_diff_tag_complet(tagmerge), maxnum_diff_tag_complet
+                           write(*,*) " ***************** "
+                           WarningFlag = .true.
+                           !call pariserror("Number of tags over max tag number when finding complete list!")
+                        end if ! WarningFlag
+                        over_maxnum_diff_tag = .true.  
+                        exit
                      end if ! maxnum_diff_tag
                   end if ! TagAlreadylist
                   idiff_tag1 = idiff_tag1 + 1
                end do ! idiff_tag1
+               if ( over_maxnum_diff_tag ) exit
                idiff_tag = idiff_tag + 1
             end do ! idff_tag
          end do ! tag
@@ -816,8 +843,9 @@ contains
 
                max_drop_merge_vol = drops_merge_comm(idrop,irank)%vol
                tag_max_drop_merge_vol = tag
-               do idiff_tag = 1,num_diff_tag_complet(idrop,irank)
-                  tag1   = diff_tag_list_complet(idiff_tag,idrop,irank)
+               tagmerge = tag2tagmerge(tag)
+               do idiff_tag = 1,num_diff_tag_complet(tagmerge)
+                  tag1   = diff_tag_list_complet(idiff_tag,tagmerge)
                   if ( tag1 == tag ) cycle ! for some VOF-BC, tag in ghost cell may be the same as inside  
                   new_drop_id(tag1) = num_new_drop 
                   idrop1 = tag_dropid(tag1)
@@ -865,8 +893,8 @@ contains
                drops_merge_comm(idrop,irank)%duc  = duc_merge
                drops_merge_comm(idrop,irank)%dvc  = dvc_merge
                drops_merge_comm(idrop,irank)%dwc  = dwc_merge
-               do idiff_tag = 1,num_diff_tag_complet(idrop,irank)
-                  tag1   = diff_tag_list_complet(idiff_tag,idrop,irank)
+               do idiff_tag = 1,num_diff_tag_complet(tagmerge)
+                  tag1   = diff_tag_list_complet(idiff_tag,tagmerge)
                   idrop1 = tag_dropid(tag1)
                   irank1 = tag_rank  (tag1)
                   drops_merge_comm(idrop1,irank1)%sur = sur_merge
@@ -890,6 +918,8 @@ contains
          ! deallocate memory
          deallocate( num_diff_tag_complet ) 
          deallocate( diff_tag_list_complet )
+         deallocate( tagmerge2tag ) 
+         deallocate( tag2tagmerge ) 
       end if ! rank 
 
       call DistributeDropMerge
