@@ -204,7 +204,7 @@
 
    ! For merging drops
    integer, dimension(:), allocatable :: num_diff_tag_complet
-   integer, dimension(:,:), allocatable :: diff_tag_list_complet
+   integer(2), dimension(:,:), allocatable :: diff_tag_list_complet
    integer, dimension(:), allocatable :: tagmerge2tag
    integer, dimension(:), allocatable :: tag2tagmerge
    integer :: maxnum_diff_tag_complet 
@@ -234,13 +234,15 @@ contains
       allocate( drops_cell_list(3,max_num_drop) )
       allocate( drops_merge_cell_list(3,max_num_drop_merge) )
       allocate( drops_merge_gcell_list(3,maxnum_cell_drop,max_num_drop_merge) )
-      allocate( sdu(imin:imax,jmin:jmax,kmin:kmax), & 
-                sdv(imin:imax,jmin:jmax,kmin:kmax), &
-                sdw(imin:imax,jmin:jmax,kmin:kmax), & 
-                sdu_work(imin:imax,jmin:jmax,kmin:kmax), & 
-                sdv_work(imin:imax,jmin:jmax,kmin:kmax), &
-                sdw_work(imin:imax,jmin:jmax,kmin:kmax) )
-             
+      if ( UnsteadyPartForce ) then 
+         allocate( sdu(imin:imax,jmin:jmax,kmin:kmax), & 
+                   sdv(imin:imax,jmin:jmax,kmin:kmax), &
+                   sdw(imin:imax,jmin:jmax,kmin:kmax), & 
+                   sdu_work(imin:imax,jmin:jmax,kmin:kmax), & 
+                   sdv_work(imin:imax,jmin:jmax,kmin:kmax), &
+                   sdw_work(imin:imax,jmin:jmax,kmin:kmax) )
+      end if ! UnsteadyPartForce
+                
       if ( CriteriaConvertCase == CriteriaInterface ) & 
          allocate( RegAwayInterface(imin:imax,jmin:jmax,kmin:kmax) )
 
@@ -258,8 +260,10 @@ contains
 
       LPP_initialized = .true.
 
-      sdu = 0.d0; sdv = 0.d0; sdw =0.d0
-      sdu_work = 0.d0; sdv_work = 0.d0; sdw_work =0.d0
+      if ( UnsteadyPartForce ) then 
+         sdu = 0.d0; sdv = 0.d0; sdw =0.d0
+         sdu_work = 0.d0; sdv_work = 0.d0; sdw_work =0.d0
+      end if ! UnsteadyPartForce
 
    end subroutine initialize_LPP
 
@@ -617,9 +621,11 @@ contains
                uc  = uc  + cvof_scaled*u(isq,jsq,ksq)
                vc  = vc  + cvof_scaled*v(isq,jsq,ksq)
                wc  = wc  + cvof_scaled*w(isq,jsq,ksq)
-               duc  = duc  + cvof_scaled*sdu(isq,jsq,ksq)
-               dvc  = dvc  + cvof_scaled*sdv(isq,jsq,ksq)
-               dwc  = dwc  + cvof_scaled*sdw(isq,jsq,ksq)
+               if ( UnsteadyPartForce ) then 
+                  duc  = duc  + cvof_scaled*sdu(isq,jsq,ksq)
+                  dvc  = dvc  + cvof_scaled*sdv(isq,jsq,ksq)
+                  dwc  = dwc  + cvof_scaled*sdw(isq,jsq,ksq)
+               end if ! UnsteadyPartForce
                if ( num_cell_drop == 0 ) then
                   num_cell_drop = num_cell_drop + 1
                   if ( num_cell_drop == 1) cell_list(1:3) = [isq,jsq,ksq]
@@ -838,7 +844,7 @@ contains
          allocate( diff_tag_list_complet(maxnum_diff_tag_complet,total_num_tagmerge) )
 
          num_diff_tag_complet  = 0
-         diff_tag_list_complet = 123456789
+         diff_tag_list_complet = 12345
          do irank = 0,nPdomain-1
             if ( num_drop_merge(irank) > 0 ) then 
                do idrop = 1,num_drop_merge(irank)
@@ -3573,9 +3579,11 @@ contains
          um = um + u(i,j,k)
          vm = vm + v(i,j,k)
          wm = wm + w(i,j,k)
-         sdum = sdum + sdu(i,j,k)
-         sdvm = sdvm + sdv(i,j,k)
-         sdwm = sdwm + sdw(i,j,k)
+         if ( UnsteadyPartForce ) then 
+            sdum = sdum + sdu(i,j,k)
+            sdvm = sdvm + sdv(i,j,k)
+            sdwm = sdwm + sdw(i,j,k)
+         end if ! UnsteadyPartForce
       end do; end do; end do
       numcell = dble(i2-i1+1)*dble(j2-j1+1)*dble(k2-k1+1)
       um = um/numcell
