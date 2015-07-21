@@ -390,8 +390,11 @@ contains
       integer, intent(in) :: tswap
       real(8), intent(in) :: time
 
-      if ( MOD(tswap,nsteps_clean_debris) == 0 .and. do_clean_debris ) & 
+      if ( MOD(tswap,nsteps_clean_debris) == 0 .and. do_clean_debris ) then 
          call clean_debris
+         if ( nPdomain > 1 ) & 
+             call VOFCommGhost    ! Communicate vof field after cleaning
+      end if ! nsteps_clean_debris
 
       ! Only do tagging and conversion in specific time steps
       if ( MOD(tswap,ntimestepTag) == 0 ) then
