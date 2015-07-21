@@ -428,7 +428,7 @@ module module_front
     real(8) :: time
     if(output_format==1) call print_fronts1(nf,time) !tecplot format
     if(output_format==2) call print_fronts2(nf,time) !vtk format
-    if(output_format==3) call print_fronts3(nf,time) !silo forma
+    if(output_format==3) call print_fronts3(nf,time) !silo format
   end subroutine print_fronts
 !-------------------------------------------------------------------------------------------------
   subroutine print_fronts1(nf,time)
@@ -514,11 +514,14 @@ module module_front
     use module_grid
     use module_IO
     implicit none
-    include "silo_f9x.inc"
+#ifdef HAVE_SILO
+    include 'silo_f9x.inc'
+#endif   
 
     integer :: nf, front, elem, point, ifr, i, j
     real(8) :: time, xp0(3)
 
+#ifdef HAVE_SILO
     integer :: dbfile, err, ierr, lname
     integer :: ndims, nzones, nnodes, Lnodelist
     integer :: shapesize, shapecount
@@ -577,6 +580,7 @@ module module_front
     err = dbputum(dbfile, "front", 5, ndims, xp, yp, zp, "X", 1, "Y", 1, "Z", 1, DB_FLOAT, &
                   nnodes, nzones, "zonelist", 8, DB_F77NULL, 0, DB_F77NULL, ierr)
     ierr = dbclose(dbfile)
+#endif   
 
   end subroutine print_fronts3
 !=================================================================================================
