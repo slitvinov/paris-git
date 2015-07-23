@@ -290,7 +290,7 @@ contains
     mixed_heights = .true.
     use_full_heights = .true. 
     debug_par = .false.
-    r_min=0.02; var_r=0.01; coord_min=0.2; var_coord=0.6
+    r_min=0.02; var_r=0.03; coord_min=0.15; var_coord=0.7
     limit = 5.0d-2
     
     in=31
@@ -554,9 +554,8 @@ contains
     integer :: i,j,k
     real(8) :: ryz, sine, NozzleThickness
     
-    if( test_D2P ) then 
+    if( test_D2P .or. ( test_tag .and. NumBubble >= 50 ) ) then 
        if ( rank == root_rank ) then
-          r_min=0.02; var_r=0.03; coord_min=0.15; var_coord=0.70
           call random_bubbles
        endif
        call MPI_BCAST(rad, NumBubble, MPI_REAL8, &
@@ -705,10 +704,9 @@ contains
     if(NumBubble>2) then 
       do ib=1,NumBubble
          rad(ib) = r_min + rand()*var_r
-         xc(ib)  = coord_min + rand()*var_coord
-         yc(ib)  = coord_min + rand()*var_coord
-         zc(ib)  = coord_min + rand()*var_coord
-         if (NumBubble < 30) write(*,'("Random bub generated at ",3e10.2," with radius ",e10.2)')xc(ib),yc(ib),zc(ib),rad(ib)
+         xc(ib)  = (coord_min + rand()*var_coord)*xLength
+         yc(ib)  = (coord_min + rand()*var_coord)*yLength
+         zc(ib)  = (coord_min + rand()*var_coord)*zlength
       end do
     end if ! NumBubble
   end subroutine random_bubbles 

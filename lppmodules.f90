@@ -207,6 +207,7 @@
    integer(2), dimension(:,:), allocatable :: diff_tag_list_complet
    integer, dimension(:), allocatable :: tagmerge2tag
    integer, dimension(:), allocatable :: tag2tagmerge
+   logical, dimension(:), allocatable :: tagmergeDone
    integer :: maxnum_diff_tag_complet 
 
    logical :: do_clean_debris
@@ -297,7 +298,7 @@ contains
       ! Set default values 
       DropStatisticsMethod = 0 
       dragmodel    = 1
-      nTimeStepTag = 1
+      nTimeStepTag = 10
       CriteriaConvertCase = 1
       vol_cut  = 1.d-9
       xlpp_min = xh(   Ng)
@@ -309,8 +310,8 @@ contains
       max_num_drop = 100
       max_num_drop_merge = 20
       maxnum_cell_drop = 10000
-      max_num_part = 100
-      max_num_part_cross = 10
+      max_num_part = 2
+      max_num_part_cross = 2
       outputlpp_format = 3
       ConvertRegSizeToDiam = 2.d0 
       nStepConverion = 0
@@ -765,7 +766,6 @@ contains
 
    subroutine merge_drop_pieces
       implicit none
-
       integer :: idrop,iCell,idrop1
       integer :: idiff_tag,tag,tag1,idiff_tag1,idiff_tag2,tag2
       real(8) :: sur_merge,vol_merge,xc_merge,yc_merge,zc_merge,& 
@@ -831,8 +831,11 @@ contains
          ! Find tags belonging to a merge_drop
          allocate( tagmerge2tag(total_num_tag) ) 
          allocate( tag2tagmerge(total_num_tag) ) 
+         allocate( tagmergeDone(total_num_tag) ) 
          total_num_tagmerge  = 0 
+         tag2tagmerge        = 0 
          tagmerge2tag        = 0 
+         tagmergeDone        = .false. 
          do tag = 1,total_num_tag
             if ( tag_mergeflag(tag) == 1 ) then 
                total_num_tagmerge = total_num_tagmerge + 1
@@ -840,8 +843,6 @@ contains
                tag2tagmerge(tag) = total_num_tagmerge 
             end if ! tag_mergeflag
          end do !tag 
-         
-         ! Allocate memory & initialize
          max_num_drop_merge_use = maxval(num_drop_merge)
          allocate( num_diff_tag_complet(total_num_tagmerge) ) 
          allocate( diff_tag_list_complet(maxnum_diff_tag_complet,total_num_tagmerge) )
@@ -863,16 +864,25 @@ contains
             end if ! num_drop_merge(irank)
          end do ! irank 
 
-         ! Find complete list of different tags belonging to a drop
+         ! Find complete list of different tags connected to each tag 
          WarningFlag = .false. 
          do tagmerge = 1,total_num_tagmerge
+            if ( tagmergeDone(tagmerge) ) cycle 
+            
             tag   = tagmerge2tag(tagmerge)
             idiff_tag = 1 
             over_maxnum_diff_tag = .false.  
             do while( idiff_tag <= num_diff_tag_complet(tagmerge) )
                tag1      = diff_tag_list_complet(idiff_tag,tagmerge)
-               tagmerge1 = tag2tagmerge(tag1) 
+               tagmerge1 = tag2tagmerge(tag1)
                idiff_tag1 = 1
+
+               ! only used when maxnum_diff_tag_complet is not enough
+               if ( tagmergeDone(tagmerge1) ) then 
+                  idiff_tag = idiff_tag + 1
+                  cycle
+               end if ! tagmergeDone(tagmerge1)
+               
                do while( idiff_tag1 <= num_diff_tag_complet(tagmerge1) )
                   TagAlreadylisted = .false.
                   tag2   = diff_tag_list_complet(idiff_tag1,tagmerge1)
@@ -909,6 +919,26 @@ contains
                if ( over_maxnum_diff_tag ) exit
                idiff_tag = idiff_tag + 1
             end do ! idff_tag
+            tagmergeDone(tagmerge) = .true.
+
+            do idiff_tag = 1,num_diff_tag_complet(tagmerge)
+               tag1      = diff_tag_list_complet(idiff_tag,tagmerge)
+               tagmerge1 = tag2tagmerge(tag1) 
+
+               ! only used when maxnum_diff_tag_complet is not enough
+               if ( tagmergeDone(tagmerge1) ) cycle
+               
+               ! share diff_tag_list to all connected tag
+               diff_tag_list_complet(:,tagmerge1) = diff_tag_list_complet(:,tagmerge)
+               do idiff_tag1 = 1,num_diff_tag_complet(tagmerge1)
+                  if ( diff_tag_list_complet(idiff_tag1,tagmerge1) == tag1 ) then
+                     diff_tag_list_complet(idiff_tag1,tagmerge1) = tag
+                     exit
+                  end if ! diff_tag_list
+               end do ! idiff_tag1
+
+               tagmergeDone(tagmerge1) = .true.
+            end do ! idiff_tag
          end do ! tag
 
          ! Calculate merge drop properties by summing all pieces
@@ -942,6 +972,7 @@ contains
                do idiff_tag = 1,num_diff_tag_complet(tagmerge)
                   tag1   = diff_tag_list_complet(idiff_tag,tagmerge)
                   if ( tag1 == tag ) cycle ! for some VOF-BC, tag in ghost cell may be the same as inside  
+                  if ( new_drop_id(tag1) /=0 .or. tag_mergeflag(tag1) /= 1 ) cycle
                   new_drop_id(tag1) = num_new_drop 
                   idrop1 = tag_dropid(tag1)
                   irank1 = tag_rank  (tag1)
@@ -990,6 +1021,7 @@ contains
                drops_merge_comm(idrop,irank)%dwc  = dwc_merge
                do idiff_tag = 1,num_diff_tag_complet(tagmerge)
                   tag1   = diff_tag_list_complet(idiff_tag,tagmerge)
+                  if ( new_drop_id(tag1) /= new_drop_id(tag) ) cycle
                   idrop1 = tag_dropid(tag1)
                   irank1 = tag_rank  (tag1)
                   drops_merge_comm(idrop1,irank1)%sur = sur_merge
@@ -1477,6 +1509,7 @@ contains
       if ( nPdomain > 1 ) call merge_drop_pieces 
       call ReleaseTag2DropTable
       if ( DropStatisticsMethod > 0 ) call drop_statistics(0,0.d0)
+      if ( rank == 0 ) write(*,*) 'Total num of tags/particles/elements:',time,sum(num_tag),sum(num_part),sum(num_element)
    end subroutine test_tagDrop
 
   subroutine output_tag(nf,i1,i2,j1,j2,k1,k2)
