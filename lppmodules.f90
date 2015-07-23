@@ -492,15 +492,33 @@ contains
        end do; end do; end do
     end if ! clean_debris_method
     
+! DEBUG
+    write(101,*) 'Cells to be cleaned at time',time,'for rank',rank
+    do i=is,ie; do j=js,je; do k=ks,ke
+      if ( tag_flag(i,j,k) == -1 .and. cvof(i,j,k) > 0.d0 ) then
+         write(101,*) '**********************************'
+         write(101,*) 'vof set to 0',i,j,k,time,cvof(i,j,k) 
+         write(101,'(9(E11.2))') cvof(i-1,j-1:j+1,k-1),cvof(i,j-1:j+1,k-1),cvof(i+1,j-1:j+1,k-1)
+         write(101,'(9(E11.2))') cvof(i-1,j-1:j+1,k  ),cvof(i,j-1:j+1,k  ),cvof(i+1,j-1:j+1,k  )
+         write(101,'(9(E11.2))') cvof(i-1,j-1:j+1,k+1),cvof(i,j-1:j+1,k+1),cvof(i+1,j-1:j+1,k+1)
+      else if ( tag_flag(i,j,k) ==  1 .and. cvof(i,j,k) < 1.d0 ) then 
+         write(101,*) '$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$'
+         write(101,*) 'vof set to 1',i,j,k,time,cvof(i,j,k) 
+         write(101,'(9(E11.2))') cvof(i-1,j-1:j+1,k-1),cvof(i,j-1:j+1,k-1),cvof(i+1,j-1:j+1,k-1)
+         write(101,'(9(E11.2))') cvof(i-1,j-1:j+1,k  ),cvof(i,j-1:j+1,k  ),cvof(i+1,j-1:j+1,k  )
+         write(101,'(9(E11.2))') cvof(i-1,j-1:j+1,k+1),cvof(i,j-1:j+1,k+1),cvof(i+1,j-1:j+1,k+1)
+      end if ! tag_flag 
+    end do; end do; end do
+! END DEBUG
+
     ! remove debris
     do i=is,ie; do j=js,je; do k=ks,ke
-      if ( tag_flag(i,j,k) == -1 .and. cvof(i,j,k) > 0.d0 ) then 
+      if ( tag_flag(i,j,k) == -1 .and. cvof(i,j,k) > 0.d0 ) then
          cvof(i,j,k) = 0.d0
       else if ( tag_flag(i,j,k) ==  1 .and. cvof(i,j,k) < 1.d0 ) then 
          cvof(i,j,k) = 1.d0
       end if ! tag_flag 
     end do; end do; end do
-
     
   end subroutine clean_debris
 
