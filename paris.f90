@@ -938,10 +938,18 @@ subroutine calcStats
      ! average momentum
      mystats(8)=mystats(8)+0.5*(rho(i,j,k)+rho(i+1,j,k))*u(i,j,k)*vol
      mystats(9)=mystats(9)+0.5*(rho(i,j,k)+rho(i+1,j,k))*uold(i,j,k)*vol
-     ! Phase C=1 volume
-     if(DoVOF) CC=cvof(i,j,k) ;  mystats(10)=mystats(10)+CC*vol
-     ! Phase C=1 center of mass
-     if(DoVOF) CC=cvof(i,j,k) ;  mystats(11)=mystats(11)+CC*vol*x(i)
+     
+     if(DoVOF) then
+        CC=cvof(i,j,k)
+        ! Phase C=1 volume
+        mystats(10)=mystats(10)+CC*vol
+        ! Phase C=1 center of mass x-coordinate
+        mystats(11)=mystats(11)+CC*vol*x(i)
+        ! Rise velocity of bubble with gravity in x-direction
+        if (test_risingbubble) then
+           mystats(24) = mystats(24)+0.50d0*(u(i-1,j,k)+u(i,j,k))*CC*vol
+        endif
+     endif
      ! kinetic energy
      kenergy = 0.5d0*( (0.5d0*(u(i,j,k)+u(i+1,j,k)))**2.d0 & 
           +(0.5d0*(v(i,j,k)+v(i,j+1,k)))**2.d0 & 
@@ -1031,6 +1039,13 @@ subroutine calcStats
   mystats(1) = mystats(1)/(xLength*zLength*2.0)
   mystats(11) = mystats(11) ! /mystats(10)
   call MPI_ALLREDUCE(mystats(1), stats(1), nstatarray, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_Domain, ierr)
+  if (DoVOF .and. test_risingbubble) then
+     stats(10:11) = stats(10:11)*(xLength*yLength*zLength)
+     if (stats(10) > 1d-15) then
+        stats(11) = stats(11)/stats(10)
+        stats(24) = stats(24)/stats(10)
+     endif
+  endif
   rho_ave = stats(6)
   p_ave = stats(7)
 ! This stops the code in case the average velocity (stats(2)) becomes NaN.
