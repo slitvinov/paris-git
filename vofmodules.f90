@@ -1818,7 +1818,7 @@ subroutine backup_VOF_write
   1100 FORMAT(es17.8e3,7I10)
   !Note: to guarantee identical results, 16 digits are needed for real8 
   1200 FORMAT(5es25.16e3)
-  1201 FORMAT(4e14.5)
+  1201 FORMAT(4es25.16e3)
 end subroutine backup_VOF_write
 !=================================================================================================
 !=================================================================================================
