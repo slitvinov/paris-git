@@ -57,6 +57,7 @@ module module_surface_tension
   integer, parameter :: NOR=6 ! number of orientations
   integer, parameter :: NPOS=27*NOR
   real(8), parameter :: EPS_GEOM = 1d-4
+  real(8), dimension(:,:,:), allocatable :: n1,n2,n3 ! normals
   real(8), dimension(:,:,:,:), allocatable :: height ! 
 
   ! 4th index: 1 for normal vector pointing towards positive x "positive height", 
