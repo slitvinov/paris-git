@@ -265,7 +265,6 @@ Program paris
                    call surfaceForce(du,dv,dw,rho)
               call my_timer(8)
               if (FreeSurface) then
-                 call get_normals()
                  if (.not. (test_capwave .or. test_plane)) then
                     call tag_bubbles(itimestep,time)
                     if (.not. RP_test) then
@@ -277,7 +276,6 @@ Program paris
                           call get_vof_phase(cvof) !cvof updated above from min to max
                           call ReleaseTag2DropTable
                           call tag_bubbles(itimestep,time)
-                          call get_normals()
                           call get_all_heights(itimestep)
                        endif
                     endif
@@ -378,17 +376,15 @@ Program paris
              else
               call SetupPoisson(u,v,w,umask,vmask,wmask,rho,dt,A,tmp,VolumeSource)
             endif
-           else 
-              call get_all_curvatures(kappa_fs,itimestep)
+           else
               solver_flag = 1
-              call Setuppoisson_fs_new(u,v,w,vof_phase,rho1,dt,A,cvof,n1,n2,n3,kappa_fs)
+              call setuppoisson_fs_heights(u,v,w,vof_phase,rho1,dt,A,cvof)
            endif
            ! (div u)*dt < epsilon => div u < epsilon/dt => maxresidual : maxerror/dt 
            if(HYPRE)then
               if (FreeSurface) call pariserror("HYPRE not functional for Free Surface")
               call poi_solve(A,p,maxError/MaxDt*ErrorScaleHYPRE,maxit,it,HYPRESolverType)
               call do_all_ghost(p)
-              
            else
               if (FreeSurface) then
                  if (RP_test) call set_RP_pressure(p,rho1)
@@ -413,7 +409,6 @@ Program paris
               end if
            endif
            call project_velocity()
-
            if(mod(itimestep,nout)==0) call check_corrected_vel(u,umask,itimestep)
            if( DoLPP ) call ComputeSubDerivativeVel()
            call my_timer(10)
@@ -445,7 +440,7 @@ Program paris
            if (DoVOF .and. FreeSurface) then
               call extrapolate_velocities()
               solver_flag = 2
-              call setuppoisson_fs_new(u,v,w,vof_phase,rho1,dt,A,cvof,n1,n2,n3,kappa_fs)
+              call setuppoisson_fs_heights(u,v,w,vof_phase,rho1,dt,A,cvof)
               if(HYPRE)then !HYPRE will not work with removed nodes from domain.
                  call pariserror("HYPRE solver not yet available for Free Surfaces")
               else
@@ -2864,11 +2859,11 @@ contains
     use module_2phase
     implicit none
     call set_topology(vof_phase,itimestep) !vof_phases are updated in initconditions_VOF called above
-    call get_normals()
-    call get_all_curvatures(kappa_fs,0)
-    !call tag_bubbles(itimestep,time)
+    !call get_normals()
+    !call get_all_curvatures(kappa_fs,0)
+    call get_ref_volume(cvof)
     if (RP_test) then
-       call get_ref_volume
+       !call get_ref_volume(cvof)
        call Integrate_RP(dt,time,rho1)
        call initialize_P_RP(p,rho1)  !initialize P field for RP test
        call ghost_x(p,1,req( 1: 4))

@@ -82,6 +82,7 @@ module module_VOF
   logical :: test_fsdrop = .false.
   logical :: test_randombubs = .false.
   logical :: test_plane = .false.
+  logical :: test_risingbubble = .false.
   logical :: linfunc_initialized = .false.
   logical :: DoMOMCONS = .false.
   logical :: STGhost = .false.
@@ -459,6 +460,8 @@ contains
        test_randombubs = .true.
     else if(test_type=='plane') then
        test_plane = .true.   
+    else if(test_type=='rising_bubble') then
+       test_risingbubble = .true.   
     else
        write(*,*) test_type, rank
        call pariserror("unknown initialization")
@@ -667,7 +670,7 @@ contains
     end if
 
     if (test_fsdrop) then
-       if (.not. FreeSurface) call pariserror('FS has to be switched on for this test case')
+       if (.not. FreeSurface) call pariserror('FS has to be switched on for the FS plane test')
        do i=is,ie; do j=js,je; do k=ks,ke
           cvof(i,j,k) = 1.d0-cvof(i,j,k)
        enddo; enddo; enddo 
