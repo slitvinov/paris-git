@@ -161,11 +161,9 @@ Program paris
                           tmp(i,j,k)=ABS((u(i-1,j,k)-u(i,j,k))/dx(i)+(v(i,j-1,k)-v(i,j,k))/dy(j)+(w(i,j,k-1)-w(i,j,k))/dz(k))
                        enddo; enddo; enddo
                        call VTK_scalar_struct(out_fs,0,tmp)
-                    case (2)
-                       call VTK_scalar_struct(out_fs,0,kappa_fs)
-                    case(3)
+                    case(2)
                        call VTK_scalar_struct(out_fs,0,P_gx)
-                    case(4)
+                    case(3)
                        call VTK_scalar_struct(out_fs,0,v_source)
                     end SELECT
                  endif
@@ -623,11 +621,9 @@ Program paris
                           tmp(i,j,k)=ABS((u(i-1,j,k)-u(i,j,k))/dx(i)+(v(i,j-1,k)-v(i,j,k))/dy(j)+(w(i,j,k-1)-w(i,j,k))/dz(k))
                        enddo; enddo; enddo
                        call VTK_scalar_struct(out_fs,itimestep/NOUT_VTK(out_fs),tmp)
-                    case (2)
-                       call VTK_scalar_struct(out_fs,itimestep/NOUT_VTK(out_fs),kappa_fs)
-                    case(3)
+                    case(2)
                        call VTK_scalar_struct(out_fs,itimestep/NOUT_VTK(out_fs),P_gx)
-                    case(4)
+                    case(3)
                        call VTK_scalar_struct(out_fs,itimestep/NOUT_VTK(out_fs),v_source)
                     end SELECT
                  endif !output interval
@@ -2874,8 +2870,6 @@ contains
     use module_2phase
     implicit none
     call set_topology(vof_phase,itimestep) !vof_phases are updated in initconditions_VOF called above
-    !call get_normals()
-    !call get_all_curvatures(kappa_fs,0)
     call get_ref_volume(cvof)
     if (RP_test) then
        !call get_ref_volume(cvof)
