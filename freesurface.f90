@@ -57,14 +57,6 @@
         w_cmask(i,j,k)=0
      endif
   enddo; enddo; enddo
-  !fill ghost layers for zero masks
-!!$  call ighost_x(u_cmask,2,reqs(1:4)); call ighost_x(v_cmask,2,reqs(5:8))
-!!$  call ighost_x(w_cmask,2,reqs(9:12)); call ighost_x(pcmask,2,reqs(13:16))
-!!$  call ighost_y(u_cmask,2,reqs(17:20)); call ighost_y(v_cmask,2,reqs(21:24))
-!!$  call ighost_y(w_cmask,2,reqs(25:28)); call ighost_y(pcmask,2,reqs(29:32))
-!!$  call ighost_z(u_cmask,2,reqs(33:36)); call ighost_z(v_cmask,2,reqs(37:40))
-!!$  call ighost_z(w_cmask,2,reqs(41:44)); call ighost_z(pcmask,2,reqs(45:48))
-!!$  call MPI_WAITALL(48,reqs(1:48),stat,ierr1)
   call ighost_x(u_cmask,2,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
   call ighost_y(u_cmask,2,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
   call ighost_z(u_cmask,2,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
@@ -113,13 +105,6 @@
            endif
         endif
      enddo; enddo; enddo
-!!$     call ighost_x(u_cmask,2,reqs(1:4)); call ighost_x(v_cmask,2,reqs(5:8))
-!!$     call ighost_x(w_cmask,2,reqs(9:12)); call ighost_x(pcmask,2,reqs(13:16))
-!!$     call ighost_y(u_cmask,2,reqs(17:20)); call ighost_y(v_cmask,2,reqs(21:24))
-!!$     call ighost_y(w_cmask,2,reqs(25:28)); call ighost_y(pcmask,2,reqs(29:32))
-!!$     call ighost_z(u_cmask,2,reqs(33:36)); call ighost_z(v_cmask,2,reqs(37:40))
-!!$     call ighost_z(w_cmask,2,reqs(41:44)); call ighost_z(pcmask,2,reqs(45:48))
-!!$     call MPI_WAITALL(48,reqs(1:48),stat,ierr1)
      call ighost_x(u_cmask,2,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
      call ighost_y(u_cmask,2,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
      call ighost_z(u_cmask,2,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
@@ -201,6 +186,7 @@ subroutine check_topology()
   if (signal) write(*,'("COLLAPSING BUBBLE DETECTED IN RANK: ",I4)')rank
   call MPI_ALLREDUCE(remove,fill_ghost, 1, MPI_LOGICAL, MPI_LOR, MPI_COMM_Active, ierr)
   if (fill_ghost) then
+     !write(*,'("Bubble to be removed, fill_ghost true")')
      call MPI_ALLGATHER(clear_zone,4,MPI_DOUBLE_PRECISION,clear_list(1:4,:),4,MPI_DOUBLE_PRECISION,MPI_Comm_World,ierr)
      do rankid=0,nPdomain-1
         call clear_bubble(clear_list(1:4,rankid))
@@ -251,15 +237,6 @@ contains
        d_clean = 2.5d0*(volume/4.d0)**(1./3.)
        clear_zone = (/ xt,yt,zt,d_clean /)
        !write(*,'("Cleaning radius: ",e14.5)')d_clean
-!!$       do k=ks,ke; do j=js,je; do i=is,ie
-!!$          if (sqrt((x(i)-xt)**2.d0+(y(j)-yt)**2.d0+(z(k)-zt)**2.d0)<d_clean) then
-!!$             cvof(i,j,k)=0.0d0
-!!$             v_source(i,j,k) = 0.0d0
-!!$             if (itime_scheme==2) cvofold(i,j,k)=0.0d0
-!!$             implode(i,j,k) = 0
-!!$          endif
-!!$       enddo; enddo; enddo
-!!$       write(*,'("BUBBLE TRACES REMOVED IN RANK: ",I4)')rank
     endif
   end subroutine bub_implode
 !-----------------------------------------------------------------------
@@ -417,18 +394,27 @@ subroutine discrete_divergence(u,v,w,iout)
 115 format(I8,5e14.5)
 end subroutine discrete_divergence
 !--------------------------------------------------------------------------------------------------------------------
-subroutine get_ref_volume
+subroutine get_ref_volume(vof)
+  use module_grid
   use module_2phase
   use module_BC
   use module_freesurface
   implicit none
+  include 'mpif.h'
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: vof
   real(8), parameter :: pi=3.1415926535897932384626433833
+  real(8) :: V_loc
+  integer :: i,j,k,ierr
 
-  V_0 = 4d0/3d0*pi*(R_ref**3d0)
+  !V_0 = 4d0/3d0*pi*(R_ref**3d0)
+  V_loc = 0.0d0
+  do k=ks,ke; do j=js,je; do i=is,ie
+     V_loc=V_loc+vof(i,j,k)*dx(i)*dy(j)*dz(k)
+  enddo; enddo; enddo
+  call MPI_ALLREDUCE(V_loc, V_0, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_Domain, ierr)
   R_RK = rad(1)
   dR_RK = 0d0 
   P_inf = BoundaryPressure(1)
-  ddR_RK = (P_ref*(R_ref/R_RK)**(3d0*gamma)-P_inf)/R_RK
 end subroutine get_ref_volume
 !--------------------------------------------------------------------------------------------------------------------
 ! This is a straight copy of NewSolver. The idea is to not clutter NewSolver with all the FreeSurface flags and tests, 
@@ -442,7 +428,6 @@ subroutine FreeSolver(A,p,maxError,beta,maxit,it,ierr,iout,time,tres2)
   use module_BC
   use module_IO
   use module_freesurface
-  !use module_Lag_part
   implicit none
   include 'mpif.h'
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: p
@@ -935,6 +920,7 @@ subroutine initialize_P_RP(p,rho)
   real(8) :: r, P_l, rho
   integer :: i,j,k,ierr
   P_l = P_ref*(R_ref/R_RK)**(3d0*gamma)-2d0*sigma/R_RK
+  if (rank==0) write(*,'("RP test, P_l, R_RK, dR_RK, ddR_RK: ",4e14.5)')P_l,R_RK, dR_RK, ddR_RK
   do k=ks,ke; do j=js,je; do i=is,ie
      r = sqrt((x(i)-xc(1))**2d0 + (y(j)-yc(1))**2d0 + (z(k)-zc(1))**2d0)
      if (r .ge. rad(1)) then
