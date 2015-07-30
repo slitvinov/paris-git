@@ -1065,6 +1065,7 @@ contains
          deallocate( diff_tag_list_complet )
          deallocate( tagmerge2tag ) 
          deallocate( tag2tagmerge ) 
+         deallocate( tagmergeDone ) 
       end if ! rank 
 
       call DistributeDropMerge
