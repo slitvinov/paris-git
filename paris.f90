@@ -393,13 +393,15 @@ Program paris
            endif
            if(mod(itimestep,termout)==0 .and. ii==1) then
               if (.not.FreeSurface) call calcResidual(A,p,ResNormOrderPressure,residual)
-              if (HYPRE .and. residual/(maxError/MaxDt) > 2.d0 ) then  
-                 ErrorScaleHYPRE = ErrorScaleHYPRE*0.5d0
-                 if (rank == 0) write(*,*) "ErrorScaleHYPRE is decreased.",ErrorScaleHYPRE
-              else if (HYPRE .and. residual/(maxError/MaxDt) < 0.25d0 ) then  
-                 ErrorScaleHYPRE = ErrorScaleHYPRE*2.0d0
-                 if (rank == 0) write(*,*) "ErrorScaleHYPRE is increased.",ErrorScaleHYPRE
-              end if ! HYPRE & residual
+              if ( DynamicAdjustPoiTol ) then 
+                 if (HYPRE .and. residual/(maxError/MaxDt) > 2.d0 ) then  
+                    ErrorScaleHYPRE = ErrorScaleHYPRE*0.5d0
+                    if (rank == 0) write(*,*) "ErrorScaleHYPRE is decreased.",ErrorScaleHYPRE
+                 else if (HYPRE .and. residual/(maxError/MaxDt) < 0.25d0 ) then  
+                    ErrorScaleHYPRE = ErrorScaleHYPRE*2.0d0
+                    if (rank == 0) write(*,*) "ErrorScaleHYPRE is increased.",ErrorScaleHYPRE
+                 end if ! HYPRE & residual
+              end if ! DynamicAdjustPoiTol  
               if(rank==0) then
                  write(*,'("              pressure residual*dt:   ",e7.1,&
                    &" maxerror: ",e7.1)') residual*MaxDt,maxerror
@@ -2978,7 +2980,7 @@ subroutine ReadParameters
                         nsteps_probe,  num_probes,    ijk_probe,                                 &
                         num_probes_cvof,  ijk_probe_cvof,   num_probes_linez, ij_probe_linez,    & 
                         DoTurbStats,   nStepOutputTurbStats, TurbStatsOrder,  timeStartTurbStats,&
-                        ResNormOrderPressure,         ErrorScaleHYPRE,                           & 
+                        ResNormOrderPressure,         ErrorScaleHYPRE, DynamicAdjustPoiTol,      & 
                         OutVelSpecified,  MaxFluxRatioPresBC, LateralBdry,                       & 
                         HYPRESolverType, plane, n_p
  
@@ -3016,7 +3018,7 @@ subroutine ReadParameters
   nsteps_probe =1; num_probes = 0; ijk_probe = 1; num_probes_cvof = 0; ijk_probe_cvof = 1 
   DoTurbStats = .false.; nStepOutputTurbStats = 1000; TurbStatsOrder = 2
   timeStartTurbStats = 0.d0
-  ResNormOrderPressure = 100; ErrorScaleHYPRE = 1.d-2; 
+  ResNormOrderPressure = 100; ErrorScaleHYPRE = 1.d-2; DynamicAdjustPoiTol=.true. 
   OutVelSpecified = .false.
   MaxFluxRatioPresBC = 0.7d0
   LateralBdry = .false.
@@ -3043,7 +3045,6 @@ subroutine ReadParameters
   yc (1:NumBubble) = xyzrad(2,1:NumBubble)
   zc (1:NumBubble) = xyzrad(3,1:NumBubble)
   rad(1:NumBubble) = xyzrad(4,1:NumBubble)
-
 
   FrontProps(5,1:NumBubble) = xyzrad(1,1:NumBubble)
   FrontProps(6,1:NumBubble) = xyzrad(2,1:NumBubble)

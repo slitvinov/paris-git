@@ -344,6 +344,7 @@ module module_flow
   real(8) :: dpdx, dpdy, dpdz, W_ave  !pressure gradients in case of pressure driven channel flow
   real(8) :: dpdx_stat, dpdy_stat, dpdz_stat
   real(8) :: beta, MaxError,ErrorScaleHYPRE
+  logical :: DynamicAdjustPoiTol 
   integer :: ResNormOrderPressure
   integer :: HYPRESolverType
   integer :: maxit, it, itime_scheme, BuoyancyCase, drive
@@ -3082,7 +3083,7 @@ subroutine calcResidual(A,p,NormOrder, residual)
   integer :: i,j,k, ierr
   res = 0d0
   do k=ks,ke; do j=js,je; do i=is,ie
-      locres = abs(-p(i,j,k) * A(i,j,k,7) +                             &
+      locres = dabs(-p(i,j,k) * A(i,j,k,7) +                         &
       A(i,j,k,1) * p(i-1,j,k) + A(i,j,k,2) * p(i+1,j,k) +            &
       A(i,j,k,3) * p(i,j-1,k) + A(i,j,k,4) * p(i,j+1,k) +            &
       A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8) )
@@ -3094,12 +3095,13 @@ subroutine calcResidual(A,p,NormOrder, residual)
          res = max(res,locres)
       end if ! NormOrder
   enddo; enddo; enddo
+  residual = 0.d0
   if ( NormOrder == 1 ) then 
       call MPI_ALLREDUCE(res, residual, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr)
-      residual = residual/dble(Nx*Ny*Nz)
+      residual = residual/dble(Nx)/dble(Ny)/dble(Nz)
   else if ( NormOrder == 2 ) then 
       call MPI_ALLREDUCE(res, residual, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr)
-      Residual = sqrt(residual)/dble(Nx*Ny*Nz)
+      residual = dsqrt(residual)/dble(Nx)/dble(Ny)/dble(Nz)
   else 
       call MPI_ALLREDUCE(res, residual, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_Comm_Cart, ierr)
   end if ! NormOrder
