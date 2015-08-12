@@ -708,9 +708,10 @@ contains
     if(NumBubble>2) then 
       do ib=1,NumBubble
          rad(ib) = r_min + rand()*var_r
-         xc(ib)  = (coord_min + rand()*var_coord)*xLength
-         yc(ib)  = (coord_min + rand()*var_coord)*yLength
-         zc(ib)  = (coord_min + rand()*var_coord)*zlength
+         xc(ib)  = (coord_min + rand()*var_coord)
+         yc(ib)  = (coord_min + rand()*var_coord)
+         zc(ib)  = (coord_min + rand()*var_coord)
+         write(*,'("Bubble ",I4," generated at ",3e14.5," with radius: ",e14.5)')ib,xc(ib),yc(ib),zc(ib),rad(ib)
       end do
     end if ! NumBubble
   end subroutine random_bubbles 
