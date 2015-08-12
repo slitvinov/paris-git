@@ -734,11 +734,12 @@ end subroutine do_droplet_test
   end subroutine h_of_KHI2D
   ! Output zone=======================================================================================
   ! General subroutine
-  subroutine output_ALL(nf,i1,i2,j1,j2,k1,k2,timestep)
+  subroutine output_ALL(nf,i1,i2,j1,j2,k1,k2,timestep,sub)
     implicit none
     integer :: nf,i1,i2,j1,j2,k1,k2,timestep
+    integer :: sub
     if(output_format==4) call output4(nf,i1,i2,j1,j2,k1,k2)
-    if(output_format==5) call output5(nf,timestep)
+    if(output_format==5) call output5(nf,timestep,sub)
     if(output_format==6) call output6(nf)
   end subroutine output_ALL
   ! Visit file generation subroutine
@@ -1083,7 +1084,7 @@ end subroutine do_droplet_test
   
   
 
-  subroutine output5(index,timestep)
+  subroutine output5(index,timestep,sub)
     use module_flow
     use module_grid
     use module_surface_tension
@@ -1095,6 +1096,7 @@ end subroutine do_droplet_test
 #endif	
     integer :: timestep
     integer :: index
+    integer :: sub
 #ifdef HAVE_SILO
     ! Silo Util Variables
 
@@ -1117,9 +1119,13 @@ end subroutine do_droplet_test
     !Write(*,*) 'Starting job in rank: ', rank
 
     ! Setting string lengths
-    levarnames = 25 + 2*padd
-    lemeshnames = 24 + 2*padd
-
+    if (out_sub) then
+       levarnames = 28 + 2*padd
+       lemeshnames = 27 + 2*padd
+    else
+       levarnames = 25 + 2*padd
+       lemeshnames = 24 + 2*padd
+    endif
     ! Setting number of processors for each spatial dimension
     dims_cpu(1) = nPx; dims_cpu(2) = nPy; dims_cpu(3) = nPz;
 
@@ -1176,13 +1182,20 @@ end subroutine do_droplet_test
     ghosttop(3) = kee-ke
     
     ! Writing multi mesh file
-    if (rank == 0) call write_master(TRIM(path)//'/fbasic',index, time, timestep)
+    if (rank == 0) call write_master(TRIM(path)//'/fbasic',index, time, timestep, out_sub, sub)
 
-    ! Setting *.silo file path
-    file_name = TRIM(path)//'/fbasic'//i2t(index,padd)//'-'//i2t(rank,padd)//".silo"
-    ! Setting *.silo file path length
-    lfile_name = 20 + 2*padd
-
+    if (out_sub) then
+       ! Setting *.silo file path
+       file_name = TRIM(path)//'/fbasic'//i2t(index,padd)//'-'//i2t(sub,2)//'-'//i2t(rank,padd)//".silo"
+       ! Setting *.silo file path length
+       lfile_name = 23 + 2*padd
+    else
+       ! Setting *.silo file path
+       file_name = TRIM(path)//'/fbasic'//i2t(index,padd)//'-'//i2t(rank,padd)//".silo"
+       ! Setting *.silo file path length
+       lfile_name = 20 + 2*padd
+    endif
+    
     !Debugging message
     !write(*,*) 'Path for silo is ', file_name
 
@@ -1296,7 +1309,7 @@ end subroutine do_droplet_test
   end function i2t
   
 
-  subroutine write_master(rootname, step, time, timestep)
+  subroutine write_master(rootname, step, time, timestep, dosub, sub)
     implicit none
 #ifdef HAVE_SILO
     include 'silo_f9x.inc'
@@ -1311,6 +1324,8 @@ end subroutine do_droplet_test
     integer, dimension(numProcess) :: lmeshnames, lvarnames, meshtypes, vartypes
     integer :: lfile_n, lsilon, optlist, timestep
     real(8) :: time
+    logical :: dosub
+    integer :: sub
 
 #ifdef HAVE_SILO
     ! Setting mesh types and variable types
@@ -1321,7 +1336,11 @@ end subroutine do_droplet_test
     lvarnames = levarnames
 
     ! Setting multi mesh and variables paths
-    file_n = TRIM(rootname)//i2t(step,padd)//'-'
+    if (dosub) then
+       file_n = TRIM(rootname)//i2t(step,padd)//'-'//i2t(sub,2)//'-'
+    else
+       file_n = TRIM(rootname)//i2t(step,padd)//'-'
+    endif
     do m=0,numProcess-1
        fullname = TRIM(file_n)//TRIM(i2t(m,padd))//'.silo:srm'
        !Debugging message
@@ -1335,12 +1354,18 @@ end subroutine do_droplet_test
        !write(*,*) 'Paths ', meshnames(m+1)
     enddo
 
-    ! Setting length of multi mesh file pash
-    lsilon = 10 + padd
-
     ! Creating root file
-    err = dbcreate('multi'//i2t(step,padd)//'.root', lsilon, DB_CLOBBER, DB_LOCAL, &
-         "multimesh root", 14, DB_PDB, dbfile)
+    if (dosub) then
+       ! Setting length of multi mesh file pash
+       lsilon = 13 + padd
+       err = dbcreate('multi'//i2t(step,padd)//'-'//i2t(sub,2)//'.root', lsilon, DB_CLOBBER, DB_LOCAL, &
+            "multimesh root", 17, DB_PDB, dbfile)
+    else
+       ! Setting length of multi mesh file pash
+       lsilon = 10 + padd
+       err = dbcreate('multi'//i2t(step,padd)//'.root', lsilon, DB_CLOBBER, DB_LOCAL, &
+            "multimesh root", 14, DB_PDB, dbfile)
+    endif
 
     if(dbfile.eq.-1) write (6,*) 'Could not create Silo file!'
 

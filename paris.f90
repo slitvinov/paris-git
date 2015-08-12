@@ -149,7 +149,7 @@ Program paris
         if(DoVOF .and. .not.restart) then
            call output_VOF(0,is,ie+1,js,je+1,ks,ke+1)
            if(out_centroid) call output_centroids(0)
-           call output_ALL(0,is,ie+1,js,je+1,ks,ke+1,itimestep)
+           call output_ALL(0,is,ie+1,js,je+1,ks,ke+1,itimestep,5)
            if (FreeSurface) then
               do out_fs = 1,4
                  if (VTK_OUT(out_fs)) then
@@ -353,6 +353,10 @@ Program paris
               w = w + dt * dw
            endif
 
+           if(out_sub .and. ii==1 .and. mod(itimestep-itimestepRestart,nout)==0) then
+              call output5(itimestep/nout,itimestep,1)
+           endif
+
            call my_timer(3)
            call SetVelocityBC(u,v,w,umask,vmask,wmask,time,dt,0)
            if (FreeSurface) then
@@ -408,7 +412,14 @@ Program paris
                  write(*,'("              pressure iterations :",I9)')it
               end if
            endif
+
+           if(out_sub .and. ii==1 .and. mod(itimestep-itimestepRestart,nout)==0) then
+              call output5(itimestep/nout,itimestep,2)
+           endif
            call project_velocity()
+           if(out_sub .and. ii==1 .and. mod(itimestep-itimestepRestart,nout)==0) then
+              call output5(itimestep/nout,itimestep,3)
+           endif
            if(mod(itimestep,nout)==0) call check_corrected_vel(u,umask,itimestep)
            if( DoLPP ) call ComputeSubDerivativeVel()
            call my_timer(10)
@@ -439,6 +450,9 @@ Program paris
 !----------------------------------EXTRAPOLATION FOR FREE SURFACE---------------------------------
            if (DoVOF .and. FreeSurface) then
               call extrapolate_velocities()
+              if(out_sub .and. ii==1 .and. mod(itimestep-itimestepRestart,nout)==0) then
+                 call output5(itimestep/nout,itimestep,4)
+              endif
               solver_flag = 2
               call setuppoisson_fs_heights(u,v,w,vof_phase,rho1,dt,A,cvof)
               if(HYPRE)then !HYPRE will not work with removed nodes from domain.
@@ -560,7 +574,7 @@ Program paris
               call output(nfile,is,ie+1,js,je+1,ks,ke+1)
               if (DoVOF) then
                  call output_VOF(nfile,is,ie+1,js,je+1,ks,ke+1)
-                 call output_ALL(nfile,is,ie+1,js,je+1,ks,ke+1,itimestep)
+                 call output_ALL(nfile,is,ie+1,js,je+1,ks,ke+1,itimestep,5)
                  if(out_centroid) call output_centroids(nfile)
               endif
               if(DoLPP) call output_LPP(nfile,is,ie+1,js,je+1,ks,ke+1)
@@ -581,7 +595,7 @@ Program paris
               call output(nfile,is,ie+1,js,je+1,ks,ke+1)
               if (DoVOF) then
                  call output_VOF(nfile,is,ie+1,js,je+1,ks,ke+1)
-                 call output_ALL(nfile,is,ie+1,js,je+1,ks,ke+1,itimestep)
+                 call output_ALL(nfile,is,ie+1,js,je+1,ks,ke+1,itimestep,5)
                  if(out_centroid) call output_centroids(nfile)
               endif
               if(DoLPP) call output_LPP(nfile,is,ie+1,js,je+1,ks,ke+1)
@@ -2991,7 +3005,7 @@ subroutine ReadParameters
                         DoTurbStats,   nStepOutputTurbStats, TurbStatsOrder,  timeStartTurbStats,&
                         ResNormOrderPressure,         ErrorScaleHYPRE, DynamicAdjustPoiTol,      & 
                         OutVelSpecified,  MaxFluxRatioPresBC, LateralBdry,                       & 
-                        HYPRESolverType, plane, n_p
+                        HYPRESolverType, plane, n_p, out_sub
  
   Nx = 0; Ny = 4; Nz = 4 ! cause absurd input file that lack nx value to fail. 
   Ng=2;xLength=1d0;yLength=1d0;zLength=1d0
@@ -3033,6 +3047,7 @@ subroutine ReadParameters
   LateralBdry = .false.
   HYPRESolverType = 1
   plane = 0.5d0; n_p = 0.0d0
+  out_sub = .false.
 
   in=1
   out=2

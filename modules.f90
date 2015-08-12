@@ -435,6 +435,7 @@ module module_IO
   logical :: read_x, read_y, read_z, restart, ICOut, restartFront, restartAverages, zip_data
   logical :: out_mom, output_fields(5)
   logical :: out_centroid, opened_cent
+  logical :: out_sub
   real(8) :: tout,timeLastOutput
 contains
     !=================================================================================================
