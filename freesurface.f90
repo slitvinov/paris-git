@@ -1015,7 +1015,11 @@ subroutine inflow_accelerate
   real(8), parameter :: pi=3.141592653589793238462643383
   integer :: i,j,k
   
-  factor = (1.d0 + sin(-pi/2.d0 + DBLE(itimestep*1.0)/DBLE(step_max*1.0)*pi))/2.
+  if (itimestep < 2) then
+     factor = 0.0d0
+  else
+     factor = (1.d0 + sin(-pi/2.d0 + DBLE((itimestep-2)*1.0)/DBLE(step_max*1.0)*pi))/2.0
+  endif
   !if (rank==0) Write(*,'("Factor: ",e14.5)')factor
   ! inflow boundary condition x- with injection
   if(bdry_cond(1)==3 .and. coords(1)==0    ) then
