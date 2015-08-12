@@ -1172,7 +1172,6 @@ contains
 !===============================================================================================================
        !----Cav-liquid neighbours, set P_g in cavity cells
        if (implode(i,j,k)==0) then
-          !write(*,*)'Implode 0'
           ! Set Laplace jumps for surface tension 
           if(vof_phase(i,j,k)==1) then
              do l=-1,1,2
@@ -1319,4 +1318,70 @@ contains
     endif
   end subroutine stagerred_cut
 end subroutine setuppoisson_fs_heights
+
+subroutine curvature_sphere(t)
+  use module_VOF
+  use module_surface_tension
+  use module_grid
+  use module_freesurface
+  implicit none
+  include 'mpif.h'
+  real(8) :: kap(imin:imax,jmin:jmax,kmin:kmax)
+  integer :: i,j,k,l,ierr
+  real(8), dimension(1:2) :: errnorm(2), err_glob(2)
+  real(8) :: kap_sphere, max_loc, err_inf, gh_cells, t_cells, t
+  real(8) :: V_loc, V_t
+  logical :: check
+  ! initialize errors
+  errnorm = 0.0d0; err_glob=0.0d0; gh_cells = 0.0d0; max_loc = 0.0d0
+
+  OPEN(unit=122,file='curve_stats',position='append')
+  ! Get bubble volume
+  V_loc = 0.0d0
+  do k=ks,ke; do j=js,je; do i=is,ie
+     V_loc=V_loc+cvof(i,j,k)*dx(i)*dy(j)*dz(k)
+  enddo; enddo; enddo
+  call MPI_ALLREDUCE(V_loc, V_t, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_Domain, ierr)
+  ! Curvature for perfect sphere
+  kap_sphere = -1.0d0*((32.0d0*pi)/(V_t*3.0d0))**(1.0/3.0)
+  !write(*,'("Curvature sphere: ",e14.5)')kap_sphere
+! Get calculated curvature
+  call get_all_curvatures(kap,2)
+  do k=ks,ke; do j=js,je; do i=is,ie
+     if(vof_phase(i,j,k)==1) then
+        check = .false.
+        do l=-1,1,2
+           if (vof_phase(i+l,j,k)==0) check = .true.
+           if (vof_phase(i,j+l,k)==0) check = .true.
+           if (vof_phase(i,j,k+l)==0) check = .true.
+        enddo
+        if (check) then
+           call err_curve(kap(i,j,k)/dx(i),kap_sphere,errnorm,max_loc)
+           gh_cells=gh_cells+1.0d0
+        endif
+     endif
+  enddo; enddo; enddo
+  call MPI_ALLREDUCE(errnorm(1), err_glob(1), 2, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_Domain, ierr)
+  call MPI_ALLREDUCE(max_loc, err_inf, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_Comm_Cart, ierr)
+  call MPI_ALLREDUCE(gh_cells, t_cells, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr)
+  if (t_cells<1.0d0) then
+     write(*,*)"WARNING: curvature calc without cut cells!"
+  else
+     err_glob(1)=err_glob(1)/t_cells
+     err_glob(2)=sqrt(err_glob(2))/t_cells
+  endif
+  if (rank==0) write(122,13)t,err_glob(1),err_glob(2),err_inf
+
+13 format(4e14.5)
+  CLOSE(122)
+contains
+  subroutine err_curve(kapc,ref,err_out,localmax)
+    implicit none
+    real(8) :: kapc, ref, localmax
+    real(8) :: err_out(1:2)
+    err_out(1)=err_out(1)+ABS(kapc-ref)
+    err_out(2)=err_out(2)+((kapc-ref)**2.0d0)
+    localmax=MAX(ABS(kapc-ref),localmax)
+  end subroutine err_curve
+end subroutine curvature_sphere
 !=======================================================================================================

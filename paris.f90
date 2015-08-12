@@ -521,6 +521,9 @@ Program paris
         endif
         if (FreeSurface) then
            if (RP_test) call Integrate_RP(dt,time,rho1)
+           if (mod(itimestep,nstats)==0 .and. curve_stats) then
+              call curvature_sphere(time)
+           endif
         endif
         if (DoLPP) then
            call PartBCWrapper
