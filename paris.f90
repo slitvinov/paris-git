@@ -2660,6 +2660,12 @@ subroutine InitCondition
            call ighost_y(vof_flag,2,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
            call ighost_z(vof_flag,2,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
            call setVOFBC(cvof,vof_flag)
+           if (FreeSurface) then
+              if (rank==0) then
+                 write(*,'("Restarted simulation with free surface.")') 
+                 write(*,'("P_ref, R_ref, R_RK, dR_RK, ddR_RK, V_0: ",6e14.5)')P_ref, R_ref, R_RK, dR_RK, ddR_RK, V_0
+              endif
+           endif
         end if ! DoFront, DoVOF
         if ( DoLPP ) then 
            call backup_LPP_read

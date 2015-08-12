@@ -1812,7 +1812,7 @@ subroutine backup_VOF_write
     write(7,1200) u(i,j,k), v(i,j,k), w(i,j,k), p(i,j,k), cvof(i,j,k)
   enddo; enddo; enddo
   if (FreeSurface) then
-     write(7,1201)R_RK,dR_RK,ddR_RK
+     write(7,1201)R_RK,dR_RK,ddR_RK,V_0
   endif
   CLOSE(7)
   if(rank==0)print*,'Backup written at t=',time
@@ -1836,7 +1836,7 @@ subroutine backup_VOF_read
     read(7,*) u(i,j,k), v(i,j,k), w(i,j,k), p(i,j,k), cvof(i,j,k)
   enddo; enddo; enddo
   if (FreeSurface) then
-     read(7,*)R_RK,dR_RK,ddR_RK
+     read(7,*)R_RK,dR_RK,ddR_RK,V_0
   endif
   CLOSE(7)
 end subroutine backup_VOF_read
