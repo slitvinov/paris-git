@@ -1088,7 +1088,7 @@ subroutine setuppoisson_fs_heights(utmp,vtmp,wtmp,vof_phase,rho,dt,A,cvof)
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: cvof
   real(8), dimension(is:ie,js:je,ks:ke,8), intent(inout) :: A
   integer, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: vof_phase
-  real(8) :: dt, rho
+  real(8), intent(in) :: dt, rho
   integer :: i,j,k,nbr
   integer :: reqd(24),stat(MPI_STATUS_SIZE,24)
   
@@ -1140,7 +1140,7 @@ contains
     real(8) :: kap(imin:imax,jmin:jmax,kmin:kmax) 
     real(8) :: Source
     integer :: i,j,k,l,ierr
-
+    
     !OPEN(unit=121,file='mods.txt')
     call get_all_curvatures(kap,2)
     x_mod=dxh((is+ie)/2); y_mod=dyh((js+je)/2); z_mod=dzh((ks+ke)/2) !assumes an unstretched grid
@@ -1229,7 +1229,7 @@ contains
           endif ! Liquid cell
        endif ! we are not imploding
     enddo; enddo; enddo
-10 format(6e14.5)
+10  format(6e14.5)
     !close(121)
     call ghost_x(P_gx,1,reqd(1:4)); call ghost_y(P_gy,1,reqd(5:8)); call ghost_z(P_gz,1,reqd(9:12)) 
     call ghost_x(x_mod,1,reqd(13:16)); call ghost_y(y_mod,1,reqd(17:20)); call ghost_z(z_mod,1,reqd(21:24)) 
