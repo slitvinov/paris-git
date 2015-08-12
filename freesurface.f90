@@ -460,6 +460,8 @@ subroutine FreeSolver(A,p,maxError,beta,maxit,it,ierr,iout,time,tres2)
      if (solver_flag==1 .and. pcmask(i,j,k)/=0) p(i,j,k) = P_gas(i,j,k)
      if (solver_flag==2 .and. pcmask(i,j,k)==3) p(i,j,k) = 0.d0
   enddo; enddo; enddo
+  call ghost_x(p,1,req( 1: 4)); call ghost_y(p,1,req( 5: 8)); call ghost_z(p,1,req( 9:12))
+  call MPI_WAITALL(12,req,sta,ierr)
   !--------------------------------------ITERATION LOOP--------------------------------------------  
   div_count=0; cutcell=0; gas_nbrs=0; min_branch=0
   do it=1,maxit
@@ -926,6 +928,8 @@ subroutine initialize_P_RP(p,rho)
      if (r .ge. rad(1)) then
         p(i,j,k) = P_l - rho*(dR_RK**2d0 * R_RK**4d0/(2d0*r**4d0) - (ddR_RK*R_RK**2d0 + 2d0*R_RK*dR_RK**2d0)/r +&
              ddR_RK*R_RK + 3d0/2d0*dR_RK**2d0)
+     else
+        p(i,j,k) = P_ref*(R_ref/rad(1))**(3d0*gamma)
      endif
   enddo; enddo; enddo
 end subroutine initialize_P_RP
