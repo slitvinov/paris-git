@@ -700,11 +700,12 @@ contains
     use IFPORT
 #endif
     implicit none
-    integer ib
+    integer :: ib, seed
 #ifndef __INTEL_COMPILER
     real :: rand
 #endif
-    call srand(NumBubble)
+    seed = ABS(TIME())
+    call srand(seed)
     if(NumBubble>2) then 
       do ib=1,NumBubble
          rad(ib) = r_min + rand()*var_r
