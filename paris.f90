@@ -151,7 +151,7 @@ Program paris
            if(out_centroid) call output_centroids(0)
            call output_ALL(0,is,ie+1,js,je+1,ks,ke+1,itimestep,5)
            if (FreeSurface) then
-              do out_fs = 1,4
+              do out_fs = 1,3
                  if (VTK_OUT(out_fs)) then
                     if (rank==0) call append_visit_fs(out_fs,0)
                     SELECT CASE (out_fs)
@@ -640,7 +640,7 @@ Program paris
         !output for scalar variables used in free surface
         if (FreeSurface) then
            if (RP_test .and. (mod(itimestep,nstats)==0) .and. rank==0) call write_RP_test(time,rho1)
-           do out_fs = 1,4
+           do out_fs = 1,3
               if (VTK_OUT(out_fs)) then
                  if (mod(itimestep,NOUT_VTK(out_fs))==0) then
                     if (rank==0) call append_visit_fs(out_fs,itimestep/NOUT_VTK(out_fs))
