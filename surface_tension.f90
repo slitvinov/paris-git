@@ -99,17 +99,18 @@ contains
     st_initialized=.true.
    end subroutine initialize_surface_tension
 !
-   subroutine print_st_stats()
+   subroutine print_st_stats(iout)
      use module_BC
+     use module_IO
      implicit none
      include 'mpif.h'
-     integer :: ierr,i
+     integer :: ierr,i,iout
      integer :: glob_count(ngc)
      character(len=85) :: glob_desc(ngc)
      if(st_initialized) then
         call MPI_ALLREDUCE(geom_case_count, glob_count, ngc, MPI_INTEGER, MPI_SUM, MPI_COMM_Cart, ierr)  
         if(rank==0) then
-           open(unit=101, file=trim(out_path)//'/st_stats', action='write', iostat=ierr)
+           open(unit=101, file=trim(out_path)//'/st_stats-'//TRIM(int2text(iout,padding)), action='write', iostat=ierr)
            glob_desc(1)="mixed w/less than 3 mixed neighbors (quasi-isolated mixed, unfittable by sphere)"
            glob_desc(2)="mixed w/less than 5 mixed neighbors (quasi-isolated mixed, unfittable by paraboloid)"
            glob_desc(3)="pure cells w/more than 2 other color pure neighbors (grid-aligned interfaces)"
@@ -135,6 +136,7 @@ contains
            enddo
            close(101)
         endif
+        geom_case_count=0
      endif
    end subroutine print_st_stats
         

@@ -201,7 +201,7 @@ Program paris
      if(test_HF.or.test_LP) then
         ! Exit MPI gracefully
         close(out)
-        call print_st_stats()
+        call print_st_stats(0)
         call MPI_BARRIER(MPI_COMM_WORLD, ierr)
         if(rank==0) write(*,'("Paris exits succesfully after HF, curvature or LP test")')
         call MPI_finalize(ierr)
@@ -598,6 +598,7 @@ Program paris
                  call output_ALL(nfile,is,ie+1,js,je+1,ks,ke+1,itimestep,5)
                  if(out_centroid) call output_centroids(nfile)
               endif
+              call print_st_stats(nfile)
               if(DoLPP) call output_LPP(nfile,is,ie+1,js,je+1,ks,ke+1)
               if(rank==0)then
                  end_time =  MPI_WTIME()
@@ -715,7 +716,7 @@ Program paris
   if(rank==0)  call final_output(stats(2))
   if(HYPRE) call poi_finalize
   if(rank==0) write(*,'("Paris exits succesfully")')
-  call print_st_stats()
+  call print_st_stats(itimestep/nout+1)
   call MPI_BARRIER(MPI_COMM_WORLD, ierr)
   call MPI_FINALIZE(ierr)
   stop
