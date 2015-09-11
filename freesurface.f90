@@ -1285,6 +1285,7 @@ contains
     real(8) :: kap(imin:imax,jmin:jmax,kmin:kmax) 
     real(8) :: Source
     integer :: i,j,k,l,ierr
+    real(8) :: wt_g, wt_l, avg_kap
     
     !OPEN(unit=121,file='mods.txt')
     call get_all_curvatures(kap,2)
@@ -1327,30 +1328,43 @@ contains
        if (implode(i,j,k)==0) then
           ! Set Laplace jumps for surface tension 
           if(vof_phase(i,j,k)==1) then
+             wt_g=(1.0d0-cvof(i,j,k))**2.0d0
              do l=-1,1,2
                 if (vof_phase(i+l,j,k)==0) then
-                   P_gx(i,j,k) = sigma*kap(i,j,k)/dx(i) !!filaments and droplets of one cell will be an issue here
+                   wt_l=cvof(i+l,j,k)**2.0d0
+                   avg_kap=kap(i,j,k)*wt_g/(wt_g+wt_l)+kap(i+l,j,k)*wt_l/(wt_g+wt_l)
+                   P_gx(i,j,k) = sigma*avg_kap/dx(i) !!filaments and droplets of one cell will be an issue here
                 endif
                 if (vof_phase(i,j+l,k)==0) then
-                   P_gy(i,j,k) = sigma*kap(i,j,k)/dy(j)
+                   wt_l=cvof(i,j+l,k)**2.0d0
+                   avg_kap=kap(i,j,k)*wt_g/(wt_g+wt_l)+kap(i,j+l,k)*wt_l/(wt_g+wt_l)
+                   P_gy(i,j,k) = sigma*avg_kap/dy(j)
                 endif
                 if (vof_phase(i,j,k+l)==0) then
-                   P_gz(i,j,k) = sigma*kap(i,j,k)/dz(k)
+                   wt_l=cvof(i,j,k+l)**2.0d0
+                   avg_kap=kap(i,j,k)*wt_g/(wt_g+wt_l)+kap(i,j,k+l)*wt_l/(wt_g+wt_l)
+                   P_gz(i,j,k) = sigma*avg_kap/dz(k)
                 endif
              enddo
              if (vof_phase(i+1,j,k)==0) then
                 x_mod(i,j,k)=-1.d0*height(i+1,j,k,1)*dx(i)
-                if (x_mod(i,j,k)>dx(i) .or. x_mod(i,j,k)<limit*dxh(i)) call stagerred_cut(i,j,k,x_mod(i,j,k),vof_phase(i,j,k),1)
+                !if (x_mod(i,j,k) /= x_mod(i,j,k)) call mod_details(x_mod(i,j,k),i,j,k,.true.,1)
+                if (x_mod(i,j,k)>dx(i) .or. x_mod(i,j,k)<limit*dxh(i)) call staggered_cut(i,j,k,x_mod(i,j,k),vof_phase(i,j,k),1)
+                if (x_mod(i,j,k) /= x_mod(i,j,k)) call mod_details(x_mod(i,j,k),i,j,k,.false.,1)
                 !write(121,10)x(i+1),y(j),z(k),-x_mod(i,j,k),0d0,0d0
              endif
              if (vof_phase(i,j+1,k)==0) then
                 y_mod(i,j,k)=-1.d0*height(i,j+1,k,3)*dy(j)
-                if (y_mod(i,j,k)>dy(j) .or. y_mod(i,j,k)<limit*dxh(i)) call stagerred_cut(i,j,k,y_mod(i,j,k),vof_phase(i,j,k),2)
+                !if (y_mod(i,j,k) /= y_mod(i,j,k)) call mod_details(y_mod(i,j,k),i,j,k,.true.,3)
+                if (y_mod(i,j,k)>dy(j) .or. y_mod(i,j,k)<limit*dxh(i)) call staggered_cut(i,j,k,y_mod(i,j,k),vof_phase(i,j,k),2)
+                if (y_mod(i,j,k) /= y_mod(i,j,k)) call mod_details(y_mod(i,j,k),i,j,k,.false.,3)
                 !write(121,10)x(i),y(j+1),z(k),0d0,-y_mod(i,j,k),0d0
              endif
              if (vof_phase(i,j,k+1)==0) then
                 z_mod(i,j,k)=-1.d0*height(i,j,k+1,5)*dz(k)
-                if (z_mod(i,j,k)>dz(k) .or. z_mod(i,j,k)<limit*dxh(i)) call stagerred_cut(i,j,k,z_mod(i,j,k),vof_phase(i,j,k),3)
+                !if (z_mod(i,j,k) /= z_mod(i,j,k)) call mod_details(z_mod(i,j,k),i,j,k,.true.,5)
+                if (z_mod(i,j,k)>dz(k) .or. z_mod(i,j,k)<limit*dxh(i)) call staggered_cut(i,j,k,z_mod(i,j,k),vof_phase(i,j,k),3)
+                if (z_mod(i,j,k) /= z_mod(i,j,k)) call mod_details(z_mod(i,j,k),i,j,k,.false.,5)
                 !write(121,10)x(i),y(j),z(k+1),0d0,0d0,-z_mod(i,j,k)
              endif
           endif ! Cavity cell
@@ -1358,17 +1372,23 @@ contains
           if(vof_phase(i,j,k)==0) then
              if (vof_phase(i+1,j,k)==1) then
                 x_mod(i,j,k)=height(i,j,k,2)*dx(i)
-                if (x_mod(i,j,k)>dx(i) .or. x_mod(i,j,k)<limit*dxh(i)) call stagerred_cut(i,j,k,x_mod(i,j,k),vof_phase(i,j,k),1)
+                !if (x_mod(i,j,k) /= x_mod(i,j,k)) call mod_details(x_mod(i,j,k),i,j,k,.true.,2)
+                if (x_mod(i,j,k)>dx(i) .or. x_mod(i,j,k)<limit*dxh(i)) call staggered_cut(i,j,k,x_mod(i,j,k),vof_phase(i,j,k),1)
+                if (x_mod(i,j,k) /= x_mod(i,j,k)) call mod_details(x_mod(i,j,k),i,j,k,.false.,2)
                 !write(121,10)x(i),y(j),z(k),x_mod(i,j,k),0d0,0d0
              endif
              if (vof_phase(i,j+1,k)==1) then
                 y_mod(i,j,k)=height(i,j,k,4)*dy(j)
-                if (y_mod(i,j,k)>dy(j) .or. y_mod(i,j,k)<limit*dxh(i)) call stagerred_cut(i,j,k,y_mod(i,j,k),vof_phase(i,j,k),2)
+                !if (y_mod(i,j,k) /= y_mod(i,j,k)) call mod_details(y_mod(i,j,k),i,j,k,.true.,4)
+                if (y_mod(i,j,k)>dy(j) .or. y_mod(i,j,k)<limit*dxh(i)) call staggered_cut(i,j,k,y_mod(i,j,k),vof_phase(i,j,k),2)
+                if (y_mod(i,j,k) /= y_mod(i,j,k)) call mod_details(y_mod(i,j,k),i,j,k,.false.,4)
                 !write(121,10)x(i),y(j),z(k),0d0,y_mod(i,j,k),0d0
              endif
              if (vof_phase(i,j,k+1)==1) then
                 z_mod(i,j,k)=height(i,j,k,6)*dz(k)
-                if (z_mod(i,j,k)>dz(k) .or. z_mod(i,j,k)<limit*dxh(i)) call stagerred_cut(i,j,k,z_mod(i,j,k),vof_phase(i,j,k),3)
+                !if (z_mod(i,j,k) /= z_mod(i,j,k)) call mod_details(z_mod(i,j,k),i,j,k,.true.,6)
+                if (z_mod(i,j,k)>dz(k) .or. z_mod(i,j,k)<limit*dxh(i)) call staggered_cut(i,j,k,z_mod(i,j,k),vof_phase(i,j,k),3)
+                if (z_mod(i,j,k) /= z_mod(i,j,k)) call mod_details(z_mod(i,j,k),i,j,k,.false.,6)
                 !write(121,10)x(i),y(j),z(k),0d0,0d0,z_mod(i,j,k)
              endif
           endif ! Liquid cell
@@ -1404,7 +1424,7 @@ contains
 
     if (.not. RP_test) call Poisson_BCs(A)
   end subroutine liq_gas2
-  subroutine stagerred_cut(i,j,k,theta,phase,d)
+  subroutine staggered_cut(i,j,k,theta,phase,d)
     implicit none
     real(8) :: theta
     integer :: i,j,k,phase,d
@@ -1414,7 +1434,7 @@ contains
     real(8) :: alpha2, c_ref, c_nbr, c_stag, c_min=1.0d-1, test
     real(8) :: al3dnew, FL3DNEW
 
-    if (.not.(phase==1 .or. phase==0)) call pariserror('cell phase has to be 0 or 1 in stagerred_cut call')
+    if (.not.(phase==1 .or. phase==0)) call pariserror('cell phase has to be 0 or 1 in staggered_cut call')
     
     loc = 0
     loc(d) = 1
@@ -1469,7 +1489,42 @@ contains
        if (theta>dxh(i)) theta = dxh(i)
        if (theta<limit*dxh(i)) theta = limit*dxh(i)
     endif
-  end subroutine stagerred_cut
+  end subroutine staggered_cut
+  subroutine mod_details(h,i,j,k,height,d)
+    use module_flow
+    implicit none
+    real(8) :: h
+    integer :: i,j,k,d
+    logical :: height
+    integer :: ind(1:3)
+
+    ind = 0
+    open(unit=70,file="mod_details.txt",position="append")
+    write(70,'("Mod in direction ",I4,": ",e14.5)')d,h
+    write(70,'("Time step ",I10)')itimestep
+    if (height) then
+       write(70,'("NaN using Heights")')
+    else
+       write(70,'("NaN using staggered cut")')
+    endif
+    write(70,'("Limits: ",6I8)')is,ie,js,je,ks,ke
+    write(70,'("ijk rank",4I4)')i,j,k,rank
+    write(70,'("x, y, z: ",3e14.5)')x(i),y(j),z(k)
+    write(70,'("Cvof 1-7: ",7e14.5)')cvof(i-1,j,k),cvof(i+1,j,k),cvof(i,j-1,k),cvof(i,j+1,k),&
+         cvof(i,j,k-1),cvof(i,j,k+1),cvof(i,j,k)
+    write(70,'("Phase 1-7: ",7I8)')vof_phase(i-1,j,k),vof_phase(i+1,j,k),vof_phase(i,j-1,k),vof_phase(i,j+1,k),&
+         vof_phase(i,j,k-1),vof_phase(i,j,k+1),vof_phase(i,j,k)
+    write(70,'("Pcmask 1-7: ",7I8)')pcmask(i-1,j,k),pcmask(i+1,j,k),pcmask(i,j-1,k),pcmask(i,j+1,k),&
+         pcmask(i,j,k-1),pcmask(i,j,k+1),pcmask(i,j,k)
+    write(70,'("Implode_flags 1-7: ",7I8)')implode(i-1,j,k),implode(i+1,j,k),implode(i,j-1,k),implode(i,j+1,k),&
+         implode(i,j,k-1),implode(i,j,k+1),implode(i,j,k)
+    write(70,'("S_v 1-7: ",7e14.5)')v_source(i-1,j,k),v_source(i+1,j,k),v_source(i,j-1,k),v_source(i,j+1,k),&
+         v_source(i,j,k-1),v_source(i,j,k+1),v_source(i,j,k)
+    write(70,'("Velocities in div u: ",6e14.5)')utmp(i,j,k),utmp(i-1,j,k),vtmp(i,j,k),vtmp(i,j-1,k),&
+         wtmp(i,j,k),wtmp(i,j,k-1)
+    write(70,'("  ")')
+    close(70)
+  end subroutine mod_details
 end subroutine setuppoisson_fs_heights
 
 subroutine curvature_sphere(t)
