@@ -2,7 +2,7 @@
 
 DropStatisticsMethod = 1
 DRAGMODEL = 1
-nTimeStepTag = 20
+nTimeStepTag = 200
 DoConvertVOF2LPP = F 
 DoConvertLPP2VOF = F
 CriteriaConvertCase = 1

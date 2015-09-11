@@ -866,6 +866,7 @@ contains
            endif
            if(nposit <6) then
               geom_case_count(nposit+4) = geom_case_count(nposit+4) + 1
+              kappa = 2d6 ! Value is set back to the initial kapparay value
            endif
         endif
      endif
