@@ -101,7 +101,7 @@ contains
     if(npy < 1) call err_no_out_dir("wrong npy")
     if(nz < 1) call err_no_out_dir("wrong nz")
     if(npz < 1) call err_no_out_dir("wrong npz")
-    if(nx > 32767) call err_no_out_dir("nx too large")  ! why ? INTEGER*4 goes to 2**32-1 but NX*NY*NZ then too large ? 
+    if(nx > 32767) call err_no_out_dir("nx too large")  ! why ? INTEGER*4 goes to 2**32-1 but NX*NY*NZ then too large !
   end subroutine check_sanity
 !
   function EndProc(d)

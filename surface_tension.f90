@@ -617,7 +617,7 @@ contains
 
       !*** Initialize
       kapparray=2d6
-      kappa = 0d0
+ !     kappa = 0d0 done at the beginning of get_curvature
 
       do k=ks,ke; do j=js,je; do i=is,ie
          is_bulk_cell=.false. 
@@ -1082,7 +1082,7 @@ contains
                 
         !Ensure diagonal elements are non-zero
         DO k = 1,n-1
-          DO j = k+1,n
+          DO j = k+1,n   ! @ needs to be checked
             IF (abs(augmatrix(k,k)) <  TINY_DOUBLE) THEN
                DO i = k+1, n
                  IF (abs(augmatrix(i,k)) > TINY_DOUBLE) THEN
