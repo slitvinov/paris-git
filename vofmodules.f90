@@ -265,7 +265,8 @@ contains
        out_centroid
     ! Free Surface parameters to be read from a parameter file called "inputFS"
     namelist /FSparameters/ X_level, RP_test, gamma, R_ref, P_ref,&
-         VTK_OUT, NOUT_VTK, step_max, limit, curve_stats
+         VTK_OUT, NOUT_VTK, step_max, limit, curve_stats, order_extrap,&
+         do_2nd_projection
     X_level = 2; RP_test = .false.; gamma = 1.4d0; R_ref = 1.d0; P_ref = 1.d0; 
     VTK_OUT = .false.; NOUT_VTK = 100000; vtk_open = .false.
     step_max = 1
@@ -294,6 +295,8 @@ contains
     r_min=0.02; var_r=0.03; coord_min=0.15; var_coord=0.7
     limit = 1.0d-2
     curve_stats = .false.
+    order_extrap = 1
+    do_2nd_projection = .false.
     
     in=31
 

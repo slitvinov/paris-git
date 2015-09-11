@@ -419,6 +419,8 @@ module module_freesurface
   logical, dimension(1:3) :: VTK_OUT, vtk_open
   character(len=10) :: visit_file(1:3) = (/ "divergence", "deltaPfs  ", "vol_Source" /)
   character(len=3) :: file_short(1:3) = (/ "DIV", "Pfs", "S_v" /)
+  integer :: order_extrap
+  logical :: do_2nd_projection
 end module module_freesurface
 !=================================================================================================
 !=================================================================================================

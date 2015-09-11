@@ -146,6 +146,7 @@ subroutine check_topology()
   clear_zone(1:3)=-1.d0
   clear_zone(4) = 0.d0
   xt=-1.d0; yt =-1.d0; zt=-1.d0
+
   if (num_drop(rank)>0) then
      do bub=1,num_drop(rank)
         dropid = drops(bub)%element%id
@@ -271,85 +272,229 @@ subroutine extrapolate_velocities()
   integer :: i,j,k,level,nbr
   real(8) :: nr(3)
   real(8) :: x_vel, xcount
-
-  !New simple extrapolation: Velocities of neighbours at lower topological level averaged
-  do level = 1, X_level
-     do k=ks,ke; do j=js,je; do i=is,ie
-        if (u_cmask(i,j,k) == level) then
-           xcount = 0d0; x_vel = 0d0
-           do nbr=-1,1,2
-              if (u_cmask(i+nbr,j,k)==level-1) then
-                 xcount = xcount+1d0
-                 x_vel = x_vel + u(i+nbr,j,k)
+  integer :: inbr, jnbr, knbr
+  real(8), dimension(-2:2,-2:2,-2:2) :: vel_val
+  integer, dimension(-2:2,-2:2,-2:2) :: velmask
+  logical :: x_success
+  real(8) :: varx
+  
+  !Simple 1st order extrapolation: Velocities of neighbours at lower topological level averaged
+  if (order_extrap == 1) then
+     do level = 1, X_level
+        do k=ks,ke; do j=js,je; do i=is,ie
+           if (u_cmask(i,j,k) == level) then
+              xcount = 0d0; x_vel = 0d0
+              do nbr=-1,1,2
+                 if (u_cmask(i+nbr,j,k)==level-1) then
+                    xcount = xcount+1d0
+                    x_vel = x_vel + u(i+nbr,j,k)
+                 endif
+              enddo
+              do nbr=-1,1,2
+                 if (u_cmask(i,j+nbr,k)==level-1) then
+                    xcount = xcount+1d0
+                    x_vel = x_vel + u(i,j+nbr,k)
+                 endif
+              enddo
+              do nbr=-1,1,2
+                 if (u_cmask(i,j,k+nbr)==level-1) then
+                    xcount = xcount+1d0
+                    x_vel = x_vel + u(i,j,k+nbr)
+                 endif
+              enddo
+              if (xcount>0d0) then
+                 u(i,j,k) = x_vel/xcount
               endif
-           enddo
-           do nbr=-1,1,2
-              if (u_cmask(i,j+nbr,k)==level-1) then
-                 xcount = xcount+1d0
-                 x_vel = x_vel + u(i,j+nbr,k)
-              endif
-           enddo
-           do nbr=-1,1,2
-              if (u_cmask(i,j,k+nbr)==level-1) then
-                 xcount = xcount+1d0
-                 x_vel = x_vel + u(i,j,k+nbr)
-              endif
-           enddo
-           if (xcount>0d0) then
-              u(i,j,k) = x_vel/xcount
            endif
-        endif
-        if (v_cmask(i,j,k) == level) then
-           xcount = 0d0; x_vel = 0d0
-           do nbr = -1,1,2
-              if (v_cmask(i+nbr,j,k)==level-1) then
-                 xcount = xcount+1d0
-                 x_vel = x_vel + v(i+nbr,j,k)
+           if (v_cmask(i,j,k) == level) then
+              xcount = 0d0; x_vel = 0d0
+              do nbr = -1,1,2
+                 if (v_cmask(i+nbr,j,k)==level-1) then
+                    xcount = xcount+1d0
+                    x_vel = x_vel + v(i+nbr,j,k)
+                 endif
+              enddo
+              do nbr = -1,1,2
+                 if (v_cmask(i,j+nbr,k)==level-1) then
+                    xcount = xcount+1d0
+                    x_vel = x_vel + v(i,j+nbr,k)
+                 endif
+              enddo
+              do nbr = -1,1,2
+                 if (v_cmask(i,j,k+nbr)==level-1) then
+                    xcount = xcount+1d0
+                    x_vel = x_vel + v(i,j,k+nbr)
+                 endif
+              enddo
+              if (xcount>0d0) then
+                 v(i,j,k) = x_vel/xcount
               endif
-           enddo
-           do nbr = -1,1,2
-              if (v_cmask(i,j+nbr,k)==level-1) then
-                 xcount = xcount+1d0
-                 x_vel = x_vel + v(i,j+nbr,k)
-              endif
-           enddo
-           do nbr = -1,1,2
-              if (v_cmask(i,j,k+nbr)==level-1) then
-                 xcount = xcount+1d0
-                 x_vel = x_vel + v(i,j,k+nbr)
-              endif
-           enddo
-           if (xcount>0d0) then
-              v(i,j,k) = x_vel/xcount
            endif
-        endif
-        if (w_cmask(i,j,k) == level) then
-           xcount = 0d0; x_vel = 0d0
-           do nbr = -1,1,2
-              if (w_cmask(i+nbr,j,k)==level-1) then
-                 xcount = xcount+1d0
-                 x_vel = x_vel + w(i+nbr,j,k)
+           if (w_cmask(i,j,k) == level) then
+              xcount = 0d0; x_vel = 0d0
+              do nbr = -1,1,2
+                 if (w_cmask(i+nbr,j,k)==level-1) then
+                    xcount = xcount+1d0
+                    x_vel = x_vel + w(i+nbr,j,k)
+                 endif
+              enddo
+              do nbr = -1,1,2
+                 if (w_cmask(i,j+nbr,k)==level-1) then
+                    xcount = xcount+1d0
+                    x_vel = x_vel + w(i,j+nbr,k)
+                 endif
+              enddo
+              do nbr = -1,1,2
+                 if (w_cmask(i,j,k+nbr)==level-1) then
+                    xcount = xcount+1d0
+                    x_vel = x_vel + w(i,j,k+nbr)
+                 endif
+              enddo
+              if (xcount>0d0) then
+                 w(i,j,k) = x_vel/xcount
               endif
-           enddo
-           do nbr = -1,1,2
-              if (w_cmask(i,j+nbr,k)==level-1) then
-                 xcount = xcount+1d0
-                 x_vel = x_vel + w(i,j+nbr,k)
-              endif
-           enddo
-           do nbr = -1,1,2
-              if (w_cmask(i,j,k+nbr)==level-1) then
-                 xcount = xcount+1d0
-                 x_vel = x_vel + w(i,j,k+nbr)
-              endif
-           enddo
-           if (xcount>0d0) then
-              w(i,j,k) = x_vel/xcount
            endif
-        endif
-     enddo; enddo; enddo
-     call do_ghost_vector(u,v,w)
-  enddo
+        enddo; enddo; enddo
+        call do_ghost_vector(u,v,w)
+     enddo
+  else if (order_extrap ==2) then
+     do level = 1, X_level !Loop extrapolation levels
+        do k=ks,ke; do j=js,je; do i=is,ie !Loop i,j,k
+           !setup matrix
+           ! Zero sums
+           if (u_cmask(i,j,k) == level) then
+              !get 5x5x5 mask
+              do knbr=-2,2; do jnbr=-2,2; do inbr=-2,2
+                 velmask(inbr,jnbr,knbr)=u_cmask(i+inbr,j+jnbr,k+knbr)
+                 vel_val(inbr,jnbr,knbr)=u(i+inbr,j+jnbr,k+knbr)
+              enddo; enddo; enddo
+              call setupmatrix(velmask,vel_val,level,varx,x_success)
+              if (x_success) u(i,j,k)=varx
+           endif
+           if (v_cmask(i,j,k) == level) then
+              !get 5x5x5 mask
+              do knbr=-2,2; do jnbr=-2,2; do inbr=-2,2
+                 velmask(inbr,jnbr,knbr)=v_cmask(i+inbr,j+jnbr,k+knbr)
+                 vel_val(inbr,jnbr,knbr)=v(i+inbr,j+jnbr,k+knbr)
+              enddo; enddo; enddo
+              call setupmatrix(velmask,vel_val,level,varx,x_success)
+              if (x_success) v(i,j,k)=varx
+           endif
+           if (w_cmask(i,j,k) == level) then
+              !get 5x5x5 mask
+              do inbr=-2,2; do jnbr=-2,2; do knbr=-2,2
+                 velmask(inbr,jnbr,knbr)=w_cmask(i+inbr,j+jnbr,k+knbr)
+                 vel_val(inbr,jnbr,knbr)=w(i+inbr,j+jnbr,k+knbr)
+              enddo; enddo; enddo
+              call setupmatrix(velmask,vel_val,level,varx,x_success)
+              if (x_success) w(i,j,k)=varx
+           endif
+        enddo; enddo; enddo !end loop i,j,k
+        call do_ghost_vector(u,v,w)
+     enddo !end loop levels
+  endif
+contains
+  subroutine setupmatrix(topmask,vel,lvl,var,extra_vel_found)
+    use module_surface_tension
+    implicit none
+    real(8) :: var
+    real(8), dimension(-2:2,-2:2,-2:2), intent(in) :: vel
+    integer, dimension(-2:2,-2:2,-2:2), intent(in) :: topmask
+    integer :: lvl,row,col,mult
+    integer :: inr,jnr,knr
+    real(8), dimension(1:4,1:4) :: x_m, x_im, test
+    real(8), dimension(1:4) :: dh, rhs
+    real(8) :: den, psi, maxc
+    integer :: fit_cells
+    logical :: inverse_success, extra_vel_found
+    var = 0.0d0
+    fit_cells=0
+    rhs=0.0d0
+    x_m =0.0d0
+    !maxc=0.0d0
+    !check eligible neighbours
+    extra_vel_found=.false.
+    do knr=-2,2; do jnr=-2,2; do inr=-2,2
+       if (topmask(inr,jnr,knr)<=lvl-1) then
+          fit_cells=fit_cells+1
+          den = inr**2.0d0 + jnr**2.0d0 + knr**2.0d0
+          if (den >= 1.0d0) then
+             psi=1.0d0/den
+          else
+             psi=1.0d0
+          endif      
+          dh(1)=1.0d0   
+          dh(2)=inr*dx(is) !only unstretched regular grids
+          dh(3)=jnr*dy(js)
+          dh(4)=knr*dz(ks)
+          do col=1,4; do row=1,4
+             x_m(row,col) = x_m(row,col) + dh(row)*dh(col)*psi
+             !maxc=MAX(maxc,x_m(row,col))
+          enddo; enddo
+          do row=1,4
+             rhs(row) = rhs(row) + dh(row)*vel(inr,jnr,knr)*psi
+          enddo
+       endif
+    enddo; enddo; enddo
+    do row=1,4
+       maxc = 0.0d0
+       do col=1,4
+          maxc=MAX(maxc,x_m(row,col))
+       enddo
+       do col=1,4
+          x_m(row,col)=x_m(row,col)/maxc
+       enddo
+       rhs(row) = rhs(row)/maxc 
+    enddo
+    !solve matrix locally
+    if (fit_cells>3) then
+!       write(*,*)' '
+       call FindInverseMatrix(x_m,x_im,4,inverse_success)
+       if (inverse_success) then
+!!$          !check product matrix*inverse
+!!$          test = 0.0d0
+!!$          do row=1,4; do col=1,4
+!!$             test(row,col) = 0.0d0
+!!$             do mult=1,4
+!!$                test(row,col) = test(row,col) + x_m(row,mult)*x_im(mult,col)
+!!$             enddo; enddo
+!!$          enddo
+!!$          write(*,'("Product of  matrix and inverted matrix: ")')
+!!$          do row=1,4
+!!$             write(*,'(4e16.5)')test(row,1:4)
+!!$          enddo
+!!$          write(*,*)' '
+          !get extrapolated velocity
+          !write(*,'("Matrix inverted successfully using ",I4, "points.")')fit_cells
+          do col=1,4
+             !write(*,'("Inverted row, col",I4,e14.5)')col,x_im(4,col)
+             var=var+x_im(1,col)*rhs(col)                                                                                       
+          enddo
+          !write(*,'("Extrapolated velocity: ",e14.5)')var
+          extra_vel_found=.true.
+       else
+          !write(*,*)'Error: Matrix could not be inverted for velocity extrapolation, reverting to 1st order'
+          !write(*,'("LS fit failed using ",I5," points")')fit_cells
+!!$          do row=1,4; do col=1,4
+!!$             write(*,'("A",2I4,e14.5)')row,col,x_m(row,col)
+!!$          enddo; enddo
+          !revert to 1st order
+          var=rhs(1)/(1.0d0*fit_cells)
+          extra_vel_found=.true. !1st order
+       endif
+    else
+       if (fit_cells > 0) then
+          var=rhs(1)/(1.0d0*fit_cells)
+          extra_vel_found=.true.
+       else
+          write(*,'("WARNING, ISOLATED TOPOLOGICAL STRUCTURE, NO NEIGHBOURS! Level: ",I4)')lvl
+          write(*,'("Neighbouring level values:")')
+          do inr=-2,2; do jnr=-2,2; do knr=-2,2
+             write(*,'("Value at ",3I4," :",e14.5)')inr,jnr,knr,topmask(inr,jnr,knr)
+          enddo; enddo; enddo
+       endif
+    endif
+  end subroutine setupmatrix
 end subroutine extrapolate_velocities
 !=============================================================================================================================================
 subroutine discrete_divergence(u,v,w,iout)
