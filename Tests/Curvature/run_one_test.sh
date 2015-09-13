@@ -37,22 +37,13 @@ npx=2; npy=$npx; npz=$npx
 
 if [ $d == 2 ]; then
     type="Curvature2D"
-    if [ $cyldir == 1 ];  then
-	nx=2
-	npx=1
-    fi
-    if [ $cyldir == 2 ];  then
-	ny=2
-	npy=1
-    fi
     if [ $cyldir == 3 ];  then
 	nz=2
 	npz=1
 	if [ -f grid_template.gp ]; then
 	    sed s/XC1/$xc/g grid_template.gp | sed s/XC2/$yc/g  | sed s/RADIUS/$radius/g  > grid.gp
 	fi
-    fi
-    if [ $cyldir -gt 3 ]; then
+    else
 	echo "incorrect cyldir"
 	exit
     fi

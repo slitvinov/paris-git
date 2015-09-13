@@ -15,7 +15,6 @@ nstats=$4
 d=$5
 
 RANDOM=$$
-echo $RANDOM > seed.txt
 ndepth=`head -60  ../../surface_tension.f90 |  awk -F '=' ' /NDEPTH/ {print $2}' | tr -d ' '`
 dim=$d'D'
 
@@ -24,6 +23,7 @@ dim=$d'D'
 for i in $(seq 1 $nstats); 
 do 
 echo -n "."
+
 xc=`awk -v nx=$nx -v random=$RANDOM 'BEGIN {print (0.5 + (random / nx)/32767)}'`
 yc=`awk -v nx=$nx -v random=$RANDOM 'BEGIN {print (0.5 + (random / nx)/32767)}'`
 zc=`awk -v nx=$nx -v random=$RANDOM 'BEGIN {print (0.5 + (random / nx)/32767)}'`

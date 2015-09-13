@@ -619,7 +619,7 @@ contains
 
       !*** Initialize
       kapparray=2d6
- !     kappa = 0d0 done at the beginning of get_curvature
+      ! kappa = 0d0 ! done at the beginning of get_curvature ?
 
       do k=ks,ke; do j=js,je; do i=is,ie
          is_bulk_cell=.false. 
