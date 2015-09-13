@@ -53,7 +53,7 @@ contains
        method_count=0
        call output_curvature()
     end if
-    if(test_curvature_2D.and.nx<=16.and.ny<=16.and.nz<=2) then
+    if(test_curvature_2D.and.nx<=32.and.ny<=32.and.nz<=2) then
        call plot_curvature()
     end if
   end subroutine test_VOF_HF
@@ -291,6 +291,7 @@ contains
        kappa_exact = - 1.d0/rad(ib)
        do i=is,ie; do j=js,je
           if (vof_flag(i,j,k) == 2) then 
+             ntests=ntests+1
              call get_curvature(i,j,k,kappa,nfound,nposit,a,.false.)
              if(nfound > 0) then
                 method_count(1) = method_count(1) + 1  ! nine heights
@@ -301,7 +302,7 @@ contains
              endif
              ! This stops the code in case kappa becomes NaN.
              if(kappa.ne.kappa) call pariserror("OC: Invalid Curvature")  
-             if(nfound==-1.or.abs(kappa)<EPS_GEOM) then
+             if(nfound==-1.or.abs(kappa)<EPS_GEOM.or.kappa.gt.1e6) then ! valid curvature ? 
                 write(6,*) "i,j,k,nfound,nindepend,kappa ",i,j,k,nfound,nindepend,kappa
                 call pariserror("OC: curvature not found")
              else
@@ -318,17 +319,25 @@ contains
              endif ! valid curvature
           end if ! cvof(i,j,k)
        end do; end do
-
+       if(sumCount==0) then 
+          print *, "no valid curvatures found in current processor."
+          if(ntests==0) then
+             print *, "also no fractional cells found in current processor."
+          endif
+          print *, 'rank = ', rank, 'ntests =', ntests
+       endif
        L2_err_K    = sqrt(S2_err_K/dble(sumCount))
        write(*,*) 'L2 Norm:'
        write(*,'(I5,I5,1X,(E15.8,1X))') Nx,rank,L2_err_K
        write(*,*) 'Linfty Norm:'
        write(*,'(I5,I5,1X,(E15.8,1X))') Nx,rank,Lm_err_K
-    end if ! test_curvature
+       call plot_curvature()
+    end if ! test_curvature / test_curvature2D
     if(ntests>0) then
        write(*,*) 'rank,max, min, and exact ABS(kappa)', rank, kappamax, kappamin,kappa_exact
        write(*,*) '     max relative error', MAX(ABS(kappamax-kappa_exact), ABS(kappamin-kappa_exact))/kappa_exact
     else
+       print *, "no fractional cells found in current processor."
        print *, 'rank = ', rank, 'ntests =', ntests
     endif
     CLOSE(89)
@@ -366,7 +375,6 @@ contains
     real(8) :: centroid_scaled(2), deltax
     k = (Nz+4)/2
     deltax=dx(nx/2)
-
     allocate(pc(imin:imax,jmin:jmax,3))
     if(rank==0.and.cylinder_dir==3) then
        OPEN(UNIT=79,FILE=TRIM(out_path)//'/grid.txt')

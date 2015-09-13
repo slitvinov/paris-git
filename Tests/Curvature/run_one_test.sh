@@ -82,15 +82,13 @@ if [ -d out ]; then
     echo `awk -v nx=$nx -v radius=$radius 'BEGIN {print nx * radius }'`  `pariscompare curvature.txt reference.txt 0.1 1 2 `  >> ../paris-$nx-$ndepth.tmp
     cd ..
     awk -v nx=$nx  -v radius=$radius '{print nx * radius, $1, $2, $3 }' mcount.tmp >> mcount_one_test-$nx-$ndepth.tmp
+    if [ $setmono == mono ] && [ $cyldir == 3 ] && [ $nx -le 32 ] && [ d==2 ]; then
+	gnuplot < "grid.gp"
+    fi
 else
     RED="\\033[1;31m"
     NORMAL="\\033[0m"
     echo -e "$RED" "FAIL: directory 'out' not found."  "$NORMAL"
 fi
 
-if [ $setmono == mono ] && [ $cyldir == 3 ] && [ $nx -le 16 ] && [ d==2 ]; then
-	gnuplot <<EOF
-call "../grid.gp"
-EOF
-fi
 exit 0

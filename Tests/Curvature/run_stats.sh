@@ -24,11 +24,12 @@ for i in $(seq 1 $nstats);
 do 
 echo -n "."
 
-xc=`awk -v nx=$nx -v random=$RANDOM 'BEGIN {print (0.5 + (random / nx)/32767)}'`
-yc=`awk -v nx=$nx -v random=$RANDOM 'BEGIN {print (0.5 + (random / nx)/32767)}'`
-zc=`awk -v nx=$nx -v random=$RANDOM 'BEGIN {print (0.5 + (random / nx)/32767)}'`
+xc=`awk -v nx=$nx -v random=$RANDOM 'BEGIN {print (0.5 + 0.5*(random / nx)/32767)}'`
+yc=`awk -v nx=$nx -v random=$RANDOM 'BEGIN {print (0.5 + 0.5*(random / nx)/32767)}'`
+zc=`awk -v nx=$nx -v random=$RANDOM 'BEGIN {print (0.5 + 0.5*(random / nx)/32767)}'`
 
-run_one_test.sh F Curvature_test F 2 $radius 1e20 $init $nx $xc $yc $zc $d || exit 1
+echo "xc=$xc; yc=$yc; zc=$zc" > center_coordinates.txt
+run_one_test.sh F Curvature_test F 3 $radius 1e20 $init $nx $xc $yc $zc $d || exit 1
 
 cd out
 echo `awk -v nx=$nx -v radius=$radius 'BEGIN {print nx * radius }'`  `pariscompare curvature.txt reference.txt 0.1 1 2 `  >> ../errors.tmp
