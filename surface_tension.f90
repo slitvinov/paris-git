@@ -82,7 +82,7 @@ contains
 ! detect thin slice
     if(Ny<=2) minM=min(Mx,Mz)
     if(Nz<=2) minM=min(Mx,My)
-! thin slice expect in y or z. 
+! thin slice expected in y or z. 
     if(MinM<=2) call pariserror("unexpected thin slice")
 ! detect small subdomains in which the stencil will straddle two boundaries. 
     if(2*NDEPTH+1.gt.minM) then
