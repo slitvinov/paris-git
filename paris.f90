@@ -255,6 +255,24 @@ Program paris
               else
                  call vofsweeps(itimestep)
               endif
+              
+              if ( MOD(itimestep,nsteps_clean_debris) == 0 .and. do_clean_debris ) then 
+                 call clean_debris
+                 if ( nPdomain > 1 ) & 
+                      call VOFCommGhost    ! Communicate vof field after cleaning
+              end if ! nsteps_clean_debris
+
+!!$              if (curvature_clean) then
+!!$                 call clean_curvature(cleaned)
+!!$                 tot_clean = tot_clean + cleaned
+!!$                 if(mod(itimestep,termout)==0 .and. ii==1) then
+!!$                    if(rank==0) then
+!!$                       write(*,'("Total VOF removed in clean_curvature operation: ",e15.5)')tot_clean
+!!$                    endif
+!!$                 endif
+!!$              endif
+!!$              call check_var_nan("CVOF1",itimestep,cvof)
+              
               call my_timer(4)
               call get_all_heights(itimestep)
               call my_timer(5)

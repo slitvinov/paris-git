@@ -106,6 +106,12 @@ module module_VOF
 
   real(8), parameter :: PI = 3.14159265359d0
 
+  real(8) :: tot_clean, cleaned
+  logical :: curvature_clean
+
+  logical :: do_clean_debris
+  integer :: clean_debris_method, nsteps_clean_debris, clean_debris_neighbours
+
 contains
 !=================================================================================================
 !=================================================================================================
@@ -293,10 +299,11 @@ contains
     use_full_heights = .true. 
     debug_par = .false.
     r_min=0.02; var_r=0.03; coord_min=0.15; var_coord=0.7
-    limit = 1.0d-2
-    curve_stats = .false.
-    order_extrap = 1
-    do_2nd_projection = .false.
+    curvature_clean = .false.
+    do_clean_debris = .false.
+    clean_debris_method = 1 
+    nsteps_clean_debris = 10 
+    clean_debris_neighbours = 2
     
     in=31
 
@@ -1847,4 +1854,93 @@ subroutine backup_VOF_read
 end subroutine backup_VOF_read
 !=================================================================================================
 !-------------------------------------------------------------------------------------------------
+  subroutine clean_debris()
+    implicit none
+
+    integer, dimension(imin:imax,jmin:jmax,kmin:kmax) :: phase_id, clean_flag
+    integer :: i,j,k,i0,j0,k0
+    integer :: ni,nj,nk
+    real(8) :: cvof_min,sum_cvof_min,sum1,sum_cvof
+   
+    ! -1:gas, 1:liquid
+    phase_id(:,:,:) = -1 
+    ! -1:set to pure gas; 0:not changed; 1:set to pure liquid 
+    clean_flag(:,:,:) = 0
+
+    if ( clean_debris_method == 1 ) then 
+       ! **********************************************************
+       ! Stephane's approach
+       ! **********************************************************
+      
+       ! Binary map of liquid and gas cells
+       do i=imin,imax; do j=jmin,jmax; do k=kmin,kmax
+         if ( cvof(i,j,k) > 0.5 ) phase_id(i,j,k) = 1
+       end do; end do; end do
+
+       ! flag debris
+       ni=clean_debris_neighbours; nj=clean_debris_neighbours; nk=clean_debris_neighbours
+       if (Nz == 2) nk = 0 !assume Nz=2 for 2d case 
+       do i=is,ie; do j=js,je; do k=ks,ke
+         clean_flag(i,j,k) = phase_id(i,j,k)
+         do i0=-ni,ni; do j0=-nj,nj; do k0=-nk,nk
+            if ( phase_id(i,j,k)*phase_id(i+i0,j+j0,k+k0) == -1 ) then
+               clean_flag(i,j,k) = 0 
+               exit
+            end if ! phase_id
+         enddo; enddo; enddo
+       end do; end do; end do
+
+    else if ( clean_debris_method == 2 ) then 
+       ! **********************************************************
+       ! Ruben's approach
+       ! **********************************************************
+       ! User defined parameter
+       cvof_min      = 0.1d0 
+       sum_cvof_min  = 0.3d0
+
+       ni=clean_debris_neighbours;nj=clean_debris_neighbours;nk=clean_debris_neighbours
+       if (Nz == 2) nk = 0 !assume Nz=2 for 2d case
+       sum1 = (1+ni*2)*(1+nj*2)*(1+nk*2)
+       do i=is,ie; do j=js,je; do k=ks,ke
+         sum_cvof = 0.d0 
+         do i0=-ni,ni; do j0=-nj,nj; do k0=-nk,nk
+            sum_cvof = sum_cvof + cvof(i+i0,j+j0,k+k0) 
+         enddo; enddo; enddo
+         if ( cvof(i,j,k) <      cvof_min .and. & 
+              sum_cvof    <  sum_cvof_min ) clean_flag(i,j,k) = -1 
+         if ( cvof(i,j,k) > 1.d0-cvof_min .and. & 
+              sum_cvof    > sum1-sum_cvof_min ) clean_flag(i,j,k) = 1 
+       end do; end do; end do
+    end if ! clean_debris_method
+    
+! DEBUG
+!!$    write(101,*) 'Cells to be cleaned at time',time,'for rank',rank
+!!$    do i=is,ie; do j=js,je; do k=ks,ke
+!!$      if ( clean_flag(i,j,k) == -1 .and. cvof(i,j,k) > 0.d0 ) then
+!!$         write(101,*) '**********************************'
+!!$         write(101,*) 'vof set to 0',i,j,k,time,cvof(i,j,k) 
+!!$         write(101,'(9(E11.2))') cvof(i-1,j-1:j+1,k-1),cvof(i,j-1:j+1,k-1),cvof(i+1,j-1:j+1,k-1)
+!!$         write(101,'(9(E11.2))') cvof(i-1,j-1:j+1,k  ),cvof(i,j-1:j+1,k  ),cvof(i+1,j-1:j+1,k  )
+!!$         write(101,'(9(E11.2))') cvof(i-1,j-1:j+1,k+1),cvof(i,j-1:j+1,k+1),cvof(i+1,j-1:j+1,k+1)
+!!$      else if ( clean_flag(i,j,k) ==  1 .and. cvof(i,j,k) < 1.d0 ) then 
+!!$         write(101,*) '$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$'
+!!$         write(101,*) 'vof set to 1',i,j,k,time,cvof(i,j,k) 
+!!$         write(101,'(9(E11.2))') cvof(i-1,j-1:j+1,k-1),cvof(i,j-1:j+1,k-1),cvof(i+1,j-1:j+1,k-1)
+!!$         write(101,'(9(E11.2))') cvof(i-1,j-1:j+1,k  ),cvof(i,j-1:j+1,k  ),cvof(i+1,j-1:j+1,k  )
+!!$         write(101,'(9(E11.2))') cvof(i-1,j-1:j+1,k+1),cvof(i,j-1:j+1,k+1),cvof(i+1,j-1:j+1,k+1)
+!!$      end if ! clean_flag 
+!!$    end do; end do; end do
+! END DEBUG
+
+    ! remove debris
+    do i=is,ie; do j=js,je; do k=ks,ke
+      if ( clean_flag(i,j,k) == -1 .and. cvof(i,j,k) > 0.d0 ) then
+         cvof(i,j,k) = 0.d0
+      else if ( clean_flag(i,j,k) ==  1 .and. cvof(i,j,k) < 1.d0 ) then 
+         cvof(i,j,k) = 1.d0
+      end if ! clean_flag 
+    end do; end do; end do
+    
+  end subroutine clean_debris
+
 end module module_output_vof
