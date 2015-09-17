@@ -210,7 +210,7 @@
    logical, dimension(:), allocatable :: tagmergeDone
    integer :: maxnum_diff_tag_complet 
 
-   !integer :: tracked_phase
+   integer :: tracked_phase
 contains
 !=================================================================================================
    subroutine initialize_LPP()
@@ -364,6 +364,10 @@ contains
          end if ! lppbdry_cond 
       end do !i
 
+      if (.not.(tracked_phase==0 .or. tracked_phase==1)) then
+         call pariserror("tracked_phase must either be 1 or 0 for lpp tagging.")
+      endif
+
    end subroutine ReadLPPParameters
 
 
@@ -439,6 +443,7 @@ contains
     integer :: idif_drop,jdif_drop,kdif_drop
 
     real(8) :: stencil3x3(-1:1,-1:1,-1:1),mxyz(3),AREA3D
+    real(8), dimension(imin:imax,jmin:jmax,kmin:kmax) :: tag_phase
   
     if (.not. LPP_initialized) then 
       call initialize_LPP()
@@ -451,13 +456,23 @@ contains
 
     drops_merge(:)%num_gcell = 0
 
+    if (.not.(tracked_phase==0 .or. tracked_phase==1)) then
+       call pariserror("tracked_phase must either be 1 or 0 for lpp tagging.")
+    endif
+
+    if (tracked_phase==1) then
+       tag_phase = cvof
+    else
+       tag_phase = 1.0d0-cvof
+    endif
+
     ns_queue = 0
     s_queue(:,:) = 0
     num_drop(:) = 0
     num_drop_merge(:) = 0
     do i=imin,imax; do j=jmin,jmax; do k=kmin,kmax
     !do i=is,ie; do j=js,je; do k=ks,ke
-      if ( cvof(i,j,k) > tag_threshold .and. tag_flag(i,j,k) == 0 ) then 
+      if ( tag_phase(i,j,k) > tag_threshold .and. tag_flag(i,j,k) == 0 ) then 
         tag_id  (i,j,k) = current_id
         tag_flag(i,j,k) = 2 ! mark as S node
         num_drop(rank) = num_drop(rank) + 1
@@ -502,7 +517,7 @@ contains
                if ( isq+i0 >= imin .and. isq+i0 <= imax .and. & 
                     jsq+j0 >= jmin .and. jsq+j0 <= jmax .and. &
                     ksq+k0 >= kmin .and. ksq+k0 <= kmax ) then  
-                  if ( cvof(isq+i0,jsq+j0,ksq+k0)      > tag_threshold .and. & 
+                  if ( tag_phase(isq+i0,jsq+j0,ksq+k0)      > tag_threshold .and. & 
                       tag_flag(isq+i0,jsq+j0,ksq+k0) == 0 ) then 
                      tag_id  (isq+i0,jsq+j0,ksq+k0) = current_id  ! tag node with id
                      tag_flag(isq+i0,jsq+j0,ksq+k0) = 3  ! mark as C node
@@ -521,17 +536,17 @@ contains
                tag_flag(isq,jsq,ksq) = 1 ! mark S node as tagged
                ! perform droplet calculation
 
-               if ( cvof(isq,jsq,ksq) > 0.d0 .and. cvof(isq,jsq,ksq) < 1.d0 ) then 
+               if ( tag_phase(isq,jsq,ksq) > 0.d0 .and. tag_phase(isq,jsq,ksq) < 1.d0 ) then 
                   do i0=-1,1; do j0=-1,1; do k0=-1,1
-                     stencil3x3(i0,j0,k0) =cvof(isq+i0,jsq+j0,ksq+k0)
+                     stencil3x3(i0,j0,k0) =tag_phase(isq+i0,jsq+j0,ksq+k0)
                   enddo;enddo;enddo
                   call mycs(stencil3x3,mxyz)
                   if ( mxyz(1)/=0.d0 .or. mxyz(2)/=0.d0 .or. mxyz(3)/=0.d0 ) then  
-                     sur = sur + AREA3D(mxyz,cvof(isq,jsq,ksq))*dx(isq)*dy(jsq)
+                     sur = sur + AREA3D(mxyz,tag_phase(isq,jsq,ksq))*dx(isq)*dy(jsq)
                   end if ! mxyz(1,2,3)
-               end if ! cvof(isq,jsq,ksq) only caculate area at cut cell
+               end if ! tag_phase(isq,jsq,ksq) only caculate area at cut cell
                volcell = dx(isq)*dy(jsq)*dz(ksq)
-               cvof_scaled = cvof(isq,jsq,ksq)*volcell
+               cvof_scaled = tag_phase(isq,jsq,ksq)*volcell
                vol = vol + cvof_scaled
                xc  = xc  + cvof_scaled*x(isq)
                yc  = yc  + cvof_scaled*y(jsq)
@@ -628,9 +643,9 @@ contains
              num_drop      (rank) = num_drop      (rank) - 1
           end if ! merge_drop
         end if ! vol
-      else if ( cvof(i,j,k) == 0.d0 .and. tag_flag(i,j,k) == 0 ) then 
+      else if ( tag_phase(i,j,k) == 0.d0 .and. tag_flag(i,j,k) == 0 ) then 
          tag_flag(i,j,k) = 4
-      end if ! cvof(i,j,k)
+      end if ! tag_phase(i,j,k)
     enddo; enddo; enddo
 
     num_tag(rank) = num_drop(rank) + num_drop_merge(rank)
