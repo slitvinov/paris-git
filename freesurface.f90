@@ -1406,24 +1406,6 @@ contains
        if (implode(i,j,k)==0) then
           ! Set Laplace jumps for surface tension 
           if(vof_phase(i,j,k)==1) then
-             wt_g=(1.0d0-cvof(i,j,k))**2.0d0
-             do l=-1,1,2
-                if (vof_phase(i+l,j,k)==0) then
-                   wt_l=cvof(i+l,j,k)**2.0d0
-                   avg_kap=kap(i,j,k)*wt_g/(wt_g+wt_l)+kap(i+l,j,k)*wt_l/(wt_g+wt_l)
-                   P_gx(i,j,k) = sigma*avg_kap/dx(i) !!filaments and droplets of one cell will be an issue here
-                endif
-                if (vof_phase(i,j+l,k)==0) then
-                   wt_l=cvof(i,j+l,k)**2.0d0
-                   avg_kap=kap(i,j,k)*wt_g/(wt_g+wt_l)+kap(i,j+l,k)*wt_l/(wt_g+wt_l)
-                   P_gy(i,j,k) = sigma*avg_kap/dy(j)
-                endif
-                if (vof_phase(i,j,k+l)==0) then
-                   wt_l=cvof(i,j,k+l)**2.0d0
-                   avg_kap=kap(i,j,k)*wt_g/(wt_g+wt_l)+kap(i,j,k+l)*wt_l/(wt_g+wt_l)
-                   P_gz(i,j,k) = sigma*avg_kap/dz(k)
-                endif
-             enddo
              if (vof_phase(i+1,j,k)==0) then
                 x_mod(i,j,k)=-1.d0*height(i+1,j,k,1)*dx(i)
                 !if (x_mod(i,j,k) /= x_mod(i,j,k)) call mod_details(x_mod(i,j,k),i,j,k,.true.,1)
@@ -1473,13 +1455,52 @@ contains
        endif ! we are not imploding
     enddo; enddo; enddo
 10  format(6e14.5)
-    !close(121)
+    !close(121)    
+    call ghost_x(x_mod,1,reqd(1:4)); call ghost_y(y_mod,1,reqd(5:8)); call ghost_z(z_mod,1,reqd(9:12)) 
+    call MPI_WAITALL(12,reqd(1:12),stat(:,1:12),ierr)
+    
+    do k=ks,ke; do j=js,je; do i=is,ie
+       if(vof_phase(i,j,k)==1) then
+          do l=-1,1,2
+             if (vof_phase(i+l,j,k)==0) then
+                if (kap(i+l,j,k)>1.0d6) then
+                   avg_kap = kap(i,j,k)
+                else
+                   wt_g=x_mod(i+(l-1)/2,j,k)/dx(i)
+                   wt_l=1.0d0-wt_g
+                   avg_kap=kap(i,j,k)*wt_g+kap(i+l,j,k)*wt_l
+                endif
+                P_gx(i,j,k) = sigma*avg_kap/dx(i) !!filaments and droplets of one cell will be an issue here
+             endif
+             if (vof_phase(i,j+l,k)==0) then
+                if (kap(i,j+l,k)>1.0d6) then
+                   avg_kap = kap(i,j,k)
+                else
+                   wt_g=y_mod(i,j+(l-1)/2,k)/dy(j)
+                   wt_l=1.0d0-wt_g
+                   avg_kap=kap(i,j,k)*wt_g/(wt_g+wt_l)+kap(i,j+l,k)*wt_l/(wt_g+wt_l)
+                endif
+                P_gy(i,j,k) = sigma*avg_kap/dy(j)
+             endif
+             if (vof_phase(i,j,k+l)==0) then
+                if (kap(i,j,k+l)>1.0d6) then
+                   avg_kap = kap(i,j,k)
+                else
+                   wt_g=z_mod(i,j,k+(l-1)/2)/dz(k)
+                   wt_l=1.0d0-wt_g
+                   avg_kap=kap(i,j,k)*wt_g/(wt_g+wt_l)+kap(i,j,k+l)*wt_l/(wt_g+wt_l)
+                endif
+                P_gz(i,j,k) = sigma*avg_kap/dz(k)
+             endif
+          enddo
+       endif
+    enddo; enddo; enddo
     call ghost_x(P_gx,1,reqd(1:4)); call ghost_y(P_gy,1,reqd(5:8)); call ghost_z(P_gz,1,reqd(9:12)) 
-    call ghost_x(x_mod,1,reqd(13:16)); call ghost_y(y_mod,1,reqd(17:20)); call ghost_z(z_mod,1,reqd(21:24)) 
-    call MPI_WAITALL(24,reqd(1:24),stat(:,1:24),ierr)
+    call MPI_WAITALL(12,reqd(1:12),stat(:,1:12),ierr)
     !--------------------------------------------------------------------------------------------------------
     do k=ks,ke; do j=js,je; do i=is,ie
        if (vof_phase(i,j,k)==0 .and. implode(i,j,k)==0) then
+          
           A(i,j,k,1) = 2.d0*dt/((dx(i)+x_mod(i-1,j,k))*x_mod(i-1,j,k)*rho)
           A(i,j,k,2) = 2.d0*dt/((dx(i)+x_mod(i  ,j,k))*x_mod(i  ,j,k)*rho)
           A(i,j,k,3) = 2.d0*dt/((dy(j)+y_mod(i,j-1,k))*y_mod(i,j-1,k)*rho)
@@ -1566,6 +1587,8 @@ contains
        endif
        if (theta>dxh(i)) theta = dxh(i)
        if (theta<limit*dxh(i)) theta = limit*dxh(i)
+    else
+       theta = dxh(i) !set to standard length if no cut in staggered cell can be found
     endif
   end subroutine staggered_cut
   subroutine mod_details(h,i,j,k,height,d)
