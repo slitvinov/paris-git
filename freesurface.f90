@@ -429,7 +429,6 @@ contains
           dh(4)=knr*dz(ks)
           do col=1,4; do row=1,4
              x_m(row,col) = x_m(row,col) + dh(row)*dh(col)*psi
-             !maxc=MAX(maxc,x_m(row,col))
           enddo; enddo
           do row=1,4
              rhs(row) = rhs(row) + dh(row)*vel(inr,jnr,knr)*psi
@@ -441,14 +440,15 @@ contains
        do col=1,4
           maxc=MAX(maxc,x_m(row,col))
        enddo
-       do col=1,4
-          x_m(row,col)=x_m(row,col)/maxc
-       enddo
-       rhs(row) = rhs(row)/maxc 
+       if (ABS(maxc)>1d-10) then
+          do col=1,4
+             x_m(row,col)=x_m(row,col)/maxc
+          enddo
+          rhs(row) = rhs(row)/maxc
+       endif
     enddo
     !solve matrix locally
     if (fit_cells>3) then
-!       write(*,*)' '
        call FindInverseMatrix(x_m,x_im,4,inverse_success)
        if (inverse_success) then
 !!$          !check product matrix*inverse
@@ -471,7 +471,33 @@ contains
              var=var+x_im(1,col)*rhs(col)                                                                                       
           enddo
           !write(*,'("Extrapolated velocity: ",e14.5)')var
-          extra_vel_found=.true.
+          if (var /= var) then
+             open(unit=70,file="Extr_v_NaN.txt",position="append")
+             write(70,'("Extrapolated vel NaN after fit success at time step: ",I10)')itimestep
+             write(70,'("ijk rank",4I4)')i,j,k,rank
+             write(70,'("x, y, z: ",3e14.5)')x(i),y(j),z(k)
+             write(70,'("Cvof 1-7: ",7e14.5)')cvof(i-1,j,k),cvof(i+1,j,k),cvof(i,j-1,k),cvof(i,j+1,k),&
+                  cvof(i,j,k-1),cvof(i,j,k+1),cvof(i,j,k)
+             write(70,'("  ")')
+             write(70,'("Topology mask: ")')
+             do jnr=-2,2; do knr=-2,2
+                write(70,'(" ",3I4," :",e14.5)')topmask(-2:2,jnr,knr)
+             enddo; enddo
+             write(70,'("  ")')
+             write(70,'("Velocity mask: ")')
+             do jnr=-2,2; do knr=-2,2
+                write(70,'(" ",3I4," :",e14.5)')vel(-2:2,jnr,knr)
+             enddo; enddo
+             write(70,'("  ")')
+             write(70,'("Phase 1-7: ",7I8)')vof_phase(i-1,j,k),vof_phase(i+1,j,k),vof_phase(i,j-1,k),vof_phase(i,j+1,k),&
+                  vof_phase(i,j,k-1),vof_phase(i,j,k+1),vof_phase(i,j,k)
+             write(70,'("Pcmask 1-7: ",7I8)')pcmask(i-1,j,k),pcmask(i+1,j,k),pcmask(i,j-1,k),pcmask(i,j+1,k),&
+                  pcmask(i,j,k-1),pcmask(i,j,k+1),pcmask(i,j,k)
+             write(70,'("  ")')
+             close(70) 
+          else
+             extra_vel_found=.true.
+          endif
        else
           !write(*,*)'Error: Matrix could not be inverted for velocity extrapolation, reverting to 1st order'
           !write(*,'("LS fit failed using ",I5," points")')fit_cells
@@ -480,12 +506,64 @@ contains
 !!$          enddo; enddo
           !revert to 1st order
           var=rhs(1)/(1.0d0*fit_cells)
-          extra_vel_found=.true. !1st order
+          if (var /= var) then
+             open(unit=70,file="Extr_v_NaN.txt",position="append")
+             write(70,'("Extrapolated vel NaN reverting 1st, > 3, at time step: ",I10)')itimestep
+             write(70,'("ijk rank",4I4)')i,j,k,rank
+             write(70,'("x, y, z: ",3e14.5)')x(i),y(j),z(k)
+             write(70,'("Cvof 1-7: ",7e14.5)')cvof(i-1,j,k),cvof(i+1,j,k),cvof(i,j-1,k),cvof(i,j+1,k),&
+                  cvof(i,j,k-1),cvof(i,j,k+1),cvof(i,j,k)
+             write(70,'("  ")')
+             write(70,'("Topology mask: ")')
+             do jnr=-2,2; do knr=-2,2
+                write(70,'(" ",3I4," :",e14.5)')topmask(-2:2,jnr,knr)
+             enddo; enddo
+             write(70,'("  ")')
+             write(70,'("Velocity mask: ")')
+             do jnr=-2,2; do knr=-2,2
+                write(70,'(" ",3I4," :",e14.5)')vel(-2:2,jnr,knr)
+             enddo; enddo
+             write(70,'("  ")')
+             write(70,'("Phase 1-7: ",7I8)')vof_phase(i-1,j,k),vof_phase(i+1,j,k),vof_phase(i,j-1,k),vof_phase(i,j+1,k),&
+                  vof_phase(i,j,k-1),vof_phase(i,j,k+1),vof_phase(i,j,k)
+             write(70,'("Pcmask 1-7: ",7I8)')pcmask(i-1,j,k),pcmask(i+1,j,k),pcmask(i,j-1,k),pcmask(i,j+1,k),&
+                  pcmask(i,j,k-1),pcmask(i,j,k+1),pcmask(i,j,k)
+             write(70,'("  ")')
+             close(70) 
+          else
+             extra_vel_found=.true. !1st order
+          endif
        endif
     else
-       if (fit_cells > 0) then
+       if (fit_cells >= 1) then
           var=rhs(1)/(1.0d0*fit_cells)
-          extra_vel_found=.true.
+          if (var /= var) then
+             open(unit=70,file="Extr_v_NaN.txt",position="append")
+             write(70,'("Extrapolated vel NaN reverting 1st, < 3, at time step: ",I10)')itimestep
+             write(70,'("ijk rank",4I4)')i,j,k,rank
+             write(70,'("x, y, z: ",3e14.5)')x(i),y(j),z(k)
+             write(70,'("Cvof 1-7: ",7e14.5)')cvof(i-1,j,k),cvof(i+1,j,k),cvof(i,j-1,k),cvof(i,j+1,k),&
+                  cvof(i,j,k-1),cvof(i,j,k+1),cvof(i,j,k)
+             write(70,'("  ")')
+             write(70,'("Topology mask: ")')
+             do jnr=-2,2; do knr=-2,2
+                write(70,'(" ",3I4," :",e14.5)')topmask(-2:2,jnr,knr)
+             enddo; enddo
+             write(70,'("  ")')
+             write(70,'("Velocity mask: ")')
+             do jnr=-2,2; do knr=-2,2
+                write(70,'(" ",3I4," :",e14.5)')vel(-2:2,jnr,knr)
+             enddo; enddo
+             write(70,'("  ")')
+             write(70,'("Phase 1-7: ",7I8)')vof_phase(i-1,j,k),vof_phase(i+1,j,k),vof_phase(i,j-1,k),vof_phase(i,j+1,k),&
+                  vof_phase(i,j,k-1),vof_phase(i,j,k+1),vof_phase(i,j,k)
+             write(70,'("Pcmask 1-7: ",7I8)')pcmask(i-1,j,k),pcmask(i+1,j,k),pcmask(i,j-1,k),pcmask(i,j+1,k),&
+                  pcmask(i,j,k-1),pcmask(i,j,k+1),pcmask(i,j,k)
+             write(70,'("  ")')
+             close(70) 
+          else
+             extra_vel_found=.true.
+          endif
        else
           write(*,'("WARNING, ISOLATED TOPOLOGICAL STRUCTURE, NO NEIGHBOURS! Level: ",I4)')lvl
           write(*,'("Neighbouring level values:")')
