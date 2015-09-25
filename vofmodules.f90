@@ -710,12 +710,13 @@ contains
     use IFPORT
 #endif
     implicit none
-    integer :: ib, seed
+    integer :: ib, rand_seed, shift, check, compare
+    real(8) :: d_min
 #ifndef __INTEL_COMPILER
     real :: rand
 #endif
-    seed = ABS(TIME())
-    call srand(seed)
+    rand_seed = ABS(TIME())
+    call srand(rand_seed)
     if(NumBubble>2) then 
       do ib=1,NumBubble
          rad(ib) = r_min + rand()*var_r
