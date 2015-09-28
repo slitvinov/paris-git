@@ -783,6 +783,7 @@ end subroutine do_droplet_test
     use module_IO
     implicit none
     integer ::nf,i1,i2,j1,j2,k1,k2,i,j,k, itype=5
+    real(8) :: kap(imin:imax,jmin:jmax,kmin:kmax) 
     !  logical, save :: first_time=.true.
     character(len=30) :: rootname,filename
     rootname=TRIM(out_path)//'/VTK/fields'//TRIM(int2text(nf,padding))//'-'
@@ -884,6 +885,16 @@ end subroutine do_droplet_test
        write(8,18)
        do k=k1,k2; do j=j1,j2; do i=i1,i2;
           write(8,210) p(i,j,k)
+       enddo; enddo; enddo
+    endif
+
+    ! Writing curvature values
+    if(output_fields(5)) then
+       write(8,17) 'Kappa'
+       write(8,18)
+       call get_all_curvatures(kap,0)
+       do k=k1,k2; do j=j1,j2; do i=i1,i2;
+          write(8,210) kap(i,j,k)
        enddo; enddo; enddo
     endif
     
