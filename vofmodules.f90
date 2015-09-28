@@ -1901,11 +1901,16 @@ end subroutine backup_VOF_read
 !-------------------------------------------------------------------------------------------------
   subroutine clean_debris()
     implicit none
-
+    include 'mpif.h'
     integer, dimension(imin:imax,jmin:jmax,kmin:kmax) :: phase_id, clean_flag
     integer :: i,j,k,i0,j0,k0
     integer :: ni,nj,nk
     real(8) :: cvof_min,sum_cvof_min,sum1,sum_cvof
+    integer :: m,n,l,inr,jnr,knr
+    integer :: nposit
+    integer :: cleaned_mix,cleaned_tot,itr,it_max,ierr
+    real(8) :: d_vof, d_vof_tot
+    logical :: all_clean_local, all_clean_global
    
     ! -1:gas, 1:liquid
     phase_id(:,:,:) = -1 
@@ -1956,7 +1961,7 @@ end subroutine backup_VOF_read
          if ( cvof(i,j,k) > 1.d0-cvof_min .and. & 
               sum_cvof    > sum1-sum_cvof_min ) clean_flag(i,j,k) = 1 
        end do; end do; end do
-    end if ! clean_debris_method
+    end if
     
 ! DEBUG
 !!$    write(101,*) 'Cells to be cleaned at time',time,'for rank',rank
@@ -1977,15 +1982,70 @@ end subroutine backup_VOF_read
 !!$    end do; end do; end do
 ! END DEBUG
 
-    ! remove debris
-    do i=is,ie; do j=js,je; do k=ks,ke
-      if ( clean_flag(i,j,k) == -1 .and. cvof(i,j,k) > 0.d0 ) then
-         cvof(i,j,k) = 0.d0
-      else if ( clean_flag(i,j,k) ==  1 .and. cvof(i,j,k) < 1.d0 ) then 
-         cvof(i,j,k) = 1.d0
-      end if ! clean_flag 
-    end do; end do; end do
+    if ( clean_debris_method == 1 .or. clean_debris_method == 2 ) then! remove debris
+       do i=is,ie; do j=js,je; do k=ks,ke
+          if ( clean_flag(i,j,k) == -1 .and. cvof(i,j,k) > 0.d0 ) then
+             cvof(i,j,k) = 0.d0
+          else if ( clean_flag(i,j,k) ==  1 .and. cvof(i,j,k) < 1.d0 ) then 
+             cvof(i,j,k) = 1.d0
+          end if ! clean_flag 
+       end do; end do; end do
+    endif
     
+    if ( clean_debris_method == 3 ) then
+       
+       all_clean_local = .false.
+       all_clean_global = .false.
+       itr = 0
+       cleaned_mix = 0
+
+       do while ((.not.all_clean_global) .and. (itr<=10))
+          itr = itr + 1
+          do k=ks,ke; do j=js,je; do i=is,ie 
+             if (vof_flag(i,j,k) == 2 ) then  ! mixed cell
+                nposit=0
+                do m=-1,1; do n=-1,1; do l=-1,1
+                   inr=i+m
+                   jnr=j+n
+                   knr=k+l
+                   if(vof_flag(inr,jnr,knr) == 2) then
+                      nposit = nposit + 1
+                   endif ! vof_flag
+                enddo; enddo; enddo ! do m,n,l
+                ! arrange coordinates so height direction is closest to normal
+                ! try(:) array contains direction closest to normal first
+
+                if(nposit<6) then
+                   !clean cell
+                   if (vof_phase(i,j,k)==1) then             
+                      !calc mass diff
+                      d_vof = d_vof + 1.0d0-cvof(i,j,k)
+                      cvof(i,j,k) = 1.0d0
+                      vof_flag(i,j,k) = 1
+                   else
+                      d_vof = d_vof - cvof(i,j,k)
+                      cvof(i,j,k) = 0.0d0
+                      vof_flag(i,j,k) = 0
+                   endif
+                   cleaned_mix = cleaned_mix + 1
+                endif
+
+             endif ! mixed cell loop
+          enddo;enddo;enddo
+          if (cleaned_mix==0) then
+             all_clean_local=.true.
+          endif
+          call MPI_ALLREDUCE(all_clean_local, all_clean_global, 1, MPI_LOGICAL, MPI_LAND, MPI_COMM_Active, ierr)
+          if (.not.all_clean_global) then
+             call do_all_ghost(cvof)
+             call get_flags_and_clip(cvof,vof_flag)
+             call get_vof_phase(cvof)
+          endif
+       enddo ! all_clean
+       call MPI_ALLREDUCE(cleaned_mix, cleaned_tot, 1, MPI_INTEGER, MPI_SUM, MPI_COMM_Active, ierr)
+       call MPI_ALLREDUCE(itr, it_max, 1, MPI_INTEGER, MPI_MAX, MPI_COMM_Active, ierr)
+       call MPI_ALLREDUCE(d_vof, d_vof_tot, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_Active, ierr)
+    endif
   end subroutine clean_debris
 
 end module module_output_vof
