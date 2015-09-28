@@ -286,7 +286,7 @@ contains
     implicit none
     integer :: i,j,k,bub_id
     do k=ks,ke; do j=js,je; do i=is,ie
-       if (tag_id(i,j,k))==bub_id) then
+       if (tag_id(i,j,k)==bub_id) then
           cvof(i,j,k)=1.0d0
        endif
     enddo; enddo; enddo
