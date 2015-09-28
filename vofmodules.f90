@@ -112,6 +112,8 @@ module module_VOF
   logical :: do_clean_debris
   integer :: clean_debris_method, nsteps_clean_debris, clean_debris_neighbours
 
+  logical :: filter_random_seeds
+
 contains
 !=================================================================================================
 !=================================================================================================
@@ -304,6 +306,7 @@ contains
     clean_debris_method = 1 
     nsteps_clean_debris = 10 
     clean_debris_neighbours = 2
+    filter_random_seeds = .false.
     
     in=31
 
@@ -572,6 +575,11 @@ contains
        if ( rank == root_rank ) then
           call random_bubbles
        endif
+       if (filter_random_seeds) then
+          call MPI_BCAST(NumBubble, 1, MPI_INT, &
+               root_rank, MPI_Comm_Cart, ierr)
+          write(*,'("Number of bubbles after filtering in rank ",I4," :",I4)')rank,NumBubble
+       endif
        call MPI_BCAST(rad, NumBubble, MPI_REAL8, &
                       root_rank, MPI_Comm_Cart, ierr)
        call MPI_BCAST(xc , NumBubble, MPI_REAL8, &
@@ -723,9 +731,32 @@ contains
          xc(ib)  = (coord_min + rand()*var_coord)
          yc(ib)  = (coord_min + rand()*var_coord)
          zc(ib)  = (coord_min + rand()*var_coord)
-         write(*,'("Bubble ",I4," generated at ",3e14.5," with radius: ",e14.5)')ib,xc(ib),yc(ib),zc(ib),rad(ib)
+         !write(*,'("Bubble ",I4," generated at ",3e14.5," with radius: ",e14.5)')ib,xc(ib),yc(ib),zc(ib),rad(ib)
       end do
     end if ! NumBubble
+    if (filter_random_seeds) then
+       !calculate min separation distance
+       d_min = xLength/(1.5d0*(NumBubble*1.0)**(1.0/3.0))
+       write(*,'("Minimum separation distance: ",e14.5)')d_min
+       do check=1,NumBubble-1
+          do compare=check+1,NumBubble
+             if (sqrt((xc(compare)-xc(check))**2.d0+(yc(compare)-yc(check))**2.d0+(zc(compare)-zc(check))**2.d0)<d_min) then
+                !delete bub
+                do shift=compare,NumBubble-1
+                   xc(shift)=xc(shift+1)
+                   yc(shift)=yc(shift+1)
+                   zc(shift)=zc(shift+1)
+                   rad(shift)=rad(shift+1)
+                enddo
+                NumBubble = NumBubble-1
+             endif
+          enddo
+       enddo
+       do compare=1,NumBubble
+          write(*,'("Bubble ",I8," generated at ",3e14.5," with radius: ",e14.5)')&
+               compare,xc(compare),yc(compare),zc(compare),rad(compare)
+       enddo
+    endif
   end subroutine random_bubbles 
   !=================================================================================================
   !   Spheres and cylinders
