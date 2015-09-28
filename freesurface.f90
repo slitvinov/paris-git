@@ -203,7 +203,7 @@ subroutine check_topology(is_gas)
                    write(*,'("Single element ",I5," found in rank ",I5,"with volume: "e14.5)')bub,rank,volume
               if (volume < 50.0*dx(is)**3.d0) then
                  write(*,'("Removing detached liquid in rank: ",I5)')rank
-                 call clear_stray_liquid(bub)
+                 call clear_stray_liquid(dropid)
                  remove = .true.
               endif
            endif
@@ -231,7 +231,7 @@ subroutine check_topology(is_gas)
               if (volume<0.4*(xLength*yLength*zLength))&
                    write(*,'("Merged element ",I5," found in rank ",I5,"with volume: "e14.5)')bub,rank,volume
               if (volume < 50.0*dx(is)**3.d0) then
-                 call clear_stray_liquid(bub)
+                 call clear_stray_liquid(dropid)
                  write(*,'("Removing detached liquid (merged) in rank: ",I5)')rank
                  remove = .true.
               endif
@@ -281,21 +281,16 @@ contains
 
   end subroutine bub_implode
 !-----------------------------------------------------------------------
-  subroutine clear_bubble(cl)
+  subroutine clear_stray_liquid(bub_id)
     use module_vof
-    use module_flow
     implicit none
-    integer :: i,j,k
-    real(8) :: cl(4)
+    integer :: i,j,k,bub_id
     do k=ks,ke; do j=js,je; do i=is,ie
-       if (sqrt((x(i)-cl(1))**2.d0+(y(j)-cl(2))**2.d0+(z(k)-cl(3))**2.d0)<cl(4)) then
-          cvof(i,j,k)=0.0d0
-          v_source(i,j,k) = 0.0d0
-          if (itime_scheme==2) cvofold(i,j,k)=0.0d0
-          implode(i,j,k) = 0
+       if (tag_id(i,j,k))==bub_id) then
+          cvof(i,j,k)=1.0d0
        endif
     enddo; enddo; enddo
-  end subroutine clear_bubble
+  end subroutine clear_stray_liquid
 end subroutine check_topology
 !=================================================================================================
 !
