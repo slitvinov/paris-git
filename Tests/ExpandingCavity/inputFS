@@ -2,6 +2,7 @@
 
 X_level = 2	! Layers inside gas bubbles filled with extrapolated velocities 
 order_extrap = 1
+
 do_2nd_projection = T
 RP_test = F	! RP test switch
 !Parameters for Rayleigh-Plesset test
@@ -14,7 +15,6 @@ VTK_out = F F F
 ! the Laplace pressure jump in the x-direction 	
 NOUT_VTK = 50 50 50
 ! Timestep intervals to write the outputs that are switched on
-
 !=================================================================================================
 
 &end

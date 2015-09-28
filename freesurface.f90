@@ -21,15 +21,58 @@
 ! 02111-1307, USA.  
 !=================================================================================================
 !=================================================================================================
+!!$subroutine fs_sweep(iout,t)
+!!$  use module_grid
+!!$  use module_vof
+!!$  use module_surface_tension
+!!$  use module_freesurface
+!!$  use module_IO
+!!$  use module_BC
+!!$  use module_lag_part
+!!$  implicit none
+!!$  include 'mpif.h' 
+!!$  real(8) :: t
+!!$  integer :: iout
+!!$
+!!$  if (check_stray_liquid .and. mod(itimestep,n_stray_liquid)==0) then
+!!$     call tag_bubbles(0,iout,t)
+!!$     call check_topology(.false.)
+!!$     call ReleaseTag2DropTable
+!!$     if (fill_ghost) then
+!!$        call clean_debris
+!!$        call do_all_ghost(cvof)
+!!$        call get_flags_and_clip(cvof,vof_flag)
+!!$        call get_vof_phase(cvof) !cvof updated above from min to max
+!!$     endif
+!!$  endif
+!!$  if (.not. (test_capwave .or. test_plane)) then
+!!$     call tag_bubbles(1,iout,t)
+!!$     if (.not.(RP_test) .and. (mod(itimestep,n_check_topo)==0)) then
+!!$        call check_topology(.true.)
+!!$        if (fill_ghost) then
+!!$           call clean_debris
+!!$           call do_all_ghost(cvof)
+!!$           call get_flags_and_clip(cvof,vof_flag)
+!!$           call get_vof_phase(cvof) !cvof updated above from min to max
+!!$           call ReleaseTag2DropTable
+!!$           call tag_bubbles(1,iout,t)
+!!$           call get_all_heights(iout)
+!!$        endif
+!!$     endif
+!!$  endif
+!!$  call set_topology(vof_phase,itimestep) !vof_phase updated in vofsweeps
+!!$
+!!$endsubroutine fs_sweep
 !-------------------------------------------------------------------------------------------------
- subroutine set_topology(vof_phase,iout)
+ subroutine set_topology(phase,iout)
   use module_grid
   use module_freesurface
   use module_IO
   use module_BC
+  use module_lag_part
   implicit none
   include 'mpif.h' 
-  integer, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: vof_phase
+  integer, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: phase
   integer :: req(4),sta(MPI_STATUS_SIZE,4)
   integer :: i,j,k,level,iout,ierr
   integer :: level3, l3sum
@@ -39,18 +82,18 @@
   u_cmask = 3; v_cmask = 3; w_cmask = 3; pcmask = 3
   !First loop to set level 0 velocities in liq-liq and liq-gas cells
   do k=ks,ke; do j=js,je; do i=is,ie
-     if (vof_phase(i,j,k) == 1) then
-        if (vof_phase(i+1,j,k) == 0) then
+     if (phase(i,j,k) == 1) then
+        if (phase(i+1,j,k) == 0) then
            u_cmask(i,j,k) = 0
         endif
-        if (vof_phase(i,j+1,k) == 0) then
+        if (phase(i,j+1,k) == 0) then
            v_cmask(i,j,k) = 0
         endif
-        if (vof_phase(i,j,k+1) == 0) then 
+        if (phase(i,j,k+1) == 0) then 
            w_cmask(i,j,k) = 0
         endif
      endif
-     if (vof_phase(i,j,k) == 0 .or. implode(i,j,k)>0) then
+     if (phase(i,j,k) == 0 .or. implode_flag(tag_id(i,j,k))) then
         pcmask(i,j,k)=0
         u_cmask(i,j,k)=0
         v_cmask(i,j,k)=0
@@ -120,7 +163,7 @@
   enddo
 end subroutine set_topology
 !-------------------------------------------------------------------------------------------------
-subroutine check_topology()
+subroutine check_topology(is_gas)
   use module_grid
   use module_2phase
   use module_freesurface
@@ -134,18 +177,12 @@ subroutine check_topology()
   integer :: dropid
   integer :: i,j,k,bub,ierr,rankid
   logical :: remove,signal
-  real(8) :: xt,yt,zt
-  real(8) :: clear_zone(4)
-  real(8), dimension(1:4,0:nPdomain) :: clear_list
-  !cycle through bubs first maybe? Use lagrangian approach rather than Eulerian, since there are much less bubble 
-  ! parts which may be imploding than discrete points!
+  logical, intent(in) :: is_gas
+
   signal = .false.
   fill_ghost = .false.
   remove = .false.
   v_source=0.d0
-  clear_zone(1:3)=-1.d0
-  clear_zone(4) = 0.d0
-  xt=-1.d0; yt =-1.d0; zt=-1.d0
 
   if (num_drop(rank)>0) then
      do bub=1,num_drop(rank)
@@ -157,8 +194,18 @@ subroutine check_topology()
         endif
         volume = drops(bub)%element%vol
         if (volume > 1.d-9*dx(is)**3.d0) then
-           if (volume < 125.0*dx(is)**3.d0) then              
-              call bub_implode(bub,.false.)
+           if (is_gas) then
+              if (volume < 125.0*dx(is)**3.d0) then              
+                 call bub_implode(dropid,.false.)
+              endif
+           else
+              if (volume<0.4*(xLength*yLength*zLength))&
+                   write(*,'("Single element ",I5," found in rank ",I5,"with volume: "e14.5)')bub,rank,volume
+              if (volume < 50.0*dx(is)**3.d0) then
+                 write(*,'("Removing detached liquid in rank: ",I5)')rank
+                 call clear_stray_liquid(bub)
+                 remove = .true.
+              endif
            endif
         else
            write(*,'("Bubble volume error in topology check. Vol from table: ",e14.5)')volume
@@ -176,23 +223,25 @@ subroutine check_topology()
         endif
         volume = drops_merge(bub)%element%vol
         if (volume > 1.d-9*dx(is)**3.d0) then
-           if (volume < 125.0*dx(is)**3.d0) then
-              call bub_implode(bub,.true.)
+           if (is_gas) then
+              if (volume < 125.0*dx(is)**3.d0) then
+                 call bub_implode(dropid,.true.)
+              endif
+           else 
+              if (volume<0.4*(xLength*yLength*zLength))&
+                   write(*,'("Merged element ",I5," found in rank ",I5,"with volume: "e14.5)')bub,rank,volume
+              if (volume < 50.0*dx(is)**3.d0) then
+                 call clear_stray_liquid(bub)
+                 write(*,'("Removing detached liquid (merged) in rank: ",I5)')rank
+                 remove = .true.
+              endif
            endif
         else
            write(*,'("Bubble volume error in topology check. Vol from table: ",e14.5)')volume
         endif
      enddo
   endif
-  if (signal) write(*,'("COLLAPSING BUBBLE DETECTED IN RANK: ",I4)')rank
   call MPI_ALLREDUCE(remove,fill_ghost, 1, MPI_LOGICAL, MPI_LOR, MPI_COMM_Active, ierr)
-  if (fill_ghost) then
-     !write(*,'("Bubble to be removed, fill_ghost true")')
-     call MPI_ALLGATHER(clear_zone,4,MPI_DOUBLE_PRECISION,clear_list(1:4,:),4,MPI_DOUBLE_PRECISION,MPI_Comm_World,ierr)
-     do rankid=0,nPdomain-1
-        call clear_bubble(clear_list(1:4,rankid))
-     enddo
-  endif
 contains 
   subroutine bub_implode(bub_id,merged)
     use module_vof
@@ -200,45 +249,36 @@ contains
     implicit none
     integer :: i,j,k,bub_id,inbr,jnbr,knbr
     integer :: req(4),sta(MPI_STATUS_SIZE,4),ierr
-    !integer, dimension(is:ie,js:je,ks:ke) :: cleaned ! 0: not checked, 1: cleaned, 2: left as is 
     real(8) :: d_clean 
     integer :: max_implode
     logical :: merged
     max_implode = 0
+    remove =.false.
     do k=ks,ke; do j=js,je; do i=is,ie
-       !if (vof_phase(i,j,k)==1) then !check if gas phase
-       if (tag_dropid(tag_id(i,j,k))==bub_id) then !check if we are in the correct bubble
-          implode(i,j,k) = implode(i,j,k)+1
-          max_implode = MAX(max_implode,implode(i,j,k))
-          !max_nbr = MAX(implode(i-1:i+1,j-1:j+1,k-1:k+1))
-          v_source(i,j,k) = 0.85*(u(i-1,j,k)-u(i,j,k))/dx(i)+&
+       if (tag_id(i,j,k)==bub_id) then !check if we are in the correct bubble
+          if (.not.implode_flag(tag_id(i,j,k))) then
+             implode_flag(tag_id(i,j,k)) = .true.
+             write(*,'("COLLAPSING BUBBLE DETECTED IN RANK: ",I4)')rank
+          endif
+          v_source(i,j,k) = 0.95*(u(i-1,j,k)-u(i,j,k))/dx(i)+&
                (v(i,j-1,k)-v(i,j,k))/dy(j)+(w(i,j,k-1)-w(i,j,k))/dz(k)
        endif
-       !endif
-    enddo; enddo; enddo
-    !consolidate to max
-    if (max_implode==1) signal = .true. !signal imploding bubble
-    if (volume <= 64.0*dx(is)**3.d0) max_implode=40
-    if (max_implode ==40) remove=.true.
-    do k=ks,ke; do j=js,je; do i=is,ie
-       if (tag_dropid(tag_id(i,j,k))==bub_id) implode(i,j,k) = max_implode
     enddo; enddo; enddo
 
-    if (remove) then
-       if (merged) then
-          xt = drops_merge(bub)%element%xc
-          yt = drops_merge(bub)%element%yc
-          zt = drops_merge(bub)%element%zc
-       else
-          xt = drops(bub)%element%xc
-          yt = drops(bub)%element%yc
-          zt = drops(bub)%element%zc
-       endif
-       !get effective cleaning radius
-       d_clean = 2.5d0*(volume/4.d0)**(1./3.)
-       clear_zone = (/ xt,yt,zt,d_clean /)
-       !write(*,'("Cleaning radius: ",e14.5)')d_clean
+    if (volume <= 30.0*dx(is)**3.d0) then
+       remove =.true.
     endif
+    if (remove) then
+       do k=ks,ke; do j=js,je; do i=is,ie
+          if (tag_id(i,j,k)==bub_id) then
+             cvof(i,j,k)=0.0d0
+             v_source(i,j,k) = 0.0d0
+             if (itime_scheme==2) cvofold(i,j,k)=0.0d0
+             implode_flag(tag_id(i,j,k))=.false.
+          endif
+       enddo; enddo; enddo
+    endif
+
   end subroutine bub_implode
 !-----------------------------------------------------------------------
   subroutine clear_bubble(cl)
@@ -655,7 +695,6 @@ subroutine FreeSolver(A,p,maxError,beta,maxit,it,ierr,iout,time,tres2)
   include 'mpif.h'
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: p
   real(8), dimension(is:ie,js:je,ks:ke,8), intent(in) :: A
-  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax) :: P_gas
   real(8), intent(in) :: beta, maxError
   integer, intent(in) :: maxit
   integer, intent(out) :: it, ierr
@@ -669,14 +708,11 @@ subroutine FreeSolver(A,p,maxError,beta,maxit,it,ierr,iout,time,tres2)
   logical, parameter :: recordconvergence=.false.
   integer, save :: itime=0
   logical :: use_L_inf = .true.
-  integer :: div_count, cutcell, gas_nbrs, min_branch
-  !real(8) :: limit
 ! Open file for convergence history
   if(rank==0.and.recordconvergence) then
      OPEN(UNIT=89,FILE=TRIM(out_path)//'/convergence_history-'//TRIM(int2text(itime,padding))//'.txt')
   endif
   itime=itime+1
-  if (solver_flag==1) call get_bubble_pressure(P_gas)
 2 format(2e14.5)
   if (solver_flag == 0) call pariserror("Free Surface solver flag needs to be 1 or 2")
   do k=ks,ke; do j=js,je; do i=is,ie
@@ -686,7 +722,6 @@ subroutine FreeSolver(A,p,maxError,beta,maxit,it,ierr,iout,time,tres2)
   call ghost_x(p,1,req( 1: 4)); call ghost_y(p,1,req( 5: 8)); call ghost_z(p,1,req( 9:12))
   call MPI_WAITALL(12,req,sta,ierr)
   !--------------------------------------ITERATION LOOP--------------------------------------------  
-  !div_count=0; cutcell=0; gas_nbrs=0; min_branch=0
   do it=1,maxit
      if(relaxtype==2) then 
         call LineRelax_fs(A,p,beta)
@@ -712,26 +747,6 @@ subroutine FreeSolver(A,p,maxError,beta,maxit,it,ierr,iout,time,tres2)
              call debug_details(i,j,k,A)
              call pariserror('FreeSolver Res NaN')
           endif
-!!$          if (res_local*npx-npy*npz>1.d15) then
-!!$             !write(*,*)'WARNING: LOCAL RES HIGH!!'
-!!$             !write(*,'("Res_local, res2: ",2e14.5)')res_local,res2
-!!$             !call debug_details(i,j,k,A)
-!!$             div_count=div_count+1
-!!$             if (solver_flag==1) then
-!!$                if (sum(pcmask(i-1:i+1,j-1:j+1,k-1:k+1))>0) then
-!!$                   cutcell=cutcell+1
-!!$                   if (ABS(limit*dx(is)-x_mod(i,j  ,k))<1.0d-8) min_branch = min_branch+1
-!!$                   if (ABS(limit*dx(is)-x_mod(i-1,j,k))<1.0d-8) min_branch = min_branch+1
-!!$                   if (ABS(limit*dx(is)-y_mod(i,j  ,k))<1.0d-8) min_branch = min_branch+1
-!!$                   if (ABS(limit*dx(is)-y_mod(i,j-1,k))<1.0d-8) min_branch = min_branch+1
-!!$                   if (ABS(limit*dx(is)-z_mod(i,j  ,k))<1.0d-8) min_branch = min_branch+1
-!!$                   if (ABS(limit*dx(is)-z_mod(i,j,k-1))<1.0d-8) min_branch = min_branch+1
-!!$                endif
-!!$             endif
-!!$             if (solver_flag==2) then
-!!$                if (sum(pcmask(i-1:i+1,j-1:j+1,k-1:k+1))<=2) gas_nbrs=gas_nbrs+1
-!!$             endif 
-!!$          endif
        endif
     enddo; enddo; enddo
     call MPI_WAITALL(12,req,sta,ierr)
@@ -753,26 +768,6 @@ subroutine FreeSolver(A,p,maxError,beta,maxit,it,ierr,iout,time,tres2)
              call debug_details(i,j,k,A)
              call pariserror('FreeSolver Res NaN in proc border')
           endif
-!!$          if (res_local*npx-npy*npz>1.d15) then
-!!$             !write(*,*)'WARNING: LOCAL RES HIGH!!'
-!!$             !write(*,'("Res_local, res2: ",2e14.5)')res_local,res2
-!!$             !call debug_details(i,j,k,A)
-!!$             div_count=div_count+1
-!!$             if (solver_flag==1) then
-!!$                if (sum(pcmask(i-1:i+1,j-1:j+1,k-1:k+1))>0) then
-!!$                   cutcell=cutcell+1
-!!$                   if (ABS(limit*dx(is)-x_mod(i,j  ,k))<1.0d-8) min_branch = min_branch+1
-!!$                   if (ABS(limit*dx(is)-x_mod(i-1,j,k))<1.0d-8) min_branch = min_branch+1
-!!$                   if (ABS(limit*dx(is)-y_mod(i,j  ,k))<1.0d-8) min_branch = min_branch+1
-!!$                   if (ABS(limit*dx(is)-y_mod(i,j-1,k))<1.0d-8) min_branch = min_branch+1
-!!$                   if (ABS(limit*dx(is)-z_mod(i,j  ,k))<1.0d-8) min_branch = min_branch+1
-!!$                   if (ABS(limit*dx(is)-z_mod(i,j,k-1))<1.0d-8) min_branch = min_branch+1
-!!$                endif
-!!$             endif
-!!$             if (solver_flag==2) then
-!!$                if (sum(pcmask(i-1:i+1,j-1:j+1,k-1:k+1))<=2) gas_nbrs=gas_nbrs+1
-!!$             endif 
-!!$          endif
        endif
     enddo; enddo; enddo
     call catch_divergence_fs(res2,cells,ierr)
@@ -799,11 +794,7 @@ subroutine FreeSolver(A,p,maxError,beta,maxit,it,ierr,iout,time,tres2)
        endif
     endif
   enddo
-!!$  if (div_count>0) then
-!!$     write(*,'("Time step: ",I5,"  Iterations: ",I8)')iout,it
-!!$     write(*,'("High Res in rank ",I5," with solver flag ",I5)')rank,solver_flag
-!!$     write(*,'("High div cells, cut cells, limit branches, isolated cells: ",4I8)')div_count, cutcell, min_branch, gas_nbrs
-!!$  endif
+
   if(rank==0.and.recordconvergence) close(89)
   if(it==maxit+1 .and. rank==0) then
      write(*,*) 'Warning: LinearSolver reached maxit: ||res||: ',tres2
@@ -1179,13 +1170,19 @@ subroutine debug_details(i,j,k,A)
   close(40)
 end subroutine debug_details
 !==================================================================================================================
-subroutine tag_bubbles(iout,time_stats)
+subroutine tag_bubbles(phase_ref,iout,time_stats)
   use module_grid
   use module_Lag_part
+  use module_freesurface
   implicit none
+  include 'mpif.h'
   real(8) :: time_stats
-  integer :: iout
+  integer :: iout, flag
+  integer, intent(in) :: phase_ref
+  integer :: ierr
+  logical, allocatable :: implode_global(:) 
  
+  tracked_phase = phase_ref
   call tag_drop()
   if ( nPdomain > 1 ) call tag_drop_all
   call CreateTag2DropTable
@@ -1193,16 +1190,18 @@ subroutine tag_bubbles(iout,time_stats)
   if ( MOD(iout,nstats) == 0 ) call drop_statistics(iout,time_stats)
 end subroutine tag_bubbles
 !==================================================================================================================
-subroutine get_bubble_pressure(P_g)
+subroutine set_bubble_pressure
   use module_grid
   use module_Lag_part
   use module_freesurface
   use module_IO
   use module_2phase
   implicit none
-  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax) :: P_g
+  !real(8), dimension(imin:imax,jmin:jmax,kmin:kmax) :: P_g
   real(8) :: volume
   integer :: i,j,k,dropid
+ 
+  P_gas = 0.0d0
   if ((NumBubble>0) .and. (P_ref > 1.d-14) .and. .not. (test_capwave .or. test_plane)) then
      do k=ks,ke; do j=js,je; do i=is,ie
         if (pcmask(i,j,k) /= 0) then
@@ -1216,17 +1215,17 @@ subroutine get_bubble_pressure(P_g)
               volume = drops(dropid)%element%vol
            endif
            if (volume > 1.0d-1*dx(is)**3.0d0) then
-              P_g(i,j,k) = P_ref*(V_0/volume)**gamma
+              P_gas(i,j,k) = P_ref*(V_0/volume)**gamma
            else
               write(*,'("Bubble volume error in FreeSolver. Vol from table: ",e14.5)')volume
            endif
         endif
      enddo;enddo;enddo
   else 
-     P_g = P_ref
+     P_gas = P_ref
   endif
   if (.not. (test_capwave .or. test_plane)) call ReleaseTag2DropTable
-end subroutine get_bubble_pressure
+end subroutine set_bubble_pressure
 !==================================================================================================================
 subroutine inflow_accelerate
   use module_grid
@@ -1301,7 +1300,7 @@ subroutine inflow_accelerate
   
 end subroutine inflow_accelerate
 !===================================================================================================================================
-subroutine setuppoisson_fs_heights(utmp,vtmp,wtmp,vof_phase,rho,dt,A,cvof)
+subroutine setuppoisson_fs_heights(utmp,vtmp,wtmp,vof_phase,rho,dt,A,cvof,bub_id)
   use module_grid
   use module_freesurface
   use module_IO
@@ -1310,7 +1309,7 @@ subroutine setuppoisson_fs_heights(utmp,vtmp,wtmp,vof_phase,rho,dt,A,cvof)
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: utmp,vtmp,wtmp
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: cvof
   real(8), dimension(is:ie,js:je,ks:ke,8), intent(inout) :: A
-  integer, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: vof_phase
+  integer, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: vof_phase, bub_id
   real(8), intent(in) :: dt, rho
   integer :: i,j,k,nbr
   integer :: reqd(24),stat(MPI_STATUS_SIZE,24)
@@ -1371,7 +1370,7 @@ contains
     P_gx = 0d0; P_gy = 0d0; P_gz = 0d0
     do k=ks,ke; do j=js,je; do i=is,ie
        Source = 0.d0
-       if (implode(i,j,k)>0 .and. vof_phase(i,j,k) == 1) Source = v_source(i,j,k)
+       if ( implode_flag(bub_id(i,j,k)) .and. vof_phase(i,j,k) == 1) Source = v_source(i,j,k)
        A(i,j,k,1) = dt/(dx(i)*dx(i)*rho)
        A(i,j,k,2) = dt/(dx(i)*dx(i)*rho)
        A(i,j,k,3) = dt/(dy(j)*dy(j)*rho)
@@ -1394,8 +1393,6 @@ contains
                vof_phase(i,j,k-1),vof_phase(i,j,k+1),vof_phase(i,j,k)
           write(*,'("Pcmask 1-7: ",7I8)')pcmask(i-1,j,k),pcmask(i+1,j,k),pcmask(i,j-1,k),pcmask(i,j+1,k),&
                pcmask(i,j,k-1),pcmask(i,j,k+1),pcmask(i,j,k)
-          write(*,'("Implode_flags 1-7: ",7I8)')implode(i-1,j,k),implode(i+1,j,k),implode(i,j-1,k),implode(i,j+1,k),&
-               implode(i,j,k-1),implode(i,j,k+1),implode(i,j,k)
           write(*,'("S_v 1-7: ",7e14.5)')v_source(i-1,j,k),v_source(i+1,j,k),v_source(i,j-1,k),v_source(i,j+1,k),&
                v_source(i,j,k-1),v_source(i,j,k+1),v_source(i,j,k)
           write(*,'("Velocities in div u: ",6e14.5)')utmp(i,j,k),utmp(i-1,j,k),vtmp(i,j,k),vtmp(i,j-1,k),&
@@ -1403,27 +1400,30 @@ contains
        endif
 !===============================================================================================================
        !----Cav-liquid neighbours, set P_g in cavity cells
-       if (implode(i,j,k)==0) then
+       if (.not.implode_flag(bub_id(i,j,k))) then
           ! Set Laplace jumps for surface tension 
           if(vof_phase(i,j,k)==1) then
              if (vof_phase(i+1,j,k)==0) then
                 x_mod(i,j,k)=-1.d0*height(i+1,j,k,1)*dx(i)
                 !if (x_mod(i,j,k) /= x_mod(i,j,k)) call mod_details(x_mod(i,j,k),i,j,k,.true.,1)
-                if (x_mod(i,j,k)>dx(i) .or. x_mod(i,j,k)<limit*dxh(i)) call staggered_cut(i,j,k,x_mod(i,j,k),vof_phase(i,j,k),1)
+                if (x_mod(i,j,k)>dx(i) .or. x_mod(i,j,k)<limit*dxh(i))&
+                     call staggered_cut(cvof,i,j,k,x_mod(i,j,k),vof_phase(i,j,k),1)
                 if (x_mod(i,j,k) /= x_mod(i,j,k)) call mod_details(x_mod(i,j,k),i,j,k,.false.,1)
                 !write(121,10)x(i+1),y(j),z(k),-x_mod(i,j,k),0d0,0d0
              endif
              if (vof_phase(i,j+1,k)==0) then
                 y_mod(i,j,k)=-1.d0*height(i,j+1,k,3)*dy(j)
                 !if (y_mod(i,j,k) /= y_mod(i,j,k)) call mod_details(y_mod(i,j,k),i,j,k,.true.,3)
-                if (y_mod(i,j,k)>dy(j) .or. y_mod(i,j,k)<limit*dxh(i)) call staggered_cut(i,j,k,y_mod(i,j,k),vof_phase(i,j,k),2)
+                if (y_mod(i,j,k)>dy(j) .or. y_mod(i,j,k)<limit*dxh(i))&
+                     call staggered_cut(cvof,i,j,k,y_mod(i,j,k),vof_phase(i,j,k),2)
                 if (y_mod(i,j,k) /= y_mod(i,j,k)) call mod_details(y_mod(i,j,k),i,j,k,.false.,3)
                 !write(121,10)x(i),y(j+1),z(k),0d0,-y_mod(i,j,k),0d0
              endif
              if (vof_phase(i,j,k+1)==0) then
                 z_mod(i,j,k)=-1.d0*height(i,j,k+1,5)*dz(k)
                 !if (z_mod(i,j,k) /= z_mod(i,j,k)) call mod_details(z_mod(i,j,k),i,j,k,.true.,5)
-                if (z_mod(i,j,k)>dz(k) .or. z_mod(i,j,k)<limit*dxh(i)) call staggered_cut(i,j,k,z_mod(i,j,k),vof_phase(i,j,k),3)
+                if (z_mod(i,j,k)>dz(k) .or. z_mod(i,j,k)<limit*dxh(i))&
+                     call staggered_cut(cvof,i,j,k,z_mod(i,j,k),vof_phase(i,j,k),3)
                 if (z_mod(i,j,k) /= z_mod(i,j,k)) call mod_details(z_mod(i,j,k),i,j,k,.false.,5)
                 !write(121,10)x(i),y(j),z(k+1),0d0,0d0,-z_mod(i,j,k)
              endif
@@ -1433,21 +1433,24 @@ contains
              if (vof_phase(i+1,j,k)==1) then
                 x_mod(i,j,k)=height(i,j,k,2)*dx(i)
                 !if (x_mod(i,j,k) /= x_mod(i,j,k)) call mod_details(x_mod(i,j,k),i,j,k,.true.,2)
-                if (x_mod(i,j,k)>dx(i) .or. x_mod(i,j,k)<limit*dxh(i)) call staggered_cut(i,j,k,x_mod(i,j,k),vof_phase(i,j,k),1)
+                if (x_mod(i,j,k)>dx(i) .or. x_mod(i,j,k)<limit*dxh(i))&
+                     call staggered_cut(cvof,i,j,k,x_mod(i,j,k),vof_phase(i,j,k),1)
                 if (x_mod(i,j,k) /= x_mod(i,j,k)) call mod_details(x_mod(i,j,k),i,j,k,.false.,2)
                 !write(121,10)x(i),y(j),z(k),x_mod(i,j,k),0d0,0d0
              endif
              if (vof_phase(i,j+1,k)==1) then
                 y_mod(i,j,k)=height(i,j,k,4)*dy(j)
                 !if (y_mod(i,j,k) /= y_mod(i,j,k)) call mod_details(y_mod(i,j,k),i,j,k,.true.,4)
-                if (y_mod(i,j,k)>dy(j) .or. y_mod(i,j,k)<limit*dxh(i)) call staggered_cut(i,j,k,y_mod(i,j,k),vof_phase(i,j,k),2)
+                if (y_mod(i,j,k)>dy(j) .or. y_mod(i,j,k)<limit*dxh(i))&
+                     call staggered_cut(cvof,i,j,k,y_mod(i,j,k),vof_phase(i,j,k),2)
                 if (y_mod(i,j,k) /= y_mod(i,j,k)) call mod_details(y_mod(i,j,k),i,j,k,.false.,4)
                 !write(121,10)x(i),y(j),z(k),0d0,y_mod(i,j,k),0d0
              endif
              if (vof_phase(i,j,k+1)==1) then
                 z_mod(i,j,k)=height(i,j,k,6)*dz(k)
                 !if (z_mod(i,j,k) /= z_mod(i,j,k)) call mod_details(z_mod(i,j,k),i,j,k,.true.,6)
-                if (z_mod(i,j,k)>dz(k) .or. z_mod(i,j,k)<limit*dxh(i)) call staggered_cut(i,j,k,z_mod(i,j,k),vof_phase(i,j,k),3)
+                if (z_mod(i,j,k)>dz(k) .or. z_mod(i,j,k)<limit*dxh(i))&
+                     call staggered_cut(cvof,i,j,k,z_mod(i,j,k),vof_phase(i,j,k),3)
                 if (z_mod(i,j,k) /= z_mod(i,j,k)) call mod_details(z_mod(i,j,k),i,j,k,.false.,6)
                 !write(121,10)x(i),y(j),z(k),0d0,0d0,z_mod(i,j,k)
              endif
@@ -1460,35 +1463,50 @@ contains
     call MPI_WAITALL(12,reqd(1:12),stat(:,1:12),ierr)
     
     do k=ks,ke; do j=js,je; do i=is,ie
-       if(vof_phase(i,j,k)==1) then
+       if ( (.not.implode_flag(bub_id(i,j,k))) .and. vof_phase(i,j,k)==1) then
           do l=-1,1,2
              if (vof_phase(i+l,j,k)==0) then
-                if (kap(i+l,j,k)>1.0d6) then
+                if (kap(i+l,j,k)>1.0d5) then
                    avg_kap = kap(i,j,k)
                 else
                    wt_g=x_mod(i+(l-1)/2,j,k)/dx(i)
                    wt_l=1.0d0-wt_g
+                   if (ABS(wt_g + wt_l - 1.0d0)>1d-12) then
+                      write(*,*)"WARNING, weights issues in staggered cut"
+                      write(*,'("Weights g, l : ",2e14.5)')wt_g, wt_l
+                      write(*,'("Curvatures g, l : ",2e14.5)')kap(i,j,k), kap(i+l,j,k)
+                   endif
                    avg_kap=kap(i,j,k)*wt_g+kap(i+l,j,k)*wt_l
                 endif
                 P_gx(i,j,k) = sigma*avg_kap/dx(i) !!filaments and droplets of one cell will be an issue here
              endif
              if (vof_phase(i,j+l,k)==0) then
-                if (kap(i,j+l,k)>1.0d6) then
+                if (kap(i,j+l,k)>1.0d5) then
                    avg_kap = kap(i,j,k)
                 else
                    wt_g=y_mod(i,j+(l-1)/2,k)/dy(j)
                    wt_l=1.0d0-wt_g
-                   avg_kap=kap(i,j,k)*wt_g/(wt_g+wt_l)+kap(i,j+l,k)*wt_l/(wt_g+wt_l)
+                   if (ABS(wt_g + wt_l - 1.0d0)>1d-12) then
+                      write(*,*)"WARNING, weights issues in staggered cut"
+                      write(*,'("Weights g, l : ",2e14.5)')wt_g, wt_l
+                      write(*,'("Curvatures g, l : ",2e14.5)')kap(i,j,k), kap(i,j+l,k)
+                   endif
+                   avg_kap=kap(i,j,k)*wt_g+kap(i,j+l,k)*wt_l
                 endif
                 P_gy(i,j,k) = sigma*avg_kap/dy(j)
              endif
              if (vof_phase(i,j,k+l)==0) then
-                if (kap(i,j,k+l)>1.0d6) then
+                if (kap(i,j,k+l)>1.0d5) then
                    avg_kap = kap(i,j,k)
                 else
                    wt_g=z_mod(i,j,k+(l-1)/2)/dz(k)
                    wt_l=1.0d0-wt_g
-                   avg_kap=kap(i,j,k)*wt_g/(wt_g+wt_l)+kap(i,j,k+l)*wt_l/(wt_g+wt_l)
+                   if (ABS(wt_g + wt_l - 1.0d0)>1d-12) then
+                      write(*,*)"WARNING, weights issues in staggered cut"
+                      write(*,'("Weights g, l : ",2e14.5)')wt_g, wt_l
+                      write(*,'("Curvatures g, l : ",2e14.5)')kap(i,j,k), kap(i,j,k+l)
+                   endif
+                   avg_kap=kap(i,j,k)*wt_g+kap(i,j,k+l)*wt_l
                 endif
                 P_gz(i,j,k) = sigma*avg_kap/dz(k)
              endif
@@ -1499,7 +1517,7 @@ contains
     call MPI_WAITALL(12,reqd(1:12),stat(:,1:12),ierr)
     !--------------------------------------------------------------------------------------------------------
     do k=ks,ke; do j=js,je; do i=is,ie
-       if (vof_phase(i,j,k)==0 .and. implode(i,j,k)==0) then
+       if (vof_phase(i,j,k)==0 .and. (.not.implode_flag(bub_id(i,j,k))) ) then
           
           A(i,j,k,1) = 2.d0*dt/((dx(i)+x_mod(i-1,j,k))*x_mod(i-1,j,k)*rho)
           A(i,j,k,2) = 2.d0*dt/((dx(i)+x_mod(i  ,j,k))*x_mod(i  ,j,k)*rho)
@@ -1523,111 +1541,120 @@ contains
 
     if (.not. RP_test) call Poisson_BCs(A)
   end subroutine liq_gas2
-  subroutine staggered_cut(i,j,k,theta,phase,d)
-    implicit none
-    real(8) :: theta
-    integer :: i,j,k,phase,d
-    integer :: i0,j0,k0,loc(3)
-    real(8), dimension(-1:1,-1:1,-1:1) :: stencil3x3
-    real(8) :: n_ref(3), n_nbr(3), x0(3), dc(3), n_stag(3), nr(3)
-    real(8) :: alpha2, c_ref, c_nbr, c_stag, c_min=1.0d-1, test
-    real(8) :: al3dnew, FL3DNEW
-
-    if (.not.(phase==1 .or. phase==0)) call pariserror('cell phase has to be 0 or 1 in staggered_cut call')
-    
-    loc = 0
-    loc(d) = 1
-    !liq_gas, make general
-    !get normals
-    do i0=-1,1; do j0=-1,1; do k0=-1,1
-       stencil3x3(i0,j0,k0) = cvof(i+i0,j+j0,k+k0)
-    enddo;enddo;enddo
-    call mycs(stencil3x3,n_ref)
-    do i0=-1,1; do j0=-1,1; do k0=-1,1
-       stencil3x3(i0,j0,k0) = cvof(i+loc(1)+i0,j+loc(2)+j0,k+loc(3)+k0)
-    enddo;enddo;enddo
-    call mycs(stencil3x3,n_nbr)
-    !=====================
-    alpha2 = al3dnew(n_ref,cvof(i,j,k))
-    x0 = 0.0d0; x0(d) = 0.5d0 
-    dc = 1.0d0; dc(d) = 0.5d0
-    c_ref = FL3DNEW(n_ref,alpha2,x0,dc)
-   
-    alpha2 = al3dnew(n_nbr,cvof(i+loc(1),j+loc(2),k+loc(2)))
-    x0=0.0d0
-    dc = 1.0d0; dc(d) = 0.5d0
-    c_nbr = FL3DNEW(n_nbr,alpha2,x0,dc)
-    c_stag = c_ref+c_nbr
-    
-    if (min(c_ref,c_nbr)>c_min) then
-       nr = 0.5d0*(n_ref+n_nbr)
-       n_stag(1) = nr(1)/(ABS(nr(1))+ABS(nr(2))+ABS(nr(3)))
-       n_stag(2) = nr(2)/(ABS(nr(1))+ABS(nr(2))+ABS(nr(3)))
-       n_stag(3) = nr(3)/(ABS(nr(1))+ABS(nr(2))+ABS(nr(3)))
-    else
-       if (phase==1) then
-          n_stag=n_ref 
-       else
-          n_stag=n_nbr
-       endif
-    endif
-
-    if (ABS((ABS(n_stag(1))+ABS(n_stag(2))+ABS(n_stag(3)))-1.0d0) > 1.0d-12) then
-       write(*,*)'Normals not normalised'
-       call pariserror('Normals not normalised')
-    endif
-    
-    alpha2=al3dnew(n_stag,c_stag)
-    if (ABS(n_stag(d))>1.0d-12) then
-       test = (alpha2 - (n_stag(1)+n_stag(2)+n_stag(3)-n_stag(d))/2.0d0)/n_stag(d)
-       if (phase==1) then
-          theta = dxh(i)*(1.0d0-test)
-       else
-          theta = dxh(i)*test
-       endif
-       if (theta>dxh(i)) theta = dxh(i)
-       if (theta<limit*dxh(i)) theta = limit*dxh(i)
-    else
-       theta = dxh(i) !set to standard length if no cut in staggered cell can be found
-    endif
-  end subroutine staggered_cut
-  subroutine mod_details(h,i,j,k,height,d)
-    use module_flow
-    implicit none
-    real(8) :: h
-    integer :: i,j,k,d
-    logical :: height
-    integer :: ind(1:3)
-
-    ind = 0
-    open(unit=70,file="mod_details.txt",position="append")
-    write(70,'("Mod in direction ",I4,": ",e14.5)')d,h
-    write(70,'("Time step ",I10)')itimestep
-    if (height) then
-       write(70,'("NaN using Heights")')
-    else
-       write(70,'("NaN using staggered cut")')
-    endif
-    write(70,'("Limits: ",6I8)')is,ie,js,je,ks,ke
-    write(70,'("ijk rank",4I4)')i,j,k,rank
-    write(70,'("x, y, z: ",3e14.5)')x(i),y(j),z(k)
-    write(70,'("Cvof 1-7: ",7e14.5)')cvof(i-1,j,k),cvof(i+1,j,k),cvof(i,j-1,k),cvof(i,j+1,k),&
-         cvof(i,j,k-1),cvof(i,j,k+1),cvof(i,j,k)
-    write(70,'("Phase 1-7: ",7I8)')vof_phase(i-1,j,k),vof_phase(i+1,j,k),vof_phase(i,j-1,k),vof_phase(i,j+1,k),&
-         vof_phase(i,j,k-1),vof_phase(i,j,k+1),vof_phase(i,j,k)
-    write(70,'("Pcmask 1-7: ",7I8)')pcmask(i-1,j,k),pcmask(i+1,j,k),pcmask(i,j-1,k),pcmask(i,j+1,k),&
-         pcmask(i,j,k-1),pcmask(i,j,k+1),pcmask(i,j,k)
-    write(70,'("Implode_flags 1-7: ",7I8)')implode(i-1,j,k),implode(i+1,j,k),implode(i,j-1,k),implode(i,j+1,k),&
-         implode(i,j,k-1),implode(i,j,k+1),implode(i,j,k)
-    write(70,'("S_v 1-7: ",7e14.5)')v_source(i-1,j,k),v_source(i+1,j,k),v_source(i,j-1,k),v_source(i,j+1,k),&
-         v_source(i,j,k-1),v_source(i,j,k+1),v_source(i,j,k)
-    write(70,'("Velocities in div u: ",6e14.5)')utmp(i,j,k),utmp(i-1,j,k),vtmp(i,j,k),vtmp(i,j-1,k),&
-         wtmp(i,j,k),wtmp(i,j,k-1)
-    write(70,'("  ")')
-    close(70)
-  end subroutine mod_details
 end subroutine setuppoisson_fs_heights
+!==============================================================================================================
+subroutine staggered_cut(cvof,i,j,k,theta,phase,d)
+  use module_grid
+  use module_freesurface
+  implicit none
+  real(8) :: theta
+  integer :: i,j,k,phase,d
+  integer :: i0,j0,k0,loc(3)
+  real(8), dimension(-1:1,-1:1,-1:1) :: stencil3x3
+  real(8) :: n_ref(3), n_nbr(3), x0(3), dc(3), n_stag(3), nr(3)
+  real(8) :: alpha2, c_ref, c_nbr, c_stag, c_min=1.0d-1, test
+  real(8) :: al3dnew, FL3DNEW
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: cvof
 
+  if (.not.(phase==1 .or. phase==0)) call pariserror('cell phase has to be 0 or 1 in staggered_cut call')
+
+  loc = 0
+  loc(d) = 1
+  theta = dxh(is)
+  !liq_gas, make general
+  !get normals
+  do i0=-1,1; do j0=-1,1; do k0=-1,1
+     stencil3x3(i0,j0,k0) = cvof(i+i0,j+j0,k+k0)
+  enddo;enddo;enddo
+  call mycs(stencil3x3,n_ref)
+  do i0=-1,1; do j0=-1,1; do k0=-1,1
+     stencil3x3(i0,j0,k0) = cvof(i+loc(1)+i0,j+loc(2)+j0,k+loc(3)+k0)
+  enddo;enddo;enddo
+  call mycs(stencil3x3,n_nbr)
+  !=====================
+  alpha2 = al3dnew(n_ref,cvof(i,j,k))
+  x0 = 0.0d0; x0(d) = 0.5d0 
+  dc = 1.0d0; dc(d) = 0.5d0
+  c_ref = FL3DNEW(n_ref,alpha2,x0,dc)
+
+  alpha2 = al3dnew(n_nbr,cvof(i+loc(1),j+loc(2),k+loc(2)))
+  x0=0.0d0
+  dc = 1.0d0; dc(d) = 0.5d0
+  c_nbr = FL3DNEW(n_nbr,alpha2,x0,dc)
+  c_stag = c_ref+c_nbr
+
+  if (min(c_ref,c_nbr)>c_min) then
+     nr = 0.5d0*(n_ref+n_nbr)
+     n_stag(1) = nr(1)/(ABS(nr(1))+ABS(nr(2))+ABS(nr(3)))
+     n_stag(2) = nr(2)/(ABS(nr(1))+ABS(nr(2))+ABS(nr(3)))
+     n_stag(3) = nr(3)/(ABS(nr(1))+ABS(nr(2))+ABS(nr(3)))
+  else
+     if (phase==1) then
+        n_stag=n_ref 
+     else
+        n_stag=n_nbr
+     endif
+  endif
+
+  if (ABS((ABS(n_stag(1))+ABS(n_stag(2))+ABS(n_stag(3)))-1.0d0) > 1.0d-12) then
+     write(*,*)'Normals not normalised'
+     write(*,'("Normals: ",3e14.5)')n_stag(1:3)
+     call mod_details(-1.0d2,i,j,k,.false.,d)
+     call pariserror('Normals not normalised')
+  endif
+
+  alpha2=al3dnew(n_stag,c_stag)
+  if (ABS(n_stag(d))>1.0d-12) then
+     test = (alpha2 - (n_stag(1)+n_stag(2)+n_stag(3)-n_stag(d))/2.0d0)/n_stag(d)
+     if (phase==1) then
+        theta = dxh(i)*(1.0d0-test)
+     else
+        theta = dxh(i)*test
+     endif
+     if (theta>dxh(i)) theta = dxh(i)
+     if (theta<limit*dxh(i)) theta = limit*dxh(i)
+  else
+     theta = dxh(i) !set to standard length if no cut in staggered cell can be found
+  endif
+end subroutine staggered_cut
+!================================================================================================================
+subroutine mod_details(h,i,j,k,height,d)
+  use module_grid
+  use module_VOF
+  use module_freesurface
+  use module_flow
+  implicit none
+  real(8) :: h
+  integer :: i,j,k,d
+  logical :: height
+  integer :: ind(1:3)
+
+  ind = 0
+  open(unit=70,file="mod_details.txt",position="append")
+  write(70,'("Mod in direction ",I4,": ",e14.5)')d,h
+  write(70,'("Time step ",I10)')itimestep
+  if (height) then
+     write(70,'("NaN using Heights")')
+  else
+     write(70,'("NaN using staggered cut")')
+  endif
+  write(70,'("Limits: ",6I8)')is,ie,js,je,ks,ke
+  write(70,'("ijk rank",4I4)')i,j,k,rank
+  write(70,'("x, y, z: ",3e14.5)')x(i),y(j),z(k)
+  write(70,'("Cvof 1-7: ",7e14.5)')cvof(i-1,j,k),cvof(i+1,j,k),cvof(i,j-1,k),cvof(i,j+1,k),&
+       cvof(i,j,k-1),cvof(i,j,k+1),cvof(i,j,k)
+  write(70,'("Phase 1-7: ",7I8)')vof_phase(i-1,j,k),vof_phase(i+1,j,k),vof_phase(i,j-1,k),vof_phase(i,j+1,k),&
+       vof_phase(i,j,k-1),vof_phase(i,j,k+1),vof_phase(i,j,k)
+  write(70,'("Pcmask 1-7: ",7I8)')pcmask(i-1,j,k),pcmask(i+1,j,k),pcmask(i,j-1,k),pcmask(i,j+1,k),&
+       pcmask(i,j,k-1),pcmask(i,j,k+1),pcmask(i,j,k)
+  write(70,'("S_v 1-7: ",7e14.5)')v_source(i-1,j,k),v_source(i+1,j,k),v_source(i,j-1,k),v_source(i,j+1,k),&
+       v_source(i,j,k-1),v_source(i,j,k+1),v_source(i,j,k)
+  write(70,'("Velocities in div u: ",6e14.5)')u(i,j,k),u(i-1,j,k),v(i,j,k),v(i,j-1,k),&
+       w(i,j,k),w(i,j,k-1)
+  write(70,'("  ")')
+  close(70)
+end subroutine mod_details
+!=============================================================================================================================
 subroutine curvature_sphere(t)
   use module_VOF
   use module_surface_tension
@@ -1694,3 +1721,236 @@ contains
   end subroutine err_curve
 end subroutine curvature_sphere
 !=======================================================================================================
+subroutine remove_drops(phase,vof,fill_all)
+  use module_grid
+  use module_freesurface
+  implicit none
+  include 'mpif.h'
+  integer, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: phase
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: vof
+  logical :: clearcells, fill, fill_all
+  integer :: i,j,k,ierr
+  integer :: inr,jnr,knr,phase_ref
+
+  fill = .false.
+  do i=is,ie; do j=js,je; do k=ks,ke
+     clearcells = .true.
+     !Check "shell" at 5 cubed
+     phase_ref=phase(i-2,j-2,k-2)
+     do inr=-2,2,4; do jnr=-2,2; do knr=-2,2
+        if (.not.(phase(i+inr,j+jnr,k+knr)==phase_ref)) then
+           clearcells = .false.
+           exit
+        endif
+     enddo; enddo; enddo
+     do jnr=-2,2,4; do inr=-2,2; do knr=-2,2
+        if (.not.(phase(i+inr,j+jnr,k+knr)==phase_ref)) then
+           clearcells = .false.
+           exit
+        endif
+     enddo; enddo; enddo
+     do knr=-2,2,4; do inr=-2,2; do jnr=-2,2
+        if (.not.(phase(i+inr,j+jnr,k+knr)==phase_ref)) then
+           clearcells = .false.
+           exit
+        endif
+     enddo; enddo; enddo
+     !Set "core" of 3 cubed to ref phase
+     if (clearcells) then
+        do inr=-2,2; do jnr=-2,2; do knr=-2,2
+           if (phase_ref==0) then
+              vof(i+inr,j+jnr,k+knr)=0.00d0
+           else
+              vof(i+inr,j+jnr,k+knr)=1.00d0
+           endif
+        enddo; enddo; enddo
+        fill =.true.
+     endif
+  enddo; enddo; enddo
+  call MPI_ALLREDUCE(fill,fill_all, 1, MPI_LOGICAL, MPI_LOR, MPI_COMM_Active, ierr)
+end subroutine remove_drops
+
+subroutine setuppoisson_fs_hypre(utmp,vtmp,wtmp,vof_phase,rho,dt,A,cvof,height,kap,bub_id)
+  use module_grid
+  use module_BC
+  use module_freesurface
+  use module_IO
+  use module_2phase
+  implicit none
+  include 'mpif.h'
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax,6), intent(in) :: height
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: utmp,vtmp,wtmp
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: cvof,kap
+  real(8), dimension(is:ie,js:je,ks:ke,8), intent(inout) :: A
+  integer, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: vof_phase, bub_id
+  real(8), intent(in) :: dt, rho
+  integer :: i,j,k,nbr,ierr,l
+  integer :: reqd(12),stat(MPI_STATUS_SIZE,12)
+  real(8) :: Source
+  real(8) :: wt_g, wt_l, avg_kap
+  
+  !OPEN(unit=121,file='mods.txt')
+  x_mod=dxh((is+ie)/2); y_mod=dyh((js+je)/2); z_mod=dzh((ks+ke)/2) !assumes an unstretched grid
+  P_gx = 0d0; P_gy = 0d0; P_gz = 0d0
+  do k=ks,ke; do j=js,je; do i=is,ie
+     Source = 0.d0
+     if (implode_flag(bub_id(i,j,k)) .and. vof_phase(i,j,k) == 1) Source = v_source(i,j,k)
+     A(i,j,k,1) = dt/(dx(i)*dx(i)*rho)
+     A(i,j,k,2) = dt/(dx(i)*dx(i)*rho)
+     A(i,j,k,3) = dt/(dy(j)*dy(j)*rho)
+     A(i,j,k,4) = dt/(dy(j)*dy(j)*rho)
+     A(i,j,k,5) = dt/(dz(k)*dz(k)*rho)
+     A(i,j,k,6) = dt/(dz(k)*dz(k)*rho)
+     A(i,j,k,7) = sum(A(i,j,k,1:6))
+     A(i,j,k,8) =  -(Source + (utmp(i,j,k)-utmp(i-1,j,k))/dx(i) &
+          +  (vtmp(i,j,k)-vtmp(i,j-1,k))/dy(j) &
+          +  (wtmp(i,j,k)-wtmp(i,j,k-1))/dz(k) )
+     ! Debugging A8 NaN
+     if (A(i,j,k,8) /= A(i,j,k,8)) then
+        write(*,'("A8 NaN, liq_gas at x y z: ",3e14.5)')x(i),y(j),z(k)
+        write(*,'("Limits: ",6I8)')is,ie,js,je,ks,ke
+        write(*,'("ijk rank",4I4)')i,j,k,rank
+        write(*,'("A branches: ",8e14.5)')A(i,j,k,:)
+        write(*,'("Cvof 1-7: ",7e14.5)')cvof(i-1,j,k),cvof(i+1,j,k),cvof(i,j-1,k),cvof(i,j+1,k),&
+             cvof(i,j,k-1),cvof(i,j,k+1),cvof(i,j,k)
+        write(*,'("Phase 1-7: ",7I8)')vof_phase(i-1,j,k),vof_phase(i+1,j,k),vof_phase(i,j-1,k),vof_phase(i,j+1,k),&
+             vof_phase(i,j,k-1),vof_phase(i,j,k+1),vof_phase(i,j,k)
+        write(*,'("Pcmask 1-7: ",7I8)')pcmask(i-1,j,k),pcmask(i+1,j,k),pcmask(i,j-1,k),pcmask(i,j+1,k),&
+             pcmask(i,j,k-1),pcmask(i,j,k+1),pcmask(i,j,k)
+        write(*,'("S_v 1-7: ",7e14.5)')v_source(i-1,j,k),v_source(i+1,j,k),v_source(i,j-1,k),v_source(i,j+1,k),&
+             v_source(i,j,k-1),v_source(i,j,k+1),v_source(i,j,k)
+        write(*,'("Velocities in div u: ",6e14.5)')utmp(i,j,k),utmp(i-1,j,k),vtmp(i,j,k),vtmp(i,j-1,k),&
+             wtmp(i,j,k),wtmp(i,j,k-1)
+     endif
+     !===============================================================================================================
+     !----Cav-liquid neighbours, set P_g in cavity cells
+     if (.not.implode_flag(bub_id(i,j,k))) then
+        ! Set Laplace jumps for surface tension 
+        if(vof_phase(i,j,k)==1) then
+           if (vof_phase(i+1,j,k)==0) then
+              x_mod(i,j,k)=-1.d0*height(i+1,j,k,1)*dx(i)
+              !if (x_mod(i,j,k) /= x_mod(i,j,k)) call mod_details(x_mod(i,j,k),i,j,k,.true.,1)
+              if (x_mod(i,j,k)>dx(i) .or. x_mod(i,j,k)<limit*dxh(i))&
+                   call staggered_cut(cvof,i,j,k,x_mod(i,j,k),vof_phase(i,j,k),1)
+              if (x_mod(i,j,k) /= x_mod(i,j,k)) call mod_details(x_mod(i,j,k),i,j,k,.false.,1)
+              !write(121,10)x(i+1),y(j),z(k),-x_mod(i,j,k),0d0,0d0
+           endif
+           if (vof_phase(i,j+1,k)==0) then
+              y_mod(i,j,k)=-1.d0*height(i,j+1,k,3)*dy(j)
+              !if (y_mod(i,j,k) /= y_mod(i,j,k)) call mod_details(y_mod(i,j,k),i,j,k,.true.,3)
+              if (y_mod(i,j,k)>dy(j) .or. y_mod(i,j,k)<limit*dxh(i))&
+                   call staggered_cut(cvof,i,j,k,y_mod(i,j,k),vof_phase(i,j,k),2)
+              if (y_mod(i,j,k) /= y_mod(i,j,k)) call mod_details(y_mod(i,j,k),i,j,k,.false.,3)
+              !write(121,10)x(i),y(j+1),z(k),0d0,-y_mod(i,j,k),0d0
+           endif
+           if (vof_phase(i,j,k+1)==0) then
+              z_mod(i,j,k)=-1.d0*height(i,j,k+1,5)*dz(k)
+              !if (z_mod(i,j,k) /= z_mod(i,j,k)) call mod_details(z_mod(i,j,k),i,j,k,.true.,5)
+              if (z_mod(i,j,k)>dz(k) .or. z_mod(i,j,k)<limit*dxh(i))&
+                   call staggered_cut(cvof,i,j,k,z_mod(i,j,k),vof_phase(i,j,k),3)
+              if (z_mod(i,j,k) /= z_mod(i,j,k)) call mod_details(z_mod(i,j,k),i,j,k,.false.,5)
+              !write(121,10)x(i),y(j),z(k+1),0d0,0d0,-z_mod(i,j,k)
+           endif
+        endif ! Cavity cell
+
+        if(vof_phase(i,j,k)==0) then
+           if (vof_phase(i+1,j,k)==1) then
+              x_mod(i,j,k)=height(i,j,k,2)*dx(i)
+              !if (x_mod(i,j,k) /= x_mod(i,j,k)) call mod_details(x_mod(i,j,k),i,j,k,.true.,2)
+              if (x_mod(i,j,k)>dx(i) .or. x_mod(i,j,k)<limit*dxh(i))&
+                   call staggered_cut(cvof,i,j,k,x_mod(i,j,k),vof_phase(i,j,k),1)
+              if (x_mod(i,j,k) /= x_mod(i,j,k)) call mod_details(x_mod(i,j,k),i,j,k,.false.,2)
+              !write(121,10)x(i),y(j),z(k),x_mod(i,j,k),0d0,0d0
+           endif
+           if (vof_phase(i,j+1,k)==1) then
+              y_mod(i,j,k)=height(i,j,k,4)*dy(j)
+              !if (y_mod(i,j,k) /= y_mod(i,j,k)) call mod_details(y_mod(i,j,k),i,j,k,.true.,4)
+              if (y_mod(i,j,k)>dy(j) .or. y_mod(i,j,k)<limit*dxh(i))&
+                   call staggered_cut(cvof,i,j,k,y_mod(i,j,k),vof_phase(i,j,k),2)
+              if (y_mod(i,j,k) /= y_mod(i,j,k)) call mod_details(y_mod(i,j,k),i,j,k,.false.,4)
+              !write(121,10)x(i),y(j),z(k),0d0,y_mod(i,j,k),0d0
+           endif
+           if (vof_phase(i,j,k+1)==1) then
+              z_mod(i,j,k)=height(i,j,k,6)*dz(k)
+              !if (z_mod(i,j,k) /= z_mod(i,j,k)) call mod_details(z_mod(i,j,k),i,j,k,.true.,6)
+              if (z_mod(i,j,k)>dz(k) .or. z_mod(i,j,k)<limit*dxh(i))&
+                   call staggered_cut(cvof,i,j,k,z_mod(i,j,k),vof_phase(i,j,k),3)
+              if (z_mod(i,j,k) /= z_mod(i,j,k)) call mod_details(z_mod(i,j,k),i,j,k,.false.,6)
+              !write(121,10)x(i),y(j),z(k),0d0,0d0,z_mod(i,j,k)
+           endif
+        endif ! Liquid cell
+     endif ! we are not imploding
+  enddo; enddo; enddo
+10 format(6e14.5)
+  !close(121)    
+  call ghost_x(x_mod,1,reqd(1:4)); call ghost_y(y_mod,1,reqd(5:8)); call ghost_z(z_mod,1,reqd(9:12)) 
+  call MPI_WAITALL(12,reqd(1:12),stat(:,1:12),ierr)
+
+  do k=ks,ke; do j=js,je; do i=is,ie
+     if(vof_phase(i,j,k)==1) then
+        do l=-1,1,2
+           if (vof_phase(i+l,j,k)==0) then
+              if (kap(i+l,j,k)>1.0d6) then
+                 avg_kap = kap(i,j,k)
+              else
+                 wt_g=x_mod(i+(l-1)/2,j,k)/dx(i)
+                 wt_l=1.0d0-wt_g
+                 avg_kap=kap(i,j,k)*wt_g+kap(i+l,j,k)*wt_l
+              endif
+              P_gx(i,j,k) = sigma*avg_kap/dx(i) !!filaments and droplets of one cell will be an issue here
+           endif
+           if (vof_phase(i,j+l,k)==0) then
+              if (kap(i,j+l,k)>1.0d6) then
+                 avg_kap = kap(i,j,k)
+              else
+                 wt_g=y_mod(i,j+(l-1)/2,k)/dy(j)
+                 wt_l=1.0d0-wt_g
+                 avg_kap=kap(i,j,k)*wt_g/(wt_g+wt_l)+kap(i,j+l,k)*wt_l/(wt_g+wt_l)
+              endif
+              P_gy(i,j,k) = sigma*avg_kap/dy(j)
+           endif
+           if (vof_phase(i,j,k+l)==0) then
+              if (kap(i,j,k+l)>1.0d6) then
+                 avg_kap = kap(i,j,k)
+              else
+                 wt_g=z_mod(i,j,k+(l-1)/2)/dz(k)
+                 wt_l=1.0d0-wt_g
+                 avg_kap=kap(i,j,k)*wt_g/(wt_g+wt_l)+kap(i,j,k+l)*wt_l/(wt_g+wt_l)
+              endif
+              P_gz(i,j,k) = sigma*avg_kap/dz(k)
+           endif
+        enddo
+     endif
+  enddo; enddo; enddo
+  call ghost_x(P_gx,1,reqd(1:4)); call ghost_y(P_gy,1,reqd(5:8)); call ghost_z(P_gz,1,reqd(9:12)) 
+  call MPI_WAITALL(12,reqd(1:12),stat(:,1:12),ierr)
+  !--------------------------------------------------------------------------------------------------------
+  do k=ks,ke; do j=js,je; do i=is,ie
+     if (vof_phase(i,j,k)==0 .and. .not.implode_flag(bub_id(i,j,k))) then
+
+        A(i,j,k,1) = 2.d0*dt/((dx(i)+x_mod(i-1,j,k))*x_mod(i-1,j,k)*rho)
+        A(i,j,k,2) = 2.d0*dt/((dx(i)+x_mod(i  ,j,k))*x_mod(i  ,j,k)*rho)
+        A(i,j,k,3) = 2.d0*dt/((dy(j)+y_mod(i,j-1,k))*y_mod(i,j-1,k)*rho)
+        A(i,j,k,4) = 2.d0*dt/((dy(j)+y_mod(i,j  ,k))*y_mod(i,j  ,k)*rho)
+        A(i,j,k,5) = 2.d0*dt/((dz(k)+z_mod(i,j,k-1))*z_mod(i,j,k-1)*rho)
+        A(i,j,k,6) = 2.d0*dt/((dz(k)+z_mod(i,j,k  ))*z_mod(i,j,k  )*rho)
+        A(i,j,k,7) = sum(A(i,j,k,1:6))
+        A(i,j,k,8) = A(i,j,k,8) + A(i,j,k,1)*P_gx(i-1,j,k) + A(i,j,k,2)*P_gx(i+1,j,k)&
+             +A(i,j,k,3)*P_gy(i,j-1,k)+A(i,j,k,4)*P_gy(i,j+1,k)&
+             +A(i,j,k,5)*P_gz(i,j,k-1)+A(i,j,k,6)*P_gz(i,j,k+1)
+        if (A(i,j,k,8) /= A(i,j,k,8)) then
+           write(*,'("A8 NaN, error imminent. Neigbours mods :",6e14.5)')x_mod(i-1,j,k),x_mod(i,j,k),&
+                y_mod(i,j-1,k),y_mod(i,j,k),z_mod(i,j,k-1),z_mod(i,j,k)
+           write(*,'("A8 NaN, error imminent. P_g :",6e14.5,2I8)')P_gx(i-1,j,k),P_gx(i+1,j,k),&
+                P_gy(i,j-1,k),P_gy(i,j+1,k),P_gz(i,j,k-1),P_gz(i,j,k+1),i,k
+        endif
+        if (pcmask(i,j,k).ne.0) write(*,'("Error topology, phase 0, pcmask :",i8)')pcmask(i,j,k)
+     else if (vof_phase(i,j,k)==1) then
+       A(i,j,k,1:6) = 0.0d0 
+       A(i,j,k,7) = 1.0d0
+       A(i,j,k,8) = P_gas(i,j,k) !Should now work for polytropic law and vacuum
+     endif
+  enddo;enddo;enddo
+
+  if (.not. RP_test) call Poisson_BCs(A)
+end subroutine setuppoisson_fs_hypre
