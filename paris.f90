@@ -261,17 +261,6 @@ Program paris
                  if ( nPdomain > 1 ) & 
                       call VOFCommGhost    ! Communicate vof field after cleaning
               end if ! nsteps_clean_debris
-
-!!$              if (curvature_clean) then
-!!$                 call clean_curvature(cleaned)
-!!$                 tot_clean = tot_clean + cleaned
-!!$                 if(mod(itimestep,termout)==0 .and. ii==1) then
-!!$                    if(rank==0) then
-!!$                       write(*,'("Total VOF removed in clean_curvature operation: ",e15.5)')tot_clean
-!!$                    endif
-!!$                 endif
-!!$              endif
-!!$              call check_var_nan("CVOF1",itimestep,cvof)
               
               call my_timer(4)
               call get_all_heights(itimestep)
@@ -281,26 +270,37 @@ Program paris
                    call surfaceForce(du,dv,dw,rho)
               call my_timer(8)
               if (FreeSurface) then
+                 !call fs_sweep(itimestep,time) !Will include all calls below, to be implemented
+                 if (check_stray_liquid .and. mod(itimestep,n_stray_liquid)==0) then
+                    call tag_bubbles(0,itimestep,time)
+                    call check_topology(.false.)
+                    call ReleaseTag2DropTable
+                    if (fill_ghost) then
+                       call clean_debris
+                       call do_all_ghost(cvof)
+                       call get_flags_and_clip(cvof,vof_flag)
+                       call get_vof_phase(cvof) !cvof updated above from min to max
+                    endif
+                 endif
                  if (.not. (test_capwave .or. test_plane)) then
-                    call tag_bubbles(itimestep,time)
-                    if (.not. RP_test) then
-                       call check_topology()
+                    call tag_bubbles(1,itimestep,time)
+                    if (.not.RP_test) then
+                       call check_topology(.true.)
                        if (fill_ghost) then
+                          call clean_debris
                           call do_all_ghost(cvof)
-                          if (itime_scheme==2) call do_all_ghost(cvofold)
                           call get_flags_and_clip(cvof,vof_flag)
                           call get_vof_phase(cvof) !cvof updated above from min to max
                           call ReleaseTag2DropTable
-                          call tag_bubbles(itimestep,time)
+                          call tag_bubbles(1,itimestep,time)
                           call get_all_heights(itimestep)
                        endif
                     endif
                  endif
                  call set_topology(vof_phase,itimestep) !vof_phase updated in vofsweeps
+                 call set_bubble_pressure
                  call my_timer(15)
-              elseif (.not.Freesurface .and. debug_par) then
-                 call get_all_curvatures(tmp,itimestep)
-              endif
+              endif ! FreeSurface
            endif
            if (DoLPP) then
                 call lppsweeps(itimestep,time,ii)  
@@ -342,7 +342,8 @@ Program paris
                  du = du*umask; dv = dv*vmask; dw = dw*wmask
               endif
               call my_timer(2)
-           endif
+
+           endif ! not FreeSurface
            if(Implicit) then   
               call SetupUvel(u,du,rho,mu,rho1,mu1,dt,A)
               if(hypre)then
@@ -397,24 +398,32 @@ Program paris
               call SetupPoisson(u,v,w,umask,vmask,wmask,rho,dt,A,tmp,VolumeSource)
             endif
            else
-              solver_flag = 1
-              call setuppoisson_fs_heights(u,v,w,vof_phase,rho1,dt,A,cvof)
+              if (FS_Hypre) then
+                 call get_all_curvatures(tmp,itimestep)
+                 call setuppoisson_fs_hypre(u,v,w,vof_phase,rho1,dt,A,cvof,height,tmp,tag_id)
+              else
+                 solver_flag = 1
+                 call setuppoisson_fs_heights(u,v,w,vof_phase,rho1,dt,A,cvof,tag_id)
+              endif
            endif
            ! (div u)*dt < epsilon => div u < epsilon/dt => maxresidual : maxerror/dt 
            if(HYPRE)then
-              if (FreeSurface) call pariserror("HYPRE not functional for Free Surface")
+!              if (FreeSurface) call pariserror("HYPRE not functional for Free Surface")
               call poi_solve(A,p,maxError/MaxDt*ErrorScaleHYPRE,maxit,it,HYPRESolverType)
               call do_all_ghost(p)
            else
               if (FreeSurface) then
-                 if (RP_test) call set_RP_pressure(p,rho1)
-                 call FreeSolver(A,p,maxError/MaxDt,beta,maxit,it,ierr,itimestep,time,residual)
+                 if (.not.FS_Hypre) then
+                    if (RP_test) call set_RP_pressure(p,rho1)
+                    call FreeSolver(A,p,maxError/MaxDt,beta,maxit,it,ierr,itimestep,time,residual)
+                 endif
               else
                  call NewSolver(A,p,maxError/MaxDt,beta,maxit,it,ierr)
               endif
            endif
            if(mod(itimestep,termout)==0 .and. ii==1) then
-              if (.not.FreeSurface) call calcResidual(A,p,ResNormOrderPressure,residual)
+              !if (.not.FreeSurface) call calcResidual(A,p,ResNormOrderPressure,residual)
+              call calcResidual(A,p,ResNormOrderPressure,residual)
               if ( DynamicAdjustPoiTol ) then 
                  if (HYPRE .and. residual/(maxError/MaxDt) > 2.d0 ) then  
                     ErrorScaleHYPRE = ErrorScaleHYPRE*0.5d0
@@ -434,7 +443,9 @@ Program paris
            if(out_sub .and. ii==1 .and. mod(itimestep-itimestepRestart,nout)==0) then
               call output5(itimestep/nout,itimestep,2)
            endif
+
            call project_velocity()
+
            if(out_sub .and. ii==1 .and. mod(itimestep-itimestepRestart,nout)==0) then
               call output5(itimestep/nout,itimestep,3)
            endif
@@ -471,23 +482,16 @@ Program paris
               
               if (do_2nd_projection) then
 
-                 !call check_var_nan("uvel3",itimestep,u)
-                 !call check_var_nan("vvel3",itimestep,v)
-                 !call check_var_nan("wvel3",itimestep,w)
                  if(out_sub .and. ii==1 .and. mod(itimestep-itimestepRestart,nout)==0) then
                     call output5(itimestep/nout,itimestep,4)
                  endif
                  solver_flag = 2
-                 call setuppoisson_fs_heights(u,v,w,vof_phase,rho1,dt,A,cvof)
-                 if(HYPRE)then !HYPRE will not work with removed nodes from domain.
-                    call pariserror("HYPRE solver not yet available for Free Surfaces")
-                 else
-                    call FreeSolver(A,p_ext,maxError/MaxDt,beta,maxit,it,ierr,itimestep,time,residual)
-                 endif
+                 call setuppoisson_fs_heights(u,v,w,vof_phase,rho1,dt,A,cvof,tag_id)
+                 call FreeSolver(A,p_ext,5.0d-2,beta,50,it,ierr,itimestep,time,residual)
                  if(mod(itimestep,termout)==0) then
                     if(rank==0) then
-                       write(*,'("FS2:          pressure residual:   ",e7.1,&
-                            &" maxerror: ",e7.1)') residual*dt,maxerror
+                       write(*,'("FS2:   pressure residual, L_inf:   ",e7.1,&
+                            &" maxerror: ",e7.1)') residual,5.0d-2
                        write(*,'("              pressure iterations :",I9)')it
                     endif
                  endif
@@ -517,13 +521,11 @@ Program paris
                  enddo; enddo; enddo
                  call SetVelocityBC(u,v,w,umask,vmask,wmask,time,dt,0) !check this
                  call do_ghost_vector(u,v,w)
-                 !call check_var_nan("uvel4",itimestep,u)
-                 !call check_var_nan("vvel4",itimestep,v)
-                 !call check_var_nan("wvel4",itimestep,w)
               endif
               if (mod(itimestep,nstats)==0 .and. mod(ii,itime_scheme)==0) call discrete_divergence(u,v,w,itimestep/nstats)
               call my_timer(15) 
            endif !Extrapolation
+
 !------------------------------------------------------------------------------------------------
 
 
@@ -579,6 +581,7 @@ Program paris
            if(test_control_droplet) call do_droplet_test(itimestep,time,REAL(nstats*dt,8))
            if ( DoTurbStats .and. time > timeStartTurbStats ) call calcTurbStats(itimestep)
            if( test_KHI2D .or. test_HF ) call h_of_KHI2D(itimestep,time)
+           if (FreeSurface) call pressure_stats(time)
         endif
         if(mod(itimestep,nsteps_probe)==0) then
            call probes
@@ -900,7 +903,7 @@ function get_cfl_and_check(deltaT)
   else
      vmax = 0.d0
      do k=ks,ke; do j=js,je; do i=is,ie
-        if (vof_phase(i,j,k)==0 .and. implode(i,j,k)==0) then
+        if (vof_phase(i,j,k)==0) then
            v_local = sqrt(u(i,j,k)**2 + v(i,j,k)**2 + w(i,j,k)**2)
            vmax = MAX(vmax,v_local)
         endif
@@ -1521,6 +1524,103 @@ end subroutine calcStats
 
    end subroutine calcTurbStats
 !=================================================================================================
+subroutine pressure_stats(t)
+  use module_grid
+  use module_flow
+  use module_VOF
+  use module_freesurface
+  implicit none
+  include "mpif.h"
+  real(8) :: t
+  integer :: i,j,k,ierr
+  real(8) :: p_face(1:6), p_face_global(1:6), p_min, p_max
+  real(8) :: p_liq, p_avg_liq, p_min_global, p_max_global, vol_liq, vol_liq_tot
+
+  p_face = 0.0d0
+  !sum pressures on x+ face
+  if(coords(1)==0) then
+     do j=js,je
+        do k=ks,ke
+           p_face(1) = p_face(1) + p(is,j,k)
+        enddo
+     enddo
+  endif
+  !sum pressures on x- face
+  if(coords(1)==nPx-1) then
+     do j=js,je
+        do k=ks,ke
+           p_face(2) = p_face(2) + p(ie,j,k)
+        enddo
+     enddo
+  endif
+  !sum pressures on y- face
+  if(coords(2)==0) then
+     do i=is,ie
+        do k=ks,ke
+           p_face(3) = p_face(3) + p(i,js,k)
+        enddo
+     enddo
+  endif
+  !sum pressures on y+ face
+  if(coords(2)==nPy-1) then
+     do i=is,ie
+        do k=ks,ke
+           p_face(4) = p_face(4) + p(i,je,k)
+        enddo
+     enddo
+  endif
+  !sum pressures on z- face
+  if(coords(3)==0) then
+     do i=is,ie
+        do j=js,je
+           p_face(5) = p_face(5) + p(i,j,ks)
+        enddo
+     enddo
+  endif
+  ! sum pressures on z+ face
+  if(coords(3)==nPz-1) then
+     do i=is,ie
+        do j=js,je
+           p_face(6) = p_face(6) + p(i,j,ke)
+        enddo
+     enddo
+  endif
+  call MPI_ALLREDUCE(p_face, p_face_global, 6, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_Domain, ierr)
+  !Calculate face averages
+  p_face_global(1)=p_face_global(1)/(ny*nz)
+  p_face_global(2)=p_face_global(2)/(ny*nz)
+  p_face_global(3)=p_face_global(3)/(nx*nz)
+  p_face_global(4)=p_face_global(4)/(nx*nz)
+  p_face_global(5)=p_face_global(5)/(nx*ny)
+  p_face_global(6)=p_face_global(6)/(nx*ny)
+  
+  p_max = -1.0d50
+  p_min = 1.0d50
+  p_liq = 0.0d0
+  vol_liq = 0.0d0
+  do k=ks,ke; do j=js,je; do i=is,ie
+     if (pcmask(i,j,k)==0) then
+        p_liq=p_liq+p(i,j,k)*dx(i)*dy(j)*dz(k)*(1.0d0-cvof(i,j,k))
+        vol_liq = vol_liq + dx(i)*dy(j)*dz(k)*(1.0d0-cvof(i,j,k))
+        p_min = MIN(p_min,p(i,j,k))
+        p_max = MAX(p_max,p(i,j,k))
+     endif
+  enddo;enddo;enddo
+  call MPI_ALLREDUCE(p_liq, p_avg_liq, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_Domain, ierr)
+  call MPI_ALLREDUCE(vol_liq, vol_liq_tot, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_Domain, ierr)
+  call MPI_ALLREDUCE(p_min, p_min_global, 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_Domain, ierr)
+  call MPI_ALLREDUCE(p_max, p_max_global, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_Domain, ierr)
+  p_avg_liq = p_avg_liq/vol_liq_tot
+
+  if (rank==0) then
+     OPEN(UNIT=20,FILE='pressure_stats.txt',position='append')
+     write(20,201)t,p_face_global(1:6),p_min_global,p_max_global,p_avg_liq
+     CLOSE(20)
+  endif
+201  format(10es14.6e2)
+
+end subroutine pressure_stats
+!=========================================================================================================================
 subroutine momentumConvection()
   use module_flow
   use module_grid
@@ -2921,8 +3021,12 @@ subroutine InitCondition
   timeLastOutput = DBLE(INT(time/tout))*tout
 contains
   subroutine init_FS()
-    use module_2phase
     implicit none
+    if (.not. LPP_initialized) then 
+      call initialize_LPP()
+      LPP_initialized = .true.
+      tag_id = 0
+    end if !
     call set_topology(vof_phase,itimestep) !vof_phases are updated in initconditions_VOF called above
     call get_ref_volume(cvof)
     if (RP_test) then

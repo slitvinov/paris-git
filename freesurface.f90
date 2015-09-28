@@ -1182,7 +1182,24 @@ subroutine tag_bubbles(phase_ref,iout,time_stats)
   if ( nPdomain > 1 ) call tag_drop_all
   call CreateTag2DropTable
   if ( nPdomain > 1 ) call merge_drop_pieces
-  if ( MOD(iout,nstats) == 0 ) call drop_statistics(iout,time_stats)
+  if ( MOD(iout,nstats) == 0 ) then
+     call drop_statistics(iout,time_stats)
+     !! DEBUGGING
+!!$     call output_tag(iout/nstats,is,ie+1,js,je+1,ks,ke+1)
+!!$     allocate( implode_global(0:total_num_tag) )
+!!$     call MPI_ALLREDUCE(implode_flag,implode_global, total_num_tag, MPI_LOGICAL, MPI_LOR, MPI_COMM_Active, ierr)
+!!$     if (rank == 0) then
+!!$        open(unit=77,file='implode_flags.txt',position='append')
+!!$        write(77,'("Implode flags at time step: ",I8)')iout
+!!$        write(77,'("Time                      : ",e14.5)')time
+!!$        do flag = 0, total_num_tag
+!!$           write(77,'(I8,": ",L3)')flag,implode_global(flag)
+!!$        enddo
+!!$        write(77,'(" ")')
+!!$        close(77)
+!!$     endif
+!!$     deallocate( implode_global )
+  endif
 end subroutine tag_bubbles
 !==================================================================================================================
 subroutine set_bubble_pressure

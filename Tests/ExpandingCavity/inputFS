@@ -4,6 +4,8 @@ X_level = 2	! Layers inside gas bubbles filled with extrapolated velocities
 order_extrap = 1
 
 do_2nd_projection = T
+CHECK_STRAY_LIQUID = F
+
 RP_test = F	! RP test switch
 !Parameters for Rayleigh-Plesset test
 gamma = 1.4d0 	! coefficient for polytropic gas law

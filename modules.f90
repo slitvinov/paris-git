@@ -404,10 +404,10 @@ end module module_2phase
 !-------------------------------------------------------------------------------------------------
 module module_freesurface
   real(8), dimension(:,:,:), allocatable :: x_mod, y_mod, z_mod, p_ext
-  real(8), dimension(:,:,:), allocatable :: P_gx, P_gy, P_gz
+  real(8), dimension(:,:,:), allocatable :: P_gx, P_gy, P_gz, P_gas
   real(8), dimension(:,:,:), allocatable :: v_source
   integer, dimension(:,:,:), allocatable :: u_cmask,v_cmask,w_cmask,pcmask
-  integer, dimension(:,:,:), allocatable :: implode !value of steps taken to collapse, 0 means normal gas bubble
+  logical, dimension(:), allocatable :: implode_flag
   integer, dimension(1:3) :: NOUT_VTK
   real(8) :: P_ref, gamma, R_ref, V_0, P_inf !eq pressure and polytropic gas exponent
   real(8) :: R_RK, dR_RK, ddR_RK
@@ -415,12 +415,12 @@ module module_freesurface
   integer :: X_level, solver_flag=0, step_max
   logical :: FreeSurface, debug=.false., initialize_fs = .false.
   logical :: RP_test, inflow
-  logical :: fill_ghost, curve_stats
+  logical :: fill_ghost, curve_stats, reset_vof
   logical, dimension(1:3) :: VTK_OUT, vtk_open
   character(len=10) :: visit_file(1:3) = (/ "divergence", "deltaPfs  ", "vol_Source" /)
   character(len=3) :: file_short(1:3) = (/ "DIV", "Pfs", "S_v" /)
-  integer :: order_extrap
-  logical :: do_2nd_projection
+  integer :: order_extrap, n_stray_liquid
+  logical :: do_2nd_projection, check_stray_liquid, FS_HYPRE
 end module module_freesurface
 !=================================================================================================
 !=================================================================================================
