@@ -264,20 +264,20 @@ contains
     logical file_is_there, fs_file_is_there
     logical ViscMeanIsArith, DensMeanIsArith
     namelist /vofparameters/ vofbdry_cond,test_type,VOF_advect,refinement, &
-       cylinder_dir, normal_up, DoLPP, &
-       FreeSurface, ViscMeanIsArith, DensMeanIsArith, &
-       output_filtered_VOF, DoMOMCONS, use_vofi,nfilter, &
-       hshift, do_rotation, debug_curvature, mixed_heights, &
-       use_full_heights, debug_par, STGhost, &
-       r_min, var_r, coord_min, var_coord, &
-       out_centroid
-    ! Free Surface parameters to be read from a parameter file called "inputFS"
+         cylinder_dir, normal_up, DoLPP, &
+         FreeSurface, ViscMeanIsArith, DensMeanIsArith, &
+         output_filtered_VOF, DoMOMCONS, use_vofi,nfilter, &
+         hshift, do_rotation, debug_curvature, mixed_heights, &
+         use_full_heights, debug_par, STGhost, &
+         r_min, var_r, coord_min, var_coord, &
+         out_centroid, curvature_clean,&
+         do_clean_debris,clean_debris_method,nsteps_clean_debris,clean_debris_neighbours,&
+         filter_random_seeds
     namelist /FSparameters/ X_level, RP_test, gamma, R_ref, P_ref,&
          VTK_OUT, NOUT_VTK, step_max, limit, curve_stats, order_extrap,&
-         do_2nd_projection
-    X_level = 2; RP_test = .false.; gamma = 1.4d0; R_ref = 1.d0; P_ref = 1.d0; 
-    VTK_OUT = .false.; NOUT_VTK = 100000; vtk_open = .false.
-    step_max = 1
+         do_2nd_projection, check_stray_liquid, n_stray_liquid, &
+         FS_HYPRE
+    
     vofbdry_cond=['undefined','undefined','undefined','undefined','undefined','undefined']
     test_type='droplet'
     VOF_advect='CIAM'
@@ -324,23 +324,7 @@ contains
        if (rank == 0) call pariserror("ReadVOFParameters: no 'inputvof' file.")
     endif
     close(in)
-    if (FreeSurface) then
-       !call MPI_COMM_RANK(MPI_COMM_WORLD, rank, ierr)
-       inquire(file='inputFS',exist=fs_file_is_there)
-       in = 77
-       open(unit=in, file='inputFS', status='old', action='read', iostat=ierr)
-       if (file_is_there) then
-          if(ierr == 0) then
-             read(UNIT=in,NML=FSparameters)
-             if(rank==0) write(out,*)'Free Surface parameters read successfully'
-          else
-             print *, 'rank=',rank,' has error ',ierr,' opening file inputFS'
-          endif
-       else
-          if (rank == 0) call pariserror("ReadVOFParameters: no 'inputFS' file and FreeSurface is on.")
-       endif
-       close(in)
-    endif
+     
     do i=1,3
        if(vofbdry_cond(i) == 'undefined') call pariserror("vofbdry_cond undefined")
        if(vofbdry_cond(i+3) == 'undefined') vofbdry_cond(i+3) = vofbdry_cond(i) 
@@ -374,6 +358,35 @@ contains
      !if (ierr .ne. 0) call pariserror("ReadParameters: error opening output file")
      write(UNIT=out,NML=vofparameters)
     end if ! rank
+
+    ! Free Surface parameters to be read from a parameter file called "inputFS"
+    if (FreeSurface) then
+       X_level = 2; RP_test = .false.; gamma = 1.4d0; R_ref = 1.d0; P_ref = 1.d0; 
+       VTK_OUT = .false.; NOUT_VTK = 100000; vtk_open = .false.
+       step_max = 1
+       limit = 1.0d-2
+       curve_stats = .false.
+       order_extrap = 1
+       do_2nd_projection = .false.
+       check_stray_liquid = .true.
+       n_stray_liquid = 50
+       FS_Hypre = .false.
+       !call MPI_COMM_RANK(MPI_COMM_WORLD, rank, ierr)
+       inquire(file='inputFS',exist=fs_file_is_there)
+       in = 77
+       open(unit=in, file='inputFS', status='old', action='read', iostat=ierr)
+       if (file_is_there) then
+          if(ierr == 0) then
+             read(UNIT=in,NML=FSparameters)
+             if(rank==0) write(out,*)'Free Surface parameters read successfully'
+          else
+             print *, 'rank=',rank,' has error ',ierr,' opening file inputFS'
+          endif
+       else
+          if (rank == 0) call pariserror("ReadVOFParameters: no 'inputFS' file and FreeSurface is on.")
+       endif
+       close(in)
+    endif
 
   end subroutine ReadVOFParameters
 !
@@ -413,8 +426,8 @@ contains
             y_mod(imin:imax,jmin:jmax,kmin:kmax), z_mod(imin:imax,jmin:jmax,kmin:kmax), &
             P_gx(imin:imax,jmin:jmax,kmin:kmax), P_gy(imin:imax,jmin:jmax,kmin:kmax),&
             P_gz(imin:imax,jmin:jmax,kmin:kmax), pcmask(imin:imax,jmin:jmax,kmin:kmax), &
-            p_ext(imin:imax,jmin:jmax,kmin:kmax), v_source(imin:imax,jmin:jmax,kmin:kmax),&
-            implode(is:ie,js:je,ks:ke))
+            P_gas(imin:imax,jmin:jmax,kmin:kmax),p_ext(imin:imax,jmin:jmax,kmin:kmax), &
+            v_source(imin:imax,jmin:jmax,kmin:kmax), implode_flag(0:NumBubble*9))
        u_cmask = 3; v_cmask = 3; w_cmask = 3
        v_source = 0.d0
        x_mod = dxh((is+ie)/2); y_mod = dyh((js+je)/2); z_mod = dzh((ks+ke)/2)
@@ -422,7 +435,7 @@ contains
        pcmask=3; p_ext=0.d0
        initialize_fs = .true.
        vtk_open = .false.
-       implode = 0
+       implode_flag = .false.
 
        inflow=.true.
        do bdry=1,6
