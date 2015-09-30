@@ -1192,9 +1192,9 @@ contains
             case(DropStatistics_WriteElementData)
                total_num_element = sum(num_element)
                open(unit=102,file=TRIM(out_path)//'/element-stats_'//TRIM(int2text(tswap,padding))//'.dat')
-               open(unit=103,file=TRIM(out_path)//'/el-rank-stats_'//TRIM(int2text(tswap,padding))//'.dat')
+               !open(unit=103,file=TRIM(out_path)//'/el-rank-stats_'//TRIM(int2text(tswap,padding))//'.dat')
                write(102,'(E15.6,1X,I7)')   time, total_num_element
-               write(103,'("Total number of elements: ",I12)')total_num_element
+               !write(103,'("Total number of elements: ",I12)')total_num_element
                do irank = 0,nPdomain-1
                   if ( num_element(irank) > 0 ) then 
                     ! write(103,'("Rank: ",I5," contains ",I4," elements.")')irank,num_element(irank)
