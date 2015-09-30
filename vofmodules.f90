@@ -83,6 +83,7 @@ module module_VOF
   logical :: test_randombubs = .false.
   logical :: test_plane = .false.
   logical :: test_risingbubble = .false.
+  logical :: test_lattice_bubs = .false.
   logical :: linfunc_initialized = .false.
   logical :: DoMOMCONS = .false.
   logical :: STGhost = .false.
@@ -272,7 +273,7 @@ contains
          r_min, var_r, coord_min, var_coord, &
          out_centroid, curvature_clean,&
          do_clean_debris,clean_debris_method,nsteps_clean_debris,clean_debris_neighbours,&
-         filter_random_seeds
+         filter_random_seeds, nb
     namelist /FSparameters/ X_level, RP_test, gamma, R_ref, P_ref,&
          VTK_OUT, NOUT_VTK, step_max, limit, curve_stats, order_extrap,&
          do_2nd_projection, check_stray_liquid, n_stray_liquid, &
@@ -307,7 +308,8 @@ contains
     nsteps_clean_debris = 10 
     clean_debris_neighbours = 2
     filter_random_seeds = .false.
-    
+    nb = 3
+
     in=31
 
     call MPI_COMM_RANK(MPI_COMM_WORLD, rank, ierr)
@@ -488,7 +490,9 @@ contains
     else if(test_type=='plane') then
        test_plane = .true.   
     else if(test_type=='rising_bubble') then
-       test_risingbubble = .true.   
+       test_risingbubble = .true.
+    else if(test_type=='cubic_lat_bubs') then
+       test_lattice_bubs = .true.
     else
        write(*,*) test_type, rank
        call pariserror("unknown initialization")
@@ -619,6 +623,23 @@ contains
                       root_rank, MPI_Comm_Cart, ierr)
        call MPI_BCAST(zc , NumBubble, MPI_REAL8, &
                       root_rank, MPI_Comm_Cart, ierr)
+    endif
+
+    if (test_lattice_bubs) then
+       if ( rank == root_rank ) then
+          if (nb <= 2) &
+               call pariserror('For cubic lattice bubble test there has to be more than 2 bubbles per coord direction')
+          call cubic_lattice_bubbles
+       endif
+       call MPI_BCAST(NumBubble, 1, MPI_INT, root_rank, MPI_Comm_Cart, ierr)
+       call MPI_BCAST(rad, NumBubble, MPI_REAL8, &
+            root_rank, MPI_Comm_Cart, ierr)
+       call MPI_BCAST(xc , NumBubble, MPI_REAL8, &
+            root_rank, MPI_Comm_Cart, ierr)
+       call MPI_BCAST(yc , NumBubble, MPI_REAL8, &
+            root_rank, MPI_Comm_Cart, ierr)
+       call MPI_BCAST(zc , NumBubble, MPI_REAL8, &
+            root_rank, MPI_Comm_Cart, ierr)
     endif
 
     if(test_heights.or.test_capwave) then 
@@ -774,6 +795,33 @@ contains
        enddo
     endif
   end subroutine random_bubbles 
+!=================================================================================================
+  !   Generate bubbles in a primitice cubic lattice 
+  !=================================================================================================
+  subroutine cubic_lattice_bubbles()
+    use module_2phase
+#ifdef __INTEL_COMPILER
+    use IFPORT
+#endif
+    implicit none
+    integer :: ib, jb, kb, rand_seed, index
+#ifndef __INTEL_COMPILER
+    real :: rand
+#endif
+    rand_seed = ABS(TIME())
+    call srand(rand_seed)
+    NumBubble = nb*nb*nb
+    write(*,'("Total number of bubbles: ",I10)')NumBubble
+    do ib=0,nb-1; do jb=0,nb-1; do kb=0,nb-1
+       index = 1 + kb + jb*nb + ib*nb*nb 
+       rad(index) = r_min + rand()*var_r
+       xc(index)  = coord_min + var_coord/(nb-1)*ib
+       yc(index)  = coord_min + var_coord/(nb-1)*jb
+       zc(index)  = coord_min + var_coord/(nb-1)*kb
+!!$       write(*,'("Bubble ",I10," generated at ",3e14.5," with radius: ",e14.5)')&
+!!$            index,xc(index),yc(index),zc(index),rad(index)
+    enddo; enddo; enddo
+  end subroutine cubic_lattice_bubbles
   !=================================================================================================
   !   Spheres and cylinders
   !=================================================================================================
