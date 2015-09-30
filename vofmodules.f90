@@ -591,7 +591,6 @@ contains
        if (filter_random_seeds) then
           call MPI_BCAST(NumBubble, 1, MPI_INT, &
                root_rank, MPI_Comm_Cart, ierr)
-          write(*,'("Number of bubbles after filtering in rank ",I4," :",I4)')rank,NumBubble
        endif
        call MPI_BCAST(rad, NumBubble, MPI_REAL8, &
                       root_rank, MPI_Comm_Cart, ierr)
@@ -607,6 +606,10 @@ contains
        if ( rank == root_rank ) then
           if (NumBubble <= 2) call pariserror('For random bubble test there has to be more than 2 bubbles')
           call random_bubbles
+       endif
+       if (filter_random_seeds) then
+          call MPI_BCAST(NumBubble, 1, MPI_INT, &
+               root_rank, MPI_Comm_Cart, ierr)
        endif
        call MPI_BCAST(rad, NumBubble, MPI_REAL8, &
                       root_rank, MPI_Comm_Cart, ierr)
