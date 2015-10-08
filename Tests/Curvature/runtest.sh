@@ -41,7 +41,7 @@ for level in $list; do
 	radlist="0.2 0.25 0.32"
     fi
     for radius in $radlist; do 
-	run_stats.sh $nx $init $radius $nstats $d || exit 1
+	./run_stats.sh $nx $init $radius $nstats $d || exit 1
     done
 done
 
@@ -49,6 +49,6 @@ done
 
 radius=0.4
 echo "testing level $level"
-run_stats.sh $nx $init $radius $nstats $d || exit 1
+./run_stats.sh $nx $init $radius $nstats $d || exit 1
 
 exit 0 
