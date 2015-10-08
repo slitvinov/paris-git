@@ -53,7 +53,7 @@ module module_surface_tension
   integer, parameter :: NDEPTH=3  
   integer, parameter :: BIGINT=100
   real(8), parameter :: D_HALF_BIGINT = DBLE(BIGINT/2)
-  integer, parameter :: MAX_EXT_H = 0
+  integer, parameter :: MAX_EXT_H = 2
   integer, parameter :: NOR=6 ! number of orientations
   integer, parameter :: NPOS=27*NOR
   real(8), parameter :: EPS_GEOM = 1d-4
@@ -455,15 +455,15 @@ contains
               ! negative normal orientation if vof_flag=1 and sign = +, etc...
               oppnormalsign = - (2*vof_flag(i,j,k)-1) * sign
               index = 2*(d-1) + 1 + (-oppnormalsign+1)/2
-              if(height(i,j,k,index)<D_HALF_BIGINT) then ! flag is 0 or 1
+              if(ABS(height(i,j,k,index))<MAX_EXT_H) then ! flag is 0 or 1
                  climitp2 = coordlimit(d,sign) + 2*sign
                  c(1) = i; c(2) = j; c(3) = k
                  c0 = c(d)
                  c(d) = c0 + sign ! start of region to be filled
                  limit_not_found=.not.(c0==climitp2) 
                  do while (limit_not_found) 
-                    limit_not_found = .not.(vof_flag(c(1),c(2),c(3))==2 &
-                         .or.c(d)==climitp2.or.abs(c(d)-c0).ge.MAX_EXT_H)
+                    limit_not_found = .not.((vof_flag(c(1),c(2),c(3))==2) &
+                         .or.(c(d)==climitp2).or.(abs(c(d)-c0)>=MAX_EXT_H))
                     height(c(1),c(2),c(3),index) = height(i,j,k,index) + c0 - c(d)
                     c(d) = c(d) + sign 
                  enddo
