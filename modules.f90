@@ -418,8 +418,8 @@ module module_freesurface
   logical :: RP_test, inflow
   logical :: fill_ghost, curve_stats, reset_vof
   logical, dimension(1:3) :: VTK_OUT, vtk_open
-  character(len=10) :: visit_file(1:3) = (/ "divergence", "deltaPfs  ", "vol_Source" /)
-  character(len=3) :: file_short(1:3) = (/ "DIV", "Pfs", "S_v" /)
+  character(len=10) :: visit_file(1:3) = (/ "divergence", "curvature ", "vol_Source" /)
+  character(len=3) :: file_short(1:3) = (/ "DIV", "Kap", "S_v" /)
   integer :: order_extrap, n_stray_liquid
   logical :: do_2nd_projection, check_stray_liquid, FS_HYPRE
 end module module_freesurface

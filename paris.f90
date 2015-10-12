@@ -673,7 +673,8 @@ Program paris
                        enddo; enddo; enddo
                        call VTK_scalar_struct(out_fs,itimestep/NOUT_VTK(out_fs),tmp)
                     case(2)
-                       call VTK_scalar_struct(out_fs,itimestep/NOUT_VTK(out_fs),P_gx)
+                       call get_all_curvatures(tmp,itimestep)
+                       call VTK_scalar_struct(out_fs,itimestep/NOUT_VTK(out_fs),tmp)
                     case(3)
                        call VTK_scalar_struct(out_fs,itimestep/NOUT_VTK(out_fs),v_source)
                     end SELECT

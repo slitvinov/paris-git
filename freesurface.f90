@@ -1801,7 +1801,7 @@ subroutine setuppoisson_fs_hypre(utmp,vtmp,wtmp,vof_phase,rho,dt,A,cvof,height,k
   real(8) :: Source
   real(8) :: wt_g, wt_l, avg_kap
   
-  !OPEN(unit=121,file='mods.txt')
+  !OPEN(unit=121,file='mods.txt',access='append')
   x_mod=dxh((is+ie)/2); y_mod=dyh((js+je)/2); z_mod=dzh((ks+ke)/2) !assumes an unstretched grid
   P_gx = 0d0; P_gy = 0d0; P_gz = 0d0
   do k=ks,ke; do j=js,je; do i=is,ie
@@ -1964,5 +1964,5 @@ subroutine setuppoisson_fs_hypre(utmp,vtmp,wtmp,vof_phase,rho,dt,A,cvof,height,k
      endif
   enddo;enddo;enddo
 
-  if (.not. RP_test) call Poisson_BCs(A)
+  call Poisson_BCs(A)
 end subroutine setuppoisson_fs_hypre
