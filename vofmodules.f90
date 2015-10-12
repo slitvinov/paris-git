@@ -368,7 +368,7 @@ contains
        curve_stats = .false.
        order_extrap = 1
        do_2nd_projection = .false.
-       check_stray_liquid = .true.
+       check_stray_liquid = .false.
        n_stray_liquid = 50
        FS_Hypre = .false.
        !call MPI_COMM_RANK(MPI_COMM_WORLD, rank, ierr)
