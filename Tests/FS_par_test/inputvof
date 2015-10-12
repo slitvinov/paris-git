@@ -5,7 +5,6 @@ VOFBDRY_COND = 'dry' 'dry' 'dry'
 
 TEST_TYPE = 'droplet'
 VOF_ADVECT = 'Dick_Yue'
-!REFINEMENT = 2
 
 FreeSurface = T
 

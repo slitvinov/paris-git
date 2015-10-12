@@ -19,7 +19,7 @@ if [[ $(($nx % $npx)) -ne 0 ]] || [[ $(($nx % $npy)) -ne 0 ]] || [[ $(($nx % $np
     exit 
 fi
 
-rm -fr input out stats tmpout-* testinput-* div_type.txt RP_out RK_int_RP*
+rm -fr input out stats tmpout-* testinput-* *.txt RP_out RK_int_RP*
 let nprocs=$1*$2*$3;
 
 sed s/NXTEMP/$nx/g testinput.template | sed s/NPXTEMP/$npx/ | sed s/NPYTEMP/$npy/ | sed s/NPZTEMP/$npz/> testinput-$npx-$npy-$npz-$nx
@@ -35,5 +35,5 @@ else
 	awk '{print $1, $11}' stats > cav_vol-$npx-$npy-$npz-$nx
 	echo "Running test with " $npx " " $npy " " $npz " procs in respective x-, y- and z-directions."
 	echo "# grid points per coord direction: " $nx
-	pariscompare cav_vol-$npx-$npy-$npz-$nx cav_vol-serial 1e-12
+	pariscompare cav_vol-$npx-$npy-$npz-$nx cav_vol-serial 1e-12 0 1
 fi
