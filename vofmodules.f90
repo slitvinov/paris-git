@@ -108,7 +108,6 @@ module module_VOF
   real(8), parameter :: PI = 3.14159265359d0
 
   real(8) :: tot_clean, cleaned
-  logical :: curvature_clean
 
   logical :: do_clean_debris
   integer :: clean_debris_method, nsteps_clean_debris, clean_debris_neighbours
@@ -271,8 +270,8 @@ contains
          hshift, do_rotation, debug_curvature, mixed_heights, &
          use_full_heights, debug_par, STGhost, &
          r_min, var_r, coord_min, var_coord, &
-         out_centroid, curvature_clean,&
-         do_clean_debris,clean_debris_method,nsteps_clean_debris,clean_debris_neighbours,&
+         out_centroid, do_clean_debris,&
+         clean_debris_method,nsteps_clean_debris,clean_debris_neighbours,&
          filter_random_seeds, nb
     namelist /FSparameters/ X_level, RP_test, gamma, R_ref, P_ref,&
          VTK_OUT, NOUT_VTK, step_max, limit, curve_stats, order_extrap,&
@@ -302,7 +301,6 @@ contains
     use_full_heights = .true. 
     debug_par = .false.
     r_min=0.02; var_r=0.03; coord_min=0.15; var_coord=0.7
-    curvature_clean = .false.
     do_clean_debris = .false.
     clean_debris_method = 1 
     nsteps_clean_debris = 10 

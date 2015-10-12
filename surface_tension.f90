@@ -46,14 +46,14 @@ module module_surface_tension
 
 ! initial state
   logical :: st_initialized = .false.
-  real(8), parameter :: kappamax = 2.d0
+  real(8), parameter :: kappamax = 4.d0
   integer, parameter :: nfound_min =  6 
   ! Caution the line below is read by test scripts, do not move it below line 60. Do not 
   ! write ndepth= elsewhere. Do not change case for ndepth. 
   integer, parameter :: NDEPTH=3  
   integer, parameter :: BIGINT=100
   real(8), parameter :: D_HALF_BIGINT = DBLE(BIGINT/2)
-  integer, parameter :: MAX_EXT_H = 2
+  integer, parameter :: MAX_EXT_H = 1
   integer, parameter :: NOR=6 ! number of orientations
   integer, parameter :: NPOS=27*NOR
   real(8), parameter :: EPS_GEOM = 1d-4
