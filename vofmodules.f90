@@ -793,8 +793,8 @@ contains
        enddo
     endif
   end subroutine random_bubbles 
-!=================================================================================================
-  !   Generate bubbles in a primitice cubic lattice 
+  !=================================================================================================
+  !   Generate bubbles in a primitive cubic lattice 
   !=================================================================================================
   subroutine cubic_lattice_bubbles()
     use module_2phase
