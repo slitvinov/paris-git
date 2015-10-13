@@ -1376,7 +1376,7 @@ contains
     integer :: i,j,k,l,ierr
     real(8) :: wt_g, wt_l, avg_kap
     
-    !OPEN(unit=121,file='mods.txt')
+    !OPEN(unit=121,file='mods.txt',access='append')
     call get_all_curvatures(kap,2)
     x_mod=dxh((is+ie)/2); y_mod=dyh((js+je)/2); z_mod=dzh((ks+ke)/2) !assumes an unstretched grid
     P_gx = 0d0; P_gy = 0d0; P_gz = 0d0
@@ -1589,7 +1589,7 @@ subroutine staggered_cut(cvof,i,j,k,theta,phase,d)
   dc = 1.0d0; dc(d) = 0.5d0
   c_ref = FL3DNEW(n_ref,alpha2,x0,dc)
 
-  alpha2 = al3dnew(n_nbr,cvof(i+loc(1),j+loc(2),k+loc(2)))
+  alpha2 = al3dnew(n_nbr,cvof(i+loc(1),j+loc(2),k+loc(3)))
   x0=0.0d0
   dc = 1.0d0; dc(d) = 0.5d0
   c_nbr = FL3DNEW(n_nbr,alpha2,x0,dc)
