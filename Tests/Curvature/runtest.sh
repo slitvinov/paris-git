@@ -14,7 +14,7 @@ levelmax=$4
 
 dim=$3'D'
 
-# TUNABLE PARAMETER
+# TUNABLE PARAMETER minlevel (grid is (2**$level)^d as in gerris)
 
 minlevel=5
 ndepth=`head -60  ../../surface_tension.f90 |  awk -F '=' ' /NDEPTH/ {print $2}' | tr -d ' '`

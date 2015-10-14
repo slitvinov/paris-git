@@ -48,8 +48,9 @@ module module_surface_tension
   logical :: st_initialized = .false.
   real(8), parameter :: kappamax = 4.d0
   integer, parameter :: nfound_min =  6 
-  ! Caution the line below is read by test scripts, do not move it below line 60. Do not 
-  ! write ndepth= elsewhere. Do not change case for ndepth. 
+  ! Caution the line below is read by test scripts, so do not move it below line 60. Do not 
+  ! write ndepth= anywhere else in the first 60 lines. 
+  ! Do not change the lettercase for ndepth. 
   integer, parameter :: NDEPTH=3  
   integer, parameter :: BIGINT=100
   real(8), parameter :: D_HALF_BIGINT = DBLE(BIGINT/2)
@@ -268,7 +269,11 @@ contains
      integer :: sign, flag_other_end, climitp1, normalsign
      ! NDEPTH is the depth of layers tested above or below the reference cell. 
      ! including the central layer and the empty/full cells
-     ! NDEPTH*2 + 1 = 7 means a 7 x 3^2 stencil. 
+     ! NDEPTH*2 + 1 = 7 means a 7 x 3^2 stencil including full/empty. 
+     ! NDEPTH*2 + 1 = 5 (ndepth = 2) is the usual 3x3 stencil with checking of the cells
+     ! above and bleow
+     ! 2*NDEPTH + 1 = N_H + 2 in the notation of Mark Owkes & Olivier Desjardins
+     ! JCP, Volume 281, 2015, Pages 285-300. 
      !  Note the normal is - grad C
 
      do k=ks,ke; do j=js,je; do i=is,ie
@@ -736,7 +741,7 @@ contains
 
      ! TEMPORARY - Stanley: avoid finding curvature for debris cells 
      if ( mxyz(1)==0.d0 .and. mxyz(2)==0.d0 .and. mxyz(3)==0.d0 ) then
-        kappa = 0.d0 
+        kappa = 2d6 ! New: debris cell curvature is invalid. 
         nfound = 0 
         nposit = 0 
         a      = 0.d0

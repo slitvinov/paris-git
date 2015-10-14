@@ -60,9 +60,9 @@ nstats   = 20       ! number of time steps between flow statistics calculations
 !=================================================================================================
 ! Grid parameters
 
-npx      = 4
-npy      = 4
-npz      = 4
+npx      = 2
+npy      = 2
+npz      = 2
                    ! number of processors in x,y,z direction
 
 Nx      = 64 

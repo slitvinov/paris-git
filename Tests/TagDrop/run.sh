@@ -3,7 +3,7 @@
 
 
 /bin/rm -fr out input stats *root tmpout vol-list.txt  
-let npstart=64
+let npstart=8
 if [ $# -gt 0 ]; then
     if [ $1 == mono ]; then
 	echo "mono"

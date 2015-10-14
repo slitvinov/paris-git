@@ -9,6 +9,7 @@ do2D=1
 
 if [ $do2D == 1 ] 
 then
+    echo "Launching "$d"D test"
     here=`pwd`
     sh runtest.sh 16 $samplesize $d $levelmax || { 
 	echo "Failed curvature test" 
@@ -20,6 +21,7 @@ then
 fi
 
 d=3
+echo "Launching "$d"D test"
 here=`pwd`
 sh runtest.sh 16 $samplesize $d $levelmax || { 
 echo "Failed curvature test" 
