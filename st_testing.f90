@@ -260,11 +260,14 @@ contains
           ! find curvature only for cut cells
           if (vof_flag(i,j,k) == 2 ) then 
              ntests=ntests+1
+             kappa=4d6
              call get_curvature(i,j,k,kappa,nfound,nposit,a,.false.)
-             !               if(kappa > 0.5e20.and.rank==0) then
-             !                  print *, i,j,k,kappa,nfound,nposit,a
-             !                  stop
-             !               endif
+             ! check if curvature was set
+             if(kappa > 3d6) then
+                print *, "rank, i,j,k,kappa,nfound,nposit,a",rank, i,j,k,kappa,nfound,nposit,a
+                call pariserror("Curvature not set in get_curvature")
+             endif
+             ! method statistics
              if(nfound > 0) then
                 method_count(1) = method_count(1) + 1  ! nine heights
              else if( -nfound < 50) then 
