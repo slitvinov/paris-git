@@ -61,33 +61,33 @@ contains
   subroutine output_heights()
     implicit none
     integer i,j,k,d,index, direction
-    real(8) h, th, ka, kb
+    real(8) h, th, ka, kb, ja, jb
     integer :: normalsign
+
+    OPEN(UNIT=89,FILE=TRIM(out_path)//'/heightb-'//TRIM(int2text(rank,padding))//'.txt')
+    OPEN(UNIT=90,FILE=TRIM(out_path)//'/reference-'//TRIM(int2text(rank,padding))//'.txt')
 
     if(normal_up) then
        normalsign=1
     else
        normalsign=-1
     endif
-
-    ! kb in processor below in theory
-    kb = nz/2 + 2  ! +2 because of ghost layers
-    ! ka in processor above
-    ka = nz/2 + 3 
-    j = ny/2 + 2  ! +2 because of ghost layers
-
-    ! First pass: search for height in processor below
-
-    k = kb
-    if(j<js.or.j>je) return
-    if(.not.(k<ks.or.k>ke)) then
-
-       OPEN(UNIT=89,FILE=TRIM(out_path)//'/heightb-'//TRIM(int2text(rank,padding))//'.txt')
-       OPEN(UNIT=90,FILE=TRIM(out_path)//'/reference-'//TRIM(int2text(rank,padding))//'.txt')
-
-       if(cylinder_dir==2) then
-          ! search in z direction
-          direction = 3
+    !***    
+    ! search in z direction
+    !***
+    if(cylinder_dir==2) then           
+       direction = 3
+       ! kb in processor below in theory
+       kb = nz/2 + 2  ! +2 because of ghost layers
+       ! ka in processor above
+       ka = nz/2 + 3 
+       ! j is arbitrary since the "cylinder direction" is the direction in which things are uniform 
+       j = ny/2 + 2
+       ! *** First pass: search for height in processor below
+       k = kb
+       ! select processors
+       if(j<js.or.j>je) return
+       if(.not.(k<ks.or.k>ke)) then
           index = 2*(direction-1) + 1 + (-normalsign+1)/2
           do i=is,ie
              th = normalsign*wave2ls(x(i),y(j),z(k),cylinder_dir)/dx(nx/2+2)
@@ -115,9 +115,57 @@ contains
                 write(89,100) x(i), h  
              endif
           enddo
-       else if(cylinder_dir==3) then
-          ! search in y direction
-          direction=2
+       endif
+       ! *** second pass
+       k = ka
+       ! select processors
+       if(.not.(k<ks.or.k>ke)) then
+          close(89)
+          OPEN(UNIT=89,FILE=TRIM(out_path)//'/heighta-'//TRIM(int2text(rank,padding))//'.txt')
+          ! search in k direction
+          index = 2*(direction-1) + 1 + (-normalsign+1)/2
+          do i=is,ie
+             th = normalsign*wave2ls(x(i),y(j),z(k),cylinder_dir)/dx(nx/2+2)
+             if (height(i,j,k,index).lt.1d6) then
+                h = height(i,j,k,index)
+             else
+                ! search for height
+                d=0
+                h = 2d6
+                do while(h.gt.1d6.and.k+d<ke.and.k-d>ks)
+                   d = d + 1
+                   if (height(i,j,k+d,index).lt.1d6) then
+                      h = height(i,j,k+d,index) + d
+                      height(i,j,k,index) = h 
+                   else if (height(i,j,k-d,index).lt.1d6) then
+                      h = height(i,j,k-d,index) - d
+                      height(i,j,k,index) = h 
+                   endif
+                enddo
+             endif
+             if(height(i,j,k,index).gt.1d6) then
+                write(89,101) x(i),' -'
+             else
+                write(89,100) x(i), h + ka - kb
+             endif
+          enddo
+       endif
+       !***
+       ! search in y direction
+       !***
+    else if(cylinder_dir==3) then   
+       direction=2
+       ! jb in processor below in theory
+       jb = ny/2 + 2  ! +2 because of ghost layers
+       ! ja in processor above
+       ja = ny/2 + 3  ! +2 because of ghost layers
+       ! k is arbitrary since the "cylinder direction" is the direction in which things are uniform 
+       k = nz/2 + 2
+       ! *** First pass: search for height in processor below
+       j = jb
+       ! select processors
+       if(k<ks.or.k>ke) return 
+       if(.not.(j<js.or.j>je)) then
           index = 2*(direction-1) + 1 + (-normalsign+1)/2
           do i=is,ie
              th = normalsign*wave2ls(x(i),y(j),z(k),cylinder_dir)/dx(nx/2+2)
@@ -146,54 +194,15 @@ contains
              endif
           enddo
        endif
-    endif
-    close(unit=89)
-    ! second pass
-
-    k = ka
-
-    if(.not.(k<ks.or.k>ke)) then
-
-       OPEN(UNIT=89,FILE=TRIM(out_path)//'/heighta-'//TRIM(int2text(rank,padding))//'.txt')
-       !     OPEN(UNIT=90,FILE=TRIM(out_path)//'/reference-'//TRIM(int2text(rank,padding))//'.txt')
-
-       if(cylinder_dir==2) then
-          ! search in z direction
-          direction = 3
+       !***  second pass
+       j=ja
+       ! select processors
+       if(.not.(j<js.or.j>je)) then
           index = 2*(direction-1) + 1 + (-normalsign+1)/2
+          close(89)
+          OPEN(UNIT=89,FILE=TRIM(out_path)//'/heighta-'//TRIM(int2text(rank,padding))//'.txt')
           do i=is,ie
              th = normalsign*wave2ls(x(i),y(j),z(k),cylinder_dir)/dx(nx/2+2)
-             !           write(90,100) x(i),th
-             if (height(i,j,k,index).lt.1d6) then
-                h = height(i,j,k,index)
-             else
-                ! search for height
-                d=0
-                h = 2d6
-                do while(h.gt.1d6.and.k+d<ke.and.k-d>ks)
-                   d = d + 1
-                   if (height(i,j,k+d,index).lt.1d6) then
-                      h = height(i,j,k+d,index) + d
-                      height(i,j,k,index) = h 
-                   else if (height(i,j,k-d,index).lt.1d6) then
-                      h = height(i,j,k-d,index) - d
-                      height(i,j,k,index) = h 
-                   endif
-                enddo
-             endif
-             if(height(i,j,k,index).gt.1d6) then
-                write(89,101) x(i),' -'
-             else
-                write(89,100) x(i), h + ka - kb
-             endif
-          enddo
-       else if(cylinder_dir==3) then
-          ! search in y direction
-          direction=2
-          index = 2*(direction-1) + 1 + (-normalsign+1)/2
-          do i=is,ie
-             th = normalsign*wave2ls(x(i),y(j),z(k),cylinder_dir)/dx(nx/2+2)
-             !           write(90,100) x(i),th
              if (height(i,j,k,index).lt.1d6) then
                 h = height(i,j,k,index)
              else
@@ -214,12 +223,13 @@ contains
              if(height(i,j,k,index).gt.1d6) then
                 write(89,101) x(i),' -'
              else
-                write(89,100) x(i), h + ka - kb
+                write(89,100) x(i), h + ja - jb
              endif
           enddo
        endif
+    else
+       call pariserror("OH: unexpected cylinder_dir")
     endif
-
 100 format(2(f24.16))
 101 format(f24.16,A2)
     close(89)

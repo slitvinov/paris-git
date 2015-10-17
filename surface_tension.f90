@@ -54,7 +54,7 @@ module module_surface_tension
   integer, parameter :: NDEPTH=3  
   integer, parameter :: BIGINT=100
   real(8), parameter :: D_HALF_BIGINT = DBLE(BIGINT/2)
-  integer, parameter :: MAX_EXT_H = 1
+  integer, parameter :: MAX_EXT_H = 2
   integer, parameter :: NOR=6 ! number of orientations
   integer, parameter :: NPOS=27*NOR
   real(8), parameter :: EPS_GEOM = 1d-4
@@ -452,16 +452,18 @@ contains
      integer :: i,j,k,c0,c(3)
      integer :: sign, climitp2, oppnormalsign
      ! need to extend heights
-     ! start from full cells and go the opposite way (towards the opposite interface); 
+     ! start from full cells for which the height is defined
+     ! and go the opposite way (towards the opposite interface); 
      do i=is-1,ie+1; do j=js-1,je+1; do k=ks-1,ke+1
         if(vof_flag(i,j,k)/2==0) then
            ! loop over search directions
            do sign=-1,1,2; 
-              ! Opposite of search direction in pass 1 so 
+              ! We want the opposite of search direction in pass 1 so 
               ! negative normal orientation if vof_flag=1 and sign = +, etc...
+              ! oppnormalsign is the opposite of the sign of the normal
               oppnormalsign = - (2*vof_flag(i,j,k)-1) * sign
               index = 2*(d-1) + 1 + (-oppnormalsign+1)/2
-              if(ABS(height(i,j,k,index))<MAX_EXT_H) then ! flag is 0 or 1
+              if(ABS(height(i,j,k,index))<1d6) then ! height has been properly computed in passes 1 and 2
                  climitp2 = coordlimit(d,sign) + 2*sign
                  c(1) = i; c(2) = j; c(3) = k
                  c0 = c(d)
