@@ -66,8 +66,8 @@ module module_surface_tension
   ! 3 for positive height in y, 4 for negative height in y, 
   !  etc... 
   integer, dimension(:,:,:,:), allocatable :: ixheight ! Height-Function flags for Ruben-Phil routines
-  integer :: method_count(3)
-  integer, parameter :: ngc=20
+  integer :: method_count(4)
+  integer, parameter :: ngc=21
   integer :: geom_case_count(ngc)
 
 contains
@@ -112,8 +112,8 @@ contains
         call MPI_ALLREDUCE(geom_case_count, glob_count, ngc, MPI_INTEGER, MPI_SUM, MPI_COMM_Cart, ierr)  
         if(rank==0) then
            open(unit=101, file=trim(out_path)//'/st_stats-'//TRIM(int2text(iout,padding)), action='write', iostat=ierr)
-           glob_desc(1)="mixed w/less than 3 mixed neighbors (quasi-isolated mixed, unfittable by sphere)"
-           glob_desc(2)="mixed w/less than 5 mixed neighbors (quasi-isolated mixed, unfittable by paraboloid)"
+           glob_desc(1)="mixed w/less than 4 mixed neighbors (quasi-isolated mixed, unfittable by sphere)"
+           glob_desc(2)="mixed w/less than 6 mixed neighbors (quasi-isolated mixed, unfittable by paraboloid)"
            glob_desc(3)="pure cells w/more than 2 other color pure neighbors (grid-aligned interfaces)"
            glob_desc(4)="non-bulk pure cells w 0 valid neighbors"
            glob_desc(5)="                      1  " 
@@ -127,11 +127,12 @@ contains
            glob_desc(13)="                    3  " 
            glob_desc(14)="                    4  " 
            glob_desc(15)="                    5 valid centroids"
-           glob_desc(16)="                    6 or more valid centroids (impossible)"
+           glob_desc(16)="                    6 or more valid centroids"
            glob_desc(17)="large kappa"
            glob_desc(18)="no surface tension force in x direction"
            glob_desc(19)="no surface tension force in y direction"
            glob_desc(20)="no surface tension force in z direction"
+           glob_desc(21)="mxyz vector is TINY (indicates debris cell)"
            do i=1,ngc
               write(101,'(I10," ",A85)') glob_count(i), glob_desc(i)
            enddo
@@ -624,8 +625,6 @@ contains
 
       !*** Initialize
       kapparray=2d6
-      ! kappa = 0d0 ! done at the beginning of get_curvature ?
-
       do k=ks,ke; do j=js,je; do i=is,ie
          is_bulk_cell=.false. 
          if (vof_flag(i,j,k) == 2 ) then  ! mixed cell
@@ -641,10 +640,12 @@ contains
             geom_case_count(17) = geom_case_count(17) + 1
             kappa = sign(1d0,kappa)*kappamax
          endif
-         if(.not.is_bulk_cell) kapparray(i,j,k) = kappa
-         if (kappa /= kappa) then !debugging
-            write(*,'("Kappa read into array is NaN, Kapparay, Kappa: ",2e14.5,3I8)')kapparray(i,j,k), kappa, i,j,k 
-            call pariserror("Kappa read into array is NaN") !debugging
+         if(.not.is_bulk_cell) kapparray(i,j,k) = kappa  ! I am not sure of the rationale for not recording the curvature value obtained for bulk cells. 
+         if(debug_curvature) then
+            if (kappa /= kappa) then !debugging
+               write(*,'("Kappa read into array is NaN, Kapparay, Kappa: ",2e14.5,3I8)')kapparray(i,j,k), kappa, i,j,k 
+               call pariserror("Kappa read into array is NaN") !debugging
+            endif
          endif
       enddo;enddo;enddo
 
@@ -711,7 +712,7 @@ contains
      integer :: n_pure_faces
      real(8) :: h(-1:1,-1:1)
      integer :: m,n,l,i,j,k
-     logical :: fit_success = .false.
+     logical :: fit_success 
      integer :: i1(-1:1,-1:1,3), j1(-1:1,-1:1,3), k1(-1:1,-1:1,3),try(3)
      integer :: s,c(3),d,central,neighbor,esign
 
@@ -740,46 +741,51 @@ contains
      call get_local_heights(i1,j1,k1,mxyz,try,nfound,h,points,nposit)
 
      ! TEMPORARY - Stanley: avoid finding curvature for debris cells 
-     if ( mxyz(1)==0.d0 .and. mxyz(2)==0.d0 .and. mxyz(3)==0.d0 ) then
+     if ( ABS(mxyz(1)) < TINY .and. ABS(mxyz(2)) < TINY .and. ABS(mxyz(3)) < TINY) then
         kappa = 2d6 ! New: debris cell curvature is invalid. 
-        nfound = 0 
         nposit = 0 
         a      = 0.d0
+        geom_case_count(21) = geom_case_count(21) + 1
+        nfound = 21
         return 
      end if ! n1,n2,n3
      ! END TEMPORARY 
 
      kappa = 0.d0
-     ! if all nine heights found 
+     ! ***
+     ! first prize: all nine heights found 
+     ! ***
+
      if ( nfound == 9 .and.use_full_heights) then
-#ifdef COUNT
-        method_count(1) = method_count(1) + 1
-#endif
         !
         !  h = a6  + a4 x + a5 y + a3 xy + a1 x**2 + a2 y**2
         !
-        a(1) = (h(1,0)-2.d0*h(0,0)+h(-1,0))/2.d0
-        a(2) = (h(0,1)-2.d0*h(0,0)+h(0,-1))/2.d0
+        a(1) = h(1,0)-2.d0*h(0,0)+h(-1,0)
+        a(2) = h(0,1)-2.d0*h(0,0)+h(0,-1)
         a(3) = (h(1,1)-h(-1,1)-h(1,-1)+h(-1,-1))/4.d0
         a(4) = (h(1,0)-h(-1,0))/2.d0
         a(5) = (h(0,1)-h(0,-1))/2.d0
-        kappa = 2.d0*(a(1)*(1.d0+a(5)*a(5)) + a(2)*(1.d0+a(4)*a(4)) - a(3)*a(4)*a(5)) &
+        kappa = (a(1)*(1.d0+a(5)*a(5)) + a(2)*(1.d0+a(4)*a(4)) - 2d0*a(3)*a(4)*a(5)) &
              /(1.d0+a(4)*a(4)+a(5)*a(5))**(1.5d0)
         kappa = sign(1.d0,mxyz(try(1)))*kappa
+        nfound=0
         return
-     endif ! nfound == 9
-     nfound = ind_pos(points,nposit) 
-     ! *** determine the origin. 
+     endif ! endif for first prize. 
+
+     ! if not succesful, continue search
+     ! ***
+     ! Second prize: determine curvature from mixed heights and fits
+     ! ***
+     ! 1) search for independent positions. 
+     nfound = ind_pos_sorted(points,bpoints,nposit) 
+     ! 2) determine the origin. 
      call FindCutAreaCentroid(i0,j0,k0,origin)
-     bpoints = points
-     ! Determine the curvature from fits. 
-     ! Rotate coordinate sytems by permutation of x,y,z
+     ! 3) Rotate coordinate sytems by permutation of x,y,z
      !  x_i' = x_k(i)
      !  m'_i = m_k(i)
      mv(1) = mxyz(try(2))
      mv(2) = mxyz(try(3))
      mv(3) = mxyz(try(1))
-     ! *** determine curvature from mixed heights 
      if(mixed_heights) then
         if ( nfound > nfound_min )  then  ! more than 6 points to avoid special 2D degeneracy. 
            ! rotate and shift origin
@@ -788,28 +794,31 @@ contains
            points(:,1) = bpoints(:,try(2))  - origin(try(2))
            points(:,2) = bpoints(:,try(3))  - origin(try(3))
            points(:,3) = bpoints(:,try(1))  - origin(try(1))   
-           ! fit over all positions returned by ind_pos ! ???
            weights=1d0
-           call parabola_fit_with_rotation(points,fit,weights,mv,nposit,a,kappasign,fit_success) 
+           ! 4) fit over all positions returned by ind_pos 
+           ! call parabola_fit_with_rotation(points,fit,weights,mv,nposit,a,kappasign,fit_success) 
+           ! 4) fit only over positions separated by a minimum distance
+           call parabola_fit_with_rotation(points,fit,weights,mv,nfound,a,kappasign,fit_success) 
            ! call parabola_fit(points,weights,nposit,a,fit_success) 
            if(fit_success) then
-              nfound = - nfound  ! encode the fact that mixed-heights were used 
-#ifdef COUNT
-              method_count(2) = method_count(2) + 1
-#endif
               kappa = 2.d0*(a(1)*(1.d0+a(5)*a(5)) + a(2)*(1.d0+a(4)*a(4)) - a(3)*a(4)*a(5)) &
                    /(1.d0+a(4)*a(4)+a(5)*a(5))**(1.5d0)
               kappa = kappasign*kappa
+              nfound = - nfound  ! encode the fact that mixed-heights were used 
               return
            else
               geom_case_count(16) = geom_case_count(16) + 1
-              nfound = 0 ! no curvature set. 
+              nfound = 16  ! encode the fact that no curvature set and no fit success. Curvature remains 0. 
               return
            endif ! fit_success
         endif !  (-nfound) > nfound_min  
-     endif ! mixed_heights
-     ! *** determine curvature from centroids
-     ! Find all centroids in 3**3
+     endif ! endif for second prize:  mixed_heights
+
+     ! if not succesful, continue search
+     ! ***
+     ! Third prize: determine curvature from centroids
+     ! ***
+     ! 1) Find all centroids in 3**3
      ! use direction closest to normal
      nposit=0
      do m=-1,1; do n=-1,1; do l=-1,1
@@ -879,21 +888,25 @@ contains
      points(:,2) = fit(:,try(3)) - origin(try(3))
      points(:,3) = fit(:,try(1)) - origin(try(1))
      if(nposit.gt.NPOS) call pariserror("GLH: nposit")
-     nfound = - nposit - 50  ! encode the fact that centroids were used 
      if(nposit < 6) then
         geom_case_count(nposit+10) = geom_case_count(nposit+10) + 1
+        nfound = nposit+10  ! encode the fact that curvature was not set due to insufficient number of centroids. 
         return
      else
         call parabola_fit_with_rotation(points,fit,weights,mv,nposit,a,kappasign,fit_success) 
         if(.not.fit_success) then
            geom_case_count(16) = geom_case_count(16) + 1
+           nfound = 16  ! encode the fact that no curvature set and no fit success. Curvature remains 0. 
            return
         else
            kappa = 2.d0*(a(1)*(1.d0+a(5)*a(5)) + a(2)*(1.d0+a(4)*a(4)) - a(3)*a(4)*a(5)) &
                 /sqrt(1.d0+a(4)*a(4)+a(5)*a(5))**3
            kappa = kappasign*kappa
+           nfound = - nposit - 50  ! encode the fact that nposit distinct centroids were used 
+           return
         endif
      endif
+     call pariserror("GLH: this statement should be unreachable")
    end subroutine get_curvature
 
    ! Performs a rotation to align z axis with normal, then calls fit
@@ -920,8 +933,7 @@ contains
          ev(:,3) = mv
          ! now the x'_3 = z' direction is aligned with the normal so 
          kappasign = 1d0 
-            ! mv(3) is the component of the 
-
+         ! mv(3) is the vector of component of the normal vector
          ! let mv1 == m1  be the canonical basis vector furthest from normal 
          mv1 = 0d0    
          mv1(2) = 1d0
@@ -1506,9 +1518,9 @@ contains
         enddo
         if(.not.reject)  then ! add new point to list
            ni = ni + 1
-         endif
+           bpoints(ni,:) = points(j,:)
+        endif
       enddo
-      bpoints = points
       ind_pos_sorted = ni
    end function ind_pos_sorted
 

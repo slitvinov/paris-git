@@ -268,15 +268,15 @@ contains
                 call pariserror("Curvature not set in get_curvature")
              endif
              ! method statistics
-             if(nfound > 0) then
+             if(nfound == 0) then
                 method_count(1) = method_count(1) + 1  ! nine heights
-             else if( -nfound < 50) then 
-                method_count(2) = method_count(2) + 1  ! mixed heights
-             else if (-nfound > 50) then
-                method_count(3) = method_count(3) + 1  ! centroids
-             else
-                call pariserror("OC: unknown method_count") 
-             endif
+             else if(nfound > 0) then
+                method_count(4) = method_count(4) + 1  ! no curvature was set. "impossible" case. 
+             else if (- nfound > - 50) then
+                method_count(2) = method_count(2) + 1  ! centroids
+             else if( - nfound < - 50) then 
+                method_count(3) = method_count(3) + 1  ! mixed heights
+              endif
              kappa = kappa*dble(Nx) ! Nx = L/deltax
              kappamax = max(ABS(kappa),kappamax)
              kappamin = min(ABS(kappa),kappamin)
@@ -296,12 +296,14 @@ contains
           if (vof_flag(i,j,k) == 2) then 
              ntests=ntests+1
              call get_curvature(i,j,k,kappa,nfound,nposit,a,.false.)
-             if(nfound > 0) then
+             if(nfound == 0) then
                 method_count(1) = method_count(1) + 1  ! nine heights
-             else if( -nfound < 50) then 
-                method_count(2) = method_count(2) + 1  ! mixed heights
-             else if (-nfound > 50) then
-                method_count(3) = method_count(3) + 1  ! centroids
+             else if(nfound > 0) then
+                method_count(4) = method_count(4) + 1  ! no curvature was set. "impossible" case. 
+             else if (- nfound > - 50) then
+                method_count(2) = method_count(2) + 1  ! centroids
+             else if( - nfound < - 50) then 
+                method_count(3) = method_count(3) + 1  ! mixed heights
              endif
              ! This stops the code in case kappa becomes NaN.
              if(kappa.ne.kappa) call pariserror("OC: Invalid Curvature")  
@@ -352,11 +354,11 @@ contains
     subroutine print_method()
       integer :: total=0
       integer :: n
-      real(8) :: fraction(3)
-      do n=1,3
+      real(8) :: fraction(4)
+      do n=1,4
          total = method_count(n) + total
       enddo
-      do n=1,3
+      do n=1,4
          fraction(n) = float(method_count(n)) / float(total)   
       enddo
 
