@@ -54,7 +54,7 @@ module module_surface_tension
   integer, parameter :: NDEPTH=3  
   integer, parameter :: BIGINT=100
   real(8), parameter :: D_HALF_BIGINT = DBLE(BIGINT/2)
-  integer, parameter :: MAX_EXT_H = 2
+  integer, parameter :: MAX_EXT_H = 1
   integer, parameter :: NOR=6 ! number of orientations
   integer, parameter :: NPOS=27*NOR
   real(8), parameter :: EPS_GEOM = 1d-4
@@ -444,7 +444,7 @@ contains
          
    end subroutine get_heights_pass2
 
-   subroutine get_heights_pass3(d)
+   subroutine get_heights_pass3(d)   ! needs fixing
      implicit none
      integer, intent(in) :: d
      integer :: index
@@ -463,7 +463,8 @@ contains
               ! oppnormalsign is the opposite of the sign of the normal
               oppnormalsign = - (2*vof_flag(i,j,k)-1) * sign
               index = 2*(d-1) + 1 + (-oppnormalsign+1)/2
-              if(ABS(height(i,j,k,index))<1d6) then ! height has been properly computed in passes 1 and 2
+              if(ABS(height(i,j,k,index))<MAX_EXT_H) then 
+                 ! height has been properly computed in passes 1 and 2 and we are not more than max_ext_h from stack center. 
                  climitp2 = coordlimit(d,sign) + 2*sign
                  c(1) = i; c(2) = j; c(3) = k
                  c0 = c(d)
