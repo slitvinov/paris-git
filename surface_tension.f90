@@ -215,7 +215,7 @@ contains
      call my_timer(6)
      do direction=1,3
         call get_heights_pass2(direction)
-        call get_heights_pass3(direction)
+!        call get_heights_pass3(direction)
      enddo
      call my_timer(5)
      do i=1,6
@@ -444,43 +444,43 @@ contains
          
    end subroutine get_heights_pass2
 
-   subroutine get_heights_pass3(d)   ! needs fixing
-     implicit none
-     integer, intent(in) :: d
-     integer :: index
-     logical :: limit_not_found
-     integer :: i,j,k,c0,c(3)
-     integer :: sign, climitp2, oppnormalsign
-     ! need to extend heights
-     ! start from full cells for which the height is defined
-     ! and go the opposite way (towards the opposite interface); 
-     do i=is-1,ie+1; do j=js-1,je+1; do k=ks-1,ke+1
-        if(vof_flag(i,j,k)/2==0) then
-           ! loop over search directions
-           do sign=-1,1,2; 
-              ! We want the opposite of search direction in pass 1 so 
-              ! negative normal orientation if vof_flag=1 and sign = +, etc...
-              ! oppnormalsign is the opposite of the sign of the normal
-              oppnormalsign = - (2*vof_flag(i,j,k)-1) * sign
-              index = 2*(d-1) + 1 + (-oppnormalsign+1)/2
-              if(ABS(height(i,j,k,index))<MAX_EXT_H) then 
-                 ! height has been properly computed in passes 1 and 2 and we are not more than max_ext_h from stack center. 
-                 climitp2 = coordlimit(d,sign) + 2*sign
-                 c(1) = i; c(2) = j; c(3) = k
-                 c0 = c(d)
-                 c(d) = c0 + sign ! start of region to be filled
-                 limit_not_found=.not.(c0==climitp2) 
-                 do while (limit_not_found) 
-                    limit_not_found = .not.((vof_flag(c(1),c(2),c(3))==2) &
-                         .or.(c(d)==climitp2).or.(abs(c(d)-c0)>=MAX_EXT_H))
-                    height(c(1),c(2),c(3),index) = height(i,j,k,index) + c0 - c(d)
-                    c(d) = c(d) + sign 
-                 enddo
-              endif
-           enddo!; enddo
-        endif
-     enddo; enddo; enddo
-   end subroutine get_heights_pass3
+!    subroutine get_heights_pass3(d)   ! needs fixing
+!      implicit none
+!      integer, intent(in) :: d
+!      integer :: index
+!      logical :: limit_not_found
+!      integer :: i,j,k,c0,c(3)
+!      integer :: sign, climitp2, oppnormalsign
+!      ! need to extend heights
+!      ! start from full cells for which the height is defined
+!      ! and go the opposite way (towards the opposite interface); 
+!      do i=is-1,ie+1; do j=js-1,je+1; do k=ks-1,ke+1
+!         if(vof_flag(i,j,k)/2==0) then
+!            ! loop over search directions
+!            do sign=-1,1,2; 
+!               ! We want the opposite of search direction in pass 1 so 
+!               ! negative normal orientation if vof_flag=1 and sign = +, etc...
+!               ! oppnormalsign is the opposite of the sign of the normal
+!               oppnormalsign = - (2*vof_flag(i,j,k)-1) * sign
+!               index = 2*(d-1) + 1 + (-oppnormalsign+1)/2
+!               if(ABS(height(i,j,k,index))<MAX_EXT_H) then 
+!                  ! height has been properly computed in passes 1 and 2 and we are not more than max_ext_h from stack center. 
+!                  climitp2 = coordlimit(d,sign) + 2*sign
+!                  c(1) = i; c(2) = j; c(3) = k
+!                  c0 = c(d)
+!                  c(d) = c0 + sign ! start of region to be filled
+!                  limit_not_found=.not.(c0==climitp2) 
+!                  do while (limit_not_found) 
+!                     limit_not_found = .not.((vof_flag(c(1),c(2),c(3))==2) &
+!                          .or.(c(d)==climitp2).or.(abs(c(d)-c0)>=MAX_EXT_H))
+!                     height(c(1),c(2),c(3),index) = height(i,j,k,index) + c0 - c(d)
+!                     c(d) = c(d) + sign 
+!                  enddo
+!               endif
+!            enddo!; enddo
+!         endif
+!      enddo; enddo; enddo
+!    end subroutine get_heights_pass3
 !=======================================================================================================
 !   Check if we find nine heights in the neighboring cells, if not collect all heights in all directions
 !=======================================================================================================
