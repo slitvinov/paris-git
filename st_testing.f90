@@ -278,15 +278,15 @@ contains
                 call pariserror("Curvature not set in get_curvature")
              endif
              ! method statistics
-             if(nfound == 0) then
+            if(nfound == 0) then
                 method_count(1) = method_count(1) + 1  ! nine heights
+             else if ( nfound < - 50) then
+                method_count(3) = method_count(3) + 1  ! centroids
+             else if(  nfound < 0) then 
+                method_count(2) = method_count(2) + 1  ! mixed heights
              else if(nfound > 0) then
                 method_count(4) = method_count(4) + 1  ! no curvature was set. "impossible" case. 
-             else if (- nfound > - 50) then
-                method_count(2) = method_count(2) + 1  ! centroids
-             else if( - nfound < - 50) then 
-                method_count(3) = method_count(3) + 1  ! mixed heights
-              endif
+             endif
              kappa = kappa*dble(Nx) ! Nx = L/deltax
              kappamax = max(ABS(kappa),kappamax)
              kappamin = min(ABS(kappa),kappamin)
@@ -308,12 +308,12 @@ contains
              call get_curvature(i,j,k,kappa,nfound,nposit,a,.false.)
              if(nfound == 0) then
                 method_count(1) = method_count(1) + 1  ! nine heights
+             else if ( nfound < - 50) then
+                method_count(3) = method_count(3) + 1  ! centroids
+             else if(  nfound < 0) then 
+                method_count(2) = method_count(2) + 1  ! mixed heights
              else if(nfound > 0) then
                 method_count(4) = method_count(4) + 1  ! no curvature was set. "impossible" case. 
-             else if (- nfound > - 50) then
-                method_count(2) = method_count(2) + 1  ! centroids
-             else if( - nfound < - 50) then 
-                method_count(3) = method_count(3) + 1  ! mixed heights
              endif
              ! This stops the code in case kappa becomes NaN.
              if(kappa.ne.kappa) call pariserror("OC: Invalid Curvature")  
@@ -327,8 +327,11 @@ contains
                 angle = atan2(y(j)-yc(ib),x(i)-xc(ib))/PI*180.d0
                 write(89,*) angle,kappa
                 write(90,*) angle,kappa_exact
-                err_K    = ABS(kappa-kappa_exact)/kappa_exact
-                S2_err_K    = S2_err_K  + err_K**2
+                err_K    = ABS((kappa-kappa_exact)/kappa_exact)
+                write(92,'(3(E15.8,1X),I4)') angle,kappa,err_K,nfound
+                if ( err_K > 0.1d0 ) &
+                     write(91,'(3(I3,1X),2(E15.8,1X),I4)') i,j,k,kappa,kappa_exact,nfound
+                 S2_err_K    = S2_err_K  + err_K**2
                 Lm_err_K    = MAX(Lm_err_K,   err_K) 
                 sumCount = sumCount + 1
              endif ! valid curvature
