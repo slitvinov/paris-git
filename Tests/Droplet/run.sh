@@ -22,10 +22,12 @@ sed s/nonMOMCONS/$plotlabel/g plot.gp.template > plot.gp
 if [ "$HAVE_SILO" == 1 ]; then
   echo "we have silo"
   sed s/"output_format = 2"/"output_format = 5"/g inputshort > tmp
+  mv inputshort inputshort.bkp
   mv tmp inputshort
 else
   echo "we do not have silo"
   sed s/"output_format = 5"/"output_format = 2"/g inputshort > tmp
+  mv inputshort inputshort.bkp
   mv tmp inputshort
 fi
 
@@ -33,6 +35,9 @@ rm -fR input out
 ln -s inputshort input
 mpirun -np 8 paris > tmpout
 rm -f input
+rm inputshort
+mv inputshort.bkp inputshort
+
 echo `awk ' /Step:/ { cpu = $8 } END { print "cpu = " cpu } ' < tmpout`
 
 if [ ${CGFONTGETGLYPH_PARIS_PROBLEM:=0} == 0 ]; then

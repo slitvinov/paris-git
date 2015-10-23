@@ -1088,7 +1088,7 @@ contains
         integer :: i, j, k, l
         real(8) :: m
         real(8), DIMENSION(n,2*n) :: augmatrix !augmented matrix
-
+        real(8), dimension(:,:), allocatable :: test
 
         !Augment input matrix with an identity matrix
         DO i = 1,n
@@ -1172,6 +1172,12 @@ contains
             inverse(i,j) = augmatrix(i,j+n)
           END DO
         END DO
+
+        if(debug_curvature) then
+           allocate(test(n,n))
+           test = matmul(matrix,inverse) 
+           print *, test
+        endif
         inverse_success = .true.
                 
    END SUBROUTINE FindInverseMatrix
