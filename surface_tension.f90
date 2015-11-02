@@ -1176,7 +1176,11 @@ contains
         if(debug_curvature) then
            allocate(test(n,n))
            test = matmul(matrix,inverse) 
-           print *, test
+           do i=1,n
+              test(i,i) = test(i,i) - 1d0
+           enddo
+           if (maxval(abs(test)).gt.1d-14) print *, "Max error of matrix inversion > 1d-14:", maxval(abs(test))
+           deallocate(test)
         endif
         inverse_success = .true.
                 

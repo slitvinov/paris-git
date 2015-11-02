@@ -388,38 +388,44 @@ contains
   subroutine plot_curvature()
     implicit none
     integer :: i,j,k,iem,jem,n
-    real(8) :: centroid(3),x1,y1
-    real(8), allocatable :: pc(:,:,:)
+    real(8) :: centroid(3),x1,y1,x2,y2
     real(8) :: centroid_scaled(2), deltax
     k = (Nz+4)/2
     deltax=dx(nx/2)
-    allocate(pc(imin:imax,jmin:jmax,3))
     if(rank==0.and.cylinder_dir==3) then
        OPEN(UNIT=79,FILE=TRIM(out_path)//'/grid.txt')
        OPEN(UNIT=80,FILE=TRIM(out_path)//'/segments.txt')
        OPEN(UNIT=81,FILE=TRIM(out_path)//'/points.txt')
        OPEN(UNIT=82,FILE=TRIM(out_path)//'/parabola.txt')
+       OPEN(UNIT=83,FILE=TRIM(out_path)//'/xheights.txt')
+       OPEN(UNIT=84,FILE=TRIM(out_path)//'/yheights.txt')
        jem = je - 2
        iem = ie - 2
-       do i=js,jem
-          write(79,'(4(E15.8,1X))') xh(is),yh(i),xh(iem)-xh(is),0.d0
+       do j=js,jem
+          do i=is,ie
+             write(79,'(4(E15.8,1X))') xh(i),yh(j),xh(i+1)-xh(i),0.d0
+          enddo
        enddo
        do i=is,iem
-          write(79,'(4(E15.8,1X))') xh(i),yh(js),0.,yh(jem)-yh(js)
+          do j=js,je
+             write(79,'(4(E15.8,1X))') xh(i),yh(j),0.,yh(j+1)-yh(j)
+          enddo
        enddo
        do i=is,ie; do j=js,je
           if(vof_flag(i,j,k).eq.2) then
-             call PlotCutAreaCentroid(i,j,k,centroid,x1,y1)
-             do n=1,2
-                pc(i,j,n) = centroid(n)
-             enddo
-             write(80,'(2(E15.8,1X))') x1,y1
+             call PlotCutAreaCentroid(i,j,k,centroid,x1,y1,x2,y2)
              do n=1,2 
                 centroid_scaled(n) = deltax*centroid(n) 
              enddo
              centroid_scaled(1) = centroid_scaled(1) + x(i)
              centroid_scaled(2) = centroid_scaled(2) + y(j)
              write(81,'(2(E15.8,1X))') centroid_scaled(1),centroid_scaled(2) 
+             write(80,'(4(E15.8,1X))') x1,y1,x2-x1,y2-y1
+             call plotheights(i,j,k,x1,y2)
+             y1=y(j) 
+             if(x1<1d6) write(83,'(2(E15.8,1X))') x1*deltax+x(i),y1
+             x2=x(i)
+             if(y2<1d6) write(84,'(2(E15.8,1X))') x2,y2*deltax+y(j)
           endif
        enddo; enddo
        CLOSE(79)
@@ -429,13 +435,28 @@ contains
     endif
   end subroutine plot_curvature
 
-  subroutine PlotCutAreaCentroid(i,j,k,centroid,x1,y1)
+  subroutine plotheights(i,j,k,hx,hy)
     implicit none
     integer, intent(in)  :: i,j,k
-    real(8), intent(out) :: centroid(3),x1,y1
+    real(8), intent(out) :: hx,hy
+    real(8) deltax
+
+    deltax=dx(nx/2)
+    hx = height(i,j,k,1)
+    if (hx>1d6) hx =  height(i,j,k,2)
+    hy = height(i,j,k,3)
+    if(hy>1d6) hy = height(i,j,k,3)
+  end subroutine plotheights
+
+  subroutine PlotCutAreaCentroid(i,j,k,centroid,x1,y1,x2,y2)
+    implicit none
+    integer, intent(in)  :: i,j,k
+    real(8), intent(out) :: centroid(3),x1,y1,x2,y2
     integer :: l,m,n
-    real(8) :: nr(3),dmx,dmy, al3dnew
+    real(8) :: nr(3),dmx,dmy, al3dnew,deltax
     real(8) :: stencil3x3(-1:1,-1:1,-1:1)
+
+    deltax=dx(nx/2)
 
     if(recomputenormals) then
        do l=-1,1; do m=-1,1; do n=-1,1
@@ -452,14 +473,31 @@ contains
     if(abs(nr(3)).gt.EPS_GEOM) call pariserror("PCAC: invalid dmz.")
     call cent3D(nr,cvof(i,j,k),centroid)
     centroid = centroid - 0.5d0
-    x1 = - al3dnew(nr,cvof(i,j,k))/dmx
-    y1 = - al3dnew(nr,cvof(i,j,k))/dmy
+! nx x + ny y = alpha
+! y = 0 
+    x1 = al3dnew(nr,cvof(i,j,k))/dmx
+    y1 = 0d0
+    if(x1.gt.1d0) then
+       ! eliminate this case, try next one
+       x1 = 1d0
+       y1 =  al3dnew(nr,cvof(i,j,k))/dmy - x1*dmx/dmy
+    endif
+    x2 = 0d0  
+    y2 = al3dnew(nr,cvof(i,j,k))/dmy
+    if(y2.gt.1d0) then
+       y2 = 1d0
+       x2 = al3dnew(nr,cvof(i,j,k))/dmx - y2*dmy/dmx
+    endif
     ! shift to cell center coordinates
     x1 = x1 - 0.5d0; y1 = y1 - 0.5d0
+    x2 = x2 - 0.5d0; y2 = y2 - 0.5d0
     ! shift
-    x1 = x1 + x(i)
-    y1 = y1 + y(j)
-    ! some stuff is missing here
+    x1 = deltax*x1 + x(i)
+    y1 = deltax*y1 + y(j)
+    x2 = deltax*x2 + x(i)
+    y2 = deltax*y2 + y(j)
+!    x2 = nr(1)
+!    y2 = nr(2)
   end subroutine PlotCutAreaCentroid
   
   ! Subroutine to perform several tests related to the falling droplet test
