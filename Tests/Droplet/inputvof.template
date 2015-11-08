@@ -8,7 +8,6 @@ VOF_ADVECT = 'CIAM'
 ViscMeanIsArith = T
 refinement = 8
 DoMOMCONS = MOMCONSTEMP
-use_vofi = T
 nfilter = NFILTERTEMP
 USE_VOFI = T
 DO_ROTATION = T

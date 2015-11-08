@@ -264,16 +264,15 @@ contains
     Lm_err_K=0.d0
     method_count=0
     ntests=0
-    if ( test_curvature ) then 
+    if ( test_curvature ) then ! Test curvature in 3D
        kappa_exact = - 2.d0/rad(ib)
        do i=is,ie; do j=js,je; do k=ks,ke
           ! find curvature only for cut cells
           if (vof_flag(i,j,k) == 2 ) then 
              ntests=ntests+1
-             kappa=4d6
              call get_curvature(i,j,k,kappa,nfound,nposit,a,.false.)
              ! check if curvature was set
-             if(kappa > 3d6) then
+             if(nfound > 0) then
                 print *, "rank, i,j,k,kappa,nfound,nposit,a",rank, i,j,k,kappa,nfound,nposit,a
                 call pariserror("Curvature not set in get_curvature")
              endif
@@ -328,7 +327,7 @@ contains
                 write(89,*) angle,kappa
                 write(90,*) angle,kappa_exact
                 err_K    = ABS((kappa-kappa_exact)/kappa_exact)
-                write(92,'(3(E15.8,1X),I4)') angle,kappa,err_K,nfound
+                write(92,'(3(E15.8,1X),4(I4))') angle,kappa,err_K,nfound,i,j,k
                 if ( err_K > 0.1d0 ) &
                      write(91,'(3(I3,1X),2(E15.8,1X),I4)') i,j,k,kappa,kappa_exact,nfound
                  S2_err_K    = S2_err_K  + err_K**2
@@ -349,7 +348,7 @@ contains
        write(*,'(I5,I5,1X,(E15.8,1X))') Nx,rank,L2_err_K
        write(*,*) 'Linfty Norm:'
        write(*,'(I5,I5,1X,(E15.8,1X))') Nx,rank,Lm_err_K
-       call plot_curvature()
+!       call plot_curvature() plot_curvature is called automatically if nx,ny <= 32
     end if ! test_curvature / test_curvature2D
     if(ntests>0) then
        write(*,*) 'rank,max, min, and exact ABS(kappa)', rank, kappamax, kappamin,kappa_exact

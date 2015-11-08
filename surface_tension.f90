@@ -60,6 +60,7 @@ module module_surface_tension
   real(8), parameter :: EPS_GEOM = 1d-4
   real(8), dimension(:,:,:), allocatable :: n1,n2,n3 ! normals
   real(8), dimension(:,:,:,:), allocatable :: height ! 
+  real(8), parameter :: UNCOMPUTED=2D6
 
   ! 4th index: 1 for normal vector pointing towards positive x "positive height", 
   ! 2 for "negative" height in x
@@ -67,8 +68,10 @@ module module_surface_tension
   !  etc... 
   integer, dimension(:,:,:,:), allocatable :: ixheight ! Height-Function flags for Ruben-Phil routines
   integer :: method_count(4)
-  integer, parameter :: ngc=21
-  integer :: geom_case_count(ngc)
+  integer, parameter :: NGC=21
+  integer :: geom_case_count(NGC)
+  integer :: nkcomp
+  integer, parameter :: NFOUND_BULK=NGC+1
 
 contains
 !=================================================================================================
@@ -132,7 +135,7 @@ contains
            glob_desc(18)="no surface tension force in x direction"
            glob_desc(19)="no surface tension force in y direction"
            glob_desc(20)="no surface tension force in z direction"
-           glob_desc(21)="mxyz vector is TINY (indicates debris cell)"
+           glob_desc(21)="mxyz vector is TINY in get_curvature (indicates debris cell)"
            do i=1,ngc
               write(101,'(I10," ",A85)') glob_count(i), glob_desc(i)
            enddo
@@ -622,33 +625,34 @@ contains
       real(8) :: afit(6), kappa
       integer :: ierr, i,j,k, nfound, nposit
       integer :: req(24),sta(MPI_STATUS_SIZE,24)
-      logical :: is_bulk_cell
       integer :: iout
       if(.not.st_initialized) call initialize_surface_tension()
 
       !*** Initialize
-      kapparray=2d6
+      kapparray=UNCOMPUTED
       do k=ks,ke; do j=js,je; do i=is,ie
-         is_bulk_cell=.false. 
          if (vof_flag(i,j,k) == 2 ) then  ! mixed cell
             call get_curvature(i,j,k,kappa,nfound,nposit,afit,.false.)
          else if (vof_flag(i,j,k) > 2 ) then
-            call pariserror("inconsistent vof_flag > 3")
-         else if(.not.bulk_cell(i,j,k)) then !  non-bulk pure cell
+            call pariserror("inconsistent vof_flag > 2")
+         else if(.not.bulk_cell(i,j,k)) then !  pure cell close to the phase boundary (may have a pure face)
             call get_curvature(i,j,k,kappa,nfound,nposit,afit,.true.)
-         else
-            is_bulk_cell=.true.
+         else ! pure and surrounded by cells of the same color
+            nfound=NFOUND_BULK  ! is always positive
          endif
-         if(abs(kappa)>kappamax) then
-            geom_case_count(17) = geom_case_count(17) + 1
-            kappa = sign(1d0,kappa)*kappamax
-         endif
-         if(.not.is_bulk_cell) kapparray(i,j,k) = kappa  ! I am not sure of the rationale for not recording the curvature value obtained for bulk cells. 
-         if(debug_curvature) then
-            if (kappa /= kappa) then !debugging
-               write(*,'("Kappa read into array is NaN, Kapparay, Kappa: ",2e14.5,3I8)')kapparray(i,j,k), kappa, i,j,k 
-               call pariserror("Kappa read into array is NaN") !debugging
+         if(nfound <= 0) then
+            if(abs(kappa)>kappamax) then
+               geom_case_count(17) = geom_case_count(17) + 1
+               kappa = sign(1d0,kappa)*kappamax
             endif
+            kapparray(i,j,k) = kappa  
+            if(debug_curvature) then !debugging
+               if (kappa /= kappa) then 
+                  write(*,'("Kappa read into array is NaN, Kapparay, Kappa: ",2e14.5,3I8)') &
+                       kapparray(i,j,k), kappa, i,j,k 
+                  call pariserror("Kappa read into array is NaN")
+               endif
+            endif                    ! end debugging
          endif
       enddo;enddo;enddo
 
@@ -676,34 +680,35 @@ contains
              ((n_mass == 6.and.vof_flag(i,j,k)==1).or. &
              (n_mass == 0 .and.vof_flag(i,j,k)==0))
       end function bulk_cell
-
-! contains
-! count flags if all faces pure
-!            sum_flag = (vof_flag(i,j,k+1)/2 + vof_flag(i,j,k-1)/2 + &
-!                 vof_flag(i,j-1,k)/2 + vof_flag(i,j+1,k)/2 + &
-!                 vof_flag(i-1,j,k)/2 + vof_flag(i+1,j,k)/2)
-!            if(vof_flag(i,j,k) == 1) then
-!               if(sum_flag==0) then
-!                  n_pure_faces = 
-!                  if(n_pure_faces/=6) then
-!                     ! 6 - n_pure_faces = number of pure faces
-!                     call get_curvature(i,j,k,kappa,nfound,nposit,afit,6-n_pure_faces)
-!                     kapparray(i,j,k) = kappa
-!                  endif
-!               endif
-!            else if(vof_flag(i,j,k) == 0) then
-!               if(sum_flag==0) then
-!                  n_pure_faces = vof_flag(i,j,k+1) + vof_flag(i,j,k-1) + &
-!                       vof_flag(i,j-1,k) + vof_flag(i,j+1,k) + vof_flag(i-1,j,k) + vof_flag(i+1,j,k)
-!                  if(n_pure_faces /= 0 ) then
-!                     call get_curvature(i,j,k,kappa,nfound,nposit,afit,n_pure_faces)
-!                     kapparray(i,j,k) = kappa
-!                  endif
-!               endif
-!           else
-! end count
    end subroutine get_all_curvatures
 
+!=================================================================================================
+!
+! get_curvature(i0,j0,k0,kappa,nfound,nposit,a,pure_non_bulk)
+!
+!=================================================================================================
+
+! This is a local function for a given cell. 
+
+! On exit:
+
+! A) The curvature is  returned by the variable kappa,
+! except when the algorithm fails. If that is the 
+! case, then kappa is unchanged from it initialisation
+! value. 
+
+! B) The condition of the calculation is returned by the variable nfound. 
+
+! Success: nfound <= 0
+! nfound=0         : nine heights found
+! -50 < nfound < 0 : -nfound mixed heights were used. 
+! nfound < -50     : -nfound + 50 centroids were used. 
+
+! Failure: nfound > 0
+! 11 < nfound < 15 : the paraboloid fit in 3D cannot be made due to insufficient number of centroids.
+! nfound=16        : no fit success (either with mixed heights or with centroids)
+! nfound=21        : failure for cells with exactly grad C = 0 
+!=================================================================================================
    subroutine get_curvature(i0,j0,k0,kappa,nfound,nposit,a,pure_non_bulk)
      implicit none
      integer, intent(in) :: i0,j0,k0
@@ -742,19 +747,14 @@ contains
      !   b) order the orientations
      call orientation(mxyz,try)
      call get_local_heights(i1,j1,k1,mxyz,try,nfound,h,points,nposit)
-
-     ! TEMPORARY - Stanley: avoid finding curvature for debris cells 
+     ! Begin computation. If it deos not succeed, return with kappa unchanged.
+     ! Avoid finding curvature for cells with exactly grad C = 0 
      if ( ABS(mxyz(1)) < TINY .and. ABS(mxyz(2)) < TINY .and. ABS(mxyz(3)) < TINY) then
-        kappa = 2d6 ! New: debris cell curvature is invalid. 
-        nposit = 0 
-        a      = 0.d0
         geom_case_count(21) = geom_case_count(21) + 1
         nfound = 21
         return 
-     end if ! n1,n2,n3
-     ! END TEMPORARY 
+     end if
 
-     kappa = 0.d0
      ! ***
      ! first prize: all nine heights found 
      ! ***
@@ -811,7 +811,7 @@ contains
               return
            else
               geom_case_count(16) = geom_case_count(16) + 1
-              nfound = 16  ! encode the fact that no curvature set and no fit success. Curvature remains 0. 
+              nfound = 16  ! encode the fact that no curvature set and no fit success. kappa is unchanged from initialisation value.
               return
            endif ! fit_success
         endif !  (-nfound) > nfound_min  
@@ -823,6 +823,7 @@ contains
      ! ***
      ! 1) Find all centroids in 3**3
      ! use direction closest to normal
+     ! filter out small cells
      nposit=0
      do m=-1,1; do n=-1,1; do l=-1,1
         i=i0+m
@@ -831,13 +832,13 @@ contains
         c(1)=m
         c(2)=n
         c(3)=l
-        if(vof_flag(i,j,k) == 2) then
+        wg = cvof(i,j,k)*(1d0-cvof(i,j,k))
+        if(vof_flag(i,j,k) == 2.and.wg>cwg_threshold) then
            nposit = nposit + 1
            call NewFindCutAreaCentroid(i,j,k,centroid)
            do s=1,3 
               fit(nposit,s) = centroid(s) + c(s)
            end do
-           wg = cvof(i,j,k)*(1-cvof(i,j,k))
            if(wg.lt.0d0) call pariserror("w<0")
            weights(nposit) = 1d0 ! wg  ! sqrt(wg)
         endif ! vof_flag
@@ -853,9 +854,9 @@ contains
            endif
            geom_case_count(2) = geom_case_count(2) + 1
         else !  pure non-bulk cell with less than 6 control points found. 
-           ! Test that the cell us pure
+           ! Verify that the cell is pure
            if(central/2/=0) call pariserror("unexpected central flag")
-           ! The cell is pure, place the centroids on the pure faces. 
+           ! The cell is pure, place additional centroids on the pure faces. 
            n_pure_faces = 0
            c(1)=i0
            c(2)=j0
@@ -883,7 +884,7 @@ contains
            endif
            if(nposit <6) then
               geom_case_count(nposit+4) = geom_case_count(nposit+4) + 1
-              kappa = 2d6 ! Value is set back to the initial kapparay value
+              kappa = UNCOMPUTED ! Value is set back to the initial kapparay value
            endif
         endif
      endif
@@ -936,7 +937,7 @@ contains
          ev(:,3) = mv
          ! now the x'_3 = z' direction is aligned with the normal so 
          kappasign = 1d0 
-         ! mv(3) is the vector of component of the normal vector
+         ! mv(3) is the vector of components of the normal vector
          ! let mv1 == m1  be the canonical basis vector furthest from normal 
          mv1 = 0d0    
          mv1(2) = 1d0
@@ -983,7 +984,7 @@ contains
             bfit(:,i) = ev(1,i)*fit(:,1) + ev(2,i)*fit(:,2) + ev(3,i)*fit(:,3)
          enddo
       else
-!      if no rotation then usual sign calculation
+         !      if no rotation then usual sign calculation
          kappasign = sign(1.d0,mv(3))
       endif ! do_rotation
       call parabola_fit(bfit,weights,nposit,a,fit_success)

@@ -109,6 +109,7 @@ module module_VOF
 
   real(8) :: tot_clean, cleaned
 
+  real(8) :: cwg_threshold
   logical :: do_clean_debris
   integer :: clean_debris_method, nsteps_clean_debris, clean_debris_neighbours
 
@@ -272,7 +273,7 @@ contains
          r_min, var_r, coord_min, var_coord, &
          out_centroid, do_clean_debris,&
          clean_debris_method,nsteps_clean_debris,clean_debris_neighbours,&
-         filter_random_seeds, nb
+         filter_random_seeds, nb, cwg_threshold
     namelist /FSparameters/ X_level, RP_test, gamma, R_ref, P_ref,&
          VTK_OUT, NOUT_VTK, step_max, limit, curve_stats, order_extrap,&
          do_2nd_projection, check_stray_liquid, n_stray_liquid, &
@@ -307,6 +308,7 @@ contains
     clean_debris_neighbours = 2
     filter_random_seeds = .false.
     nb = 3
+    cwg_threshold=0d0
 
     in=31
 

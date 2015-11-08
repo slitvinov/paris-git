@@ -57,7 +57,7 @@ start/end of non-ghost points:is,ie
 
  * Basic principle for a single domain of size L
 
-  0                               L
+ x=0                             x=L
   >--x-->--x-->  ...  >--x-->--x--> 
   |                               |
 beginning                         end

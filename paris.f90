@@ -971,7 +971,7 @@ subroutine calcStats
   integer :: i0,j0,k0
   real(8) :: stencil3x3(-1:1,-1:1,-1:1),mxyz(3),AREA3D
 
-  nstatarray=24
+  nstatarray=25
   if(nstatarray > 100) call pariserror("nstatarray too large")
   mystats(1:nstatarray)=0d0
   do k=ks,ke;  do j=js,je;  do i=is,ie
@@ -1053,6 +1053,7 @@ subroutine calcStats
         enstrophy = 0.5*vort2
         mystats(22)=mystats(22)+enstrophy*vol*      cvof(i,j,k)
         mystats(23)=mystats(23)+enstrophy*vol*(1.d0-cvof(i,j,k))
+        if(vof_flag(i,j,k)==2) mystats(25)=mystats(25)+1
      end if ! DoVOF
      ! volume fraction of top layer
      if(DoVOF .and. test_PhaseInversion) then
@@ -2530,11 +2531,12 @@ subroutine surfaceForce(du,dv,dw,rho)
   use module_surface_tension
   use module_tmpvar
   use module_timer
-  
+
   implicit none
+  include 'mpif.h'
   real(8) :: kappa,deltax
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: du, dv, dw, rho
-  integer :: i,j,k,n
+  integer :: i,j,k,n,ierr
   deltax=dx(nx)
   call get_all_curvatures(tmp,0)
   call my_timer(7)
