@@ -54,7 +54,6 @@ module module_VOF
   real(8), parameter  :: A_h = 2d0  ! For initialisation of height test
   real(8), parameter  :: TINY = 1d-50
   real(8), parameter  :: EPSC = 1.d-12  ! for clipping vof and setting flags
-  real(8), parameter  :: EPSDP = 1d-16  ! assumed precision of double precision computations
 
   character(20) :: vofbdry_cond(6),test_type,vof_advect,cond
   integer :: parameters_read=0, refinement=-1 

@@ -989,6 +989,11 @@ contains
       endif ! do_rotation
       call parabola_fit(bfit,weights,nposit,a,fit_success)
    end subroutine parabola_fit_with_rotation
+!-------------------------------------------------------------------------------------------------------
+!
+!  Parabolic fit
+!
+!-------------------------------------------------------------------------------------------------------
 
    subroutine parabola_fit(fit,weights,nposit,a,fit_success)
       implicit none
@@ -1058,7 +1063,6 @@ contains
       do im = 1,6; do jm = 1,6
          if ( im > jm ) m(im,jm) = m(jm,im)
       end do; end do 
-
       ! Solve linear system
       call FindInverseMatrix(m,invm,6,inv_success)
       if ( inv_success ) then 
@@ -1072,122 +1076,106 @@ contains
 !         print *, "WARNING: no fit success"
       end if ! inv_success
    end subroutine parabola_fit
+!-------------------------------------------------------------------------------------------------------
+!
+! Matrix inversion 
 !
 !  Subroutine to find the inverse of a square matrix with non-zero diagonal coeeficients. 
 !  From Stanley's previous code
 !
+!-------------------------------------------------------------------------------------------------------
    SUBROUTINE FindInverseMatrix(matrix,inverse,n,inverse_success)
       implicit none
-      include 'mpif.h'
+      integer, intent(in ) :: n
+      real(8), intent(in ), dimension(n,n) :: matrix 
+      real(8), intent(out), dimension(n,n) :: inverse
+      logical, intent(out) :: inverse_success 
+      integer :: i, j, k, l
+      real(8) :: m
+      real(8), dimension(n,2*n) :: augmatrix ! augmented matrix
+      real(8), dimension(:,:), allocatable :: test
 
-         !---Declarations
-        INTEGER, INTENT(IN ) :: n
-        real(8), INTENT(IN ), DIMENSION(n,n) :: matrix  !Input A matrix
-        real(8), INTENT(OUT), DIMENSION(n,n) :: inverse !Inverted matrix
-        logical, INTENT(OUT) :: inverse_success 
-
-        integer :: i, j, k, l
-        real(8) :: m
-        real(8), DIMENSION(n,2*n) :: augmatrix !augmented matrix
-        real(8), dimension(:,:), allocatable :: test
-
-        !Augment input matrix with an identity matrix
-        DO i = 1,n
-          DO j = 1,2*n
-            IF (j <= n ) THEN
-              augmatrix(i,j) = matrix(i,j)
-            ELSE IF ((i+n) == j) THEN
-              augmatrix(i,j) = 1.0d0
-            Else
-              augmatrix(i,j) = 0.0d0
-            ENDIF
-          END DO
-        END DO
-                
-        !Ensure diagonal elements are non-zero
-        DO k = 1,n-1
-          DO j = k+1,n   ! @ needs to be checked
-            IF (abs(augmatrix(k,k)) <  TINY_DOUBLE) THEN
-               DO i = k+1, n
-                 IF (abs(augmatrix(i,k)) > TINY_DOUBLE) THEN
-                   DO  l = 1, 2*n
+      ! augment input matrix with an identity matrix
+      do i = 1,n
+         do j = 1,2*n
+            if (j <= n ) then
+               augmatrix(i,j) = matrix(i,j)
+            else if ((i+n) == j) then
+               augmatrix(i,j) = 1.0d0
+            else
+               augmatrix(i,j) = 0.0d0
+            endif
+         end do
+      end do
+      ! ensure initial diagonal elements are non-zero
+      do k = 1,n-1
+         if (abs(augmatrix(k,k)) <  EPSC) then
+            do i = k+1, n
+               if (abs(augmatrix(i,k)) > EPSC ) then
+                  do  l = 1, 2*n
                      augmatrix(k,l) = augmatrix(k,l)+augmatrix(i,l)
-                   END DO
-                 ENDIF
-               END DO
-            ENDIF
-          END DO
-        END DO
-                
-        !Reduce augmented matrix to upper triangular form
-        DO k =1, n-1
-          DO j = k+1, n
-             IF (abs(augmatrix(k,k)) >  TINY_DOUBLE) THEN 
-                m = augmatrix(j,k)/augmatrix(k,k)
-                DO i = k, 2*n
-                   augmatrix(j,i) = augmatrix(j,i) - m*augmatrix(k,i)
-                END DO
-             ELSE
-!                print *, "WARNING: matrix non invertible on row ",k
-                inverse = 0.d0
-                inverse_success = .false.
-                return
-             END IF
-          END DO
-        END DO
+                  end do
+               endif
+            end do
+         endif
+      end do
 
-        !Test for invertibility
-        DO i = 1, n
-          IF (augmatrix(i,i) == 0) THEN
-!            write(*,*) "ERROR-Matrix is non-invertible"
-            inverse = 0.d0
+      ! reduce augmented matrix to upper triangular form
+      do k =1, n-1
+         if (abs(augmatrix(k,k)) <  EPSC ) then 
             inverse_success = .false.
-!            do i=1,n
-!               print *,"rank ",rank,i,matrix(i,1:n)
-!            enddo
             return
-          ENDIF
-        END DO
-                
-        !Make diagonal elements as 1
-        DO i = 1 , n
-          m = augmatrix(i,i)
-          DO j = i , (2 * n)
-            augmatrix(i,j) = (augmatrix(i,j) / m)
-          END DO
-        END DO
-                
-        !Reduced right side half of augmented matrix to identity matrix
-        DO k = n-1, 1, -1
-          DO i =1, k
+         end if
+         do j = k+1, n
+            m = augmatrix(j,k)/augmatrix(k,k)
+            do i = k, 2*n
+               augmatrix(j,i) = augmatrix(j,i) - m*augmatrix(k,i)
+            end do
+         end do
+      end do
+
+      ! test for invertibility
+      if( abs(augmatrix(n,n)) <  EPSC) then
+         !            write(*,*) "error-matrix has A_",n,n,"=",augmatrix(n,n)," and is non-invertible"
+         inverse_success = .false.
+         return
+      endif
+
+      ! rescale lines to make diagonal elements unity
+      do i = 1 , n
+         m = augmatrix(i,i)
+         do j = i , (2 * n)
+            augmatrix(i,j) = (augmatrix(i,j)/ m)
+         end do
+      end do
+
+      ! reduce left side of augmented matrix to identity matrix
+      do k = n-1, 1, -1
+         do i =1, k
             m = augmatrix(i,k+1)
-            DO j = k, (2*n)
-              augmatrix(i,j) = augmatrix(i,j) -augmatrix(k+1,j) * m
-            END DO
-          END DO
-        END DO
-                
-        !store answer
-        DO i =1, n
-          DO j = 1, n
-            inverse(i,j) = augmatrix(i,j+n)
-          END DO
-        END DO
+            do j = k, (2*n)
+               augmatrix(i,j) = augmatrix(i,j) -augmatrix(k+1,j) * m
+            end do
+         end do
+      end do
 
-        if(debug_curvature) then
-           allocate(test(n,n))
-           test = matmul(matrix,inverse) 
-           do i=1,n
-              test(i,i) = test(i,i) - 1d0
-           enddo
-           if (maxval(abs(test)).gt.1d-14) print *, "Max error of matrix inversion > 1d-14:", maxval(abs(test))
-           deallocate(test)
-        endif
-        inverse_success = .true.
-                
-   END SUBROUTINE FindInverseMatrix
+      ! store answer
+      inverse(:,1:n) = augmatrix(:,n+1:2*n)
 
-   subroutine NewFindCutAreaCentroid(i,j,k,centroid)
+      if(debug_curvature) then
+         allocate(test(n,n))
+         test = matmul(matrix,inverse) 
+         do i=1,n
+            test(i,i) = test(i,i) - 1d0
+         enddo
+         if (maxval(abs(test)).gt.1d-5) print *, "max error of matrix inversion > 1d-5:", maxval(abs(test))
+         deallocate(test)
+      endif
+      inverse_success = .true.
+    end subroutine FindInverseMatrix
+    !-------------------------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------------------
+    subroutine NewFindCutAreaCentroid(i,j,k,centroid)
       implicit none
 
       integer, intent(in)  :: i,j,k
