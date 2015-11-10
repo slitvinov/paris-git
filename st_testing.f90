@@ -271,11 +271,6 @@ contains
           if (vof_flag(i,j,k) == 2 ) then 
              ntests=ntests+1
              call get_curvature(i,j,k,kappa,nfound,nposit,a,.false.)
-             ! check if curvature was set
-             if(nfound > 0) then
-                print *, "rank, i,j,k,kappa,nfound,nposit,a",rank, i,j,k,kappa,nfound,nposit,a
-                call pariserror("Curvature not set in get_curvature")
-             endif
              ! method statistics
             if(nfound == 0) then
                 method_count(1) = method_count(1) + 1  ! nine heights
@@ -286,16 +281,18 @@ contains
              else if(nfound > 0) then
                 method_count(4) = method_count(4) + 1  ! no curvature was set. "impossible" case. 
              endif
-             kappa = kappa*dble(Nx) ! Nx = L/deltax
-             kappamax = max(ABS(kappa),kappamax)
-             kappamin = min(ABS(kappa),kappamin)
-             angle = atan2(y(j)-yc(ib),x(i)-xc(ib))/PI*180.d0
-             write(89,'(2(E15.8,1X))') angle,kappa
-             write(92,'(2(E15.8,1X),I4)') angle,kappa,nfound
-             write(90,*) angle,kappa_exact
-             err_K = ABS(kappa-kappa_exact)/kappa_exact
-             if ( err_K > 0.1d0 ) &
-                  write(91,'(3(I3,1X),2(E15.8,1X),I4)') i,j,k,kappa,kappa_exact,nfound
+             if(nfound<=0) then ! valid curvature 
+                kappa = kappa*dble(Nx) ! Nx = L/deltax
+                kappamax = max(ABS(kappa),kappamax)
+                kappamin = min(ABS(kappa),kappamin)
+                angle = atan2(y(j)-yc(ib),x(i)-xc(ib))/PI*180.d0
+                write(89,'(2(E15.8,1X))') angle,kappa
+                write(92,'(2(E15.8,1X),I4)') angle,kappa,nfound
+                write(90,*) angle,kappa_exact
+                err_K = ABS(kappa-kappa_exact)/kappa_exact
+                if ( err_K > 0.1d0 ) &
+                     write(91,'(3(I3,1X),2(E15.8,1X),I4)') i,j,k,kappa,kappa_exact,nfound
+             endif
           end if ! cvof(i,j,k)
        end do; end do; end do
     else if ( test_curvature_2D) then 
@@ -316,10 +313,7 @@ contains
              endif
              ! This stops the code in case kappa becomes NaN.
              if(kappa.ne.kappa) call pariserror("OC: Invalid Curvature")  
-             if(nfound==-1.or.abs(kappa)<EPS_GEOM.or.kappa.gt.1e6) then ! valid curvature ? 
-                write(6,*) "i,j,k,nfound,nindepend,kappa ",i,j,k,nfound,nindepend,kappa
-                call pariserror("OC: curvature not found")
-             else
+             if(nfound<=0) then ! valid curvature 
                 kappa = kappa*dble(Nx)  ! Nx = L/deltax
                 kappamax = max(ABS(kappa),kappamax)
                 kappamin = min(ABS(kappa),kappamin)

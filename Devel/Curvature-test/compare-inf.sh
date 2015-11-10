@@ -30,6 +30,6 @@ set log y
 set xrange [2:110]
 set xlabel "Grid points per Diameter"
 set ylabel "Curvature error in $dim"
-plot "gerris-$dim.txt" u (2*\$1):2 t "Gerris L2 one case" w lp,  "paris-$dim-$ndepth.tmp" u (2*\$1):2 t "ParisSim average L2", 4/(x*x) t "x^-2",  "paris-$dim-$ndepth.tmp" u (2*\$1):3 t "ParisSim max Linf" w lp
+plot "gerris-$dim.txt" u (2*\$1):2 t "Gerris L2 one case" w lp,  "paris-$dim-$ndepth.tmp" u (2*\$1):2 t "ParisSim average L2", 4/(x*x) t "x^-2",  "paris-$dim-$ndepth.tmp" u (2*\$1):3 t "ParisSim max Linf" w lp, 2/x
 EOF
 fi

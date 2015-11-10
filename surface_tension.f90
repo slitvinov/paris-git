@@ -51,7 +51,7 @@ module module_surface_tension
   ! Caution the line below is read by test scripts, so do not move it below line 60. Do not 
   ! write ndepth= anywhere else in the first 60 lines. 
   ! Do not change the lettercase for ndepth. 
-  integer, parameter :: NDEPTH=3  
+  integer, parameter :: NDEPTH=3 
   integer, parameter :: BIGINT=100
   real(8), parameter :: D_HALF_BIGINT = DBLE(BIGINT/2)
   integer, parameter :: MAX_EXT_H = 1
@@ -275,7 +275,7 @@ contains
      ! including the central layer and the empty/full cells
      ! NDEPTH*2 + 1 = 7 means a 7 x 3^2 stencil including full/empty. 
      ! NDEPTH*2 + 1 = 5 (ndepth = 2) is the usual 3x3 stencil with checking of the cells
-     ! above and bleow
+     ! above and below
      ! 2*NDEPTH + 1 = N_H + 2 in the notation of Mark Owkes & Olivier Desjardins
      ! JCP, Volume 281, 2015, Pages 285-300. 
      !  Note the normal is - grad C
@@ -1136,7 +1136,7 @@ contains
 
       ! test for invertibility
       if( abs(augmatrix(n,n)) <  EPSC) then
-         !            write(*,*) "error-matrix has A_",n,n,"=",augmatrix(n,n)," and is non-invertible"
+         ! write(*,*) "error-matrix has A_",n,n,"=",augmatrix(n,n)," and is non-invertible"
          inverse_success = .false.
          return
       endif
@@ -1144,8 +1144,8 @@ contains
       ! rescale lines to make diagonal elements unity
       do i = 1 , n
          m = augmatrix(i,i)
-         do j = i , (2 * n)
-            augmatrix(i,j) = (augmatrix(i,j)/ m)
+         do j = i , 2*n
+            augmatrix(i,j) = augmatrix(i,j)/m
          end do
       end do
 
@@ -1154,7 +1154,7 @@ contains
          do i =1, k
             m = augmatrix(i,k+1)
             do j = k, (2*n)
-               augmatrix(i,j) = augmatrix(i,j) -augmatrix(k+1,j) * m
+               augmatrix(i,j) = augmatrix(i,j) - augmatrix(k+1,j)*m
             end do
          end do
       end do
