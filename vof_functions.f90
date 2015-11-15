@@ -387,9 +387,9 @@ SUBROUTINE CENT3D(nr,cc,xc0)
     ctd0(3) = athird*al/m3                                            ! case (1)
   else if (ccr <= c02) then 
     al = 0.5d0*(m1 + DSQRT(m1*m1 + 8.d0*m2*m3*(cch - c01)))    
-    top = m1*m1 + 3.*al*(al-m1)
-    bot = 3.*(2.*al-m1)
-    ctd0(1) = (3.*al-2.*m1)/bot
+    top = m1*m1 + 3.d0*al*(al-m1)
+    bot = 3.d0*(2.d0*al-m1)
+    ctd0(1) = (3.d0*al-2.d0*m1)/bot
     ctd0(2) = top/(m2*bot)
     ctd0(3) = top/(m3*bot)                                            ! case (2)
   else if (ccr <= c03) then
@@ -509,7 +509,7 @@ function al3dOLD(b1,b2,b3,cc)
      p = m1*(m2+m3) + m2*m3 - 0.25d0
      q = 1.5d0*m1*m2*m3*(0.5d0-ch)
      p12 = DSQRT(p)
-     teta = DACOS(q/(p*p12))/3.0
+     teta = DACOS(q/(p*p12))/3.d0
      cs = DCOS(teta)
      AL3DOLD = p12*(DSQRT(3.d0*(1.d0-cs*cs)) - cs) + 0.5d0
   endif

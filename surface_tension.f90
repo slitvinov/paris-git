@@ -1337,45 +1337,45 @@ contains
      b = alpha - dmx
      if (b > 0.) then
         area = area - b*b
-        px = px - b*b*(2.*dmx + alpha)
+        px = px - b*b*(2.d0*dmx + alpha)
         py = py - b*b*b
         pz = pz - b*b*b
      endif
      b = alpha - dmy
-     if (b > 0.) then
+     if (b > 0.d0) then
         area = area - b*b
-        py = py - b*b*(2.*dmy + alpha)
+        py = py - b*b*(2.d0*dmy + alpha)
         px = px - b*b*b
         pz = pz - b*b*b
      endif
      b = alpha - dmz
-     if (b > 0.) then
+     if (b > 0.d0) then
         area = area - b*b
-        pz = pz - b*b*(2.*dmz + alpha)
+        pz = pz - b*b*(2.d0*dmz + alpha)
         px = px - b*b*b
         py = py - b*b*b
      endif
 
      amax = alpha - 1.d0
      b = amax + dmx
-     if (b > 0.) then
+     if (b > 0.d0) then
         area = area + b*b
-        py = py + b*b*(2.*dmy + alpha - dmz)
-        pz = pz + b*b*(2.*dmz + alpha - dmy)
+        py = py + b*b*(2.d0*dmy + alpha - dmz)
+        pz = pz + b*b*(2.d0*dmz + alpha - dmy)
         px = px + b*b*b
      endif
      b = amax + dmy
-     if (b > 0.) then
+     if (b > 0.d0) then
         area = area + b*b
-        px = px + b*b*(2.*dmx + alpha - dmz)
-        pz = pz + b*b*(2.*dmz + alpha - dmx)
+        px = px + b*b*(2.d0*dmx + alpha - dmz)
+        pz = pz + b*b*(2.d0*dmz + alpha - dmx)
         py = py + b*b*b
      endif
      b = amax + dmz
-     if (b > 0.) then
+     if (b > 0.d0) then
         area = area + b*b
-        px = px + b*b*(2.*dmx + alpha - dmy)
-        py = py + b*b*(2.*dmy + alpha - dmx)
+        px = px + b*b*(2.d0*dmx + alpha - dmy)
+        py = py + b*b*(2.d0*dmy + alpha - dmx)
         pz = pz + b*b*b
      endif
 
@@ -1405,35 +1405,35 @@ contains
      endif
 
      if (dmx < EPS_GEOM) then
-        px = 0.5
+        px = 0.5d0
         py = alpha;
         return
      endif
 
      if (dmy < EPS_GEOM) then
-        py = 0.5;
+        py = 0.5d0;
         px = alpha
         return
      endif
 
-     px = 0.; py = 0.
+     px = 0.; py = 0.d0
 
      if (alpha >= dmx) then
-        px = px +  1.
+        px = px +  1.d0
         py = py +  (alpha - dmx)/dmy
      else
         px = px +  alpha/dmx
      endif
 
      if (alpha >= dmy) then
-        py = py +  1.
+        py = py +  1.d0
         px = px +  (alpha - dmy)/dmx
      else
         py = py +  alpha/dmy
      endif
 
-     px = px/2.
-     py = py/2.
+     px = px/2.d0
+     py = py/2.d0
 
      call THRESHOLD (px)
      call THRESHOLD (py)
