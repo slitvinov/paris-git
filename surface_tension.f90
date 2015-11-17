@@ -71,7 +71,7 @@ module module_surface_tension
   integer, parameter :: NGC=21
   integer :: geom_case_count(NGC)
   integer :: nkcomp
-  integer, parameter :: NFOUND_BULK=NGC+1
+  integer, parameter :: NFOUND_PURE=NGC+1
 
 contains
 !=================================================================================================
@@ -632,13 +632,9 @@ contains
       kapparray=UNCOMPUTED
       do k=ks,ke; do j=js,je; do i=is,ie
          if (vof_flag(i,j,k) == 2 ) then  ! mixed cell
-            call get_curvature(i,j,k,kappa,nfound,nposit,afit,.false.)
-         else if (vof_flag(i,j,k) > 2 ) then
-            call pariserror("inconsistent vof_flag > 2")
-         else if(.not.bulk_cell(i,j,k)) then !  pure cell close to the phase boundary (may have a pure face)
-            call get_curvature(i,j,k,kappa,nfound,nposit,afit,.true.)
+            call get_curvature(i,j,k,kappa,nfound,nposit,afit)
          else ! pure and surrounded by cells of the same color
-            nfound=NFOUND_BULK  ! is always positive
+            nfound=NFOUND_PURE  ! is always positive
          endif
          if(nfound <= 0) then
             if(abs(kappa)>kappamax) then
@@ -664,22 +660,6 @@ contains
       if (debug_par) then
          call write_par_var("Kappa     ",iout,kapparray)
       endif
-
-    contains
-      function bulk_cell(i,j,k)
-        implicit none
-        integer :: i,j,k, n_mass
-        logical :: bulk_cell
-        n_mass = vof_flag(i,j,k+1) + vof_flag(i,j,k-1) + &
-             vof_flag(i,j-1,k) + vof_flag(i,j+1,k) + &
-             vof_flag(i-1,j,k) + vof_flag(i+1,j,k) 
-
-        bulk_cell = (vof_flag(i,j,k+1)/2 + vof_flag(i,j,k-1)/2 + &
-             vof_flag(i,j-1,k)/2 + vof_flag(i,j+1,k)/2 + &
-             vof_flag(i-1,j,k)/2 + vof_flag(i+1,j,k)/2 == 0).and. &
-             ((n_mass == 6.and.vof_flag(i,j,k)==1).or. &
-             (n_mass == 0 .and.vof_flag(i,j,k)==0))
-      end function bulk_cell
    end subroutine get_all_curvatures
 
 !=================================================================================================
@@ -709,15 +689,13 @@ contains
 ! nfound=16        : no fit success (either with mixed heights or with centroids)
 ! nfound=21        : failure for cells with exactly grad C = 0 
 !=================================================================================================
-   subroutine get_curvature(i0,j0,k0,kappa,nfound,nposit,a,pure_non_bulk)
+   subroutine get_curvature(i0,j0,k0,kappa,nfound,nposit,a)
      implicit none
      integer, intent(in) :: i0,j0,k0
      real(8), intent(out) :: kappa,a(6)  
      integer, intent(out) :: nfound
      integer, intent(out) :: nposit
-     logical, intent(in) :: pure_non_bulk
 
-     integer :: n_pure_faces
      real(8) :: h(-1:1,-1:1)
      integer :: m,n,l,i,j,k
      logical :: fit_success 
@@ -843,60 +821,17 @@ contains
            weights(nposit) = 1d0 ! wg  ! sqrt(wg)
         endif ! vof_flag
      enddo; enddo; enddo ! do m,n,l
-     ! arrange coordinates so height direction is closest to normal
-     ! try(:) array contains direction closest to normal first
-
-     if(nposit<6) then
-        if(.not.pure_non_bulk) then ! mixed cell
-           if(central/=2) call pariserror("unexpected non-mixed central flag")
-           if(nposit<4) then
-              geom_case_count(1) = geom_case_count(1) + 1
-           endif
-           geom_case_count(2) = geom_case_count(2) + 1
-        else !  pure non-bulk cell with less than 6 control points found. 
-           ! Verify that the cell is pure
-           if(central/2/=0) call pariserror("unexpected central flag")
-           ! The cell is pure, place additional centroids on the pure faces. 
-           n_pure_faces = 0
-           c(1)=i0
-           c(2)=j0
-           c(3)=k0
-           do d=1,3
-              do esign=-1,1,2
-                 c(d)=c(d)+esign
-                 neighbor = vof_flag(c(1),c(2),c(3))
-                 c(d)=c(d)-esign
-                 ! test whether neighbor is a pure cell of opposite kind
-                 if(neighbor/=2 .and. neighbor+central==1) then  
-                    nposit = nposit + 1
-                    n_pure_faces = n_pure_faces + 1
-                    do s=1,3
-                       if(s/=d) then
-                          fit(nposit,s) = 0d0
-                       endif
-                    enddo
-                    fit(nposit,d) = dble(esign)*0.5d0
-                 endif
-              enddo
-           enddo
-           if(n_pure_faces >= 3) then
-              geom_case_count(3) = geom_case_count(3) + 1
-           endif
-           if(nposit <6) then
-              geom_case_count(nposit+4) = geom_case_count(nposit+4) + 1
-              kappa = UNCOMPUTED ! Value is set back to the initial kapparay value
-           endif
-        endif
-     endif
-     points(:,1) = fit(:,try(2)) - origin(try(2))
-     points(:,2) = fit(:,try(3)) - origin(try(3))
-     points(:,3) = fit(:,try(1)) - origin(try(1))
      if(nposit.gt.NPOS) call pariserror("GLH: nposit")
      if(nposit < 6) then
         geom_case_count(nposit+10) = geom_case_count(nposit+10) + 1
         nfound = nposit+10  ! encode the fact that curvature was not set due to insufficient number of centroids. 
         return
      else
+        ! permute coordinates so z direction is closest to normal
+        ! try(:) array contains direction closest to normal first
+        points(:,1) = fit(:,try(2)) - origin(try(2))
+        points(:,2) = fit(:,try(3)) - origin(try(3))
+        points(:,3) = fit(:,try(1)) - origin(try(1))
         call parabola_fit_with_rotation(points,fit,weights,mv,nposit,a,kappasign,fit_success) 
         if(.not.fit_success) then
            geom_case_count(16) = geom_case_count(16) + 1

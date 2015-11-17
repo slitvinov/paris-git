@@ -2639,9 +2639,11 @@ subroutine surfaceForce(du,dv,dw,rho)
            kappa=kappa+tmp(i,j,k)
            n=n+1
         endif
-        if(n==0) then 
-           geom_case_count(18) = geom_case_count(18) + 1
-           ! call print_cvof_3x3x3(i,j,k)
+        if(n==0) then
+!          if(.not.((vof_flag(i,j,k+1)==1.and.vof_flag(i,j,k)==0) &
+!                .or.(vof_flag(i,j,k+1)==0.and.vof_flag(i,j,k)==1))) then
+             geom_case_count(18) = geom_case_count(18) + 1
+!           endif
         else
            kappa=kappa/(deltax*n)
            du(i,j,k) = du(i,j,k) - kappa*sigma*(2.0/dxh(i))*(cvof(i+1,j,k)-cvof(i,j,k))/(rho(i+1,j,k)+rho(i,j,k))
@@ -2662,8 +2664,10 @@ subroutine surfaceForce(du,dv,dw,rho)
            n=n+1
         endif
         if(n==0) then 
-           geom_case_count(19) = geom_case_count(19) + 1
-           ! call print_cvof_3x3x3(i,j,k)
+ !          if(.not.((vof_flag(i,j+1,k)==1.and.vof_flag(i,j,k)==0) &
+ !               .or.(vof_flag(i,j+1,k)==0.and.vof_flag(i,j,k)==1))) then
+              geom_case_count(19) = geom_case_count(19) + 1
+ !          endif
         else
            kappa=kappa/(deltax*n)
            dv(i,j,k)=dv(i,j,k) - kappa*sigma*(2.0/dyh(j))*(cvof(i,j+1,k)-cvof(i,j,k))/(rho(i,j+1,k)+rho(i,j,k))
@@ -2684,8 +2688,10 @@ subroutine surfaceForce(du,dv,dw,rho)
            n=n+1
         endif
         if(n==0) then  
-           geom_case_count(20) = geom_case_count(20) + 1
-           ! call print_cvof_3x3x3(i,j,k)
+ !          if(.not.((vof_flag(i,j,k+1)==1.and.vof_flag(i,j,k)==0) &
+ !               .or.(vof_flag(i,j,k+1)==0.and.vof_flag(i,j,k)==1))) then
+              geom_case_count(20) = geom_case_count(20) + 1
+ !          endif
         else
            kappa=kappa/(deltax*n)
            dw(i,j,k)=dw(i,j,k) - kappa*sigma*(2.0/dzh(k))*(cvof(i,j,k+1)-cvof(i,j,k))/(rho(i,j,k+1)+rho(i,j,k))

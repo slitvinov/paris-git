@@ -270,7 +270,7 @@ contains
           ! find curvature only for cut cells
           if (vof_flag(i,j,k) == 2 ) then 
              ntests=ntests+1
-             call get_curvature(i,j,k,kappa,nfound,nposit,a,.false.)
+             call get_curvature(i,j,k,kappa,nfound,nposit,a)
              ! method statistics
             if(nfound == 0) then
                 method_count(1) = method_count(1) + 1  ! nine heights
@@ -301,7 +301,7 @@ contains
        do i=is,ie; do j=js,je
           if (vof_flag(i,j,k) == 2) then 
              ntests=ntests+1
-             call get_curvature(i,j,k,kappa,nfound,nposit,a,.false.)
+             call get_curvature(i,j,k,kappa,nfound,nposit,a)
              if(nfound == 0) then
                 method_count(1) = method_count(1) + 1  ! nine heights
              else if ( nfound < - 50) then
