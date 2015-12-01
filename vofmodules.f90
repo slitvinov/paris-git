@@ -592,7 +592,7 @@ contains
           call random_bubbles
        endif
        if (filter_random_seeds) then
-          call MPI_BCAST(NumBubble, 1, MPI_INT, &
+          call MPI_BCAST(NumBubble, 1, MPI_INTEGER, &
                root_rank, MPI_Comm_Cart, ierr)
        endif
        call MPI_BCAST(rad, NumBubble, MPI_REAL8, &
@@ -611,7 +611,7 @@ contains
           call random_bubbles
        endif
        if (filter_random_seeds) then
-          call MPI_BCAST(NumBubble, 1, MPI_INT, &
+          call MPI_BCAST(NumBubble, 1, MPI_INTEGER, &
                root_rank, MPI_Comm_Cart, ierr)
        endif
        call MPI_BCAST(rad, NumBubble, MPI_REAL8, &
@@ -630,7 +630,7 @@ contains
                call pariserror('For cubic lattice bubble test there has to be more than 2 bubbles per coord direction')
           call cubic_lattice_bubbles
        endif
-       call MPI_BCAST(NumBubble, 1, MPI_INT, root_rank, MPI_Comm_Cart, ierr)
+       call MPI_BCAST(NumBubble, 1, MPI_INTEGER, root_rank, MPI_Comm_Cart, ierr)
        call MPI_BCAST(rad, NumBubble, MPI_REAL8, &
             root_rank, MPI_Comm_Cart, ierr)
        call MPI_BCAST(xc , NumBubble, MPI_REAL8, &

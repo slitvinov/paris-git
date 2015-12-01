@@ -2933,18 +2933,18 @@ subroutine InitCondition
             !   end do; end do; end do 
             !end if ! inject_type
 
-            if ( inject_type == 3 ) then
-               do i=imin,imax; do j=jmin,jmax; do k=kmin,kmax
-                  if ( y(j) < radius_liq_inject & 
-                     .and. x(i) < radius_gas_inject*10.d0 ) then 
-                     u(i,j,k) = ugas_inject*y(j)/radius_gas_inject
-                  else if ( y(j) > radius_gas_inject & 
-                     .and.  y(j) > radius_liq_inject & 
-                     .and.  x(i) < radius_liq_inject*10.d0 )then
-                     u(i,j,k) = uliq_inject
-                  end if ! y(j)
-               end do; end do; end do
-            end if ! 
+            !if ( inject_type == 3 ) then
+            !   do i=imin,imax; do j=jmin,jmax; do k=kmin,kmax
+            !      if ( y(j) < radius_liq_inject & 
+            !         .and. x(i) < radius_gas_inject*10.d0 ) then 
+            !         u(i,j,k) = ugas_inject*y(j)/radius_gas_inject
+            !      else if ( y(j) > radius_gas_inject & 
+            !         .and.  y(j) > radius_liq_inject & 
+            !         .and.  x(i) < radius_liq_inject*10.d0 )then
+            !         u(i,j,k) = uliq_inject
+            !      end if ! y(j)
+            !   end do; end do; end do
+            !end if ! 
          end if ! test_jet
          ! Test: Shear Droplet
          if (test_shear) then
