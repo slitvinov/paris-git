@@ -93,7 +93,10 @@
            w_cmask(i,j,k) = 0
         endif
      endif
-     if (phase(i,j,k) == 0 .or. implode_flag(tag_id(i,j,k))) then
+!!$     if (implode_flag(tag_id(i,j,k))) then
+!!$        write(*,'("Implode_flag true")')
+!!$     endif
+     if (phase(i,j,k) == 0 .or. (implode_flag(tag_id(i,j,k))) ) then
         pcmask(i,j,k)=0
         u_cmask(i,j,k)=0
         v_cmask(i,j,k)=0
@@ -186,16 +189,12 @@ subroutine check_topology(is_gas)
 
   if (num_drop(rank)>0) then
      do bub=1,num_drop(rank)
-        dropid = drops(bub)%element%id
-        if (.not.(rank==tag_rank(dropid))) write(*,*)"Full bub loop issue"
-        if (.not.(tag_mergeflag(dropid) == 1 .or. tag_mergeflag(dropid) == 0)) then
-           write(*,'("ERROR. Bub index, rank",3I8)')bub,rank
-           call pariserror('Error in Lagrangian loop')
-        endif
         volume = drops(bub)%element%vol
+        !write(*,'("Volume of drop ",I5," in rank ",I5", : ",e14.5)')bub,rank,volume
         if (volume > 1.d-9*dx(is)**3.d0) then
            if (is_gas) then
-              if (volume < 125.0*dx(is)**3.d0) then              
+              if (volume < 125.0*dx(is)**3.d0) then   
+                 !write(*,'("Volume <  of drop ",I5," in rank ",I5", : ",e14.5)')bub,rank,volume
                  call bub_implode(dropid,.false.)
               endif
            else
@@ -215,16 +214,12 @@ subroutine check_topology(is_gas)
 
   if ( num_drop_merge(rank) > 0 ) then 
      do bub=1,num_drop_merge(rank)
-        dropid = drops_merge(bub)%element%id
-        if (.not.(rank==tag_rank(dropid))) write(*,*)"Merged bub loop issue"
-        if (.not.(tag_mergeflag(dropid) == 1 .or. tag_mergeflag(dropid) == 0)) then
-           write(*,'("ERROR. Bub index, rank",3I8)')bub,rank
-           call pariserror('Error in Lagrangian loop')
-        endif
         volume = drops_merge(bub)%element%vol
+        !write(*,'("Volume of drop_merge ",I5," in rank ",I5", : ",e14.5)')bub,rank,volume
         if (volume > 1.d-9*dx(is)**3.d0) then
            if (is_gas) then
               if (volume < 125.0*dx(is)**3.d0) then
+                 !write(*,'("Volume < of drop_merge ",I5," in rank ",I5", : ",e14.5)')bub,rank,volume
                  call bub_implode(dropid,.true.)
               endif
            else 
@@ -791,9 +786,8 @@ subroutine FreeSolver(A,p,maxError,beta,maxit,it,ierr,iout,time,tres2)
   enddo
 
   if(rank==0.and.recordconvergence) close(89)
-  if(it==maxit+1 .and. rank==0) then
+  if(it==maxit+1 .and. rank==0 .and. solver_flag==1) then
      write(*,*) 'Warning: LinearSolver reached maxit: ||res||: ',tres2
-     write(*,'("Solver flag:",I8)')solver_flag
   endif
 contains
   subroutine catch_divergence_fs(res2,cells,ierr)
@@ -1185,9 +1179,9 @@ subroutine tag_bubbles(phase_ref,iout,time_stats)
   if ( MOD(iout,nstats) == 0 ) then
      call drop_statistics(iout,time_stats)
      !! DEBUGGING
-!!$     call output_tag(iout/nstats,is,ie+1,js,je+1,ks,ke+1)
-!!$     allocate( implode_global(0:total_num_tag) )
-!!$     call MPI_ALLREDUCE(implode_flag,implode_global, total_num_tag, MPI_LOGICAL, MPI_LOR, MPI_COMM_Active, ierr)
+     !call output_tag(iout/nstats,is,ie+1,js,je+1,ks,ke+1)
+!!$     allocate( implode_global(0:NumBubble*28) )
+!!$     call MPI_ALLREDUCE(implode_flag,implode_global, (NumBubble*28+1), MPI_LOGICAL, MPI_LOR, MPI_COMM_Active, ierr)
 !!$     if (rank == 0) then
 !!$        open(unit=77,file='implode_flags.txt',position='append')
 !!$        write(77,'("Implode flags at time step: ",I8)')iout
@@ -1236,7 +1230,6 @@ subroutine set_bubble_pressure
   else 
      P_gas = P_ref
   endif
-  if (.not. (test_capwave .or. test_plane)) call ReleaseTag2DropTable
 end subroutine set_bubble_pressure
 !==================================================================================================================
 subroutine inflow_accelerate
