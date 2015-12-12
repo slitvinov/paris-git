@@ -19,7 +19,7 @@ if [[ $(($nx % $npx)) -ne 0 ]] || [[ $(($nx % $npy)) -ne 0 ]] || [[ $(($nx % $np
     exit 
 fi
 
-rm -fr input out stats tmpout-* testinput-* *.txt RP_out RK_int_RP* *.root
+rm -fr input out stats testinput-* *.txt RP_out RK_int_RP* *.root
 let nprocs=$1*$2*$3;
 
 sed s/NXTEMP/$nx/g testinput.template | sed s/NPXTEMP/$npx/ | sed s/NPYTEMP/$npy/ | sed s/NPZTEMP/$npz/> testinput-$npx-$npy-$npz-$nx

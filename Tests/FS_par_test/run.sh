@@ -1,6 +1,6 @@
 #!/bin/bash
 #set -x
-rm -fr cav_vol*
+rm -fr cav_vol* tmpout*
 ./run-3dtest.sh 1 1 1 36 #this arrangement must be here in order to have a serial reference
 ./run-3dtest.sh 3 1 1 36
 ./run-3dtest.sh 4 1 1 36
