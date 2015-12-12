@@ -83,6 +83,7 @@ module module_VOF
   logical :: test_plane = .false.
   logical :: test_risingbubble = .false.
   logical :: test_lattice_bubs = .false.
+  logical :: test_fcc_lattice = .false.
   logical :: linfunc_initialized = .false.
   logical :: DoMOMCONS = .false.
   logical :: STGhost = .false.
@@ -269,10 +270,10 @@ contains
          output_filtered_VOF, DoMOMCONS, use_vofi,nfilter, &
          hshift, do_rotation, debug_curvature, mixed_heights, &
          use_full_heights, debug_par, STGhost, &
-         r_min, var_r, coord_min, var_coord, &
+         r_min, var_r, coord_min, var_coord, var_pos,&
          out_centroid, do_clean_debris,&
          clean_debris_method,nsteps_clean_debris,clean_debris_neighbours,&
-         filter_random_seeds, nb, cwg_threshold
+         filter_random_seeds, nb
     namelist /FSparameters/ X_level, RP_test, gamma, R_ref, P_ref,&
          VTK_OUT, NOUT_VTK, step_max, limit, curve_stats, order_extrap,&
          do_2nd_projection, check_stray_liquid, n_stray_liquid, &
@@ -300,14 +301,13 @@ contains
     mixed_heights = .true.
     use_full_heights = .true. 
     debug_par = .false.
-    r_min=0.02; var_r=0.03; coord_min=0.15; var_coord=0.7
+    r_min=0.02; var_r=0.03; coord_min=0.15; var_coord=0.7; var_pos=0.0d0
     do_clean_debris = .false.
     clean_debris_method = 1 
     nsteps_clean_debris = 10 
     clean_debris_neighbours = 2
     filter_random_seeds = .false.
     nb = 3
-    cwg_threshold=0d0
 
     in=31
 
@@ -493,6 +493,8 @@ contains
        test_risingbubble = .true.
     else if(test_type=='cubic_lat_bubs') then
        test_lattice_bubs = .true.
+    else if(test_type=='fcc_lat_bubs') then
+       test_fcc_lattice = .true.
     else
        write(*,*) test_type, rank
        call pariserror("unknown initialization")
@@ -627,11 +629,28 @@ contains
 
     if (test_lattice_bubs) then
        if ( rank == root_rank ) then
-          if (nb <= 2) &
-               call pariserror('For cubic lattice bubble test there has to be more than 2 bubbles per coord direction')
+          if (nb < 2) &
+               call pariserror('For cubic lattice bubble test there has to be at least 2 bubbles per coord direction')
           call cubic_lattice_bubbles
        endif
        call MPI_BCAST(NumBubble, 1, MPI_INTEGER, root_rank, MPI_Comm_Cart, ierr)
+       call MPI_BCAST(rad, NumBubble, MPI_REAL8, &
+            root_rank, MPI_Comm_Cart, ierr)
+       call MPI_BCAST(xc , NumBubble, MPI_REAL8, &
+            root_rank, MPI_Comm_Cart, ierr)
+       call MPI_BCAST(yc , NumBubble, MPI_REAL8, &
+            root_rank, MPI_Comm_Cart, ierr)
+       call MPI_BCAST(zc , NumBubble, MPI_REAL8, &
+            root_rank, MPI_Comm_Cart, ierr)
+    endif
+
+    if (test_fcc_lattice) then
+       if ( rank == root_rank ) then
+          if (n_cell < 2) &
+               call pariserror('For cubic lattice bubble test there has to be at least 2 cells per coord dir')
+          call fcc_lattice_bubbles
+       endif
+       call MPI_BCAST(NumBubble, 1, MPI_INT, root_rank, MPI_Comm_Cart, ierr)
        call MPI_BCAST(rad, NumBubble, MPI_REAL8, &
             root_rank, MPI_Comm_Cart, ierr)
        call MPI_BCAST(xc , NumBubble, MPI_REAL8, &
@@ -815,13 +834,47 @@ contains
     do ib=0,nb-1; do jb=0,nb-1; do kb=0,nb-1
        index = 1 + kb + jb*nb + ib*nb*nb 
        rad(index) = r_min + rand()*var_r
-       xc(index)  = coord_min + var_coord/(nb-1)*ib
-       yc(index)  = coord_min + var_coord/(nb-1)*jb
-       zc(index)  = coord_min + var_coord/(nb-1)*kb
+       xc(index)  = coord_min + var_coord/(nb-1)*(ib+var_pos/(3.0**(0.5d0))*(2.0d0*rand()-1.0d0))
+       yc(index)  = coord_min + var_coord/(nb-1)*(jb+var_pos/(3.0**(0.5d0))*(2.0d0*rand()-1.0d0))
+       zc(index)  = coord_min + var_coord/(nb-1)*(kb+var_pos/(3.0**(0.5d0))*(2.0d0*rand()-1.0d0))
 !!$       write(*,'("Bubble ",I10," generated at ",3e14.5," with radius: ",e14.5)')&
 !!$            index,xc(index),yc(index),zc(index),rad(index)
     enddo; enddo; enddo
   end subroutine cubic_lattice_bubbles
+  !=================================================================================================
+  !   Generate bubbles in a face centered cubic lattice 
+  !   Total bubbles should equal:
+  !   NumBubble = 4n^3 + 6n^2 + 3n + 1 with n=n_cell 
+  !=================================================================================================
+  subroutine fcc_lattice_bubbles()
+    use module_2phase
+#ifdef __INTEL_COMPILER
+    use IFPORT
+#endif
+    implicit none
+    integer :: ib, jb, kb, rand_seed, index
+    real(8) :: L_d
+#ifndef __INTEL_COMPILER
+    real :: rand
+#endif
+    rand_seed = ABS(TIME())
+    call srand(rand_seed)
+    index=2
+    NumBubble=0
+    !Calculate mean separation distance in bulk
+    L_d=var_coord/(real(n_cell)*sqrt(2.d0))
+    do ib=0,2*n_cell; do jb=0,2*n_cell; do kb=0,2*n_cell
+       if (mod(index,2)==0) then
+          NumBubble=NumBubble+1
+          rad(NumBubble) = r_min + rand()*var_r
+          xc(NumBubble)= coord_min + ib*var_coord/(n_cell*2.0d0)+var_pos*L_d/(sqrt(3.d0))*(2.d0*rand()-1.d0)
+          yc(NumBubble)= coord_min + jb*var_coord/(n_cell*2.0d0)+var_pos*L_d/(sqrt(3.d0))*(2.d0*rand()-1.d0)
+          zc(NumBubble)= coord_min + kb*var_coord/(n_cell*2.0d0)+var_pos*L_d/(sqrt(3.d0))*(2.d0*rand()-1.d0)  
+       endif
+       index=index+1
+    enddo; enddo; enddo
+    write(*,'("Total number of bubbles: ",I10)')NumBubble
+  end subroutine fcc_lattice_bubbles
   !=================================================================================================
   !   Spheres and cylinders
   !=================================================================================================

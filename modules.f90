@@ -385,7 +385,7 @@ end module module_tmpvar
 !-------------------------------------------------------------------------------------------------
 module module_2phase
   real(8), dimension( : ), allocatable :: rad, xc, yc, zc, vol
-  real(8) :: r_min, var_r, coord_min, var_coord
+  real(8) :: r_min, var_r, coord_min, var_coord, var_pos
   real(8) :: excentricity(3)
   real(8) :: ugas_inject,uliq_inject
   real(8) :: blayer_gas_inject, tdelay_gas_inject 
@@ -397,7 +397,7 @@ module module_2phase
   real(8) :: n_p(3)
   integer :: NumBubble
   real(8) :: NozzleThick2Cell,NozzleLength
-  integer :: nb
+  integer :: nb, n_cell
 end module module_2phase
 !=================================================================================================
 !=================================================================================================
