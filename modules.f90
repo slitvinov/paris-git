@@ -410,6 +410,7 @@ module module_freesurface
   integer, dimension(:,:,:), allocatable :: u_cmask,v_cmask,w_cmask,pcmask
   logical, dimension(:), allocatable :: implode_flag
   integer, dimension(1:3) :: NOUT_VTK
+  integer, dimension(1:6) :: p_ind
   real(8) :: P_ref, gamma, R_ref, V_0, P_inf !eq pressure and polytropic gas exponent
   real(8) :: R_RK, dR_RK, ddR_RK
   real(8) :: limit

@@ -299,6 +299,7 @@ Program paris
                  endif
                  call set_topology(vof_phase,itimestep) !vof_phase updated in vofsweeps
                  call set_bubble_pressure
+                 if (.not. (test_capwave .or. test_plane)) call ReleaseTag2DropTable
                  call my_timer(15)
               endif ! FreeSurface
            endif
@@ -408,7 +409,6 @@ Program paris
            endif
            ! (div u)*dt < epsilon => div u < epsilon/dt => maxresidual : maxerror/dt 
            if(HYPRE)then
-!              if (FreeSurface) call pariserror("HYPRE not functional for Free Surface")
               call poi_solve(A,p,maxError/MaxDt*ErrorScaleHYPRE,maxit,it,HYPRESolverType)
               call do_all_ghost(p)
            else
@@ -487,7 +487,7 @@ Program paris
                  endif
                  solver_flag = 2
                  call setuppoisson_fs_heights(u,v,w,vof_phase,rho1,dt,A,cvof,tag_id)
-                 call FreeSolver(A,p_ext,5.0d-2,beta,50,it,ierr,itimestep,time,residual)
+                 call FreeSolver(A,p_ext,5.0d-2,beta,10,it,ierr,itimestep,time,residual)
                  if(mod(itimestep,termout)==0) then
                     if(rank==0) then
                        write(*,'("FS2:   pressure residual, L_inf:   ",e7.1,&
@@ -1535,93 +1535,180 @@ subroutine pressure_stats(t)
   include "mpif.h"
   real(8) :: t
   integer :: i,j,k,ierr
-  real(8) :: p_face(1:6), p_face_global(1:6), p_min, p_max
-  real(8) :: p_liq, p_avg_liq, p_min_global, p_max_global, vol_liq, vol_liq_tot
+  real(8) :: p_face(1:6), vol_face(1:6), p_face_global(1:6), vol_face_global(1:6), p_min, p_max
+  real(8) :: p_liq, p_avg_liq, p_min_global, p_max_global, vol_liq, vol_liq_tot, vol
+  real(8) :: p_dyn, p_dyn_avg, ke_box, ke_box_avg
 
   p_face = 0.0d0
+  vol_face = 0.0d0
   !sum pressures on x+ face
-  if(coords(1)==0) then
+  if(p_ind(1)>=is .and. p_ind(1)<=ie) then
      do j=js,je
         do k=ks,ke
-           p_face(1) = p_face(1) + p(is,j,k)
+           if (j>=p_ind(3) .and. j<=p_ind(4) .and.&
+                k>=p_ind(5) .and. k<=p_ind(6) ) then
+              i=p_ind(1)
+              vol=dx(i)*dy(j)*dz(k)
+              p_face(1) = p_face(1) + vol*(1.0d0-cvof(i,j,k))*(p(i,j,k)+&
+                   0.5d0*rho(i,j,k)*( (0.5d0*(u(i,j,k)+u(i+1,j,k)))**2.d0 & 
+                   +(0.5d0*(v(i,j,k)+v(i,j+1,k)))**2.d0+(0.5d0*(w(i,j,k)+w(i,j,k+1)))**2.d0))
+              vol_face(1) = vol_face(1) + vol*(1.0d0-cvof(i,j,k))
+           endif
         enddo
      enddo
   endif
   !sum pressures on x- face
-  if(coords(1)==nPx-1) then
+  if(p_ind(2)>=is .and. p_ind(2)<=ie) then
      do j=js,je
         do k=ks,ke
-           p_face(2) = p_face(2) + p(ie,j,k)
+           if (j>=p_ind(3) .and. j<=p_ind(4) .and.&
+                k>=p_ind(5) .and. k<=p_ind(6) ) then
+              i=p_ind(2)
+              vol=dx(i)*dy(j)*dz(k)
+              p_face(2) = p_face(2) + vol*(1.0d0-cvof(i,j,k))*(p(i,j,k)+&
+                   0.5d0*rho(i,j,k)*( (0.5d0*(u(i,j,k)+u(i+1,j,k)))**2.d0 & 
+                   +(0.5d0*(v(i,j,k)+v(i,j+1,k)))**2.d0+(0.5d0*(w(i,j,k)+w(i,j,k+1)))**2.d0))
+              vol_face(2) = vol_face(2) + vol*(1.0d0-cvof(i,j,k))
+           endif
         enddo
      enddo
   endif
   !sum pressures on y- face
-  if(coords(2)==0) then
+  if(p_ind(3)>=js .and. p_ind(3)<=je) then
      do i=is,ie
         do k=ks,ke
-           p_face(3) = p_face(3) + p(i,js,k)
+           if (i>=p_ind(1) .and. i<=p_ind(2) .and.&
+                k>=p_ind(5) .and. k<=p_ind(6) ) then
+              j=p_ind(3)
+              vol=dx(i)*dy(j)*dz(k)
+              p_face(3) = p_face(3) + vol*(1.0d0-cvof(i,j,k))*(p(i,j,k)+&
+                   0.5d0*rho(i,j,k)*( (0.5d0*(u(i,j,k)+u(i+1,j,k)))**2.d0 & 
+                   +(0.5d0*(v(i,j,k)+v(i,j+1,k)))**2.d0+(0.5d0*(w(i,j,k)+w(i,j,k+1)))**2.d0))  
+              vol_face(3) = vol_face(3) + vol*(1.0d0-cvof(i,j,k))
+           endif
         enddo
      enddo
   endif
   !sum pressures on y+ face
-  if(coords(2)==nPy-1) then
+  if(p_ind(4)>=js .and. p_ind(4)<=je) then
      do i=is,ie
         do k=ks,ke
-           p_face(4) = p_face(4) + p(i,je,k)
+           if (i>=p_ind(1) .and. i<=p_ind(2) .and.&
+                k>=p_ind(5) .and. k<=p_ind(6) ) then
+              j=p_ind(4)
+              vol=dx(i)*dy(j)*dz(k)
+              p_face(4) = p_face(4) + vol*(1.0d0-cvof(i,j,k))*(p(i,j,k)+&
+                   0.5d0*rho(i,j,k)*( (0.5d0*(u(i,j,k)+u(i+1,j,k)))**2.d0 & 
+                   +(0.5d0*(v(i,j,k)+v(i,j+1,k)))**2.d0+(0.5d0*(w(i,j,k)+w(i,j,k+1)))**2.d0))
+              vol_face(4) = vol_face(4) + vol*(1.0d0-cvof(i,j,k))
+           endif
         enddo
      enddo
   endif
   !sum pressures on z- face
-  if(coords(3)==0) then
+  if(p_ind(5)>=ks .and. p_ind(5)<=ke) then
      do i=is,ie
         do j=js,je
-           p_face(5) = p_face(5) + p(i,j,ks)
+           if (i>=p_ind(1) .and. i<=p_ind(2) .and.&
+                j>=p_ind(3) .and. j<=p_ind(4) ) then
+              k=p_ind(5)
+              vol=dx(i)*dy(j)*dz(k)
+              p_face(5) = p_face(5) + vol*(1.0d0-cvof(i,j,k))*(p(i,j,k)+&
+                   0.5d0*rho(i,j,k)*( (0.5d0*(u(i,j,k)+u(i+1,j,k)))**2.d0 & 
+                   +(0.5d0*(v(i,j,k)+v(i,j+1,k)))**2.d0+(0.5d0*(w(i,j,k)+w(i,j,k+1)))**2.d0))
+              vol_face(5) = vol_face(5) + vol*(1.0d0-cvof(i,j,k))
+           endif
         enddo
      enddo
   endif
   ! sum pressures on z+ face
-  if(coords(3)==nPz-1) then
+  if(p_ind(6)>=ks .and. p_ind(6)<=ke) then
      do i=is,ie
         do j=js,je
-           p_face(6) = p_face(6) + p(i,j,ke)
+           if (i>=p_ind(1) .and. i<=p_ind(2) .and.&
+                j>=p_ind(3) .and. j<=p_ind(4) ) then
+              k=p_ind(6)
+              vol=dx(i)*dy(j)*dz(k)
+              p_face(6) = p_face(6) + vol*(1.0d0-cvof(i,j,k))*(p(i,j,k)+&
+                   0.5d0*rho(i,j,k)*( (0.5d0*(u(i,j,k)+u(i+1,j,k)))**2.d0 & 
+                   +(0.5d0*(v(i,j,k)+v(i,j+1,k)))**2.d0+(0.5d0*(w(i,j,k)+w(i,j,k+1)))**2.d0))
+              vol_face(6) = vol_face(6) + vol*(1.0d0-cvof(i,j,k))
+           endif
         enddo
      enddo
   endif
   call MPI_ALLREDUCE(p_face, p_face_global, 6, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_Domain, ierr)
+  call MPI_ALLREDUCE(vol_face, vol_face_global, 6, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_Domain, ierr)
   !Calculate face averages
-  p_face_global(1)=p_face_global(1)/(ny*nz)
-  p_face_global(2)=p_face_global(2)/(ny*nz)
-  p_face_global(3)=p_face_global(3)/(nx*nz)
-  p_face_global(4)=p_face_global(4)/(nx*nz)
-  p_face_global(5)=p_face_global(5)/(nx*ny)
-  p_face_global(6)=p_face_global(6)/(nx*ny)
+  p_face_global(1)=p_face_global(1)/vol_face_global(1)
+  p_face_global(2)=p_face_global(2)/vol_face_global(2)
+  p_face_global(3)=p_face_global(3)/vol_face_global(3)
+  p_face_global(4)=p_face_global(4)/vol_face_global(4)
+  p_face_global(5)=p_face_global(5)/vol_face_global(5)
+  p_face_global(6)=p_face_global(6)/vol_face_global(6)
   
   p_max = -1.0d50
   p_min = 1.0d50
   p_liq = 0.0d0
   vol_liq = 0.0d0
+  p_dyn = 0.0d0
+  ke_box = 0.0d0
   do k=ks,ke; do j=js,je; do i=is,ie
-     if (pcmask(i,j,k)==0) then
-        p_liq=p_liq+p(i,j,k)*dx(i)*dy(j)*dz(k)*(1.0d0-cvof(i,j,k))
-        vol_liq = vol_liq + dx(i)*dy(j)*dz(k)*(1.0d0-cvof(i,j,k))
+     if ( (i>=p_ind(1)).and.(i<=p_ind(2)) .and.&
+        (j>=p_ind(3)).and.(j<=p_ind(4)) .and.&
+        (k>=p_ind(5)).and.(k<=p_ind(6)) ) then
+        vol=dx(i)*dy(j)*dz(k)
+        ke_box = vol*(1.0d0-cvof(i,j,k))*(0.5d0*rho(i,j,k)*( (0.5d0*(u(i,j,k)+u(i+1,j,k)))**2.d0 & 
+             +(0.5d0*(v(i,j,k)+v(i,j+1,k)))**2.d0+(0.5d0*(w(i,j,k)+w(i,j,k+1)))**2.d0) )
+        p_liq=p_liq+vol*(1.0d0-cvof(i,j,k))*p(i,j,k) + ke_box 
+        vol_liq = vol_liq + vol*(1.0d0-cvof(i,j,k))
         p_min = MIN(p_min,p(i,j,k))
         p_max = MAX(p_max,p(i,j,k))
+        p_dyn =p_dyn+vol*(1.0d0-cvof(i,j,k))*p(i,j,k) 
      endif
   enddo;enddo;enddo
   call MPI_ALLREDUCE(p_liq, p_avg_liq, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_Domain, ierr)
+  call MPI_ALLREDUCE(p_dyn, p_dyn_avg, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_Domain, ierr)
+  call MPI_ALLREDUCE(ke_box, ke_box_avg, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_Domain, ierr)
   call MPI_ALLREDUCE(vol_liq, vol_liq_tot, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_Domain, ierr)
   call MPI_ALLREDUCE(p_min, p_min_global, 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_Domain, ierr)
   call MPI_ALLREDUCE(p_max, p_max_global, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_Domain, ierr)
   p_avg_liq = p_avg_liq/vol_liq_tot
+  p_dyn_avg = p_dyn_avg/vol_liq_tot
+  ke_box_avg = ke_box_avg/vol_liq_tot
 
   if (rank==0) then
      OPEN(UNIT=20,FILE='pressure_stats.txt',position='append')
-     write(20,201)t,p_face_global(1:6),p_min_global,p_max_global,p_avg_liq
+     write(20,201)t,p_face_global(1:6),p_min_global,p_max_global,p_avg_liq,p_dyn_avg,ke_box_avg,vol_liq_tot
      CLOSE(20)
   endif
-201  format(10es14.6e2)
+201  format(13es14.6e2)
 
 end subroutine pressure_stats
+!=================================================================================================
+subroutine press_indices
+  use module_grid
+  use module_freesurface
+  use module_2phase
+  implicit none
+  integer :: q
+
+  p_ind(1) = Nx*coord_min/xLength + Ng
+  p_ind(2) = Nx*(coord_min+var_coord)/xLength + Ng
+
+  p_ind(3) = Ny*coord_min/yLength + Ng
+  p_ind(4) = Ny*(coord_min+var_coord)/yLength + Ng
+
+  p_ind(5) = Nz*coord_min/zLength + Ng
+  p_ind(6) = Nz*(coord_min+var_coord)/zLength + Ng
+
+  if (rank==0) then
+     write(*,'("Grid indices at coord limits for pressure stats: ")')
+     do q=1,6    
+        write(*,'("Face ",I4,": ",I4)')q,p_ind(q)
+     enddo
+  endif
+end subroutine press_indices
 !=========================================================================================================================
 subroutine momentumConvection()
   use module_flow
@@ -2807,6 +2894,7 @@ subroutine InitCondition
            call ighost_z(vof_flag,2,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
            call setVOFBC(cvof,vof_flag)
            if (FreeSurface) then
+              call press_indices
               if (rank==0) then
                  write(*,'("Restarted simulation with free surface.")') 
                  write(*,'("P_ref, R_ref, R_RK, dR_RK, ddR_RK, V_0: ",6e14.5)')P_ref, R_ref, R_RK, dR_RK, ddR_RK, V_0
@@ -3032,6 +3120,7 @@ contains
     end if !
     call set_topology(vof_phase,itimestep) !vof_phases are updated in initconditions_VOF called above
     call get_ref_volume(cvof)
+    call press_indices
     if (RP_test) then
        !call get_ref_volume(cvof)
        call Integrate_RP(dt,time,rho1)

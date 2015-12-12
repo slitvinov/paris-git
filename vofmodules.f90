@@ -372,6 +372,7 @@ contains
        check_stray_liquid = .false.
        n_stray_liquid = 50
        FS_Hypre = .false.
+       p_ind = -2
        !call MPI_COMM_RANK(MPI_COMM_WORLD, rank, ierr)
        inquire(file='inputFS',exist=fs_file_is_there)
        in = 77
@@ -428,7 +429,7 @@ contains
             P_gx(imin:imax,jmin:jmax,kmin:kmax), P_gy(imin:imax,jmin:jmax,kmin:kmax),&
             P_gz(imin:imax,jmin:jmax,kmin:kmax), pcmask(imin:imax,jmin:jmax,kmin:kmax), &
             P_gas(imin:imax,jmin:jmax,kmin:kmax),p_ext(imin:imax,jmin:jmax,kmin:kmax), &
-            v_source(imin:imax,jmin:jmax,kmin:kmax), implode_flag(0:NumBubble*9))
+            v_source(imin:imax,jmin:jmax,kmin:kmax), implode_flag(0:NumBubble*28))
        u_cmask = 3; v_cmask = 3; w_cmask = 3
        v_source = 0.d0
        x_mod = dxh((is+ie)/2); y_mod = dyh((js+je)/2); z_mod = dzh((ks+ke)/2)
