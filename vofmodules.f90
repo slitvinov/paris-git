@@ -273,7 +273,8 @@ contains
          r_min, var_r, coord_min, var_coord, var_pos,&
          out_centroid, do_clean_debris,&
          clean_debris_method,nsteps_clean_debris,clean_debris_neighbours,&
-         filter_random_seeds, nb
+         filter_random_seeds, nb, n_cell,&
+         cwg_threshold
     namelist /FSparameters/ X_level, RP_test, gamma, R_ref, P_ref,&
          VTK_OUT, NOUT_VTK, step_max, limit, curve_stats, order_extrap,&
          do_2nd_projection, check_stray_liquid, n_stray_liquid, &
@@ -307,7 +308,8 @@ contains
     nsteps_clean_debris = 10 
     clean_debris_neighbours = 2
     filter_random_seeds = .false.
-    nb = 3
+    nb = 3; n_cell=3
+    cwg_threshold=0d0
 
     in=31
 
