@@ -633,7 +633,7 @@ contains
       do k=ks,ke; do j=js,je; do i=is,ie
          if (vof_flag(i,j,k) == 2 ) then  ! mixed cell
             call get_curvature(i,j,k,kappa,nfound,nposit,afit)
-         else ! pure and surrounded by cells of the same color
+         else ! pure 
             nfound=NFOUND_PURE  ! is always positive
          endif
          if(nfound <= 0) then
