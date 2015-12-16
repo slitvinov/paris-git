@@ -649,7 +649,7 @@ contains
                   call pariserror("Kappa read into array is NaN")
                endif
             endif                    ! end debugging
-         endif
+         endif ! end if nfound <=0 loop, do not change kapparray from UNCOMPUTED
       enddo;enddo;enddo
 
       call ghost_x(kapparray(:,:,:),2,req(1:4))
