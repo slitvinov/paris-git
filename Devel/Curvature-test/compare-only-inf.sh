@@ -13,6 +13,10 @@ dim=$2'D'
 
 cp gerris-3D.txt gerris-3D.tmp
 cp ../../Tests/Curvature/paris-$dim-$ndepth.tmp . 
+cp paris-$dim-$ndepth.tmp 1.tmp
+egrep -v nan 1.tmp > paris-$dim-$ndepth.tmp
+rm -f 1.tmp
+
 
 if [ $2 == 2 ]; then
 gnuplot <<EOF
