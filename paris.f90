@@ -372,7 +372,6 @@ Program paris
               v = v + dt * dv
               w = w + dt * dw
            endif
-
            if(out_sub .and. ii==1 .and. mod(itimestep-itimestepRestart,nout)==0) then
               call output5(itimestep/nout,itimestep,1)
            endif
@@ -1640,13 +1639,13 @@ subroutine pressure_stats(t)
   call MPI_ALLREDUCE(p_face, p_face_global, 6, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_Domain, ierr)
   call MPI_ALLREDUCE(vol_face, vol_face_global, 6, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_Domain, ierr)
   !Calculate face averages
+  vol_face_global = vol_face_global + TINY_DOUBLE
   p_face_global(1)=p_face_global(1)/vol_face_global(1)
   p_face_global(2)=p_face_global(2)/vol_face_global(2)
   p_face_global(3)=p_face_global(3)/vol_face_global(3)
   p_face_global(4)=p_face_global(4)/vol_face_global(4)
   p_face_global(5)=p_face_global(5)/vol_face_global(5)
   p_face_global(6)=p_face_global(6)/vol_face_global(6)
-  
   p_max = -1.0d50
   p_min = 1.0d50
   p_liq = 0.0d0
@@ -1673,6 +1672,7 @@ subroutine pressure_stats(t)
   call MPI_ALLREDUCE(vol_liq, vol_liq_tot, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_Domain, ierr)
   call MPI_ALLREDUCE(p_min, p_min_global, 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_Domain, ierr)
   call MPI_ALLREDUCE(p_max, p_max_global, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_Domain, ierr)
+  vol_liq_tot = vol_liq_tot + TINY_DOUBLE
   p_avg_liq = p_avg_liq/vol_liq_tot
   p_dyn_avg = p_dyn_avg/vol_liq_tot
   ke_box_avg = ke_box_avg/vol_liq_tot
