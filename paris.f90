@@ -3489,7 +3489,7 @@ subroutine hello_proc(n)
   integer, save :: hello_count=1
   integer :: n
   if(debug == 1) then 
-  if(rank==n) write(6,*) 'coucou ',hello_count, "Process0"
+  if(rank==n) write(6,*) 'coucou ',hello_count, "Process ", n
   if(rank==nPdomain) write(6,*) 'coucou ',hello_count, "Front"
   hello_count = hello_count + 1
   end if

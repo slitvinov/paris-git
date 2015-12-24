@@ -240,7 +240,7 @@ contains
     implicit none      
     include "mpif.h"
     integer :: i,j,k! ,l,m,n
-    integer :: ib 
+    integer :: ib,iout
     real(8) :: kappa,a(6)
     real(8) :: angle 
     real(8) :: kappamin
@@ -249,49 +249,45 @@ contains
     real(8) :: L2_err_K, err_K
     real(8) :: S2_err_K
     real(8) :: Lm_err_K
-    integer :: sumCount,nfound,nindepend
+    integer :: sumCount,nindepend
     integer :: nposit, ntests
-
-    OPEN(UNIT=89,FILE=TRIM(out_path)//'/curvature-'//TRIM(int2text(rank,padding))//'.txt')
-    OPEN(UNIT=90,FILE=TRIM(out_path)//'/reference-'//TRIM(int2text(rank,padding))//'.txt')
-    OPEN(UNIT=91,FILE=TRIM(out_path)//'/bigerror-'//TRIM(int2text(rank,padding))//'.txt')
-    OPEN(UNIT=92,FILE=TRIM(out_path)//'/debug-'//TRIM(int2text(rank,padding))//'.txt')
+    real(8), allocatable :: kapparray(:,:,:)
+    allocate(kapparray(imin:imax,jmin:jmax,kmin:kmax))
     ib = 1
     kappamin = 1d20
-    kappamax = -1d20
+    kappamax = 0d0
     sumCount = 0
     S2_err_K=0.d0
     Lm_err_K=0.d0
     method_count=0
     ntests=0
+    iout=-1
+
+    call get_all_curvatures_pop(kapparray,iout)
+
+    OPEN(UNIT=89,FILE=TRIM(out_path)//'/curvature-'//TRIM(int2text(rank,padding))//'.txt')
+    OPEN(UNIT=90,FILE=TRIM(out_path)//'/reference-'//TRIM(int2text(rank,padding))//'.txt')
+    OPEN(UNIT=91,FILE=TRIM(out_path)//'/bigerror-'//TRIM(int2text(rank,padding))//'.txt')
+    OPEN(UNIT=92,FILE=TRIM(out_path)//'/debug-'//TRIM(int2text(rank,padding))//'.txt')
     if ( test_curvature ) then ! Test curvature in 3D
        kappa_exact = - 2.d0/rad(ib)
        do i=is,ie; do j=js,je; do k=ks,ke
           ! find curvature only for cut cells
           if (vof_flag(i,j,k) == 2 ) then 
              ntests=ntests+1
-             call get_curvature(i,j,k,kappa,nfound,nposit,a)
-             ! method statistics
-            if(nfound == 0) then
-                method_count(1) = method_count(1) + 1  ! nine heights
-             else if ( nfound < - 50) then
-                method_count(3) = method_count(3) + 1  ! centroids
-             else if(  nfound < 0) then 
-                method_count(2) = method_count(2) + 1  ! mixed heights
-             else if(nfound > 0) then
-                method_count(4) = method_count(4) + 1  ! no curvature was set. "impossible" case. 
-             endif
-             if(nfound<=0) then ! valid curvature 
+             kappa = kapparray(i,j,k) 
+!              print *,i,j,k,kappa,ntests
+             if(kappa<UNCOMPUTED) then ! valid curvature 
                 kappa = kappa*dble(Nx) ! Nx = L/deltax
                 kappamax = max(ABS(kappa),kappamax)
                 kappamin = min(ABS(kappa),kappamin)
                 angle = atan2(y(j)-yc(ib),x(i)-xc(ib))/PI*180.d0
                 write(89,'(2(E15.8,1X))') angle,kappa
-                write(92,'(2(E15.8,1X),I4)') angle,kappa,nfound
+                write(92,'(2(E15.8,1X),I4)') angle,kappa,0
                 write(90,*) angle,kappa_exact
                 err_K = ABS(kappa-kappa_exact)/kappa_exact
                 if ( err_K > 0.1d0 ) &
-                     write(91,'(3(I3,1X),2(E15.8,1X),I4)') i,j,k,kappa,kappa_exact,nfound
+                     write(91,'(3(I3,1X),2(E15.8,1X),I4)') i,j,k,kappa,kappa_exact,0
              endif
           end if ! cvof(i,j,k)
        end do; end do; end do
@@ -301,19 +297,10 @@ contains
        do i=is,ie; do j=js,je
           if (vof_flag(i,j,k) == 2) then 
              ntests=ntests+1
-             call get_curvature(i,j,k,kappa,nfound,nposit,a)
-             if(nfound == 0) then
-                method_count(1) = method_count(1) + 1  ! nine heights
-             else if ( nfound < - 50) then
-                method_count(3) = method_count(3) + 1  ! centroids
-             else if(  nfound < 0) then 
-                method_count(2) = method_count(2) + 1  ! mixed heights
-             else if(nfound > 0) then
-                method_count(4) = method_count(4) + 1  ! no curvature was set. "impossible" case. 
-             endif
+             kappa = kapparray(i,j,k) 
              ! This stops the code in case kappa becomes NaN.
              if(kappa.ne.kappa) call pariserror("OC: Invalid Curvature")  
-             if(nfound<=0) then ! valid curvature 
+              if(kappa<UNCOMPUTED) then ! valid curvature 
                 kappa = kappa*dble(Nx)  ! Nx = L/deltax
                 kappamax = max(ABS(kappa),kappamax)
                 kappamin = min(ABS(kappa),kappamin)
@@ -321,9 +308,9 @@ contains
                 write(89,*) angle,kappa
                 write(90,*) angle,kappa_exact
                 err_K    = ABS((kappa-kappa_exact)/kappa_exact)
-                write(92,'(3(E15.8,1X),4(I4))') angle,kappa,err_K,nfound,i,j,k
+                write(92,'(3(E15.8,1X),4(I4))') angle,kappa,err_K,0,i,j,k
                 if ( err_K > 0.1d0 ) &
-                     write(91,'(3(I3,1X),2(E15.8,1X),I4)') i,j,k,kappa,kappa_exact,nfound
+                     write(91,'(3(I3,1X),2(E15.8,1X),I4)') i,j,k,kappa,kappa_exact,0
                  S2_err_K    = S2_err_K  + err_K**2
                 Lm_err_K    = MAX(Lm_err_K,   err_K) 
                 sumCount = sumCount + 1
@@ -355,23 +342,7 @@ contains
     CLOSE(90)
     CLOSE(91)
     CLOSE(92)
-    call print_method() 
-  contains
-    subroutine print_method()
-      integer :: total=0
-      integer :: n
-      real(8) :: fraction(4)
-      do n=1,4
-         total = method_count(n) + total
-      enddo
-      do n=1,4
-         fraction(n) = float(method_count(n)) / float(total)   
-      enddo
-
-      OPEN(UNIT=89,FILE='mcount.tmp')
-      write(89,*) fraction
-      close(89)
-    end subroutine print_method
+    deallocate(kapparray)
   end subroutine output_curvature
   !=========================================================================================================
   !

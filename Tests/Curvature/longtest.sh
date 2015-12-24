@@ -16,7 +16,7 @@ then
 	exit 
     }
     cd ../../Devel/Curvature-test
-    ./compare-inf.sh $ndepth $d
+    ./compare-only-inf.sh $ndepth $d
     cd $here
 fi
 
@@ -28,7 +28,7 @@ echo "Failed curvature test"
 exit 
 }
 cd ../../Devel/Curvature-test
-./compare-inf.sh $ndepth $d
+./compare-only-inf.sh $ndepth $d
 cd $here
 
 

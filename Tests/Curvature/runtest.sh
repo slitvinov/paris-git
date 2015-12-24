@@ -37,6 +37,7 @@ for level in $list; do
     nx=`awk -v level=$level 'BEGIN {print 2**level}'`
     if [ $level -eq $minlevel ]; then
 	radlist="0.03125 0.04 0.05 0.0625 0.08 0.1 0.125 0.16 0.2 0.25 0.32"
+#	radlist="0.03125 0.04 0.05 0.0625 0.08 0.1 0.125 0.16 0.2"
     else
 	radlist="0.2 0.25 0.32"
     fi
@@ -46,9 +47,11 @@ for level in $list; do
 done
 
 # one more time for radius 0.4 at max level
-
-radius=0.4
-echo "testing level $level"
-./run_stats.sh $nx $init $radius $nstats $d || exit 1
-
+if [ $minlevel -ne $levelmax ]; then
+    radius=0.4
+    echo "testing level $level"
+    ./run_stats.sh $nx $init $radius $nstats $d || exit 1
+else
+    echo "not redoing maxlevel"
+fi
 exit 0 

@@ -12,15 +12,13 @@ cd out
 pariscompare curvature.txt reference.txt $precision 1 1
 cd ..
 
-# temporary
-exit 0
 
 d=2
 dim=$d'D'
 
 echo "dimension" $dim
 precision=4e-2
-./run_one_test.sh F Curvature2D F 2 0.32 4e-2 8 64 0.5 0.5 0.5 2
+./run_one_test.sh F Curvature2D F 3 0.32 4e-2 8 64 0.5 0.5 0.5 2
 echo `awk ' /START:/ { cpu = $8 } END { print "cpu = " cpu } ' < tmpout`
 cd out
 pariscompare curvature.txt reference.txt $precision 1 1
