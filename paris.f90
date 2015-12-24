@@ -71,7 +71,7 @@ Program paris
   implicit none
   include 'mpif.h'
   integer :: ierr, icolor
-  integer :: req(48),sta(MPI_STATUS_SIZE,48)
+
   INTEGER :: irank, ii, i, j, k, out_fs
   real(8) :: residual,cflmax,get_cfl_and_check,residualu,residualv,residualw
   integer :: itu,itv,itw
@@ -1492,7 +1492,7 @@ end subroutine calcStats
 
      contains 
       subroutine backup_turb_write
-         integer ::i,j,k
+         integer ::i,j
          character(len=100) :: filename
          filename = trim(out_path)//'/backup_turb_'//int2text(rank,padding)
          !call system('touch '//trim(filename)//'; mv '//trim(filename)//' '//trim(filename)//'.old')
@@ -1505,7 +1505,7 @@ end subroutine calcStats
       end subroutine backup_turb_write
 
       subroutine backup_turb_read
-         integer ::i,j,k
+         integer ::i,j
          character(len=100) :: filename
          logical :: file_exist
          filename = trim(out_path)//'/backup_turb_'//int2text(rank,padding)
@@ -1693,14 +1693,14 @@ subroutine press_indices
   implicit none
   integer :: q
 
-  p_ind(1) = Nx*coord_min/xLength + Ng
-  p_ind(2) = Nx*(coord_min+var_coord)/xLength + Ng
+  p_ind(1) = floor(Nx*coord_min/xLength) + Ng
+  p_ind(2) = floor(Nx*(coord_min+var_coord)/xLength) + Ng
 
-  p_ind(3) = Ny*coord_min/yLength + Ng
-  p_ind(4) = Ny*(coord_min+var_coord)/yLength + Ng
+  p_ind(3) =  floor(Ny*coord_min/yLength) + Ng
+  p_ind(4) =  floor(Ny*(coord_min+var_coord)/yLength) + Ng
 
-  p_ind(5) = Nz*coord_min/zLength + Ng
-  p_ind(6) = Nz*(coord_min+var_coord)/zLength + Ng
+  p_ind(5) =  floor(Nz*coord_min/zLength) + Ng
+  p_ind(6) =  floor(Nz*(coord_min+var_coord)/zLength) + Ng
 
   if (rank==0) then
      write(*,'("Grid indices at coord limits for pressure stats: ")')
@@ -2245,8 +2245,8 @@ subroutine momentumConvectionBCG()
   implicit none
   include 'mpif.h'
   real(8), external :: minabs
-  real(8) :: grad, unorm, uc, fxx, fyy, fzz,usign
-  integer :: i,j,k, iaux,ierr
+
+  integer :: i,j,k,ierr
   integer :: req(48),sta(MPI_STATUS_SIZE,48)
  
   !prediction stage
@@ -2374,11 +2374,11 @@ subroutine predict_velocity(u,du,d,dt,upred,vpred,wpred,unew)
   
   integer i,j,k,d,iaux,jaux,kaux
   integer i0,j0,k0
-  integer onex, oney, onez
+  integer onex, oney, onez, usign
 
   REAL (8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), INTENT(IN) :: u, du,upred, vpred, wpred
   REAL (8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), INTENT(INOUT) :: unew
-  real(8) :: dt, uc, unorm, usign, grad, dxcell,dxcell2
+  real(8) :: dt, uc, unorm, grad, dxcell,dxcell2
   real(8) :: fyy, fzz
   
   call init_i0j0k0 (d,i0,j0,k0)
@@ -2390,7 +2390,7 @@ subroutine predict_velocity(u,du,d,dt,upred,vpred,wpred,unew)
       do i=is-1,ie+1
 
         uc    = (u(i,j,k) + u(i-i0,j-j0,k-k0))*0.5d0
-        usign = sign(1.d0,uc)
+        usign = nint(sign(1.d0,uc))
 
         if (d.eq.1) then
           iaux  = -(usign + 1)/2
@@ -2884,7 +2884,7 @@ subroutine InitCondition
   integer :: i,j,k, ierr, irank, req(12),sta(MPI_STATUS_SIZE,12)
   real(8) :: my_ave
   real :: erf
-  real(8) :: NozzleThickness
+  !   real(8) :: NozzleThickness
   !---------------------------------------------Domain----------------------------------------------
   if(rank<nPdomain)then
      if(restart)then

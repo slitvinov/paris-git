@@ -178,7 +178,7 @@ module module_front
     use module_grid
     implicit none
     integer :: front,nps
-    real(8) :: xc,yc,zc,radin, ee, rad, radx,rady,radz
+    real(8) :: xc,yc,zc,radin, ee, radx,rady,radz
     real(8) :: pi, dph, phi, theta, pt(4*nps*nps+2,3), xp(3)
     integer :: iq,i2,i1,iip,ist,iie,ia,ib,ic,id,icp(4*2*nps*nps,3),ine(4*2*nps*nps,3),iqq,ne,np, &
                indpt(4*nps*nps+2), indel(4*2*nps*nps), point, elem, i
@@ -428,7 +428,7 @@ module module_front
     real(8) :: time
     if(output_format==1) call print_fronts1(nf,time) !tecplot format
     if(output_format==2) call print_fronts2(nf,time) !vtk format
-    if(output_format==3) call print_fronts3(nf,time) !silo format
+    if(output_format==3) call print_fronts3(nf) !silo format
   end subroutine print_fronts
 !-------------------------------------------------------------------------------------------------
   subroutine print_fronts1(nf,time)
@@ -510,7 +510,7 @@ module module_front
   end subroutine print_fronts2
 
 !-------------------------------------------------------------------------------------------------
-  subroutine print_fronts3(nf,time)
+  subroutine print_fronts3(nf)
     use module_grid
     use module_IO
     implicit none
@@ -519,7 +519,7 @@ module module_front
 #endif   
 
     integer :: nf, front, elem, point, ifr, i, j
-    real(8) :: time, xp0(3)
+    real(8) :: xp0(3)
 
 #ifdef HAVE_SILO
     integer :: dbfile, err, ierr, lname
@@ -540,9 +540,9 @@ module module_front
        point = PointFirst(front)
        do i = 1, PointLength(front)
           call GetCoords(xp0,point)
-          xp(i +nnodes) = xp0(1)
-          yp(i +nnodes) = xp0(2)
-          zp(i +nnodes) = xp0(3)
+          xp(i +nnodes) = REAL(xp0(1))
+          yp(i +nnodes) = REAL(xp0(2))
+          zp(i +nnodes) = REAL(xp0(3))
           LocalPointIndex(point) = i +nnodes
           point = PointConnect(point,1)
        enddo
@@ -1587,14 +1587,14 @@ end subroutine write_integer
     ! reset pointers to p2 to p1:
     m1=ElemNgbr(m,n2)
     do
-      do i=1,3
-        if(ElemCorner(m1,i).eq.p(2))then
-          ElemCorner(m1,i)=p(1)
-          mo=i
-        end if
-      enddo
-      if(m1.eq.ElemNgbr(mc,nc2))exit
-      m1=ElemNgbr(m1,mo)
+       do i=1,3
+          if(ElemCorner(m1,i).eq.p(2))then
+             ElemCorner(m1,i)=p(1)
+             mo=i
+          end if
+       enddo
+       if(m1.eq.ElemNgbr(mc,nc2))exit
+       m1=ElemNgbr(m1,mo)
     enddo
     m=m2
     return

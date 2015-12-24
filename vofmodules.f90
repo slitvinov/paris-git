@@ -945,11 +945,11 @@ contains
   !=================================================================================================
   !  Planar interface
   !=================================================================================================
-  function plane2ls(xx,yy,zz,ipar)
+  function plane2ls(xx,yy,zz)
     use module_2phase
     implicit none
     real(8) plane2ls
-    real(8), intent(in) :: xx,zz,yy,ipar
+    real(8), intent(in) :: xx,zz,yy
     plane2ls = plane -xx*n_p(1) -yy*n_p(2) -zz*n_p(3)
   end function plane2ls
   !=================================================================================================
@@ -1467,7 +1467,7 @@ subroutine vofandmomsweepsstaggered(tswap,t)
   use module_flow
   use module_tmpvar
   implicit none
-  integer dir,i
+  integer dir
   integer, intent(in) :: tswap
   real(8) :: t
   logical :: staggeredmom =.true.
@@ -1817,11 +1817,11 @@ contains
     integer prank
     if(rank.ne.0) call pariserror('rank.ne.0 in append_VOF')
     if(vof_opened==0) then
-    	if(output_format==4) then
-    		file_name='fields.visit'
-    	else
-    		file_name='vof.visit'
-    	endif
+       if(output_format==4) then
+          file_name='fields.visit'
+       else
+          file_name='vof.visit'
+       endif
        OPEN(UNIT=88,FILE=TRIM(file_name))
        write(88,10) nPdomain
 10     format('!NBLOCKS ',I4)

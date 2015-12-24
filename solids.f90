@@ -178,6 +178,7 @@ contains
              s1 = ((x(i) - radius)*(x(i) -radius) + (z(k) - radius)*(z(k) - radius)) - radius*radius
           else
              call pariserror("invalid type")
+             s1 =0d0 ! to avoid -Wmaybe-uninitialized
           endif
           if(s1 > 0.) then
              solids(i,j,k) = 1d0

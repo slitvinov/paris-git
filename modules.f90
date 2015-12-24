@@ -513,7 +513,7 @@ contains
     include 'mpif.h'
     real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: du, dv, dw
     integer, intent(in) :: iout
-    integer :: i,j,k,ierr
+    integer :: i,j,k
     
     OPEN(UNIT=20,FILE=TRIM(out_path)//'/Mag_accel-'//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout,padding))//'.txt')
     k=(ks+ke)/2
@@ -558,7 +558,7 @@ contains
 10     format('!NBLOCKS ',I4)
        opened=1
     else
-    	OPEN(UNIT=90,FILE='velocity.visit',position='append')
+    OPEN(UNIT=90,FILE='velocity.visit',position='append')
     endif
     
     do prank=0,NpDomain-1
@@ -584,7 +584,7 @@ contains
 10     format('!NBLOCKS ',I4)
        opened_cent = .true.
     else
-    	OPEN(UNIT=110,FILE='centroid.visit',position='append')
+       OPEN(UNIT=110,FILE='centroid.visit',position='append')
     endif
     
     do prank=0,NpDomain-1
@@ -1168,7 +1168,7 @@ module module_BC
     if(bdry_cond(4)==4 .and. coords(1)==nPx-1) then
         if ( OutVelSpecified ) then 
            do j=js,je; do k=ks,ke
-              u(ie,j,k)=uout(j,k,t)
+              u(ie,j,k)=uout(j)
            end do; end do
         else 
            u(ie  ,:,:)=uaverage
@@ -1665,13 +1665,12 @@ module module_BC
       end if ! y(j), z(k)
     end function uinject
 
-    function uout(j,k,t)
+    function uout(j)
       use module_2phase
       use module_grid
       use module_flow
       implicit none
-      integer :: j,k
-      real(8) :: t
+      integer :: j
       real(8) :: u0,y0,y1,ycjet,uout
       real(8), parameter :: SpreadRate = 0.1d0 
       real(8), parameter :: alpha = 0.88d0 
@@ -1691,6 +1690,9 @@ module module_BC
          else 
             uout = u0
          end if ! y(j)
+      else
+         call pariserror("uout called with inject_type != 3")
+         uout = 0 ! dummy to avoid warnings
       end if ! inject_type
     end function uout
 !=================================================================================================
@@ -2524,7 +2526,7 @@ subroutine SetupPoisson(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask,VolumeS
   real(8), dimension(is:ie,js:je,ks:ke), intent(inout) :: pmask
   real(8), dimension(is:ie,js:je,ks:ke,8), intent(out) :: A
   real(8), intent(in) :: dt, VolumeSource
-  integer :: i,j,k,l
+  integer :: i,j,k
   
   do k=ks,ke; do j=js,je; do i=is,ie
     !    if(mask(i,j,k))then
@@ -2554,7 +2556,6 @@ subroutine Poisson_BCs(A)
   
   real(8), dimension(is:ie,js:je,ks:ke,8), intent(out) :: A
   real(8), dimension(4) :: P_bc
-  integer :: i,j,k,l
 
   P_bc = 0d0
   ! dp/dn = 0 for inflow bc on face 1 == x- : do not correct u(is-1)
@@ -2697,7 +2698,7 @@ subroutine Poisson_BCs(A)
   real(8), dimension(is:ie,js:je,ks:ke,8), intent(inout) :: A
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: pmask
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: umask,vmask,wmask,rhot
-  integer :: i,j,k,l
+  integer :: i,j,k
 
   ! What follows is a lot of debugging for small A7 values and checking the matrix 
   do k=ks,ke; do j=js,je; do i=is,ie
