@@ -85,6 +85,7 @@
       integer :: num_diff_tag
       integer :: diff_tag_list(maxnum_diff_tag)
       integer :: flag_center_mass
+      integer :: imin_drop,imax_drop,jmin_drop,jmax_drop,kmin_drop,kmax_drop
    end type drop_merge
    type (drop_merge), dimension(:), allocatable :: drops_merge
    integer, dimension(:,:), allocatable :: drops_merge_cell_list
@@ -157,6 +158,7 @@
    integer :: DropStatisticsMethod 
    logical :: DoConvertVOF2LPP 
    logical :: DoConvertLPP2VOF 
+   logical :: ConvertMergeDrop
    integer :: dragmodel 
    integer :: ntimesteptag
    integer :: CriteriaConvertCase
@@ -289,12 +291,15 @@ contains
          umin_part_seed, vmin_part_seed, wmin_part_seed, & 
          umax_part_seed, vmax_part_seed, wmax_part_seed, & 
          maxnum_diff_tag_complet, & 
-         tracked_phase
+         tracked_phase, ConvertMergeDrop
 
       in=32
 
       ! Set default values 
       DropStatisticsMethod = 0 
+      DoConvertVOF2LPP = .false.
+      DoConvertLPP2VOF = .false.
+      ConvertMergeDrop = .false.
       dragmodel    = 1
       nTimeStepTag = 10
       CriteriaConvertCase = 1
@@ -615,6 +620,13 @@ contains
             drops_merge(num_drop_merge(rank))%element%dwc  = dwc/vol
             drops_merge(num_drop_merge(rank))%num_cell_drop = num_cell_drop
             drops_merge_cell_list(:,num_drop_merge(rank)) = cell_list
+
+            drops_merge(num_drop_merge(rank))%imin_drop = imin_drop
+            drops_merge(num_drop_merge(rank))%imax_drop = imax_drop
+            drops_merge(num_drop_merge(rank))%jmin_drop = jmin_drop
+            drops_merge(num_drop_merge(rank))%jmax_drop = jmax_drop
+            drops_merge(num_drop_merge(rank))%kmin_drop = kmin_drop
+            drops_merge(num_drop_merge(rank))%kmax_drop = kmax_drop
           else 
             drops(num_drop(rank))%element%id  = current_id
             drops(num_drop(rank))%element%sur = sur 
@@ -702,12 +714,13 @@ contains
                   duc_merge,dvc_merge,dwc_merge,&
                   vol1,sur1 
       integer :: irank, irank1
-      real(8) :: max_drop_merge_vol
-      integer :: tag_max_drop_merge_vol
+!      real(8) :: max_drop_merge_vol
+!      integer :: tag_max_drop_merge_vol
       logical :: TagAlreadyListed
       integer :: max_num_drop_merge_use
       logical :: WarningFlag, over_maxnum_diff_tag
       integer :: total_num_tagmerge,tagmerge,tagmerge1
+      integer :: ipx,ipy,ipz
 
       ! Check ghost cells of droplet pieces
       if ( num_drop_merge(rank) > 0 ) then 
@@ -895,8 +908,8 @@ contains
                dvc_merge  = drops_merge_comm(idrop,irank)%dvc*vol1
                dwc_merge  = drops_merge_comm(idrop,irank)%dwc*vol1
 
-               max_drop_merge_vol = drops_merge_comm(idrop,irank)%vol
-               tag_max_drop_merge_vol = tag
+!               max_drop_merge_vol = drops_merge_comm(idrop,irank)%vol
+!               tag_max_drop_merge_vol = tag
                tagmerge = tag2tagmerge(tag)
                do idiff_tag = 1,num_diff_tag_complet(tagmerge)
                   tag1   = diff_tag_list_complet(idiff_tag,tagmerge)
@@ -918,10 +931,10 @@ contains
                   duc_merge  = duc_merge  + drops_merge_comm(idrop1,irank1)%duc*vol1
                   dvc_merge  = dvc_merge  + drops_merge_comm(idrop1,irank1)%dvc*vol1
                   dwc_merge  = dwc_merge  + drops_merge_comm(idrop1,irank1)%dwc*vol1
-                  if (drops_merge_comm(idrop1,irank1)%vol > max_drop_merge_vol) then
-                     max_drop_merge_vol = drops_merge_comm(idrop1,irank1)%vol
-                     tag_max_drop_merge_vol = tag1
-                  end if ! max_drop_merge_vol
+!                  if (drops_merge_comm(idrop1,irank1)%vol > max_drop_merge_vol) then
+!                     max_drop_merge_vol = drops_merge_comm(idrop1,irank1)%vol
+!                     tag_max_drop_merge_vol = tag1
+!                  end if ! max_drop_merge_vol
                end do ! idiff_tag
                xc_merge = xc_merge/vol_merge
                yc_merge = yc_merge/vol_merge
@@ -933,9 +946,20 @@ contains
                dvc_merge = dvc_merge/vol_merge
                dwc_merge = dwc_merge/vol_merge
 
-               idrop1 = tag_dropid(tag_max_drop_merge_vol)
-               irank1 = tag_rank  (tag_max_drop_merge_vol)
-               drops_merge_comm(idrop1,irank1)%flag_center_mass = 1
+!               idrop1 = tag_dropid(tag_max_drop_merge_vol)
+!               irank1 = tag_rank  (tag_max_drop_merge_vol)
+!               drops_merge_comm(idrop1,irank1)%flag_center_mass = 1
+               ipx = INT(xc_merge/(xLength/DBLE(npx)))
+               ipy = INT(yc_merge/(yLength/DBLE(npy)))
+               ipz = INT(zc_merge/(zLength/DBLE(npz)))
+               irank1 = ipx*npy*npz+ipy*npz+ipz
+               do idiff_tag = 1,num_diff_tag_complet(tagmerge)
+                  tag1   = diff_tag_list_complet(idiff_tag,tagmerge)
+                  if ( tag_rank(tag1) == irank1 ) then   
+                     idrop1 = tag_dropid(tag1)
+                     drops_merge_comm(tag_dropid(tag1),irank1)%flag_center_mass = 1
+                  end if ! tag_rank(tag1)
+               end do ! idiff_tag
 
                drops_merge_comm(idrop,irank)%sur = sur_merge
                drops_merge_comm(idrop,irank)%vol = vol_merge
@@ -1711,7 +1735,6 @@ contains
       integer :: i1,ic,i2,j1,jc,j2,k1,kc,k2
       real(8) :: x1,x2,y1,y2,z1,z2
       real(8) :: ufp,vfp,wfp,dist2,wt
-      logical :: ConvertMergeDrop=.false.
       real(8) :: volcell
       integer :: num_part_rank
 
@@ -1804,81 +1827,53 @@ contains
       end do ! idrop
       end if ! num_drop(rank) 
 
-      ! XXX Note: drop_merge_converge is not working yet
+      ! converge a drop sitting on multiple blocks to LPP
       if ( num_drop_merge(rank) > 0 .and. ConvertMergeDrop ) then
       do idrop = 1,num_drop_merge(rank)
 
+         ! Check conversion criteria 
+         ! note: CriteriaConvertCase=5 is not available yet, and ic,jc,kc
+         ! is not passed correctly
          call CheckConvertDropCriteria(drops_merge(idrop)%element%vol, & 
                                        drops_merge(idrop)%element%xc,  & 
                                        drops_merge(idrop)%element%yc,  & 
                                        drops_merge(idrop)%element%zc,  &
-                                       ic,jc,kc,                            & 
-                                       ConvertDropFlag,CriteriaConvertCase, & 
+                                       is,js,ks,                       &
+                                       ConvertDropFlag,               & 
+                                       CriteriaConvertCase,           &
                                        AspRatioSphere)
 
          if ( ConvertDropFlag ) then
-            write(*,*) 'Drop_merge is converted to particle', idrop,rank,tswap
+            write(*,*) 'Drop_merge is converted to particle', idrop,rank,tswap,&
+               drops_merge(idrop)%element%xc,drops_merge(idrop)%element%yc,  &
+               drops_merge(idrop)%element%zc,drops_merge(idrop)%element%vol
 
             ! compute average fluid quantities
             ! Note: XXX temporary, need to be improved later 
-            uf = 0.d0 
-            vf = 0.d0 
-            wf = 0.d0 
-
+            
             ! remove droplet vof structure
-!            do ilist = 1,drops_merge(idrop)%num_cell_drop
-!               cvof(drops_merge_cell_list(1,ilist,idrop), &
-!                    drops_merge_cell_list(2,ilist,idrop), &
-!                    drops_merge_cell_list(3,ilist,idrop)) = 0.0
-!                  u(drops_merge_cell_list(1,ilist,idrop), &
-!                    drops_merge_cell_list(2,ilist,idrop), &
-!                    drops_merge_cell_list(3,ilist,idrop)) = uf
-!                  v(drops_merge_cell_list(1,ilist,idrop), &
-!                    drops_merge_cell_list(2,ilist,idrop), &
-!                    drops_merge_cell_list(3,ilist,idrop)) = vf
-!                  w(drops_merge_cell_list(1,ilist,idrop), &
-!                    drops_merge_cell_list(2,ilist,idrop), &
-!                    drops_merge_cell_list(3,ilist,idrop)) = wf
-!            end do ! ilist
-
-            ! remove droplet vof structure
-!            do ilist = 1,drops_merge(idrop)%num_gcell
-!               cvof(drops_merge_gcell_list(1,ilist,idrop), &
-!                    drops_merge_gcell_list(2,ilist,idrop), &
-!                    drops_merge_gcell_list(3,ilist,idrop)) = 0.0
-!                  u(drops_merge_gcell_list(1,ilist,idrop), &
-!                    drops_merge_gcell_list(2,ilist,idrop), &
-!                    drops_merge_gcell_list(3,ilist,idrop)) = uf
-!                  v(drops_merge_gcell_list(1,ilist,idrop), &
-!                    drops_merge_gcell_list(2,ilist,idrop), &
-!                    drops_merge_gcell_list(3,ilist,idrop)) = vf
-!                  w(drops_merge_gcell_list(1,ilist,idrop), &
-!                    drops_merge_gcell_list(2,ilist,idrop), &
-!                    drops_merge_gcell_list(3,ilist,idrop)) = wf
-!            end do ! ilist
+            do i = drops_merge(idrop)%imin_drop,drops_merge(idrop)%imax_drop
+               do j = drops_merge(idrop)%jmin_drop,drops_merge(idrop)%jmax_drop 
+                  do k = drops_merge(idrop)%kmin_drop,drops_merge(idrop)%kmax_drop 
+                     if ( tag_id(i,j,k) == drops_merge(idrop)%element%id) & 
+                        cvof(i,j,k) = 0.d0 
+                  end do ! k 
+               end do ! j 
+            end do ! i
 
             ! transfer droplet properties to particle if center of mass located
             ! in this droplet piece
             if ( drops_merge(idrop)%flag_center_mass == 1 ) then 
                num_part(rank) = num_part(rank) + 1
                parts(num_part(rank),rank)%element = drops_merge(idrop)%element
-            
-               ! Find particle location cell
-!               MinDistPart2CellCenter = 1.0d10
-!               do ilist = 1,drops_merge(idrop)%num_cell_drop
-!                  DistPart2CellCenter = ( drops_merge(idrop)%element%xc  & 
-!                              - x(drops_merge_cell_list(1,ilist,idrop)))**2.d0 & 
-!                                      + ( drops_merge(idrop)%element%yc  & 
-!                              - y(drops_merge_cell_list(2,ilist,idrop)))**2.d0 &
-!                                      + ( drops_merge(idrop)%element%zc  & 
-!                              - z(drops_merge_cell_list(3,ilist,idrop)))**2.d0
-!                  if ( DistPart2CellCenter < MinDistPart2CellCenter ) then 
-!                     MinDistPart2CellCenter = DistPart2CellCenter
-!                     parts(num_part(rank),rank)%ic = drops_merge_cell_list(1,ilist,idrop)
-!                     parts(num_part(rank),rank)%jc = drops_merge_cell_list(2,ilist,idrop)
-!                     parts(num_part(rank),rank)%kc = drops_merge_cell_list(3,ilist,idrop)
-!                  end if !DistPart2CellCenter
-!               end do ! ilist
+               
+               call FindPartLocCell(drops_merge(idrop)%element%xc,  & 
+                                    drops_merge(idrop)%element%yc,  & 
+                                    drops_merge(idrop)%element%zc,  &
+                                    ic,jc,kc) 
+               parts(num_part(rank),rank)%ic = ic 
+               parts(num_part(rank),rank)%jc = jc 
+               parts(num_part(rank),rank)%kc = kc
             end if ! flag_center_mass 
 
          end if !ConvertDropFlag
@@ -2472,6 +2467,12 @@ contains
       real(8) :: dp2Lx
 
       integer :: ipart
+            
+      rhof = rho1
+      rhop = rho2
+      muf  = mu1
+      mup  = mu2
+
       if ( num_part(rank) > 0 ) then
          do ipart = 1,num_part(rank)
             xp = parts(ipart,rank)%element%xc
@@ -2481,15 +2482,9 @@ contains
             vp = parts(ipart,rank)%element%vc
             wp = parts(ipart,rank)%element%wc
 
-            rhof = rho1
-            rhop = rho2
-            muf  = mu1
-            mup  = mu2
-
             dp = (parts(ipart,rank)%element%vol*6.d0/PI)**(1.d0/3.d0)
             taup = rhop *dp*dp/18.0d0/muf & 
                  *(3.d0 + 3.d0*muf/mup)/(3.d0 + 2.d0*muf/mup)
-
             call GetFluidProp(parts(ipart,rank)%ic, &
                               parts(ipart,rank)%jc, &
                               parts(ipart,rank)%kc, &

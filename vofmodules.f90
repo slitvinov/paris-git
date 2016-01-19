@@ -652,7 +652,7 @@ contains
                call pariserror('For cubic lattice bubble test there has to be at least 2 cells per coord dir')
           call fcc_lattice_bubbles
        endif
-       call MPI_BCAST(NumBubble, 1, MPI_INT, root_rank, MPI_Comm_Cart, ierr)
+       call MPI_BCAST(NumBubble, 1, MPI_INTEGER, root_rank, MPI_Comm_Cart, ierr)
        call MPI_BCAST(rad, NumBubble, MPI_REAL8, &
             root_rank, MPI_Comm_Cart, ierr)
        call MPI_BCAST(xc , NumBubble, MPI_REAL8, &
