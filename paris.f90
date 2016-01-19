@@ -420,6 +420,24 @@ Program paris
                  call NewSolver(A,p,maxError/MaxDt,beta,maxit,it,ierr)
               endif
            endif
+           ! If maximum iteration is reached, check residual
+           if(it==maxit) then 
+              call calcResidual(A,p,ResNormOrderPressure,residual)
+              if (residual/(maxError/MaxDt) > DivergeTol) then 
+                 if ( SwitchHYPRESolver .and. HYPRESolverType == 2 ) then
+                    ! if HYPRE-PFMG is diverged, retry with SMG
+                    HYPRESolverType = 1
+                    call poi_solve(A,p,maxError/MaxDt*ErrorScaleHYPRE,maxit,it,HYPRESolverType)
+                    call do_all_ghost(p)
+                    call calcResidual(A,p,ResNormOrderPressure,residual)
+                    if (residual/(maxError/MaxDt) > DivergeTol ) &  
+                       call pariserror("PFMG/SMG pressure solver diverge!")
+                    if (rank == 0) write(*,*) "PFMG diverge, switch to SMG...",itimestep,ii
+                 else 
+                    call pariserror("Pressure solver diverge! (Adjust DivergeTol or Reduce ErrorScaleHYPRE if HYPRE is used!")
+                 end if ! SwitchHYPRESolver
+              end if !residual
+           end if !it
            if(mod(itimestep,termout)==0 .and. ii==1) then
               !if (.not.FreeSurface) call calcResidual(A,p,ResNormOrderPressure,residual)
               call calcResidual(A,p,ResNormOrderPressure,residual)
@@ -427,7 +445,7 @@ Program paris
                  if (HYPRE .and. residual/(maxError/MaxDt) > 2.d0 ) then  
                     ErrorScaleHYPRE = ErrorScaleHYPRE*0.5d0
                     if (rank == 0) write(*,*) "ErrorScaleHYPRE is decreased.",ErrorScaleHYPRE
-                 else if (HYPRE .and. residual/(maxError/MaxDt) < 0.25d0 ) then  
+                 else if (HYPRE .and. residual/(maxError/MaxDt) < 0.5d0 ) then  
                     ErrorScaleHYPRE = ErrorScaleHYPRE*2.0d0
                     if (rank == 0) write(*,*) "ErrorScaleHYPRE is increased.",ErrorScaleHYPRE
                  end if ! HYPRE & residual
@@ -437,6 +455,10 @@ Program paris
                    &" maxerror: ",e7.1)') residual*MaxDt,maxerror
                  write(*,'("              pressure iterations :",I9)')it
               end if
+              if ( SwitchHYPRESolver .and. HYPRESolverType == 1 ) then
+                 HYPRESolverType = 2 
+                 if (rank == 0) write(*,*) "Switch from HYPRE-SMG to PFMG"
+              end if ! SwitchSHYPRESolver
            endif
 
            if(out_sub .and. ii==1 .and. mod(itimestep-itimestepRestart,nout)==0) then
@@ -3236,7 +3258,8 @@ subroutine ReadParameters
                         DoTurbStats,   nStepOutputTurbStats, TurbStatsOrder,  timeStartTurbStats,&
                         ResNormOrderPressure,         ErrorScaleHYPRE, DynamicAdjustPoiTol,      & 
                         OutVelSpecified,  MaxFluxRatioPresBC, LateralBdry,                       & 
-                        HYPRESolverType, plane, n_p, out_sub
+                        HYPRESolverType, SwitchHYPRESolver, DivergeTol,  uinjectPertAmp,         &
+                        plane, n_p, out_sub
  
   Nx = 0; Ny = 4; Nz = 4 ! cause absurd input file that lack nx value to fail. 
   Ng=2;xLength=1d0;yLength=1d0;zLength=1d0
@@ -3258,7 +3281,7 @@ subroutine ReadParameters
   maxErrorVol=1d-4;   restartfront=.false.;  nstats=10;  WallShear=0d0
   BoundaryPressure=0d0;   ZeroReynolds=.false.;   restartAverages=.false.;   termout=0
   excentricity=0d0;   tout = -1.d0;          zip_data=.false.
-  ugas_inject=0.d0;   uliq_inject=0.d0
+  ugas_inject=0.d0;   uliq_inject=0.d0;   uinjectPertAmp = 0.d-2
   blayer_gas_inject=8.d-2; tdelay_gas_inject=1.d-2
   radius_gas_inject=0.1d0; radius_liq_inject=0.1d0 ; radius_gap_liqgas=0d0
   jetcenter_yc2yLength=0.5d0;jetcenter_zc2zLength=0.5d0
@@ -3276,7 +3299,8 @@ subroutine ReadParameters
   OutVelSpecified = .false.
   MaxFluxRatioPresBC = 0.7d0
   LateralBdry = .false.
-  HYPRESolverType = 1
+  HYPRESolverType = 1; SwitchHYPRESolver = .false.
+  DivergeTol = 1.d2
   plane = 0.5d0; n_p = 0.0d0
   out_sub = .false.
 

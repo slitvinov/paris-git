@@ -343,8 +343,8 @@ module module_flow
   real(8) :: U_init, VolumeSource, cflmax_allowed
   real(8) :: dpdx, dpdy, dpdz, W_ave  !pressure gradients in case of pressure driven channel flow
   real(8) :: dpdx_stat, dpdy_stat, dpdz_stat
-  real(8) :: beta, MaxError,ErrorScaleHYPRE
-  logical :: DynamicAdjustPoiTol 
+  real(8) :: beta, MaxError,ErrorScaleHYPRE,DivergeTol
+  logical :: DynamicAdjustPoiTol,SwitchHYPRESolver 
   integer :: ResNormOrderPressure
   integer :: HYPRESolverType
   integer :: maxit, it, itime_scheme, BuoyancyCase, drive
@@ -387,7 +387,7 @@ module module_2phase
   real(8), dimension( : ), allocatable :: rad, xc, yc, zc, vol
   real(8) :: r_min, var_r, coord_min, var_coord, var_pos
   real(8) :: excentricity(3)
-  real(8) :: ugas_inject,uliq_inject
+  real(8) :: ugas_inject,uliq_inject,uinjectPertAmp
   real(8) :: blayer_gas_inject, tdelay_gas_inject 
   real(8) :: radius_gas_inject, radius_liq_inject, radius_gap_liqgas
   real(8) :: jetcenter_yc2yLength, jetcenter_zc2zLength 
@@ -919,8 +919,8 @@ module module_BC
     real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: umask,vmask,wmask
     integer, intent (in) :: AfterProjection
     real(8) :: t,dt,fluxin,tfluxin,uaverage
-    real(8) :: fluxout(6),tfluxout(6),tfluxout_all,fluxratio
-    integer :: i,j,k,ierr
+    real(8) :: fluxout(6),tfluxout(6),tfluxout_all,fluxratio,uinj
+    integer :: i,j,k,ierr,seed
     ! Note: local and global divergence free cannot be perfectly satisfied 
     ! at the mean time for pressure BC (p=p0,du/dn=0), in BC=6, the global 
     ! divergence free is guaranteed by matching the inflow condiction. 
@@ -940,10 +940,13 @@ module module_BC
     ! inflow boundary condition x- with injection
     fluxin=0
     if(bdry_cond(1)==3 .and. coords(1)==0    ) then
+       seed = 1317*(INT(t/1.23d-10)+1)
+       call random_seed(seed)
        do j=jmin,jmax
           do k=kmin,kmax
-             u(is-1,j,k)=WallVel(1,1)*uinject(j,k,t)*umask(is-1,j,k)
-             u(is-2,j,k)=WallVel(1,1)*uinject(j,k,t)*umask(is-2,j,k)
+             uinj = uinject(j,k,t)
+             u(is-1,j,k)=WallVel(1,1)*uinj*umask(is-1,j,k)
+             u(is-2,j,k)=WallVel(1,1)*uinj*umask(is-2,j,k)
              v(is-1,j,k)=0d0
              w(is-1,j,k)=0d0
           enddo
@@ -1294,8 +1297,8 @@ module module_BC
     real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: mask
     real(8), intent(in) :: rho1,rho2
     integer, intent(in) :: d
-    real(8) :: t,flux,tflux,uaverage
-    integer :: i,j,k,ierr
+    real(8) :: t,flux,tflux,uaverage,uinj
+    integer :: i,j,k,ierr,seed
     ! solid obstacles
     u = u*mask
     mom = mom*mask
@@ -1309,17 +1312,20 @@ module module_BC
             mom(is-1,:,:)=(2*WallVel(1,2)-u(is,:,:))*(rho2*c(is,:,:) + rho1*(1.d0 - c(is,:,:))) !CHECK!!
         endif
     endif
+    
     ! inflow boundary condition x- with injection
-
+    seed = 1317*(INT(t/1.23d-10)+1)
+    call random_seed(seed)
     if(bdry_cond(1)==3 .and. coords(1)==0    ) then
         if (d.eq.1) then
         flux=0
         do j=jmin,jmax
           do k=kmin,kmax
-             mom(is-1,j,k)=WallVel(1,1)*uinject(j,k,t)*(rho2*c(is-1,j,k) + rho1*(1.d0 - c(is-1,j,k)))
+             uinj = uinject(j,k,t)
+             mom(is-1,j,k)=WallVel(1,1)*uinj*(rho2*c(is-1,j,k) + rho1*(1.d0 - c(is-1,j,k)))
 #ifndef OLD_BDRY_COND
-             mom(is-2,j,k)=WallVel(1,1)*uinject(j,k,t)*(rho2*c(is-1,j,k) + rho1*(1.d0 - c(is-1,j,k)))
-             if(j<=je.and.j>=js.and.k<=ke.and.k>=ks) flux=flux+WallVel(1,1)*uinject(j,k,t)
+             mom(is-2,j,k)=WallVel(1,1)*uinj*(rho2*c(is-1,j,k) + rho1*(1.d0 - c(is-1,j,k)))
+             if(j<=je.and.j>=js.and.k<=ke.and.k>=ks) flux=flux+WallVel(1,1)*uinj
 #endif
           enddo
         enddo
@@ -1606,6 +1612,8 @@ module module_BC
       real(8) :: ryz, low_gas_radius, NozzleThickness
       real(8), parameter :: PI = 3.14159265359d0
       real :: erf
+      real(8) :: temp
+      integer :: rand_seed
       uinject=0d0
 
       if(radius_gap_liqgas==0d0) then
@@ -1621,10 +1629,6 @@ module module_BC
          if( (y(j) - jetcenter_yc)**2.d0 + (z(k) - jetcenter_zc)**2.d0 .lt. radius_liq_inject**2.d0 ) then 
             uinject=uliq_inject*(1.d0+0.05d0*SIN(10.d0*2.d0*PI*t))
          end if ! y(j)
-      elseif( inject_type==5 ) then ! round jet 
-         if( (y(j) - jetcenter_yc)**2.d0 + (z(k) - jetcenter_zc)**2.d0 .lt. radius_liq_inject**2.d0 ) then 
-            uinject=uliq_inject
-         end if ! y(j)
       else if ( inject_type == 3 ) then ! 2d coflowing jet
          NozzleThickness = NozzleThick2Cell*dx(is) 
          if ( y(j) <= radius_liq_inject ) then 
@@ -1636,6 +1640,8 @@ module module_BC
                      *erf( (y(j) -   radius_liq_inject - NozzleThickness)/blayer_gas_inject ) & 
                      *erf( (radius_gas_inject - y(j))/blayer_gas_inject ) & 
                      *(1.d0 + erf((time-tdelay_gas_inject*0.5d0)/(tdelay_gas_inject*0.25d0)) )*0.5d0
+            call random_number(temp)
+            uinject = uinject*(1.d0+uinjectPertAmp*(temp-0.5d0))
          else 
             uinject = 0.d0 
          end if  !
