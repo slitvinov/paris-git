@@ -1,4 +1,4 @@
-!=================================================================================================
+
 ! Paris-0.1
 ! Extended from Code: FTC3D2011 (Front Tracking Code for 3D simulations)
 ! and Surfer. 
@@ -41,6 +41,7 @@ module module_solid
   logical :: bitmap_opened=.false.
   integer :: remove_layers=0
   real(8) :: porosity
+  logical :: DoOutputSolids
 !***********************************************************************
 contains
 !***********************************************************************
@@ -191,7 +192,7 @@ contains
        call ghost_x(solids,2,req(1:4));  call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
        call ghost_y(solids,2,req(1:4));  call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
        call ghost_z(solids,2,req(1:4));  call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
-       call output_solids(0,is,ie+1,js,je+1,ks,ke+1)
+       if (DoOutputSolids) call output_solids(0,is,ie+1,js,je+1,ks,ke+1)
 
        ! For solid objects set mask according to placement of solids
        umask=1d0; vmask=1d0; wmask=1d0
@@ -200,8 +201,8 @@ contains
           if((solids(i,j,k) + solids(i,j+1,k)) > 0.5d0) vmask(i,j,k) = 0d0
           if((solids(i,j,k) + solids(i,j,k+1)) > 0.5d0) wmask(i,j,k) = 0d0
        enddo; enddo; enddo
-       call printpor(solids)
-       call calcpor(solids,0,porosity)
+       if (DoOutputSolids) call printpor(solids)
+       if (DoOutputSolids) call calcpor(solids,0,porosity)
    endif
   end subroutine initialize_solids
 !============================================================================================================
@@ -365,13 +366,14 @@ contains
       integer ierr,in
       logical file_is_there
       namelist /solidparameters/ dosolids, solid_type, solid_radius,NumSpheres,sxyzrad, &
-           remove_layers
+          remove_layers,DoOutputSolids
       dosolids=.false.
       solid_type='SingleSphere'
       solid_radius=0.1d0
       NumSpheres=1;
       sxyzrad=0d0
       remove_layers=0
+      DoOutputSolids=.true.
 
       in=1
       call MPI_COMM_RANK(MPI_COMM_WORLD, rank, ierr)

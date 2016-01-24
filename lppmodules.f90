@@ -181,6 +181,7 @@
 
    logical :: WallEffectSettling
    logical :: output_lpp_evolution
+   logical :: DoOutputLPP
    
    integer :: TwoWayCouplingFlag
    integer, parameter :: TwoWayCouplingIgnore      = 0
@@ -291,7 +292,7 @@ contains
          umin_part_seed, vmin_part_seed, wmin_part_seed, & 
          umax_part_seed, vmax_part_seed, wmax_part_seed, & 
          maxnum_diff_tag_complet, & 
-         tracked_phase, ConvertMergeDrop
+         tracked_phase, ConvertMergeDrop,DoOutputLPP
 
       in=32
 
@@ -321,6 +322,7 @@ contains
       AspRatioTol = 1.5d0
       WallEffectSettling = .false.
       output_lpp_evolution = .false.
+      DoOutputLpp = .true.
       lppbdry_cond=['undefined','undefined','undefined','undefined','undefined','undefined']
       TwoWayCouplingFlag = 0 
       LengthLPP2dp = 8.d0

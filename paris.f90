@@ -170,7 +170,7 @@ Program paris
               enddo
            endif
         endif
-        if(DoLPP .and. .not.restart) call output_LPP(0,is,ie+1,js,je+1,ks,ke+1)
+        if(DoLPP .and. DoOutputLPP .and. .not.restart) call output_LPP(0,is,ie+1,js,je+1,ks,ke+1)
         if(test_control_droplet) call do_droplet_test(itimestep,time,REAL(nstats*dt,8))
         if(test_frdroplet.or.test_droplet) call output_droplet(w,time)
         call SetVelocityBC(u,v,w,umask,vmask,wmask,time,dt,0)
@@ -629,7 +629,7 @@ Program paris
                  call output_ALL(nfile,is,ie+1,js,je+1,ks,ke+1,itimestep,5)
                  if(out_centroid) call output_centroids(nfile)
               endif
-              if(DoLPP) call output_LPP(nfile,is,ie+1,js,je+1,ks,ke+1)
+              if(DoLPP .and. DoOutputLPP) call output_LPP(nfile,is,ie+1,js,je+1,ks,ke+1)
               if(rank==0)then
                  end_time =  MPI_WTIME()
                  write(out,'("Output data at Step:",I9," and time:",f10.2)')itimestep,time
@@ -651,7 +651,7 @@ Program paris
                  if(out_centroid) call output_centroids(nfile)
               endif
               call print_st_stats(nfile)
-              if(DoLPP) call output_LPP(nfile,is,ie+1,js,je+1,ks,ke+1)
+              if(DoLPP .and. DoOutputLPP) call output_LPP(nfile,is,ie+1,js,je+1,ks,ke+1)
               if(rank==0)then
                  end_time =  MPI_WTIME()
                  write(out,'("Step:",I9," Iterations:",I9," cpu(s):",f10.2)')itimestep,it,end_time-start_time
