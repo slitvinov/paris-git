@@ -821,7 +821,11 @@ contains
                tagmerge1 = tag2tagmerge(tag1)
                idiff_tag1 = 1
 
-               ! only used when maxnum_diff_tag_complet is not enough
+               ! IMPORTANT for large nPdomain (not clear why), when maxnum_diff_tag_complet is not large enough
+               if (tagmerge1 < 1 ) then
+                  idiff_tag = idiff_tag + 1
+                  cycle
+               end if ! tagmerge1
                if ( tagmergeDone(tagmerge1) ) then 
                   idiff_tag = idiff_tag + 1
                   cycle
@@ -869,7 +873,8 @@ contains
                tag1      = diff_tag_list_complet(idiff_tag,tagmerge)
                tagmerge1 = tag2tagmerge(tag1) 
 
-               ! only used when maxnum_diff_tag_complet is not enough
+               ! IMPORTANT for large nPdomain (not clear why), when maxnum_diff_tag_complet is not large enough
+               if (tagmerge1 < 1 ) cycle
                if ( tagmergeDone(tagmerge1) ) cycle
                
                ! share diff_tag_list to all connected tag
