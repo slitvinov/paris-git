@@ -960,13 +960,18 @@ contains
                ipy = INT(yc_merge/(yLength/DBLE(npy)))
                ipz = INT(zc_merge/(zLength/DBLE(npz)))
                irank1 = ipx*npy*npz+ipy*npz+ipz
-               do idiff_tag = 1,num_diff_tag_complet(tagmerge)
-                  tag1   = diff_tag_list_complet(idiff_tag,tagmerge)
-                  if ( tag_rank(tag1) == irank1 ) then   
-                     idrop1 = tag_dropid(tag1)
-                     drops_merge_comm(tag_dropid(tag1),irank1)%flag_center_mass = 1
-                  end if ! tag_rank(tag1)
-               end do ! idiff_tag
+               
+               if ( irank == irank1 ) then 
+                  drops_merge_comm(idrop,irank)%flag_center_mass = 1
+               else 
+                  do idiff_tag = 1,num_diff_tag_complet(tagmerge)
+                     tag1   = diff_tag_list_complet(idiff_tag,tagmerge)
+                     if ( tag_rank(tag1) == irank1 ) then   
+                        idrop1 = tag_dropid(tag1)
+                        drops_merge_comm(tag_dropid(tag1),irank1)%flag_center_mass = 1
+                     end if ! tag_rank(tag1)
+                  end do ! idiff_tag
+               end if ! tag
 
                drops_merge_comm(idrop,irank)%sur = sur_merge
                drops_merge_comm(idrop,irank)%vol = vol_merge

@@ -893,8 +893,7 @@ subroutine TimeStepSize(deltaT,vof_phase)
         enddo; enddo; enddo 
      endif
      if ( inject_type == 3  .and. vmax > vmax_phys*1.d2 ) then
-        !write(*,*) "Error:Max velocity 100 times larger than physical value",rank, vmax,vmax_phys 
-        call mpi_barrier(MPI_COMM_WORLD, ierr)
+        write(*,*) "Error:Max velocity 100 times larger than physical value",itimestep,rank, vmax,vmax_phys 
         call pariserror("Max velocity 100 times larger than physical value, something wrong!") 
      else 
         dtadv  = h/(max(vmax,vmax_phys))
