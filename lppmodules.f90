@@ -164,6 +164,7 @@
    integer :: CriteriaConvertCase
    real(8) :: vol_cut, xlpp_min,ylpp_min,zlpp_min, & 
                        xlpp_max,ylpp_max,zlpp_max
+   real(8) :: vol_debris
    character(20) :: lppbdry_cond(6)
 
    integer :: max_num_drop, max_num_drop_merge 
@@ -292,7 +293,7 @@ contains
          umin_part_seed, vmin_part_seed, wmin_part_seed, & 
          umax_part_seed, vmax_part_seed, wmax_part_seed, & 
          maxnum_diff_tag_complet, & 
-         tracked_phase, ConvertMergeDrop,DoOutputLPP
+         tracked_phase, ConvertMergeDrop,DoOutputLPP,vol_debris
 
       in=32
 
@@ -339,6 +340,7 @@ contains
       umax_part_seed=0.0; vmax_part_seed=0.0; wmax_part_seed=0.0; 
       maxnum_diff_tag_complet = 500
       tracked_phase = 1
+      vol_debris = dx(is)*dy(js)*dz(ks)
 
       call MPI_COMM_RANK(MPI_COMM_WORLD, rank, ierr)
       inquire(file='inputlpp',exist=file_is_there)
@@ -1757,7 +1759,25 @@ contains
          call FindPartLocCell(drops(idrop)%element%xc,  & 
                               drops(idrop)%element%yc,  & 
                               drops(idrop)%element%zc,  &
-                              ic,jc,kc) 
+                              ic,jc,kc)
+
+         ! Remove small vof debris 
+         if ( drops(idrop)%element%vol < vol_debris ) then
+            ! remove droplet vof structure
+            do i = max(ic-1,imin),min(ic+1,imax)
+               do j = max(jc-1,jmin),min(jc+1,jmax)
+                  do k = max(kc-1,kmin),min(kc+1,kmax)
+                     if ( tag_id(i,j,k) == drops(idrop)%element%id) & 
+                        cvof(i,j,k) = 0.d0 
+                  end do ! k 
+               end do ! j 
+            end do ! i
+            write(*,*) 'Drop is removed as debris', idrop,rank,tswap, &
+               drops(idrop)%element%vol,vol_debris
+
+            cycle
+         end if ! vol_debris
+
          call CheckConvertDropCriteria(drops(idrop)%element%vol, & 
                                        drops(idrop)%element%xc,  & 
                                        drops(idrop)%element%yc,  & 
@@ -1833,7 +1853,11 @@ contains
             end do; end do; end do
 
             ! remove droplet vof structure
-            cvof(i1:i2,j1:j2,k1:k2) = 0.d0 
+            do i = i1,i2; do j=j1,j2; do k=k1,k2 
+               if ( tag_id(i,j,k) == drops(idrop)%element%id) & 
+                  cvof(i,j,k) = 0.d0 
+            end do; end do; end do ! i,j,k
+            !cvof(i1:i2,j1:j2,k1:k2) = 0.d0 
 
          end if !ConvertDropFlag
       end do ! idrop
@@ -1843,6 +1867,24 @@ contains
       if ( num_drop_merge(rank) > 0 .and. ConvertMergeDrop ) then
       do idrop = 1,num_drop_merge(rank)
 
+         ! Remove small vof debris 
+         if ( drops_merge(idrop)%element%vol < vol_debris ) then
+            ! remove droplet vof structure
+            do i = drops_merge(idrop)%imin_drop,drops_merge(idrop)%imax_drop
+               do j = drops_merge(idrop)%jmin_drop,drops_merge(idrop)%jmax_drop 
+                  do k = drops_merge(idrop)%kmin_drop,drops_merge(idrop)%kmax_drop 
+                     if ( tag_id(i,j,k) == drops_merge(idrop)%element%id) & 
+                        cvof(i,j,k) = 0.d0 
+                  end do ! k 
+               end do ! j 
+            end do ! i
+            write(*,*) 'Drop_merge is removed as debris', idrop,rank,tswap, &
+               drops_merge(idrop)%element%xc,drops_merge(idrop)%element%yc, &
+               drops_merge(idrop)%element%zc,drops_merge(idrop)%element%vol,vol_debris
+
+            cycle
+         end if ! vol_debris
+         
          ! Check conversion criteria 
          ! note: CriteriaConvertCase=5 is not available yet, and ic,jc,kc
          ! is not passed correctly
