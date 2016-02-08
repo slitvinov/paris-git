@@ -36,11 +36,17 @@ else
 AFLAGS = $(FLAGS)
 endif
 
+ifdef PHASE_CHANGE
+NEWFLAGS = -DPHASE_CHANGE $(AFLAGS)
+else
+NEWFLAGS = $(AFLAGS)
+endif
+
 ifdef HAVE_SILO
-FFLAGS = -DHAVE_SILO $(AFLAGS) $(INC)
+FFLAGS = -DHAVE_SILO $(NEWFLAGS) $(INC)
 SILO_LIB = -L$(SILO_DIR)/lib -lsilo -lm -lstdc++
 else
-FFLAGS = $(AFLAGS)
+FFLAGS = $(NEWFLAGS)
 endif
 
 LIBS = $(HYPRE_LIBS) $(VOFI_LIBS) $(SILO_LIB)
@@ -48,7 +54,8 @@ LIBS = $(HYPRE_LIBS) $(VOFI_LIBS) $(SILO_LIB)
 #------------------------No changes needed beyond this line----------------------------------------------
 
 
-OBJ = paris.o solids.o modules.o vofmodules.o front.o surface_tension.o lppmodules.o st_testing.o newsolver.o freesurface.o vofnonmodule.o vof_functions.o
+OBJ = paris.o solids.o modules.o vofmodules.o front.o surface_tension.o lppmodules.o st_testing.o newsolver.o freesurface.o boiling.o vofnonmodule.o vof_functions.o
+
 SRC = $(wildcard  *.f90) 
 
 install: $(OBJ)
@@ -93,7 +100,7 @@ tags:	$(SRC)
 # @SZ On MacOS tags and TAGS are identical ! 
 # @SZ	ctags paris.f90 
 
-paris.o:  paris.f90 solids.o modules.o vofmodules.o front.o surface_tension.o lppmodules.o st_testing.o newsolver.o freesurface.o 
+paris.o:  paris.f90 solids.o modules.o vofmodules.o front.o surface_tension.o lppmodules.o st_testing.o newsolver.o freesurface.o boiling.o
 	$(FC) -c $(FFLAGS) $<
 
 vofmodules.o: vofmodules.f90 modules.o
@@ -105,7 +112,7 @@ lppmodules.o: lppmodules.f90 vofmodules.o modules.o
 surface_tension.o: surface_tension.f90 vofmodules.o modules.o
 	$(FC) -c $(FFLAGS) $<
 
-st_testing.o: st_testing.f90 vofmodules.o modules.o surface_tension.o
+st_testing.o: st_testing.f90 vofmodules.o modules.o surface_tension.o boiling.o
 	$(FC) -c $(FFLAGS) $<
 
 solids.o:  solids.f90 modules.o
@@ -118,6 +125,9 @@ newsolver.o:  newsolver.f90 modules.o
 	$(FC) -c $(FFLAGS) $<
 
 freesurface.o: freesurface.f90 modules.o
+	$(FC) -c $(FFLAGS) $<
+
+boiling.o: boiling.f90 modules.o
 	$(FC) -c $(FFLAGS) $<
 
 averages.o: averages.f90 modules.o solids.o vofmodules.o
