@@ -1128,6 +1128,9 @@ end subroutine do_droplet_test
     use module_grid
     use module_surface_tension
     use module_IO
+#ifdef PHASE_CHANGE
+    use module_boil
+#endif
     implicit none
     include 'mpif.h'
 #ifdef HAVE_SILO
@@ -1272,6 +1275,17 @@ end subroutine do_droplet_test
          matrix_small, dims_vof, &
          3, DB_F77NULL, 0, DB_FLOAT, DB_ZONECENT, DB_F77NULL, ierr2)
 
+#ifdef PHASE_CHANGE
+    do k=kse,kee; do j=jse,jee; do i=ise,iee;
+       matrix_small(i,j,k)=Te(i,j,k)
+    enddo; enddo; enddo    
+
+    ! Appending temperature variable to *.silo file  
+    ierr2 = dbputqv1 (dbfile, 'temp', 4, 'srm', 3, &
+         matrix_small, dims_vof, &
+         3, DB_F77NULL, 0, DB_FLOAT, DB_ZONECENT, DB_F77NULL, ierr2)
+#endif
+
     do k=kse,kee; do j=jse,jee; do i=ise,iee;
       if ( i == imin ) then 
          matrix_small(i,j,k)=1.5*u(i,j,k)-0.5*u(i+1,j,k)
@@ -1358,7 +1372,7 @@ end subroutine do_droplet_test
     character(len=50) :: file_n
     character(len=40) :: fullname
     character(len=levarnames), dimension(numProcess) :: varnames, vec1n, vec2n
-    character(len=levarnames), dimension(numProcess) :: vec3n, vecn, presn
+    character(len=levarnames), dimension(numProcess) :: vec3n, vecn, presn, tempn
     character(len=lemeshnames), dimension(numProcess) :: meshnames
     integer, dimension(numProcess) :: lmeshnames, lvarnames, meshtypes, vartypes
     integer :: lfile_n, lsilon, optlist, timestep
@@ -1387,6 +1401,9 @@ end subroutine do_droplet_test
        meshnames(m+1) = TRIM(fullname)
        varnames(m+1) = TRIM(file_n)//TRIM(i2t(m,padd))//'.silo:cvof'
        presn(m+1) = TRIM(file_n)//TRIM(i2t(m,padd))//'.silo:pres'
+#ifdef PHASE_CHANGE
+       tempn(m+1) = TRIM(file_n)//TRIM(i2t(m,padd))//'.silo:temp'
+#endif
        vec1n(m+1) = TRIM(file_n)//TRIM(i2t(m,padd))//'.silo:uvel'
        vec2n(m+1) = TRIM(file_n)//TRIM(i2t(m,padd))//'.silo:vvel'
        vec3n(m+1) = TRIM(file_n)//TRIM(i2t(m,padd))//'.silo:wvel'
@@ -1430,21 +1447,24 @@ end subroutine do_droplet_test
     ! Append the multivariable object.
     err = dbputmvar(dbfile, "cvof", 4, numProcess, varnames, lvarnames, &
          vartypes, DB_F77NULL, ierr)
-         
-	err = dbputmvar(dbfile, "p", 1, numProcess, presn, lvarnames, &
+
+    err = dbputmvar(dbfile, "p", 1, numProcess, presn, lvarnames, &
          vartypes, DB_F77NULL, ierr)
-         
-	err = dbputmvar(dbfile, "uvel", 4, numProcess, vec1n, lvarnames, &
+#ifdef PHASE_CHANGE
+    err = dbputmvar(dbfile, "Te", 1, numProcess, tempn, lvarnames, &
+         vartypes, DB_F77NULL, ierr)       
+#endif
+    err = dbputmvar(dbfile, "uvel", 4, numProcess, vec1n, lvarnames, &
          vartypes, DB_F77NULL, ierr)
-         
+
     err = dbputmvar(dbfile, "vvel", 4, numProcess, vec2n, lvarnames, &
          vartypes, DB_F77NULL, ierr)
-         
+
     err = dbputmvar(dbfile, "wvel", 4, numProcess, vec3n, lvarnames, &
          vartypes, DB_F77NULL, ierr)
-         
+
     err = dbputdefvars(dbfile, 'defvars',7, 1, 'velocity',8, &
-    	DB_VARTYPE_VECTOR, '{uvel,vvel,wvel}', 16, DB_F77NULL, ierr)
+         DB_VARTYPE_VECTOR, '{uvel,vvel,wvel}', 16, DB_F77NULL, ierr)
 
     ! Set maximum string length
     err = dbset2dstrlen(oldlen)

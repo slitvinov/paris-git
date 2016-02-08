@@ -183,7 +183,7 @@ subroutine swpz(us,c,f,d,vof1,vof2,vof3)
                  vof1(i,j,k) = fl3dnew(nr,alpha,x0,deltax)
               endif
               if(a2.gt.0d0) then
-                 x0(d)=1d0
+                 x0(d)=1.d0
                  deltax(d)=a2
                  vof3(i,j,k) = fl3dnew(nr,alpha,x0,deltax)
               endif
@@ -494,13 +494,13 @@ subroutine swpzmom_stg(us,c,d,mom1,mom2,mom3,mom,dir,t)
 !           uadv1 = uavg
 !           uadv3 = uavg
            if (uavg.ne.0.d0) then
-           mom1(i,j,k)  = dmax1(-a1,0.d0)*mom(i,j,k)/uavg*uadv1
-           mom3(i,j,k)  = dmax1(a2,0.d0) *mom(i,j,k)/uavg*uadv3
-           mom2(i,j,k)  = mom(i,j,k) - mom1(i,j,k) - mom3(i,j,k)
+              mom1(i,j,k)  = dmax1(-a1,0.d0)*mom(i,j,k)/uavg*uadv1
+              mom3(i,j,k)  = dmax1(a2,0.d0) *mom(i,j,k)/uavg*uadv3
+              mom2(i,j,k)  = mom(i,j,k) - mom1(i,j,k) - mom3(i,j,k)
            else
-           mom1(i,j,k)  = dmax1(-a1,0.d0)*mom(i,j,k)
-           mom3(i,j,k)  = dmax1(a2,0.d0) *mom(i,j,k)
-           mom2(i,j,k)  = mom(i,j,k) - mom1(i,j,k) - mom3(i,j,k)
+              mom1(i,j,k)  = dmax1(-a1,0.d0)*mom(i,j,k)
+              mom3(i,j,k)  = dmax1(a2,0.d0) *mom(i,j,k)
+              mom2(i,j,k)  = mom(i,j,k) - mom1(i,j,k) - mom3(i,j,k)
            endif
 !           if ((us(i,j,k)+us(i-i0,j-j0,k-k0)).gt.0.d0) then
 !               uavg = us(i-i0,j-j0,k-k0)

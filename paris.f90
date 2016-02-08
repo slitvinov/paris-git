@@ -68,6 +68,11 @@ Program paris
   use module_lag_part
   use module_output_LPP
 
+#ifdef PHASE_CHANGE
+  use module_boil
+#endif
+
+
   implicit none
   include 'mpif.h'
   integer :: ierr, icolor
@@ -136,6 +141,21 @@ Program paris
   if(HYPRE .and. rank==0) write(*  ,*)'hypre initialized'
 
   call InitCondition
+
+#ifdef PHASE_CHANGE
+  call ReadHeatParameters
+  if (rank==0) then
+     write(*,'("Running simulation with heat transfer: Parameters read successfully & initialized")')
+  endif
+  if (TwoPhase.and.(.not.GetPropertiesFromFront)) then
+     call linfunc(kc,kc1,kc2,HarmMean)
+  else
+     kc=kc1
+     Cp=Cp1
+  endif
+  call SetTempBC
+  call do_all_ghost(Te)
+#endif
 
     if(rank<nPdomain) then
 !-------------------------------------------------------------------------------------------------
@@ -234,6 +254,11 @@ Program paris
            muold  = mu
            if(DoVOF) cvofold  = cvof
            if ( DoLPP ) call StoreOldPartSol()
+#ifdef PHASE_CHANGE
+           Te_old = Te
+           kc_old = kc
+           Cp_old = Cp
+#endif
         endif
  !------------------------------------ADVECTION & DIFFUSION----------------------------------------
         du = 0d0; dv = 0d0; dw = 0d0
@@ -244,11 +269,19 @@ Program paris
            endif
            call my_timer(2)
 
+#ifdef PHASE_CHANGE
+           dTe = 0.0d0
+           call TempDiffusion
+#endif
            if( DoLPP ) call StoreBeforeConvectionTerms()
            if(.not.ZeroReynolds) call momentumConvection()
            if( DoLPP ) call StoreAfterConvectionTerms()
            call my_timer(9)
            if(DoVOF) then
+#ifdef PHASE_CHANGE
+              call vofandenergysweeps(itimestep) !Advects energy using mass flux from vof advection
+              call get_heat_source
+#endif
               if (DoMOMCONS) then
                  call vofandmomsweepsstaggered(itimestep,time)
                  call vofsweeps(itimestep)
@@ -303,6 +336,17 @@ Program paris
                  call my_timer(15)
               endif ! FreeSurface
            endif
+#ifdef PHASE_CHANGE
+           if (TwoPhase.and.(.not.GetPropertiesFromFront)) then
+              call linfunc(kc,kc1,kc2,HarmMean)
+              call linfunc(Cp,Cp1,Cp2,ArithMean)
+           endif
+           do i=is,ie; do j=js,je; do k=ks,ke
+              Te(i,j,k) = Te(i,j,k) + dt*dTe(i,j,k) !Simple explicit treatment of advection/diffusion
+           enddo; enddo; enddo
+           call SetTempBC
+           call do_all_ghost(Te)
+#endif
            if (DoLPP) then
                 call lppsweeps(itimestep,time,ii)  
                 call my_timer(12)
@@ -574,6 +618,11 @@ Program paris
            w = 0.5*(w+wold)
            rho = 0.5*(rho+rhoo)
            mu  = 0.5*(mu +muold)
+#ifdef PHASE_CHANGE
+           Te = 0.5*(Te+Te_old)
+           Cp = 0.5*(Cp+Cp_old)
+           kc = 0.5*(kc+kc_old)
+#endif
            call my_timer(2)
            if(DoVOF) cvof  = 0.5*(cvof +cvofold)
            if(DoVOF) then
@@ -708,7 +757,7 @@ Program paris
      !-------------------------------------------------------------------------------------------------
      !--------------------------------------------End domain-------------------------------------------
      !-------------------------------------------------------------------------------------------------
-     elseif((rank==nPdomain).and.DoFront) then !front tracking process (rank=nPdomain)
+  elseif((rank==nPdomain).and.DoFront) then !front tracking process (rank=nPdomain)
      !-------------------------------------------------------------------------------------------------
      !--------------------------------------------Begin front------------------------------------------
      !-------------------------------------------------------------------------------------------------
@@ -769,6 +818,9 @@ Program paris
   if(rank==0)  call final_output(stats(2))
   if(HYPRE) call poi_finalize
   if(rank==0) write(*,'("Paris exits succesfully")')
+#ifdef PHASE_CHANGE
+  call temp_stats
+#endif
   call print_st_stats(itimestep/nout+1)
   call MPI_BARRIER(MPI_COMM_WORLD, ierr)
   call MPI_FINALIZE(ierr)
@@ -868,6 +920,9 @@ subroutine TimeStepSize(deltaT,vof_phase)
   use module_IO
   use module_BC
   use module_freesurface
+#ifdef PHASE_CHANGE
+  use module_boil
+#endif
   implicit none
   include "mpif.h"
   integer, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: vof_phase
@@ -876,6 +931,9 @@ subroutine TimeStepSize(deltaT,vof_phase)
   real(8) :: v_local
   integer :: ierr
   integer :: i,j,k
+#ifdef PHASE_CHANGE
+  real(8) :: dtTdiff
+#endif
 
   vmax_phys = max(1.d-3,max(ugas_inject,uliq_inject))
   if(rank<nPdomain)then
@@ -900,6 +958,10 @@ subroutine TimeStepSize(deltaT,vof_phase)
      end if ! vmax
      mydt = CFL*dtadv
      mydt = min(mydt,MaxDt)
+#ifdef PHASE_CHANGE
+     dtTdiff = h**2.d0*min(rho1*Cp1/kc1,rho2*Cp2/kc2)/2.d0
+     mydt = min(mydt,dtTdiff)
+#endif
   else
      mydt=1.0e10
   endif
@@ -981,6 +1043,9 @@ subroutine calcStats
   use module_grid
   use module_flow
   use module_VOF
+#ifdef PHASE_CHANGE
+  use module_boil
+#endif
   implicit none
   include "mpif.h"
   integer :: i,j,k,ierr
@@ -1707,6 +1772,27 @@ subroutine pressure_stats(t)
 
 end subroutine pressure_stats
 !=================================================================================================
+#ifdef PHASE_CHANGE
+subroutine temp_stats
+  use module_boil
+  use module_grid
+  implicit none
+  integer :: i,j,k
+
+  !if (rank==0) then
+  OPEN(UNIT=20,FILE='temp_stats.txt',position='append')
+  j=(js+je)/2
+  k=(ks+ke)/2
+  do i=is,ie
+     write(20,201)x(i),Te(i,j,k)
+  enddo
+  CLOSE(20)
+  !endif
+201  format(2es14.6e2)
+
+end subroutine temp_stats
+#endif
+!=================================================================================================
 subroutine press_indices
   use module_grid
   use module_freesurface
@@ -1762,7 +1848,7 @@ end subroutine momentumConvection
 
 !=================================================================================================
 ! subroutine momentumConvectionENO
-! calculates the convection terms in mumentum equation using ENO scheme
+! calculates the convection terms in momentum equation using ENO scheme
 ! and returns them in du, dv, dw
 !-------------------------------------------------------------------------------------------------
 subroutine momentumConvection_onedim(u,v,w,phi,dphi,d,AdvScheme)
@@ -1829,21 +1915,21 @@ subroutine momentumConvection_onedim(u,v,w,phi,dphi,d,AdvScheme)
   is1 = is0 +1
   ie1 = ie0
   if (d.eq.1) then
-    ie1(1) = ieu
+     ie1(1) = ieu
   elseif (d.eq.2) then
-    ie1(2) = jev
+     ie1(2) = jev
   else
-    ie1(3) = kew
+     ie1(3) = kew
   endif
-  
-   do k=is1(3),ie1(3); do j=is1(2),ie1(2); do i=is1(1),ie1(1)
-    dphi(i,j,k)= -0.5*((u(i,j  ,k  )+u(i+i0,j+j0,k+k0))*work(i+i0,j  ,k  ,1)- &
-                    (u(i-1+i0,j  ,k  )+u(i-1,j+j0,k+k0 ))*work(i-1+i0 ,j  ,k  ,1))/dx(i) &
-              -0.5*((v(i,j  ,k  )+v(i+i0,j+j0,k+k0))*work(i  ,j+j0 ,k  ,2)-&
-                    (v(i,j-1+j0,k  )+v(i+i0,j-1,k+k0 ))*work(i  ,j-1+j0,k  ,2))/dy(j)  &
-              -0.5*((w(i,j  ,k  )+w(i+i0,j+j0,k+k0))*work(i  ,j  ,k+k0  ,3)-&
-                    (w(i,j  ,k-1+k0)+w(i+i0,j+j0,k-1))*work(i  ,j  ,k-1+k0,3))/dz(k)
-   enddo; enddo; enddo
+
+  do k=is1(3),ie1(3); do j=is1(2),ie1(2); do i=is1(1),ie1(1)
+     dphi(i,j,k)= -0.5*((u(i,j  ,k  )+u(i+i0,j+j0,k+k0))*work(i+i0,j  ,k  ,1)- &
+          (u(i-1+i0,j  ,k  )+u(i-1,j+j0,k+k0 ))*work(i-1+i0 ,j  ,k  ,1))/dx(i) &
+          -0.5*((v(i,j  ,k  )+v(i+i0,j+j0,k+k0))*work(i  ,j+j0 ,k  ,2)-&
+          (v(i,j-1+j0,k  )+v(i+i0,j-1,k+k0 ))*work(i  ,j-1+j0,k  ,2))/dy(j)  &
+          -0.5*((w(i,j  ,k  )+w(i+i0,j+j0,k+k0))*work(i  ,j  ,k+k0  ,3)-&
+          (w(i,j  ,k-1+k0)+w(i+i0,j+j0,k-1))*work(i  ,j  ,k-1+k0,3))/dz(k)
+  enddo; enddo; enddo
  
 end subroutine momentumConvection_onedim
 
@@ -2591,6 +2677,11 @@ subroutine volumeForce(rho,rho1,rho2,dpdx,dpdy,dpdz,BuoyancyCase,fx,fy,fz,gx,gy,
                        rho_ave)
 !  use module_solid
   use module_grid
+#ifdef PHASE_CHANGE
+  use module_boil
+  use module_VOF
+#endif
+
   implicit none
   integer, intent(in) :: BuoyancyCase
   real(8), intent(in) :: gx,gy,gz,rho1,rho2, dpdx, dpdy, dpdz, rho_ave
@@ -2609,20 +2700,20 @@ subroutine volumeForce(rho,rho1,rho2,dpdx,dpdy,dpdz,BuoyancyCase,fx,fy,fz,gx,gy,
   else
     call pariserror("volumeForce: invalid buoyancy option")
   endif
-
+ 
   do k=ks,ke;  do j=js,je; do i=is,ieu
-    fx(i,j,k)=fx(i,j,k)-dpdx+(0.5*(rho(i+1,j,k)+rho(i,j,k))-rro)*gx
-    du(i,j,k)=du(i,j,k) + fx(i,j,k)/(0.5*(rho(i+1,j,k)+rho(i,j,k)))
+     fx(i,j,k)=fx(i,j,k)-dpdx+(0.5*(rho(i+1,j,k)+rho(i,j,k))-rro)*gx
+     du(i,j,k)=du(i,j,k) + fx(i,j,k)/(0.5*(rho(i+1,j,k)+rho(i,j,k)))
   enddo; enddo; enddo
-  
+
   do k=ks,ke;  do j=js,jev; do i=is,ie
-    fy(i,j,k)=fy(i,j,k)-dpdy+(0.5*(rho(i,j+1,k)+rho(i,j,k))-rro)*gy
-    dv(i,j,k)=dv(i,j,k) + fy(i,j,k)/(0.5*(rho(i,j+1,k)+rho(i,j,k)))
+     fy(i,j,k)=fy(i,j,k)-dpdy+(0.5*(rho(i,j+1,k)+rho(i,j,k))-rro)*gy
+     dv(i,j,k)=dv(i,j,k) + fy(i,j,k)/(0.5*(rho(i,j+1,k)+rho(i,j,k)))
   enddo; enddo; enddo
 
   do k=ks,kew;  do j=js,je; do i=is,ie
-    fz(i,j,k)=fz(i,j,k)-dpdz+(0.5*(rho(i,j,k+1)+rho(i,j,k))-rro)*gz
-    dw(i,j,k)=dw(i,j,k) + fz(i,j,k)/(0.5*(rho(i,j,k+1)+rho(i,j,k)))
+     fz(i,j,k)=fz(i,j,k)-dpdz+(0.5*(rho(i,j,k+1)+rho(i,j,k))-rro)*gz
+     dw(i,j,k)=dw(i,j,k) + fz(i,j,k)/(0.5*(rho(i,j,k+1)+rho(i,j,k)))
   enddo; enddo; enddo
 
 end subroutine volumeForce
@@ -2984,9 +3075,9 @@ subroutine InitCondition
      
          if ( test_shear_multiphase ) then
             do i=imin,imax-1; do j=jmin,jmax-1; do k=kmin,kmax-1
-            u(i,j,k) = 1.d0*cvof(i,j,k)+15.d0*(1.-cvof(i,j,k))
-            v(i,j,k) = 1.d-2*sin(2.d0*PI*x(i))*exp(-(2.d0*(y(i)-0.5d0)/0.1d0)**2)
-            w(i,j,k) = 0.d0
+               u(i,j,k) = 1.d0*cvof(i,j,k)+15.d0*(1.-cvof(i,j,k))
+               v(i,j,k) = 1.d-2*sin(2.d0*PI*x(i))*exp(-(2.d0*(y(i)-0.5d0)/0.1d0)**2)
+               w(i,j,k) = 0.d0
             enddo; enddo; enddo
          endif
          !-------------------------------------------------------------------     
