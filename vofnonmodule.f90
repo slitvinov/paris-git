@@ -467,7 +467,7 @@ subroutine swpzmom_stg(us,c,d,mom1,mom2,mom3,mom,dir,t)
               a1 = 0.5d0*(us(i,j-1,k)+us(i+i2,j-1+j2,k+k2))*dt/dyh(j-1)
            elseif (d.eq.3) then
               a2 = 0.5d0*(us(i,j,k)+us(i+i2,j+j2,k+k2))*dt/dzh(k)
-              a1 = 0.5d0*(us(i,j,k-1)+us(i+i2,j+j2,k+k2))*dt/dzh(k-1)
+              a1 = 0.5d0*(us(i,j,k-1)+us(i+i2,j+j2,k-1+k2))*dt/dzh(k-1)
            endif
 
            ro1 = (rho2*c(i-i0,j-j0,k-k0)+rho1*(1.d0-c(i-i0,j-j0,k-k0)))
