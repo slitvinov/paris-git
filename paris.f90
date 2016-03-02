@@ -2739,7 +2739,7 @@ subroutine surfaceForce(du,dv,dw,rho)
   deltax=dx(nx)
   call get_all_curvatures(tmp,0)
   call my_timer(7)
-  do k=ks,ke;  do j=js,je; do i=is,ie
+  do k=ks,ke;  do j=js,je; do i=is,ieu
      if(abs(cvof(i+1,j,k)-cvof(i,j,k))>EPSC/1d1) then  ! there is a non-zero grad H (H Heaviside function) 
         n=0
         kappa=0d0
