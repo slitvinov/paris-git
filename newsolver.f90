@@ -32,6 +32,45 @@
 !           A4*Pij+1k + A5*Pijk-1 + A6*Pijk+1 + A8
 !-------------------------------------------------------------------------------------------------
 subroutine NewSolver(A,p,maxError,beta,maxit,it,ierr)
+  use  module_mgsolver
+  use module_grid
+  use module_BC
+  implicit none
+  include 'mpif.h'
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: p
+  real(8), dimension(is:ie,js:je,ks:ke,8), intent(in) :: A
+  real(8), intent(in) :: beta, maxError
+  integer, intent(in) :: maxit
+  integer, intent(out) :: it, ierr
+
+  if (MultiGrid) then
+      call NewSolverMG(A,p,maxError,beta,maxit,it,ierr)
+  else
+      call NewSolver_std(A,p,maxError,beta,maxit,it,ierr)
+  endif
+
+end subroutine NewSolver
+
+subroutine relax_step(A,p,beta,L)
+  use module_grid
+  use module_BC
+  implicit none
+  include 'mpif.h'
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: p
+  real(8), dimension(is:ie,js:je,ks:ke,8), intent(in) :: A
+  real(8), intent(in) :: beta
+  integer :: L
+  integer, parameter :: relaxtype=1
+
+  if(relaxtype==2) then 
+      call LineRelax(A,p,beta,L)
+  elseif(relaxtype==1) then
+      call RedBlackRelax(A,p,beta,L)
+  endif
+
+end subroutine relax_step
+
+subroutine NewSolver_std(A,p,maxError,beta,maxit,it,ierr)
   use module_grid
   use module_BC
   use module_IO
@@ -46,9 +85,8 @@ subroutine NewSolver(A,p,maxError,beta,maxit,it,ierr)
   real(8) :: res1,res2,resinf,intvol
   real(8) :: tres2
   integer :: i,j,k
-  integer :: req(12),sta(MPI_STATUS_SIZE,12)
   logical :: mask(imin:imax,jmin:jmax,kmin:kmax)
-  integer, parameter :: norm=1, relaxtype=1
+  integer, parameter :: norm=1
   logical, parameter :: recordconvergence=.false.
   integer, save :: itime=0
 ! Open file for convergence history
@@ -58,21 +96,16 @@ subroutine NewSolver(A,p,maxError,beta,maxit,it,ierr)
   itime=itime+1
   !--------------------------------------ITERATION LOOP--------------------------------------------  
   do it=1,maxit
-     if(relaxtype==2) then 
-        call LineRelax(A,p,beta)
-     elseif(relaxtype==1) then
-        call RedBlackRelax(A,p,beta)
-     endif
+
+      call relax_step(A,p,beta,-1)
 !---------------------------------CHECK FOR CONVERGENCE-------------------------------------------
      res1 = 0d0; res2=0.d0; resinf=0.d0; intvol=0.d0
-     call ghost_x(p,1,req( 1: 4)); call ghost_y(p,1,req( 5: 8)); call ghost_z(p,1,req( 9:12))
      do k=ks+1,ke-1; do j=js+1,je-1; do i=is+1,ie-1
         res2=res2+abs(-p(i,j,k) * A(i,j,k,7) +                           &
              A(i,j,k,1) * p(i-1,j,k) + A(i,j,k,2) * p(i+1,j,k) +            &
              A(i,j,k,3) * p(i,j-1,k) + A(i,j,k,4) * p(i,j+1,k) +            &
              A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8) )**norm 
      enddo; enddo; enddo
-     call MPI_WAITALL(12,req,sta,ierr)
     mask=.true.
     mask(is+1:ie-1,js+1:je-1,ks+1:ke-1)=.false.
     do k=ks,ke; do j=js,je; do i=is,ie
@@ -131,9 +164,42 @@ contains
        ierr=0
     endif
   end subroutine catch_divergence
-end subroutine NewSolver
+end subroutine NewSolver_std
+
+subroutine apply_BC(p)
+  use module_grid
+  use module_BC
+  implicit none
+  include 'mpif.h'
+  real(8) :: p(imin:imax,jmin:jmax,kmin:kmax)
+  integer :: L,ierr
+  integer :: req(12),sta(MPI_STATUS_SIZE,12)
+
+  call ghost_x(p,1,req( 1: 4))
+  call ghost_y(p,1,req( 5: 8))
+  call ghost_z(p,1,req( 9:12))
+  call MPI_WAITALL(4,req,sta,ierr)
+
+end subroutine
+
+subroutine apply_BC_MG(p,L)
+  use module_grid
+  use module_BC
+  implicit none
+  include 'mpif.h'
+  real(8) :: p(imin:imax,jmin:jmax,kmin:kmax)
+  integer :: L,ierr
+  integer :: req(12),sta(MPI_STATUS_SIZE,12)
+
+  call ghost_MG_x(p,1,req( 1: 4),L)
+  call ghost_MG_y(p,1,req( 5: 8),L)
+  call ghost_MG_z(p,1,req( 9:12),L)
+  call MPI_WAITALL(12,req,sta,ierr)
+
+end subroutine
+
 !--------------------------------------ONE RELAXATION ITERATION (SMOOTHER)----------------------------------
-subroutine RedBlackRelax(A,p,beta)
+subroutine RedBlackRelax(A,p,beta,L)
   use module_grid
   use module_BC
   use module_IO
@@ -143,9 +209,9 @@ subroutine RedBlackRelax(A,p,beta)
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: p
   real(8), dimension(is:ie,js:je,ks:ke,8), intent(in) :: A
   real(8), intent(in) :: beta
-  integer :: req(12),sta(MPI_STATUS_SIZE,12)
-  integer :: i,j,k,ierr
-  integer :: isw,jsw,ksw,ipass
+  integer :: L
+  integer :: i,j,k,isw,jsw,ksw,ipass
+
   ksw=1
   do ipass=1,2
      jsw=ksw
@@ -153,7 +219,7 @@ subroutine RedBlackRelax(A,p,beta)
         isw=jsw
         do j=js,je
            do i=isw+is-1,ie,2
-              p(i,j,k)=(1d0-beta)*p(i,j,k) + (beta/A(i,j,k,7))*(             &
+              p(i,j,k)=(1d0-beta)*p(i,j,k) + beta/A(i,j,k,7)*(             &
                    A(i,j,k,1) * p(i-1,j,k) + A(i,j,k,2) * p(i+1,j,k) +       &
                    A(i,j,k,3) * p(i,j-1,k) + A(i,j,k,4) * p(i,j+1,k) +       &
                    A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8))
@@ -163,14 +229,15 @@ subroutine RedBlackRelax(A,p,beta)
         jsw=3-jsw
      enddo
      ksw=3-ksw
-     if(ipass==1) then
-        call ghost_x(p,1,req( 1: 4)); call ghost_y(p,1,req( 5: 8)); call ghost_z(p,1,req( 9:12))
-        call MPI_WAITALL(12,req,sta,ierr)
+     if (L.GT.0) then
+         call apply_BC_MG(p,L)
+     else
+         call apply_BC(p)
      endif
   enddo
 end subroutine RedBlackRelax
 !--------------------------------------ONE RELAXATION ITERATION (SMOOTHER)----------------------------------
-subroutine LineRelax(A,p,beta)
+subroutine LineRelax(A,p,beta,L)
   use module_grid
   use module_freesurface
   implicit none
@@ -178,6 +245,7 @@ subroutine LineRelax(A,p,beta)
   real(8), dimension(is:ie,js:je,ks:ke,8), intent(in) :: A
   real(8), intent(in) :: beta
   integer :: i,j,k
+  integer :: L
 !--------------------------------------ITERATION LOOP--------------------------------------------  
   do k=ks,ke; do j=js,je; do i=is,ie
      p(i,j,k)=(1d0-beta)*p(i,j,k) + (beta/A(i,j,k,7))*(              &
@@ -185,6 +253,12 @@ subroutine LineRelax(A,p,beta)
           A(i,j,k,3) * p(i,j-1,k) + A(i,j,k,4) * p(i,j+1,k) +        &
           A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8))
   enddo; enddo; enddo
+
+  if (L.GT.0) then
+      call apply_BC_MG(p,L)
+  else
+      call apply_BC(p)
+  endif
 end subroutine LineRelax
 !=================================================================================================
 !---------------------------------CHECK FOR WELL POSEDNESS --------------------------------------  

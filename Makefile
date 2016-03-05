@@ -54,7 +54,7 @@ LIBS = $(HYPRE_LIBS) $(VOFI_LIBS) $(SILO_LIB)
 #------------------------No changes needed beyond this line----------------------------------------------
 
 
-OBJ = paris.o solids.o modules.o vofmodules.o front.o surface_tension.o lppmodules.o st_testing.o newsolver.o freesurface.o boiling.o vofnonmodule.o vof_functions.o
+OBJ = paris.o solids.o modules.o vofmodules.o front.o surface_tension.o lppmodules.o st_testing.o newsolver.o MGsolver.o freesurface.o boiling.o vofnonmodule.o vof_functions.o
 
 SRC = $(wildcard  *.f90) 
 
@@ -100,7 +100,7 @@ tags:	$(SRC)
 # @SZ On MacOS tags and TAGS are identical ! 
 # @SZ	ctags paris.f90 
 
-paris.o:  paris.f90 solids.o modules.o vofmodules.o front.o surface_tension.o lppmodules.o st_testing.o newsolver.o freesurface.o boiling.o
+paris.o:  paris.f90 solids.o modules.o vofmodules.o front.o surface_tension.o lppmodules.o st_testing.o newsolver.o MGsolver.o freesurface.o boiling.o
 	$(FC) -c $(FFLAGS) $<
 
 vofmodules.o: vofmodules.f90 modules.o
@@ -109,7 +109,7 @@ vofmodules.o: vofmodules.f90 modules.o
 lppmodules.o: lppmodules.f90 vofmodules.o modules.o
 	$(FC) -c $(FFLAGS) $<
 
-surface_tension.o: surface_tension.f90 vofmodules.o modules.o
+surface_tension.o: surface_tension.f90 vofmodules.o modules.o newsolver.o MGsolver.o
 	$(FC) -c $(FFLAGS) $<
 
 st_testing.o: st_testing.f90 vofmodules.o modules.o surface_tension.o boiling.o
@@ -121,7 +121,10 @@ solids.o:  solids.f90 modules.o
 front.o:  front.f90 modules.o
 	$(FC) -c $(FFLAGS) $<
 
-newsolver.o:  newsolver.f90 modules.o
+newsolver.o:  newsolver.f90 modules.o MGsolver.o
+	$(FC) -c $(FFLAGS) $<
+
+MGsolver.o:  MGsolver.f90 modules.o
 	$(FC) -c $(FFLAGS) $<
 
 freesurface.o: freesurface.f90 modules.o

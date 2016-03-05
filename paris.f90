@@ -57,6 +57,7 @@ Program paris
   use module_front
 
   use module_poisson
+  use module_mgsolver
 !  use module_averages
   use module_IO
   use module_solid
@@ -2830,6 +2831,7 @@ subroutine initialize
   implicit none
   include 'mpif.h'
   integer :: ierr, i,j,k
+  integer :: nd(3)
   Nxt=Nx+2*Ng; Nyt=Ny+2*Ng; Nzt=Nz+2*Ng ! total number of cells
 
   if(rank==0) call check_integers()
@@ -2863,12 +2865,8 @@ subroutine initialize
 !     print *, "rank",rank,"coords",coords
 !     stop
 
-    is=coords(1)*Mx+1+Ng; ie=coords(1)*Mx+Mx+Ng; imin=is-Ng; imax=ie+Ng
-    js=coords(2)*My+1+Ng; je=coords(2)*My+My+Ng; jmin=js-Ng; jmax=je+Ng
-    ks=coords(3)*Mz+1+Ng; ke=coords(3)*Mz+Mz+Ng; kmin=ks-Ng; kmax=ke+Ng
-    ieu=ie; if(bdry_cond(1)/=1 .and. coords(1)==nPx-1) ieu=ie-1
-    jev=je; if(bdry_cond(2)/=1 .and. coords(2)==nPy-1) jev=je-1
-    kew=ke; if(bdry_cond(3)/=1 .and. coords(3)==nPz-1) kew=ke-1
+    nd(1)=Mx; nd(2)=My; nd(3)=Mz
+    call update_bounds(nd)
 
 !     ! For pressure correction with inflow
 !     ! dp/dn = 0 for inflow bc on face 1 == x- 
@@ -2991,6 +2989,7 @@ subroutine InitCondition
   use module_output_lpp
   use module_output_vof
   use module_freesurface
+  use module_mgsolver
   implicit none
   include 'mpif.h'
   integer :: i,j,k, ierr, irank, req(12),sta(MPI_STATUS_SIZE,12)
@@ -3349,7 +3348,7 @@ subroutine ReadParameters
                         ResNormOrderPressure,         ErrorScaleHYPRE, DynamicAdjustPoiTol,      & 
                         OutVelSpecified,  MaxFluxRatioPresBC, LateralBdry,                       & 
                         HYPRESolverType, SwitchHYPRESolver, DivergeTol,  uinjectPertAmp,         &
-                        plane, n_p, out_sub
+                        plane, n_p, out_sub, test_MG, MultiGrid
  
   Nx = 0; Ny = 4; Nz = 4 ! cause absurd input file that lack nx value to fail. 
   Ng=2;xLength=1d0;yLength=1d0;zLength=1d0

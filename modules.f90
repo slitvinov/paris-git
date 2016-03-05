@@ -68,6 +68,7 @@ module module_grid
   integer :: MPI_Comm_Cart, MPI_Comm_Domain, MPI_Comm_Active
   integer :: imin, imax, jmin, jmax, kmin, kmax
   real(8), parameter :: TINY_DOUBLE=1d-300 
+  logical :: test_MG=.false., MultiGrid=.false.
 ! added by SZ
 contains
 !
@@ -871,6 +872,26 @@ module module_BC
   real(8) :: MaxFluxRatioPresBC  
   contains
 !=================================================================================================
+
+  subroutine update_bounds(n)
+      implicit none
+      integer, intent(in) :: n(3)
+
+      is=coords(1)*n(1)+1+Ng; imin=is-Ng
+      js=coords(2)*n(2)+1+Ng; jmin=js-Ng
+      ks=coords(3)*n(3)+1+Ng; kmin=ks-Ng
+      ie = is + n(1) - 1
+      je = js + n(2) - 1
+      ke = ks + n(3) - 1
+      imax = ie + Ng
+      jmax = je + Ng
+      kmax = ke + Ng
+      ieu=ie; if(bdry_cond(1)/=1 .and. coords(1)==nPx-1) ieu=ie-1
+      jev=je; if(bdry_cond(2)/=1 .and. coords(2)==nPy-1) jev=je-1
+      kew=ke; if(bdry_cond(3)/=1 .and. coords(3)==nPz-1) kew=ke-1
+
+  end subroutine update_bounds
+
 !=================================================================================================
 ! subroutine SetPressureBC: Sets the pressure boundary condition
 !-------------------------------------------------------------------------------------------------
@@ -1746,6 +1767,36 @@ module module_BC
   end subroutine SetVectorBC
 !=================================================================================================
 !=================================================================================================
+  subroutine init_ghost(srcL, srcR, destL, destR, face, dir)
+    use module_grid
+    implicit none
+    include 'mpif.h'
+    integer :: ilen, jlen, klen, ierr, dir
+    integer :: srcL, srcR, destL, destR, face(2)
+
+    SELECT CASE (dir)
+    CASE (1)
+        jlen=jmax-jmin+1; klen=kmax-kmin+1; !ilen=ngh
+        call para_type_block3a(imin, imax, jmin, jmax, 1, jlen, klen, MPI_DOUBLE_PRECISION, face(1))
+        call para_type_block3a(imin, imax, jmin, jmax, 2, jlen, klen, MPI_DOUBLE_PRECISION, face(2))
+        call MPI_CART_SHIFT(MPI_COMM_CART, 0, 1, srcR, destR, ierr)
+        call MPI_CART_SHIFT(MPI_COMM_CART, 0,-1, srcL, destL, ierr)
+    CASE (2)
+          klen=kmax-kmin+1; ilen=imax-imin+1; !jlen=ngh
+          call para_type_block3a(imin, imax, jmin, jmax, ilen, 1, klen, MPI_DOUBLE_PRECISION, face(1))
+          call para_type_block3a(imin, imax, jmin, jmax, ilen, 2, klen, MPI_DOUBLE_PRECISION, face(2))
+          call MPI_CART_SHIFT(MPI_COMM_CART, 1, 1, srcR, destR, ierr)
+          call MPI_CART_SHIFT(MPI_COMM_CART, 1,-1, srcL, destL, ierr)
+    CASE (3)
+          ilen=imax-imin+1; jlen=jmax-jmin+1; !klen=ngh
+          call para_type_block3a(imin, imax, jmin, jmax, ilen, jlen, 1, MPI_DOUBLE_PRECISION, face(1))
+          call para_type_block3a(imin, imax, jmin, jmax, ilen, jlen, 2, MPI_DOUBLE_PRECISION, face(2))
+          call MPI_CART_SHIFT(MPI_COMM_CART, 2, 1, srcR, destR, ierr)
+          call MPI_CART_SHIFT(MPI_COMM_CART, 2,-1, srcL, destL, ierr)
+    END SELECT 
+
+  end subroutine init_ghost
+
 !-------------------------------------------------------------------------------------------------
   subroutine ghost_x(F,ngh,req)
     use module_grid
@@ -1755,18 +1806,14 @@ module module_BC
     integer, intent(in) :: ngh ! number of ghost cell layers to fill
     integer, intent(out) :: req(4)
     real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: F
-    integer :: jlen, klen, ierr !,sta(MPI_STATUS_SIZE,4)
+    integer :: ierr !,sta(MPI_STATUS_SIZE,4)
     integer, save :: srcL, srcR, destL, destR, face(2)
     logical, save :: first_time=.true.
 
     if(ngh>Ng) call pariserror("ghost error: not enough ghost layers to fill")
     if(first_time) then
       first_time=.false.
-      jlen=jmax-jmin+1; klen=kmax-kmin+1; !ilen=ngh
-      call para_type_block3a(imin, imax, jmin, jmax, 1, jlen, klen, MPI_DOUBLE_PRECISION, face(1))
-      call para_type_block3a(imin, imax, jmin, jmax, 2, jlen, klen, MPI_DOUBLE_PRECISION, face(2))
-      call MPI_CART_SHIFT(MPI_COMM_CART, 0, 1, srcR, destR, ierr)
-      call MPI_CART_SHIFT(MPI_COMM_CART, 0,-1, srcL, destL, ierr)
+      call init_ghost(srcL, srcR, destL, destR, face, 1)
     endif
 
     call MPI_IRECV(F(is-ngh  ,jmin,kmin),1,face(ngh),srcR ,0,MPI_COMM_Cart,req(1),ierr)
@@ -1775,6 +1822,32 @@ module module_BC
     call MPI_ISEND(F(is      ,jmin,kmin),1,face(ngh),destL,0,MPI_COMM_Cart,req(4),ierr)
 !    call MPI_WAITALL(4,req,sta,ierr)
   end subroutine ghost_x
+
+  subroutine ghost_MG_x(F,ngh,req,L)
+    use module_grid
+    
+    implicit none
+    include 'mpif.h'
+    integer, intent(in) :: ngh ! number of ghost cell layers to fill
+    integer, intent(out) :: req(4)
+    real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: F
+    integer :: ierr, L !,sta(MPI_STATUS_SIZE,4)
+    integer, save :: srcL, srcR, destL, destR, face(2)
+    logical :: first_time(40)=.true.
+
+    if(ngh>Ng) call pariserror("ghost error: not enough ghost layers to fill")
+    if(first_time(L)) then
+      first_time(L)=.false.
+      call init_ghost(srcL, srcR, destL, destR, face, 1)
+    endif
+
+    call MPI_IRECV(F(is-ngh  ,jmin,kmin),1,face(ngh),srcR ,0,MPI_COMM_Cart,req(1),ierr)
+    call MPI_ISEND(F(ie-ngh+1,jmin,kmin),1,face(ngh),destR,0,MPI_COMM_Cart,req(2),ierr)
+    call MPI_IRECV(F(ie+1    ,jmin,kmin),1,face(ngh),srcL ,0,MPI_COMM_Cart,req(3),ierr)
+    call MPI_ISEND(F(is      ,jmin,kmin),1,face(ngh),destL,0,MPI_COMM_Cart,req(4),ierr)
+!    call MPI_WAITALL(4,req,sta,ierr)
+  end subroutine ghost_MG_x
+
 !-------------------------------------------------------------------------------------------------
   subroutine ghost_y(F,ngh,req)
     use module_grid
@@ -1784,18 +1857,14 @@ module module_BC
     integer, intent(in) :: ngh
     integer, intent(out) :: req(4)
     real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: F
-    integer :: ilen, klen, ierr !,sta(MPI_STATUS_SIZE,4)
+    integer :: ierr !,sta(MPI_STATUS_SIZE,4)
     integer, save :: srcL, srcR, destL, destR, face(2)
     logical, save :: first_time=.true.
 
     if(ngh>Ng) call pariserror("ghost error: not enough ghost layers to fill")
     if(first_time)then
       first_time=.false.
-      klen=kmax-kmin+1; ilen=imax-imin+1; !jlen=ngh
-      call para_type_block3a(imin, imax, jmin, jmax, ilen, 1, klen, MPI_DOUBLE_PRECISION, face(1))
-      call para_type_block3a(imin, imax, jmin, jmax, ilen, 2, klen, MPI_DOUBLE_PRECISION, face(2))
-      call MPI_CART_SHIFT(MPI_COMM_CART, 1, 1, srcR, destR, ierr)
-      call MPI_CART_SHIFT(MPI_COMM_CART, 1,-1, srcL, destL, ierr)
+      call init_ghost(srcL, srcR, destL, destR, face, 2)
     endif
 
     call MPI_IRECV(F(imin,js-ngh  ,kmin),1,face(ngh),srcR ,0,MPI_COMM_Cart,req(1),ierr)
@@ -1804,6 +1873,32 @@ module module_BC
     call MPI_ISEND(F(imin,js      ,kmin),1,face(ngh),destL,0,MPI_COMM_Cart,req(4),ierr)
 !    call MPI_WAITALL(4,req,sta,ierr)
   end subroutine ghost_y
+
+  subroutine ghost_MG_y(F,ngh,req,L)
+    use module_grid
+    
+    implicit none
+    include 'mpif.h'
+    integer, intent(in) :: ngh
+    integer, intent(out) :: req(4)
+    real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: F
+    integer :: ierr,L !,sta(MPI_STATUS_SIZE,4)
+    integer, save :: srcL, srcR, destL, destR, face(2)
+    logical :: first_time(40)=.true.
+
+    if(ngh>Ng) call pariserror("ghost error: not enough ghost layers to fill")
+    if(first_time(L)) then
+      first_time(L)=.false.
+      call init_ghost(srcL, srcR, destL, destR, face, 2)
+    endif
+
+    call MPI_IRECV(F(imin,js-ngh  ,kmin),1,face(ngh),srcR ,0,MPI_COMM_Cart,req(1),ierr)
+    call MPI_ISEND(F(imin,je-ngh+1,kmin),1,face(ngh),destR,0,MPI_COMM_Cart,req(2),ierr)
+    call MPI_IRECV(F(imin,je+1    ,kmin),1,face(ngh),srcL ,0,MPI_COMM_Cart,req(3),ierr)
+    call MPI_ISEND(F(imin,js      ,kmin),1,face(ngh),destL,0,MPI_COMM_Cart,req(4),ierr)
+!    call MPI_WAITALL(4,req,sta,ierr)
+  end subroutine ghost_MG_y
+
 !-------------------------------------------------------------------------------------------------
   subroutine ghost_z(F,ngh,req)
     use module_grid
@@ -1813,18 +1908,14 @@ module module_BC
     integer, intent(in) :: ngh
     integer, intent(out) :: req(4)
     real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: F
-    integer :: ilen, jlen, ierr !,sta(MPI_STATUS_SIZE,4)
+    integer :: ierr !,sta(MPI_STATUS_SIZE,4)
     integer, save :: srcL, srcR, destL, destR, face(2)
     logical, save :: first_time=.true.
 
     if(ngh>Ng) call pariserror("ghost error: not enough ghost layers to fill")
     if(first_time)then
       first_time=.false.
-      ilen=imax-imin+1; jlen=jmax-jmin+1; !klen=ngh
-      call para_type_block3a(imin, imax, jmin, jmax, ilen, jlen, 1, MPI_DOUBLE_PRECISION, face(1))
-      call para_type_block3a(imin, imax, jmin, jmax, ilen, jlen, 2, MPI_DOUBLE_PRECISION, face(2))
-      call MPI_CART_SHIFT(MPI_COMM_CART, 2, 1, srcR, destR, ierr)
-      call MPI_CART_SHIFT(MPI_COMM_CART, 2,-1, srcL, destL, ierr)
+      call init_ghost(srcL, srcR, destL, destR, face, 3)
     endif
 
     call MPI_IRECV(F(imin,jmin,ks-ngh  ),1,face(ngh),srcR ,0,MPI_COMM_Cart,req(1),ierr)
@@ -1833,6 +1924,32 @@ module module_BC
     call MPI_ISEND(F(imin,jmin,ks      ),1,face(ngh),destL,0,MPI_COMM_Cart,req(4),ierr)
 !    call MPI_WAITALL(4,req,sta,ierr)
   end subroutine ghost_z
+
+  subroutine ghost_MG_z(F,ngh,req,L)
+    use module_grid
+    
+    implicit none
+    include 'mpif.h'
+    integer, intent(in) :: ngh
+    integer, intent(out) :: req(4)
+    real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: F
+    integer :: ierr,L !,sta(MPI_STATUS_SIZE,4)
+    integer, save :: srcL, srcR, destL, destR, face(2)
+    logical :: first_time(40)=.true.
+
+    if(ngh>Ng) call pariserror("ghost error: not enough ghost layers to fill")
+    if(first_time(L))then
+      first_time(L)=.false.
+      call init_ghost(srcL, srcR, destL, destR, face, 3)
+    endif
+
+    call MPI_IRECV(F(imin,jmin,ks-ngh  ),1,face(ngh),srcR ,0,MPI_COMM_Cart,req(1),ierr)
+    call MPI_ISEND(F(imin,jmin,ke-ngh+1),1,face(ngh),destR,0,MPI_COMM_Cart,req(2),ierr)
+    call MPI_IRECV(F(imin,jmin,ke+1    ),1,face(ngh),srcL ,0,MPI_COMM_Cart,req(3),ierr)
+    call MPI_ISEND(F(imin,jmin,ks      ),1,face(ngh),destL,0,MPI_COMM_Cart,req(4),ierr)
+!    call MPI_WAITALL(4,req,sta,ierr)
+  end subroutine ghost_MG_z
+
 !=================================================================================================
 !=================================================================================================
   subroutine ighost_x(F,ngh,req)
@@ -2102,6 +2219,7 @@ subroutine lghost_x(F,ngh,req)
 !    call MPI_WAITALL(4,req,sta,ierr)
   end subroutine ghost_zAdd
 !-------------------------------------------------------------------------------------------------
+
 end module module_BC
 !=================================================================================================
 !=================================================================================================
@@ -2958,6 +3076,50 @@ subroutine SetupWvel(w,dw,rho,mu,rho1,mu1,dt,A)
     enddo; enddo
   endif
 end subroutine SetupWvel
+
+subroutine Setup_testMG(rhot,A) 
+  use module_grid
+  use module_BC
+  use module_2phase
+
+  implicit none
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: rhot
+  real(8), dimension(is:ie,js:je,ks:ke,8), intent(out) :: A
+  integer :: i,j,k
+  real(8) :: freq = 1.d0, pi=3.14159265
+  
+  do k=ks,ke; do j=js,je; do i=is,ie
+    A(i,j,k,1) = 2d0/(dx(i)*dxh(i-1)*(rhot(i-1,j,k)+rhot(i,j,k)))
+    A(i,j,k,2) = 2d0/(dx(i)*dxh(i  )*(rhot(i+1,j,k)+rhot(i,j,k)))
+    A(i,j,k,3) = 2d0/(dy(j)*dyh(j-1)*(rhot(i,j-1,k)+rhot(i,j,k)))
+    A(i,j,k,4) = 2d0/(dy(j)*dyh(j  )*(rhot(i,j+1,k)+rhot(i,j,k)))
+    A(i,j,k,5) = 2d0/(dz(k)*dzh(k-1)*(rhot(i,j,k-1)+rhot(i,j,k)))
+    A(i,j,k,6) = 2d0/(dz(k)*dzh(k  )*(rhot(i,j,k+1)+rhot(i,j,k)))
+    A(i,j,k,7) = sum(A(i,j,k,1:6))
+!    A(i,j,k,8) = 1.0d0
+!    A(i,j,k,8) = sin(2.*3.14159265*x(i))
+    A(i,j,k,8) = 2.D0*(2.d0*pi*freq)**2*sin(2.*pi*freq*x(i))*sin(2.*pi*freq*y(j))
+  enddo; enddo; enddo
+
+  call Poisson_BCs (A)
+
+  if (rank==0) then
+      OPEN(201, FILE="resid.ref")
+      do i=is,ie
+          write(201,*) x(i),A(i,js,ks,:)
+      enddo
+      close(201)
+  else
+      OPEN(201, FILE="resid1.ref")
+      do i=is,ie
+          write(201,*) x(i),A(i,js,ks,:)
+      enddo
+      close(201)
+  endif
+
+
+end subroutine Setup_testMG
+
 !=================================================================================================
 !=================================================================================================
 ! Solves the following linear equiation:
