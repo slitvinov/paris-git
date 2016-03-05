@@ -2367,7 +2367,7 @@ subroutine momentumConvectionBCG()
   tmp = p
   call SetPressureBC(umask,vmask,wmask)
   call SetupPoisson(work(:,:,:,1),work(:,:,:,2),work(:,:,:,3), &
-  umask,vmask,wmask,rho,dt,A,tmp,cvof,n1,n2,n3,VolumeSource)
+                    umask,vmask,wmask,rho,dt,A,tmp,VolumeSource)
   ! (div u)*dt < epsilon => div u < epsilon/dt => maxresidual : maxerror/dt 
   if(HYPRE)then
     call poi_solve(A,tmp,maxError/MaxDt,maxit,it,HYPRESolverType)
