@@ -143,6 +143,8 @@ Program paris
 
   call InitCondition
 
+  if (MultiGrid) call init_MG
+
 #ifdef PHASE_CHANGE
   call ReadHeatParameters
   if (rank==0) then
@@ -818,6 +820,7 @@ Program paris
   if(rank<nPdomain)  call output_at_location()
   if(rank==0)  call final_output(stats(2))
   if(HYPRE) call poi_finalize
+  if (MultiGrid) call finalize_MG
   if(rank==0) write(*,'("Paris exits succesfully")')
 #ifdef PHASE_CHANGE
   call temp_stats

@@ -40,14 +40,19 @@ subroutine NewSolver(A,p,maxError,beta,maxit,it,ierr)
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: p
   real(8), dimension(is:ie,js:je,ks:ke,8), intent(in) :: A
   real(8), intent(in) :: beta, maxError
+  real(8) :: tres2
   integer, intent(in) :: maxit
   integer, intent(out) :: it, ierr
 
   if (MultiGrid) then
-      call NewSolverMG(A,p,maxError,beta,maxit,it,ierr)
+    !if I converge the first iteration I do not use Multigrid
+      call NewSolver_std(A,p,maxError,beta,1,it,ierr,tres2) 
+      if (tres2.GT.maxError) call NewSolverMG(A,p,maxError,beta,maxit,it,ierr,tres2)
   else
-      call NewSolver_std(A,p,maxError,beta,maxit,it,ierr)
+      call NewSolver_std(A,p,maxError,beta,maxit,it,ierr,tres2)
   endif
+
+  if(it==maxit+1 .and. rank==0) write(*,*) 'Warning: LinearSolver reached maxit: ||res||: ',tres2
 
 end subroutine NewSolver
 
@@ -70,7 +75,7 @@ subroutine relax_step(A,p,beta,L)
 
 end subroutine relax_step
 
-subroutine NewSolver_std(A,p,maxError,beta,maxit,it,ierr)
+subroutine NewSolver_std(A,p,maxError,beta,maxit,it,ierr, tres2)
   use module_grid
   use module_BC
   use module_IO
@@ -79,12 +84,13 @@ subroutine NewSolver_std(A,p,maxError,beta,maxit,it,ierr)
   include 'mpif.h'
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: p
   real(8), dimension(is:ie,js:je,ks:ke,8), intent(in) :: A
-  real(8), intent(in) :: beta, maxError
+  real(8), intent(in)  :: beta, maxError
+  real(8), intent(out) :: tres2
   integer, intent(in) :: maxit
   integer, intent(out) :: it, ierr
   real(8) :: res1,res2,resinf,intvol
-  real(8) :: tres2
   integer :: i,j,k
+  integer :: req(12),sta(MPI_STATUS_SIZE,12)
   logical :: mask(imin:imax,jmin:jmax,kmin:kmax)
   integer, parameter :: norm=1
   logical, parameter :: recordconvergence=.false.
@@ -100,12 +106,14 @@ subroutine NewSolver_std(A,p,maxError,beta,maxit,it,ierr)
       call relax_step(A,p,beta,-1)
 !---------------------------------CHECK FOR CONVERGENCE-------------------------------------------
      res1 = 0d0; res2=0.d0; resinf=0.d0; intvol=0.d0
+     call ghost_x(p,1,req( 1: 4)); call ghost_y(p,1,req( 5: 8)); call ghost_z(p,1,req( 9:12))
      do k=ks+1,ke-1; do j=js+1,je-1; do i=is+1,ie-1
         res2=res2+abs(-p(i,j,k) * A(i,j,k,7) +                           &
              A(i,j,k,1) * p(i-1,j,k) + A(i,j,k,2) * p(i+1,j,k) +            &
              A(i,j,k,3) * p(i,j-1,k) + A(i,j,k,4) * p(i,j+1,k) +            &
              A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8) )**norm 
      enddo; enddo; enddo
+     call MPI_WAITALL(12,req,sta,ierr)
     mask=.true.
     mask(is+1:ie-1,js+1:je-1,ks+1:ke-1)=.false.
     do k=ks,ke; do j=js,je; do i=is,ie
@@ -126,7 +134,6 @@ subroutine NewSolver_std(A,p,maxError,beta,maxit,it,ierr)
     endif
   enddo
   if(rank==0.and.recordconvergence) close(89)
-  if(it==maxit+1 .and. rank==0) write(*,*) 'Warning: LinearSolver reached maxit: ||res||: ',tres2
 contains
   subroutine catch_divergence(res2,ierr)
     real(8), intent(in) :: res2
@@ -178,7 +185,7 @@ subroutine apply_BC(p)
   call ghost_x(p,1,req( 1: 4))
   call ghost_y(p,1,req( 5: 8))
   call ghost_z(p,1,req( 9:12))
-  call MPI_WAITALL(4,req,sta,ierr)
+  call MPI_WAITALL(12,req,sta,ierr)
 
 end subroutine
 
@@ -229,10 +236,12 @@ subroutine RedBlackRelax(A,p,beta,L)
         jsw=3-jsw
      enddo
      ksw=3-ksw
-     if (L.GT.0) then
-         call apply_BC_MG(p,L)
-     else
-         call apply_BC(p)
+     if (ipass==1) then
+       if (L.GT.0) then
+           call apply_BC_MG(p,L)
+       else
+           call apply_BC(p)
+       endif
      endif
   enddo
 end subroutine RedBlackRelax

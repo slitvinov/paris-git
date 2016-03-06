@@ -23,14 +23,69 @@
 
 MODULE module_mgsolver
 
+  TYPE equation
+    real(8), ALLOCATABLE :: K(:,:,:,:)
+  END TYPE equation
+  TYPE(equation), ALLOCATABLE :: DataMG(:), pMG(:), EMG(:)
+  integer :: nd(3), LMG
+
 CONTAINS
-    
+
+subroutine init_MG
+  use module_grid
+  use module_BC
+  implicit none
+  include 'mpif.h'
+  integer :: Ld(3), nL(3)
+  integer :: i,ierr
+
+  nd(1) = ie-is+1; nd(2) = je-js+1; nd(3) = ke-ks+1
+  IF (IAND (nd(1), nd(1)-1).NE.0) STOP 'multigrid requires 2^n+1 nodes per direction'
+  IF (IAND (nd(2), nd(2)-1).NE.0) STOP 'multigrid requires 2^n+1 nodes per direction'
+  IF (IAND (nd(3), nd(3)-1).NE.0) STOP 'multigrid requires 2^n+1 nodes per direction'
+
+  Ld(:) = int(log(float(nd(:)))/log(2.d0))
+  LMG = minval(Ld(:))
+  call MPI_ALLREDUCE(LMG, LMG, 1, MPI_INTEGER, MPI_MIN, MPI_Comm_Cart, ierr) 
+
+  ALLOCATE (DataMG(LMG)); ALLOCATE (pMG(LMG)); ALLOCATE (EMG(LMG))
+
+  DO i=LMG,1,-1
+      nL(:) = nd(:)/2**(LMG-i)
+      ALLOCATE(DataMG(i)%K(nL(1),nL(2),nL(3),8))
+      nL(:) = nd(:)/2**(LMG-i)+2*Ng
+      ALLOCATE(pMG(i)%K(nL(1),nL(2),nL(3),1)) 
+      ALLOCATE(EMG(i)%K(nL(1),nL(2),nL(3),1)) 
+      DataMG(i)%K = 0.d0
+      pMG(i)%K    = 0.d0
+      EMG(i)%K    = 0.d0
+  enddo
+
+end subroutine init_MG
+
+subroutine finalize_MG
+  implicit none
+  include 'mpif.h'
+  integer :: i
+
+  !free memory
+  DO i=1,LMG
+      DEALLOCATE(DataMG(i)%K) 
+      DEALLOCATE(pMG(i)%K) 
+      DEALLOCATE(EMG(i)%K) 
+  ENDDO
+  DEALLOCATE(DataMG) 
+  DEALLOCATE(pMG) 
+  DEALLOCATE(EMG) 
+
+end subroutine finalize_MG
+ 
 subroutine get_residual(A,p,L,norm,error_L1norm)
   use module_grid
   use module_BC
   implicit none
   include 'mpif.h'
-  real(8) :: A(is:,js:,ks:,:), p(imin:,jmin:,kmin:,:)
+  real(8) :: A(is:ie,js:je,ks:ke,8), p(imin:imax,jmin:jmax,kmin:kmax)
   real(8), intent(out) :: error_L1norm
   integer, intent(in)  :: norm
   integer :: i,j,k,L
@@ -38,10 +93,10 @@ subroutine get_residual(A,p,L,norm,error_L1norm)
   error_L1norm = 0.d0
 
   do k=ks,ke; do j=js,je; do i=is,ie
-      A(i,j,k,8) = A(i,j,k,8)     - A(i,j,k,7)*p(i,j,k,1)    + &
-        A(i,j,k,1)*p(i-1,j,k,1) + A(i,j,k,2)*p(i+1,j,k,1)  + &
-        A(i,j,k,3)*p(i,j-1,k,1) + A(i,j,k,4)*p(i,j+1,k,1)  + &
-        A(i,j,k,5)*p(i,j,k-1,1) + A(i,j,k,6)*p(i,j,k+1,1) 
+      A(i,j,k,8) = A(i,j,k,8)     - A(i,j,k,7)*p(i,j,k)    + &
+        A(i,j,k,1)*p(i-1,j,k) + A(i,j,k,2)*p(i+1,j,k)  + &
+        A(i,j,k,3)*p(i,j-1,k) + A(i,j,k,4)*p(i,j+1,k)  + &
+        A(i,j,k,5)*p(i,j,k-1) + A(i,j,k,6)*p(i,j,k+1) 
     error_L1norm = error_L1norm + abs(A(i,j,k,8))**norm
   enddo; enddo; enddo
 
@@ -75,13 +130,15 @@ subroutine coarse_from_fine(Af,Ac,is1,js1,ks1)
   use module_BC
     implicit none
     integer :: is1,js1,ks1
-    integer :: i,j,k
-    real(8) :: Ac(is1:,js1:,ks1:,:), Af(is:,js:,ks:,:)
+    integer :: i,j,k,i1,j1,k1
+    real(8) :: Af(is1:,js1:,ks1:,:), Ac(is:,js:,ks:,:)
 
     Ac(:,:,:,8) = 0.d0
     DO i=is,ie; DO j=js,je; DO k=ks,ke
-      Ac(is1+(i-is)/2, js1+(j-js)/2, ks1+(k-ks)/2, 8) = &
-      Ac(is1+(i-is)/2, js1+(j-js)/2, ks1+(k-ks)/2, 8) + Af(i,j,k,8)
+    DO i1=0,1; DO j1=0,1; DO k1=0,1
+      Ac(i,j,k,8) = Ac(i,j,k,8) + &
+      Af(2*(i-is)+is1+i1,  2*(j-js)+js1+j1,  2*(k-ks)+ks1+k1,8)*0.125d0
+    ENDDO; ENDDO; ENDDO
     ENDDO; ENDDO; ENDDO
 
 end subroutine coarse_from_fine
@@ -94,66 +151,69 @@ subroutine fill_coefficients(Af, Ac, is1, js1, ks1)
   real(8) :: Ac(is:,js:,ks:,:), Af(is1:,js1:,ks1:,:)
 
     DO k=ks,ke; DO j=js,je; DO i=is,ie
-        Ac(i,j,k,:) =                          &
+        Ac(i,j,k,:) =  0.125d0*(                       &
                 Af(2*(i-is)+is1,  2*(j-js)+js1,  2*(k-ks)+ks1,:) + &
-                Af(2*(i-is)+is1+1,2*(j-js)+js1,  2*(k-ks)+ks1,:) + &
                 Af(2*(i-is)+is1,  2*(j-js)+js1+1,2*(k-ks)+ks1,:) + &
-                Af(2*(i-is)+is1+1,2*(j-js)+js1+1,2*(k-ks)+ks1,:) + &
                 Af(2*(i-is)+is1,  2*(j-js)+js1,  2*(k-ks)+ks1+1,:) + &
-                Af(2*(i-is)+is1+1,2*(j-js)+js1,  2*(k-ks)+ks1+1,:) + &
                 Af(2*(i-is)+is1,  2*(j-js)+js1+1,2*(k-ks)+ks1+1,:) + &
-                Af(2*(i-is)+is1+1,2*(j-js)+js1+1,2*(k-ks)+ks1+1,:) 
+                Af(2*(i-is)+is1+1,2*(j-js)+js1,  2*(k-ks)+ks1,:) + &
+                Af(2*(i-is)+is1+1,2*(j-js)+js1+1,2*(k-ks)+ks1,:) + &
+                Af(2*(i-is)+is1+1,2*(j-js)+js1,  2*(k-ks)+ks1+1,:) + &
+                Af(2*(i-is)+is1+1,2*(j-js)+js1+1,2*(k-ks)+ks1+1,:))
      ENDDO; ENDDO; ENDDO
+
+!    DO k=ks,ke; DO j=js,je; DO i=is,ie
+!        Ac(i,j,k,1:2) =  0.25d0*(                       &
+!                Af(2*(i-is)+is1,  2*(j-js)+js1,  2*(k-ks)+ks1,1:2) + &
+!                Af(2*(i-is)+is1,  2*(j-js)+js1+1,2*(k-ks)+ks1,1:2) + &
+!                Af(2*(i-is)+is1,  2*(j-js)+js1,  2*(k-ks)+ks1+1,1:2) + &
+!                Af(2*(i-is)+is1,  2*(j-js)+js1+1,2*(k-ks)+ks1+1,1:2))
+!     ENDDO; ENDDO; ENDDO
+!
+!    DO k=ks,ke; DO j=js,je; DO i=is,ie
+!        Ac(i,j,k,3:4) = 0.25d0*(                       &
+!                Af(2*(i-is)+is1,  2*(j-js)+js1,  2*(k-ks)+ks1,3:4) + &
+!                Af(2*(i-is)+is1+1,2*(j-js)+js1,  2*(k-ks)+ks1,3:4) + &
+!                Af(2*(i-is)+is1,  2*(j-js)+js1,  2*(k-ks)+ks1+1,3:4) + &
+!                Af(2*(i-is)+is1+1,2*(j-js)+js1,  2*(k-ks)+ks1+1,3:4) )
+!     ENDDO; ENDDO; ENDDO
+!
+!     DO k=ks,ke; DO j=js,je; DO i=is,ie
+!        Ac(i,j,k,5:6) =  0.25d0*(                         &
+!                Af(2*(i-is)+is1,  2*(j-js)+js1,  2*(k-ks)+ks1,5:6) + &
+!                Af(2*(i-is)+is1+1,2*(j-js)+js1,  2*(k-ks)+ks1,5:6) + &
+!                Af(2*(i-is)+is1,  2*(j-js)+js1+1,2*(k-ks)+ks1,5:6) + &
+!                Af(2*(i-is)+is1+1,2*(j-js)+js1+1,2*(k-ks)+ks1,5:6) )
+!     ENDDO; ENDDO; ENDDO
+
+     DO k=ks,ke; DO j=js,je; DO i=is,ie
+        Ac(i,j,k,7) = sum(Ac(i,j,k,1:6))
+     ENDDO; ENDDO; ENDDO
+
 
 end subroutine fill_coefficients
 
-subroutine NewSolverMG(A,p,maxError,beta,maxit,it,ierr)
+subroutine NewSolverMG(A,p,maxError,beta,maxit,it,ierr,tres2)
   use module_grid
   use module_BC
   implicit none
   include 'mpif.h'
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: p
   real(8), dimension(is:ie,js:je,ks:ke,8), intent(in) :: A
-  TYPE equation
-    real(8), ALLOCATABLE :: K(:,:,:,:)
-  END TYPE equation
-  TYPE(equation), ALLOCATABLE :: DataMG(:), pMG(:), EMG(:)
   real(8), intent(in) :: beta, maxError
+  real(8), intent(out) :: tres2
   integer, intent(in) :: maxit
   integer, intent(out) :: it, ierr
   integer :: indextmp(3)
-  real(8) :: tres2, resMax
-  integer :: i,j,k,L,n, Level, ncycle, nrelax=2, Ld(3), nd(3)
+  real(8) :: resMax
+  integer :: i,j,k,L,n, Level, ncycle, nrelax=2
   integer :: is1, js1, ks1, imin1, jmin1, kmin1
   integer :: nL(3)
-  integer :: req(12),sta(MPI_STATUS_SIZE,12)
   logical :: mask(imin:imax,jmin:jmax,kmin:kmax)
   integer, parameter :: norm=1, relaxtype=1
 
-  nd(1) = ie-is+1; nd(2) = je-js+1; nd(3) = ke-ks+1
-  IF (IAND (nd(1), nd(1)-1).NE.0) STOP 'multigrid requires 2^n+1 nodes per direction'
-  IF (IAND (nd(2), nd(2)-1).NE.0) STOP 'multigrid requires 2^n+1 nodes per direction'
-  IF (IAND (nd(3), nd(3)-1).NE.0) STOP 'multigrid requires 2^n+1 nodes per direction'
-
-  Ld(:) = int(log(float(nd(:)))/log(2.d0))
-
   indextmp(1) = ie; indextmp(2) = je; indextmp(3) = ke
-
-  L = minval(Ld(:))
-  call MPI_ALLREDUCE(L, L, 1, MPI_INTEGER, MPI_MIN, MPI_Comm_Cart, ierr) 
-
-  ALLOCATE (DataMG(L)); ALLOCATE (pMG(L)); ALLOCATE (EMG(L))
-
-  DO i=L,1,-1
-      nL(:) = nd(:)/2**(L-i)
-      ALLOCATE(DataMG(i)%K(nL(1),nL(2),nL(3),8))
-      nL(:) = nd(:)/2**(L-i)+2*Ng
-      ALLOCATE(pMG(i)%K(nL(1),nL(2),nL(3),1)) 
-      ALLOCATE(EMG(i)%K(nL(1),nL(2),nL(3),1)) 
-      DataMG(i)%K = 0.d0
-      pMG(i)%K    = 0.d0
-      EMG(i)%K    = 0.d0
-  enddo
+  L = LMG
 
   do k=ks,ke; do j=js,je; do i=is,ie
       DataMG(L)%K(i-is+1,j-js+1,k-ks+1,:) = A(i,j,k,:) !fine level
@@ -172,7 +232,11 @@ subroutine NewSolverMG(A,p,maxError,beta,maxit,it,ierr)
   !compute residual at the finest level
   pMG(L)%K(:,:,:,1)    = p
   call update_bounds(nd)
-  call get_residual(DataMG(L)%K,pMG(L)%K,L,norm,resMax)
+  call get_residual(DataMG(L)%K,pMG(L)%K(:,:,:,1),L,norm,resMax)
+
+  resMax = resMax/dble(Nx*Ny*Nz)
+  call MPI_ALLREDUCE(resMax, tres2, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr) 
+
   pMG(L)%K = 0.d0
 
   !-------------
@@ -185,18 +249,24 @@ subroutine NewSolverMG(A,p,maxError,beta,maxit,it,ierr)
     
     DO i=1,nrelax
         call relax_step(DataMG(Level)%K,pMG(Level)%K(:,:,:,1),beta,Level)
+        call apply_BC_MG(pMG(Level)%K(:,:,:,1),Level)
     ENDDO
    
-    call get_residual(DataMG(Level)%K,pMG(Level)%K,Level,norm,resMax)
+    call get_residual(DataMG(Level)%K,pMG(Level)%K(:,:,:,1),Level,norm,resMax)
 
-    is1=coords(1)*nd(1)/2**(L-Level+1)+1+Ng
-    js1=coords(2)*nd(2)/2**(L-Level+1)+1+Ng
-    ks1=coords(3)*nd(3)/2**(L-Level+1)+1+Ng
+    nL(:) = nd(:)/2**(L-Level+1)
+    call update_bounds(nL)
+    is1=coords(1)*nd(1)/2**(L-Level)+1+Ng
+    js1=coords(2)*nd(2)/2**(L-Level)+1+Ng
+    ks1=coords(3)*nd(3)/2**(L-Level)+1+Ng
     call coarse_from_fine(DataMG(Level)%K,DataMG(Level-1)%K,is1,js1,ks1) !projection at the next level
 
   ENDDO
 
+  nL(:) = nd(:)/2**(L-2)
+  call update_bounds(nL)
   call relax_step(DataMG(2)%K,pMG(2)%K(:,:,:,1),beta,2)
+  call apply_BC_MG(pMG(2)%K(:,:,:,1),2)
 
   DO Level=3,L,1
 
@@ -210,20 +280,22 @@ subroutine NewSolverMG(A,p,maxError,beta,maxit,it,ierr)
     call update_bounds(nL)
     call apply_BC_MG(EMG(Level)%K(:,:,:,1),Level)
 
-    call get_residual(DataMG(Level)%K,EMG(Level)%K,Level,norm,resMax) !new residual
+    call get_residual(DataMG(Level)%K,EMG(Level)%K(:,:,:,1),Level,norm,resMax) !new residual
     pMG(Level)%K = pMG(Level)%K + EMG(Level)%K
 
     EMG(Level)%K = 0.d0  !initial guess of the error
     DO i=1,nrelax
       call relax_step(DataMG(Level)%K,EMG(Level)%K(:,:,:,1),beta,Level)
+      call apply_BC_MG(pMG(Level)%K(:,:,:,1),Level)
     ENDDO
     pMG(Level)%K = pMG(Level)%K + EMG(Level)%K
 
-    call get_residual(DataMG(Level)%K,EMG(Level)%K,Level,norm,resMax)
+    call get_residual(DataMG(Level)%K,EMG(Level)%K(:,:,:,1),Level,norm,resMax)
   ENDDO
 
   p = p + pMG(L)%K(:,:,:,1)
-  
+
+  resMax = resMax/dble(Nx*Ny*Nz)
   call MPI_ALLREDUCE(resMax, tres2, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr) 
   if(norm==2) tres2=sqrt(tres2*dble(Nx*Ny*Nz))/dble(Nx*Ny*Nz)
   if (tres2<maxError) exit
@@ -231,16 +303,6 @@ subroutine NewSolverMG(A,p,maxError,beta,maxit,it,ierr)
   ENDDO
 
   call update_bounds(nd) !restore default values (MG finished)
-
-  !free memory
-  DO i=1,L
-      DEALLOCATE(DataMG(i)%K) 
-      DEALLOCATE(pMG(i)%K) 
-      DEALLOCATE(EMG(i)%K) 
-  ENDDO
-  DEALLOCATE(DataMG) 
-  DEALLOCATE(pMG) 
-  DEALLOCATE(EMG) 
 
   if(it==maxit+1 .and. rank==0) write(*,*) 'Warning: LinearSolver reached maxit: ||res||: ',tres2
 
