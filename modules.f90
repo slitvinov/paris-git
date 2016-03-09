@@ -1832,19 +1832,19 @@ module module_BC
     integer, intent(out) :: req(4)
     real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: F
     integer :: ierr, L !,sta(MPI_STATUS_SIZE,4)
-    integer, save :: srcL, srcR, destL, destR, face(2)
+    integer, save :: srcL, srcR, destL, destR, face(2,40)
     logical :: first_time(40)=.true.
 
     if(ngh>Ng) call pariserror("ghost error: not enough ghost layers to fill")
     if(first_time(L)) then
       first_time(L)=.false.
-      call init_ghost(srcL, srcR, destL, destR, face, 1)
+      call init_ghost(srcL, srcR, destL, destR, face(:,L), 1)
     endif
 
-    call MPI_IRECV(F(is-ngh  ,jmin,kmin),1,face(ngh),srcR ,0,MPI_COMM_Cart,req(1),ierr)
-    call MPI_ISEND(F(ie-ngh+1,jmin,kmin),1,face(ngh),destR,0,MPI_COMM_Cart,req(2),ierr)
-    call MPI_IRECV(F(ie+1    ,jmin,kmin),1,face(ngh),srcL ,0,MPI_COMM_Cart,req(3),ierr)
-    call MPI_ISEND(F(is      ,jmin,kmin),1,face(ngh),destL,0,MPI_COMM_Cart,req(4),ierr)
+    call MPI_IRECV(F(is-ngh  ,jmin,kmin),1,face(ngh,L),srcR ,0,MPI_COMM_Cart,req(1),ierr)
+    call MPI_ISEND(F(ie-ngh+1,jmin,kmin),1,face(ngh,L),destR,0,MPI_COMM_Cart,req(2),ierr)
+    call MPI_IRECV(F(ie+1    ,jmin,kmin),1,face(ngh,L),srcL ,0,MPI_COMM_Cart,req(3),ierr)
+    call MPI_ISEND(F(is      ,jmin,kmin),1,face(ngh,L),destL,0,MPI_COMM_Cart,req(4),ierr)
 !    call MPI_WAITALL(4,req,sta,ierr)
   end subroutine ghost_MG_x
 
@@ -1883,19 +1883,19 @@ module module_BC
     integer, intent(out) :: req(4)
     real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: F
     integer :: ierr,L !,sta(MPI_STATUS_SIZE,4)
-    integer, save :: srcL, srcR, destL, destR, face(2)
+    integer, save :: srcL, srcR, destL, destR, face(2,40)
     logical :: first_time(40)=.true.
 
     if(ngh>Ng) call pariserror("ghost error: not enough ghost layers to fill")
     if(first_time(L)) then
       first_time(L)=.false.
-      call init_ghost(srcL, srcR, destL, destR, face, 2)
+      call init_ghost(srcL, srcR, destL, destR, face(:,L), 2)
     endif
 
-    call MPI_IRECV(F(imin,js-ngh  ,kmin),1,face(ngh),srcR ,0,MPI_COMM_Cart,req(1),ierr)
-    call MPI_ISEND(F(imin,je-ngh+1,kmin),1,face(ngh),destR,0,MPI_COMM_Cart,req(2),ierr)
-    call MPI_IRECV(F(imin,je+1    ,kmin),1,face(ngh),srcL ,0,MPI_COMM_Cart,req(3),ierr)
-    call MPI_ISEND(F(imin,js      ,kmin),1,face(ngh),destL,0,MPI_COMM_Cart,req(4),ierr)
+    call MPI_IRECV(F(imin,js-ngh  ,kmin),1,face(ngh,L),srcR ,0,MPI_COMM_Cart,req(1),ierr)
+    call MPI_ISEND(F(imin,je-ngh+1,kmin),1,face(ngh,L),destR,0,MPI_COMM_Cart,req(2),ierr)
+    call MPI_IRECV(F(imin,je+1    ,kmin),1,face(ngh,L),srcL ,0,MPI_COMM_Cart,req(3),ierr)
+    call MPI_ISEND(F(imin,js      ,kmin),1,face(ngh,L),destL,0,MPI_COMM_Cart,req(4),ierr)
 !    call MPI_WAITALL(4,req,sta,ierr)
   end subroutine ghost_MG_y
 
@@ -1934,19 +1934,19 @@ module module_BC
     integer, intent(out) :: req(4)
     real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: F
     integer :: ierr,L !,sta(MPI_STATUS_SIZE,4)
-    integer, save :: srcL, srcR, destL, destR, face(2)
+    integer, save :: srcL, srcR, destL, destR, face(2,40)
     logical :: first_time(40)=.true.
 
     if(ngh>Ng) call pariserror("ghost error: not enough ghost layers to fill")
     if(first_time(L))then
       first_time(L)=.false.
-      call init_ghost(srcL, srcR, destL, destR, face, 3)
+      call init_ghost(srcL, srcR, destL, destR, face(:,L), 3)
     endif
 
-    call MPI_IRECV(F(imin,jmin,ks-ngh  ),1,face(ngh),srcR ,0,MPI_COMM_Cart,req(1),ierr)
-    call MPI_ISEND(F(imin,jmin,ke-ngh+1),1,face(ngh),destR,0,MPI_COMM_Cart,req(2),ierr)
-    call MPI_IRECV(F(imin,jmin,ke+1    ),1,face(ngh),srcL ,0,MPI_COMM_Cart,req(3),ierr)
-    call MPI_ISEND(F(imin,jmin,ks      ),1,face(ngh),destL,0,MPI_COMM_Cart,req(4),ierr)
+    call MPI_IRECV(F(imin,jmin,ks-ngh  ),1,face(ngh,L),srcR ,0,MPI_COMM_Cart,req(1),ierr)
+    call MPI_ISEND(F(imin,jmin,ke-ngh+1),1,face(ngh,L),destR,0,MPI_COMM_Cart,req(2),ierr)
+    call MPI_IRECV(F(imin,jmin,ke+1    ),1,face(ngh,L),srcL ,0,MPI_COMM_Cart,req(3),ierr)
+    call MPI_ISEND(F(imin,jmin,ks      ),1,face(ngh,L),destL,0,MPI_COMM_Cart,req(4),ierr)
 !    call MPI_WAITALL(4,req,sta,ierr)
   end subroutine ghost_MG_z
 
@@ -3086,7 +3086,7 @@ subroutine Setup_testMG(rhot,A)
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: rhot
   real(8), dimension(is:ie,js:je,ks:ke,8), intent(out) :: A
   integer :: i,j,k
-  real(8) :: freq = 1.d0, pi=3.14159265
+  real(8) :: pi=3.14159265359
   
   do k=ks,ke; do j=js,je; do i=is,ie
     A(i,j,k,1) = 2d0/(dx(i)*dxh(i-1)*(rhot(i-1,j,k)+rhot(i,j,k)))
@@ -3098,7 +3098,7 @@ subroutine Setup_testMG(rhot,A)
     A(i,j,k,7) = sum(A(i,j,k,1:6))
 !    A(i,j,k,8) = 1.0d0
 !    A(i,j,k,8) = sin(2.*3.14159265*x(i))
-    A(i,j,k,8) = 2.D0*(2.d0*pi*freq)**2*sin(2.*pi*freq*x(i))*sin(2.*pi*freq*y(j))
+    A(i,j,k,8) = 3.D0*(2.d0*pi)**2*sin(2.*pi*x(i))*sin(2.*pi*y(j))*sin(2.*pi*z(k))
   enddo; enddo; enddo
 
   call Poisson_BCs (A)

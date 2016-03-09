@@ -32,7 +32,7 @@
 !           A4*Pij+1k + A5*Pijk-1 + A6*Pijk+1 + A8
 !-------------------------------------------------------------------------------------------------
 subroutine NewSolver(A,p,maxError,beta,maxit,it,ierr)
-  use  module_mgsolver
+  use module_mgsolver
   use module_grid
   use module_BC
   implicit none
@@ -45,9 +45,7 @@ subroutine NewSolver(A,p,maxError,beta,maxit,it,ierr)
   integer, intent(out) :: it, ierr
 
   if (MultiGrid) then
-    !if I converge the first iteration I do not use Multigrid
-      call NewSolver_std(A,p,maxError,beta,1,it,ierr,tres2) 
-      if (tres2.GT.maxError) call NewSolverMG(A,p,maxError,beta,maxit,it,ierr,tres2)
+      call NewSolverMG(A,p,maxError,beta,maxit,it,ierr,tres2)
   else
       call NewSolver_std(A,p,maxError,beta,maxit,it,ierr,tres2)
   endif
@@ -76,6 +74,7 @@ subroutine relax_step(A,p,beta,L)
 end subroutine relax_step
 
 subroutine NewSolver_std(A,p,maxError,beta,maxit,it,ierr, tres2)
+  use module_mgsolver
   use module_grid
   use module_BC
   use module_IO

@@ -221,7 +221,17 @@ Program paris
 !           itimestep=0; ii=0
         endif
      endif
-     if(test_HF.or.test_LP) then
+
+     if (test_MG) then
+       rho = 1.d0; p=0.d0; call Setup_testMG(rho,A)
+       call NewSolver(A,p,maxError,beta,maxit,it,ierr)
+       call get_MGtest_err(p)
+       end_time =  MPI_WTIME()
+       cflmax = get_cfl_and_check(dt)
+       if(rank==0) print *, 'cpu =', end_time-start_time, it
+     endif
+
+     if(test_HF.or.test_LP.or.test_MG) then
         ! Exit MPI gracefully
         close(out)
         call print_st_stats(0)

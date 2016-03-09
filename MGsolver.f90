@@ -2,7 +2,7 @@
 !=================================================================================================
 ! Paris-0.1
 !
-! Free surface extensions
+! Multigrid solver
 ! written by Daniel Fuster
 !
 ! This program is free software; you can redistribute it and/or
@@ -80,7 +80,7 @@ subroutine finalize_MG
 
 end subroutine finalize_MG
  
-subroutine get_residual(A,p,L,norm,error_L1norm)
+subroutine get_residual(A,p,norm,error_L1norm)
   use module_grid
   use module_BC
   implicit none
@@ -88,7 +88,7 @@ subroutine get_residual(A,p,L,norm,error_L1norm)
   real(8) :: A(is:ie,js:je,ks:ke,8), p(imin:imax,jmin:jmax,kmin:kmax)
   real(8), intent(out) :: error_L1norm
   integer, intent(in)  :: norm
-  integer :: i,j,k,L
+  integer :: i,j,k
 
   error_L1norm = 0.d0
 
@@ -102,25 +102,47 @@ subroutine get_residual(A,p,L,norm,error_L1norm)
 
 end subroutine get_residual
 
-subroutine coarse_fine_interp(pc,pf,imin1,jmin1,kmin1)
+subroutine compute_residual(A,p,norm,error_L1norm)
+  use module_grid
+  use module_BC
+  implicit none
+  include 'mpif.h'
+  real(8) :: A(is:ie,js:je,ks:ke,8), p(imin:imax,jmin:jmax,kmin:kmax)
+  real(8), intent(out) :: error_L1norm
+  integer, intent(in)  :: norm
+  integer :: i,j,k
+
+  error_L1norm = 0.d0
+
+  do k=ks,ke; do j=js,je; do i=is,ie
+      error_L1norm = error_L1norm + abs(A(i,j,k,8)     - &
+        A(i,j,k,7)*p(i,j,k)    + &
+        A(i,j,k,1)*p(i-1,j,k) + A(i,j,k,2)*p(i+1,j,k)  + &
+        A(i,j,k,3)*p(i,j-1,k) + A(i,j,k,4)*p(i,j+1,k)  + &
+        A(i,j,k,5)*p(i,j,k-1) + A(i,j,k,6)*p(i,j,k+1) )**norm
+  enddo; enddo; enddo
+
+end subroutine compute_residual
+
+subroutine coarse_fine_interp(pf,pc,imin1,jmin1,kmin1)
   use module_grid
   use module_BC
     implicit none
     integer :: imin1,jmin1,kmin1
-    real(8) :: pc(imin1:,jmin1:,kmin1:,:), pf(imin:,jmin:,kmin:,:)
+    real(8) :: pf(imin1:,jmin1:,kmin1:,:), pc(imin:,jmin:,kmin:,:)
     integer :: i,j,k,is1,js1,ks1
     
     is1=imin1+Ng; js1=jmin1+Ng; ks1=kmin1+Ng
     !interpolation from coarse level
     do i=is,ie; do j=js,je; do k=ks,ke
-      pc(2*(i-is)+is1,  2*(j-js)+js1,  2*(k-ks)+ks1,1)   = pf(i,j,k,1)
-      pc(2*(i-is)+is1+1,2*(j-js)+js1,  2*(k-ks)+ks1,1)   = pf(i,j,k,1)
-      pc(2*(i-is)+is1,  2*(j-js)+js1+1,2*(k-ks)+ks1,1)   = pf(i,j,k,1)
-      pc(2*(i-is)+is1+1,2*(j-js)+js1+1,2*(k-ks)+ks1,1)   = pf(i,j,k,1)
-      pc(2*(i-is)+is1,  2*(j-js)+js1,  2*(k-ks)+ks1+1,1) = pf(i,j,k,1)
-      pc(2*(i-is)+is1+1,2*(j-js)+js1,  2*(k-ks)+ks1+1,1) = pf(i,j,k,1)
-      pc(2*(i-is)+is1,  2*(j-js)+js1+1,2*(k-ks)+ks1+1,1) = pf(i,j,k,1)
-      pc(2*(i-is)+is1+1,2*(j-js)+js1+1,2*(k-ks)+ks1+1,1) = pf(i,j,k,1)
+      pf(2*(i-is)+is1,  2*(j-js)+js1,  2*(k-ks)+ks1,1)   = pc(i,j,k,1)
+      pf(2*(i-is)+is1+1,2*(j-js)+js1,  2*(k-ks)+ks1,1)   = pc(i,j,k,1)
+      pf(2*(i-is)+is1,  2*(j-js)+js1+1,2*(k-ks)+ks1,1)   = pc(i,j,k,1)
+      pf(2*(i-is)+is1+1,2*(j-js)+js1+1,2*(k-ks)+ks1,1)   = pc(i,j,k,1)
+      pf(2*(i-is)+is1,  2*(j-js)+js1,  2*(k-ks)+ks1+1,1) = pc(i,j,k,1)
+      pf(2*(i-is)+is1+1,2*(j-js)+js1,  2*(k-ks)+ks1+1,1) = pc(i,j,k,1)
+      pf(2*(i-is)+is1,  2*(j-js)+js1+1,2*(k-ks)+ks1+1,1) = pc(i,j,k,1)
+      pf(2*(i-is)+is1+1,2*(j-js)+js1+1,2*(k-ks)+ks1+1,1) = pc(i,j,k,1)
     enddo; enddo; enddo
 
 end subroutine coarse_fine_interp
@@ -185,10 +207,10 @@ subroutine fill_coefficients(Af, Ac, is1, js1, ks1)
 !                Af(2*(i-is)+is1,  2*(j-js)+js1+1,2*(k-ks)+ks1,5:6) + &
 !                Af(2*(i-is)+is1+1,2*(j-js)+js1+1,2*(k-ks)+ks1,5:6) )
 !     ENDDO; ENDDO; ENDDO
-
-     DO k=ks,ke; DO j=js,je; DO i=is,ie
-        Ac(i,j,k,7) = sum(Ac(i,j,k,1:6))
-     ENDDO; ENDDO; ENDDO
+!
+!     DO k=ks,ke; DO j=js,je; DO i=is,ie
+!        Ac(i,j,k,7) = sum(Ac(i,j,k,1:6))
+!     ENDDO; ENDDO; ENDDO
 
 
 end subroutine fill_coefficients
@@ -206,10 +228,9 @@ subroutine NewSolverMG(A,p,maxError,beta,maxit,it,ierr,tres2)
   integer, intent(out) :: it, ierr
   integer :: indextmp(3)
   real(8) :: resMax
-  integer :: i,j,k,L,n, Level, ncycle, nrelax=2
+  integer :: i,j,k,L,n, Level, nrelax=3
   integer :: is1, js1, ks1, imin1, jmin1, kmin1
   integer :: nL(3)
-  logical :: mask(imin:imax,jmin:jmax,kmin:kmax)
   integer, parameter :: norm=1, relaxtype=1
 
   indextmp(1) = ie; indextmp(2) = je; indextmp(3) = ke
@@ -232,15 +253,13 @@ subroutine NewSolverMG(A,p,maxError,beta,maxit,it,ierr,tres2)
   !compute residual at the finest level
   pMG(L)%K(:,:,:,1)    = p
   call update_bounds(nd)
-  call get_residual(DataMG(L)%K,pMG(L)%K(:,:,:,1),L,norm,resMax)
+  call get_residual(DataMG(L)%K,pMG(L)%K(:,:,:,1),norm,resMax)
 
   resMax = resMax/dble(Nx*Ny*Nz)
   call MPI_ALLREDUCE(resMax, tres2, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr) 
 
-  pMG(L)%K = 0.d0
-
   !-------------
-  DO ncycle=1,maxit,1
+  DO it=1,maxit,1
   DO Level=L,2,-1
 
     pMG(Level)%K = 0.d0  !now pMG is the error
@@ -252,7 +271,7 @@ subroutine NewSolverMG(A,p,maxError,beta,maxit,it,ierr,tres2)
         call apply_BC_MG(pMG(Level)%K(:,:,:,1),Level)
     ENDDO
    
-    call get_residual(DataMG(Level)%K,pMG(Level)%K(:,:,:,1),Level,norm,resMax)
+    call get_residual(DataMG(Level)%K,pMG(Level)%K(:,:,:,1),norm,resMax)
 
     nL(:) = nd(:)/2**(L-Level+1)
     call update_bounds(nL)
@@ -270,6 +289,7 @@ subroutine NewSolverMG(A,p,maxError,beta,maxit,it,ierr,tres2)
 
   DO Level=3,L,1
 
+    EMG(Level)%K = 0.d0  !initial guess of the error
     nL(:) = nd(:)/2**(L-Level+1)
     call update_bounds(nL)
     imin1=coords(1)*nd(1)/2**(L-Level)+1
@@ -280,20 +300,23 @@ subroutine NewSolverMG(A,p,maxError,beta,maxit,it,ierr,tres2)
     call update_bounds(nL)
     call apply_BC_MG(EMG(Level)%K(:,:,:,1),Level)
 
-    call get_residual(DataMG(Level)%K,EMG(Level)%K(:,:,:,1),Level,norm,resMax) !new residual
+    call get_residual(DataMG(Level)%K,EMG(Level)%K(:,:,:,1),norm,resMax) !new residual
     pMG(Level)%K = pMG(Level)%K + EMG(Level)%K
 
     EMG(Level)%K = 0.d0  !initial guess of the error
     DO i=1,nrelax
       call relax_step(DataMG(Level)%K,EMG(Level)%K(:,:,:,1),beta,Level)
-      call apply_BC_MG(pMG(Level)%K(:,:,:,1),Level)
+      call apply_BC_MG(EMG(Level)%K(:,:,:,1),Level)
     ENDDO
     pMG(Level)%K = pMG(Level)%K + EMG(Level)%K
 
-    call get_residual(DataMG(Level)%K,EMG(Level)%K(:,:,:,1),Level,norm,resMax)
+    call get_residual(DataMG(Level)%K,EMG(Level)%K(:,:,:,1),norm,resMax)
   ENDDO
 
   p = p + pMG(L)%K(:,:,:,1)
+!  call apply_BC(p)
+  call update_bounds(nd)
+  call compute_residual(A,p,norm,resMax)
 
   resMax = resMax/dble(Nx*Ny*Nz)
   call MPI_ALLREDUCE(resMax, tres2, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr) 
@@ -308,13 +331,24 @@ subroutine NewSolverMG(A,p,maxError,beta,maxit,it,ierr,tres2)
 
 end subroutine NewSolverMG
 
-subroutine write_sol(p)
+subroutine get_MGtest_err(p)
   use module_grid
   use module_BC
   implicit none
   include 'mpif.h'
-  integer :: i,j,k
+  integer :: i,j,k,ierr
+  real(8) :: res, pi=3.14159265359, ref
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: p
+
+  res = 0.d0; ref = 0.d0
+  do k=ks,ke; do j=js,je; do i=is,ie
+      res = res + &
+            abs(p(i,j,k)-sin(2.*pi*x(i))*sin(2.*pi*y(j))*sin(2.*pi*z(k)))
+      ref = ref + &
+            abs(sin(2.*pi*x(i))*sin(2.*pi*y(j))*sin(2.*pi*z(k)))
+  enddo; enddo; enddo
+  call MPI_ALLREDUCE(res, res, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr) 
+  if (rank==0) print *, 'residual', res/ref
 
   !debugging
   if (rank==0) then
@@ -330,6 +364,6 @@ subroutine write_sol(p)
   enddo; enddo; enddo
   CLOSE(201)
   endif
-end subroutine write_sol
+end subroutine get_MGtest_err
 
 END MODULE module_mgsolver
