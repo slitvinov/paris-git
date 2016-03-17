@@ -348,22 +348,8 @@ subroutine get_MGtest_err(p)
             abs(sin(2.*pi*x(i))*sin(2.*pi*y(j))*sin(2.*pi*z(k)))
   enddo; enddo; enddo
   call MPI_ALLREDUCE(res, res, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr) 
-  if (rank==0) print *, 'residual', res/ref
+  if (rank==0) print *, 'error', res/ref
 
-  !debugging
-  if (rank==0) then
-  OPEN(201, FILE="it_solution.dat")
-  do k=ks,ke; do j=js,je; do i=is,ie
-      write(201,*) x(i),y(j),z(k),p(i,j,k)
-  enddo; enddo; enddo
-  CLOSE(201)
-  else
-  OPEN(201, FILE="it_solution_1.dat")
-  do k=ks,ke; do j=js,je; do i=is,ie
-      write(201,*) x(i),y(j),z(k),p(i,j,k)
-  enddo; enddo; enddo
-  CLOSE(201)
-  endif
 end subroutine get_MGtest_err
 
 END MODULE module_mgsolver

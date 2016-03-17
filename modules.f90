@@ -3103,21 +3103,6 @@ subroutine Setup_testMG(rhot,A)
 
   call Poisson_BCs (A)
 
-  if (rank==0) then
-      OPEN(201, FILE="resid.ref")
-      do i=is,ie
-          write(201,*) x(i),A(i,js,ks,:)
-      enddo
-      close(201)
-  else
-      OPEN(201, FILE="resid1.ref")
-      do i=is,ie
-          write(201,*) x(i),A(i,js,ks,:)
-      enddo
-      close(201)
-  endif
-
-
 end subroutine Setup_testMG
 
 !=================================================================================================

@@ -50,6 +50,7 @@ subroutine NewSolver(A,p,maxError,beta,maxit,it,ierr)
       call NewSolver_std(A,p,maxError,beta,maxit,it,ierr,tres2)
   endif
 
+  if (test_MG.AND.rank==0) print *, 'residual', tres2
   if(it==maxit+1 .and. rank==0) write(*,*) 'Warning: LinearSolver reached maxit: ||res||: ',tres2
 
 end subroutine NewSolver
