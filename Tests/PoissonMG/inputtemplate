@@ -1,0 +1,50 @@
+&PARAMETERS
+                   
+DoVOF = F
+NSTEP   = 1       ! maximum number of time steps
+EndTime = 0   ! When to stop simulation
+
+                   ! parameters for linear solver
+test_MG = T
+MultiGrid = T
+MAXERROR= 1d-300     ! Residual for Poisson solver
+MAXERRORVOL = 1d-300 ! Tolerance for Front Tracking
+MAXIT    = MAXITNUM
+BETA     = 1.0
+
+!=================================================================================================
+! Grid parameters
+
+npx      = 2
+npy      = 1
+npz      = 1
+                   ! number of processors in x,y,z direction
+
+Nx      = 32
+Ny      = 16
+Nz      = 16
+Ng      = 2
+                   ! grid size in x,y,z direction and number of ghost cells
+
+XLENGTH = 2.d0
+YLENGTH = 1d0
+ZLENGTH = 1.d0
+                   ! domain size in x,y,z direction
+
+BDRY_COND = 1    1    1   1   1  1
+BoundaryPressure = 0  0  0  0  0  0
+                   !Type of boundary condition in x,y,z direction: 0:wall  1:periodic  2:shear
+                   !x- y- z- x+ y+ z+
+
+
+RHO1    = 1.
+RHO2    = 1.e5
+
+!=================================================================================================
+! Output parameters
+
+ICOut    = F        ! output initial condition
+out_path = 'out'    ! name of the output directory
+
+/
+! end of the namelist
