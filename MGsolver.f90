@@ -216,18 +216,18 @@ subroutine fill_coefficients(Af, Ac, is1, js1, ks1)
 
 end subroutine fill_coefficients
 
-subroutine MG_iteration(beta)
+subroutine MG_iteration(beta, norm)
   use module_grid
   use module_BC
   implicit none
   include 'mpif.h'
   real(8), intent(in) :: beta
+  integer, intent(in) :: norm
   real(8) :: resMax, start_time, end_time
   integer :: i,j,k,n, Level
   integer :: is1, js1, ks1, imin1, jmin1, kmin1
   integer :: ncall=1
   integer :: nL(3)
-  integer, parameter :: norm=1
 
   !-------------
   DO Level=LMG,2,-1
@@ -285,6 +285,30 @@ subroutine MG_iteration(beta)
 
 end subroutine MG_iteration
 
+subroutine get_MGmatrix_coef(A)
+  use module_grid
+  use module_BC
+  implicit none
+  include 'mpif.h'
+  real(8), dimension(is:ie,js:je,ks:ke,8), intent(in) :: A
+  integer :: is1, js1, ks1, i, j, k, Level
+  integer :: nL(3)
+
+  do k=ks,ke; do j=js,je; do i=is,ie
+      DataMG(LMG)%K(i-is+1,j-js+1,k-ks+1,:) = A(i,j,k,:) !fine level
+  enddo; enddo; enddo
+
+  DO Level=LMG-1,1,-1
+    nL(:) = nd(:)/2**(LMG-Level)
+    call update_bounds(nL)
+    is1=coords(1)*nd(1)/2**(LMG-Level-1)+1+Ng
+    js1=coords(2)*nd(2)/2**(LMG-Level-1)+1+Ng
+    ks1=coords(3)*nd(3)/2**(LMG-Level-1)+1+Ng
+    call fill_coefficients(DataMG(Level+1)%K,DataMG(Level)%K,is1,js1,ks1)
+  ENDDO
+
+end subroutine get_MGmatrix_coef
+
 subroutine NewSolverMG(A,p,maxError,beta,maxit,it,ierr,tres2)
   use module_grid
   use module_BC
@@ -297,8 +321,7 @@ subroutine NewSolverMG(A,p,maxError,beta,maxit,it,ierr,tres2)
   integer, intent(in) :: maxit
   integer, intent(out) :: it, ierr
   real(8) :: resMax, end_time, start_time
-  integer :: i,j,k,L,n, Level
-  integer :: is1, js1, ks1, ncall=1
+  integer :: ncall=1
   integer :: nL(3)
   integer, parameter :: norm=1
 
@@ -307,19 +330,7 @@ subroutine NewSolverMG(A,p,maxError,beta,maxit,it,ierr,tres2)
     start_time =  MPI_WTIME()
   ENDIF
 
-  do k=ks,ke; do j=js,je; do i=is,ie
-      DataMG(LMG)%K(i-is+1,j-js+1,k-ks+1,:) = A(i,j,k,:) !fine level
-  enddo; enddo; enddo
-
-  L = LMG
-  DO Level=LMG-1,1,-1
-    nL(:) = nd(:)/2**(LMG-Level)
-    call update_bounds(nL)
-    is1=coords(1)*nd(1)/2**(LMG-Level-1)+1+Ng
-    js1=coords(2)*nd(2)/2**(LMG-Level-1)+1+Ng
-    ks1=coords(3)*nd(3)/2**(LMG-Level-1)+1+Ng
-    call fill_coefficients(DataMG(Level+1)%K,DataMG(Level)%K,is1,js1,ks1)
-  ENDDO
+  call get_MGmatrix_coef(A)
 
   !compute residual at the finest level
   call update_bounds(nd)
@@ -332,7 +343,7 @@ subroutine NewSolverMG(A,p,maxError,beta,maxit,it,ierr,tres2)
 
   DO it=1,maxit,1
 
-    call MG_iteration(beta)
+    call MG_iteration(beta, norm)
 
     p = p + pMG(LMG)%K(:,:,:,1)
     call update_bounds(nd)
