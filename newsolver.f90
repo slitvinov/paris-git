@@ -93,7 +93,6 @@ subroutine NewSolver_std(A,p,maxError,beta,maxit,it,ierr, tres2)
   integer :: req(12),sta(MPI_STATUS_SIZE,12)
   logical :: mask(imin:imax,jmin:jmax,kmin:kmax)
   integer, parameter :: norm=1
-  logical, parameter :: recordconvergence=.false.
   integer, save :: itime=0
 ! Open file for convergence history
   if(rank==0.and.recordconvergence) then

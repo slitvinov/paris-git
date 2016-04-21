@@ -695,7 +695,6 @@ subroutine FreeSolver(A,p,maxError,beta,maxit,it,ierr,iout,time,tres2)
   integer :: req(12),sta(MPI_STATUS_SIZE,12)
   logical :: mask(imin:imax,jmin:jmax,kmin:kmax)
   integer, parameter :: norm=2, relaxtype=1
-  logical, parameter :: recordconvergence=.false.
   integer, save :: itime=0
   logical :: use_L_inf = .true.
 ! Open file for convergence history

@@ -69,6 +69,8 @@ module module_grid
   integer :: imin, imax, jmin, jmax, kmin, kmax
   real(8), parameter :: TINY_DOUBLE=1d-300 
   logical :: test_MG=.false., MultiGrid=.false.
+  logical, parameter :: recordconvergence=.false.
+  integer :: nrelax=3
 ! added by SZ
 contains
 !

@@ -31,11 +31,12 @@ MODULE module_mgsolver
 
 CONTAINS
 
-subroutine init_MG
+subroutine init_MG(nvar)
   use module_grid
   use module_BC
   implicit none
   include 'mpif.h'
+  integer, intent(in) :: nvar
   integer :: Ld(3), nL(3)
   integer :: i,ierr
 
@@ -54,8 +55,8 @@ subroutine init_MG
       nL(:) = nd(:)/2**(LMG-i)
       ALLOCATE(DataMG(i)%K(nL(1),nL(2),nL(3),8))
       nL(:) = nd(:)/2**(LMG-i)+2*Ng
-      ALLOCATE(pMG(i)%K(nL(1),nL(2),nL(3),1)) 
-      ALLOCATE(EMG(i)%K(nL(1),nL(2),nL(3),1)) 
+      ALLOCATE(pMG(i)%K(nL(1),nL(2),nL(3),nvar)) 
+      ALLOCATE(EMG(i)%K(nL(1),nL(2),nL(3),nvar)) 
       DataMG(i)%K = 0.d0
       pMG(i)%K    = 0.d0
       EMG(i)%K    = 0.d0
@@ -215,55 +216,24 @@ subroutine fill_coefficients(Af, Ac, is1, js1, ks1)
 
 end subroutine fill_coefficients
 
-subroutine NewSolverMG(A,p,maxError,beta,maxit,it,ierr,tres2)
+subroutine MG_iteration(beta)
   use module_grid
   use module_BC
   implicit none
   include 'mpif.h'
-  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: p
-  real(8), dimension(is:ie,js:je,ks:ke,8), intent(in) :: A
-  real(8), intent(in) :: beta, maxError
-  real(8), intent(out) :: tres2
-  integer, intent(in) :: maxit
-  integer, intent(out) :: it, ierr
-  integer :: indextmp(3)
-  real(8) :: resMax
-  integer :: i,j,k,L,n, Level, nrelax=3
+  real(8), intent(in) :: beta
+  real(8) :: resMax, start_time, end_time
+  integer :: i,j,k,n, Level
   integer :: is1, js1, ks1, imin1, jmin1, kmin1
+  integer :: ncall=1
   integer :: nL(3)
-  integer, parameter :: norm=1, relaxtype=1
-
-  indextmp(1) = ie; indextmp(2) = je; indextmp(3) = ke
-  L = LMG
-
-  do k=ks,ke; do j=js,je; do i=is,ie
-      DataMG(L)%K(i-is+1,j-js+1,k-ks+1,:) = A(i,j,k,:) !fine level
-  enddo; enddo; enddo
-
- !filling coarse levels
-  DO Level=L-1,1,-1
-    nL(:) = nd(:)/2**(L-Level)
-    call update_bounds(nL)
-    is1=coords(1)*nd(1)/2**(L-Level-1)+1+Ng
-    js1=coords(2)*nd(2)/2**(L-Level-1)+1+Ng
-    ks1=coords(3)*nd(3)/2**(L-Level-1)+1+Ng
-    call fill_coefficients(DataMG(Level+1)%K,DataMG(Level)%K,is1,js1,ks1)
-  ENDDO
-
-  !compute residual at the finest level
-  pMG(L)%K(:,:,:,1)    = p
-  call update_bounds(nd)
-  call get_residual(DataMG(L)%K,pMG(L)%K(:,:,:,1),norm,resMax)
-
-  resMax = resMax/dble(Nx*Ny*Nz)
-  call MPI_ALLREDUCE(resMax, tres2, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr) 
+  integer, parameter :: norm=1
 
   !-------------
-  DO it=1,maxit,1
-  DO Level=L,2,-1
+  DO Level=LMG,2,-1
 
     pMG(Level)%K = 0.d0  !now pMG is the error
-    nL(:) = nd(:)/2**(L-Level)
+    nL(:) = nd(:)/2**(LMG-Level)
     call update_bounds(nL)
     
     DO i=1,nrelax
@@ -273,30 +243,30 @@ subroutine NewSolverMG(A,p,maxError,beta,maxit,it,ierr,tres2)
    
     call get_residual(DataMG(Level)%K,pMG(Level)%K(:,:,:,1),norm,resMax)
 
-    nL(:) = nd(:)/2**(L-Level+1)
+    nL(:) = nd(:)/2**(LMG-Level+1)
     call update_bounds(nL)
-    is1=coords(1)*nd(1)/2**(L-Level)+1+Ng
-    js1=coords(2)*nd(2)/2**(L-Level)+1+Ng
-    ks1=coords(3)*nd(3)/2**(L-Level)+1+Ng
+    is1=coords(1)*nd(1)/2**(LMG-Level)+1+Ng
+    js1=coords(2)*nd(2)/2**(LMG-Level)+1+Ng
+    ks1=coords(3)*nd(3)/2**(LMG-Level)+1+Ng
     call coarse_from_fine(DataMG(Level)%K,DataMG(Level-1)%K,is1,js1,ks1) !projection at the next level
 
   ENDDO
 
-  nL(:) = nd(:)/2**(L-2)
+  nL(:) = nd(:)/2**(LMG-2)
   call update_bounds(nL)
   call relax_step(DataMG(2)%K,pMG(2)%K(:,:,:,1),beta,2)
   call apply_BC_MG(pMG(2)%K(:,:,:,1),2)
 
-  DO Level=3,L,1
+  DO Level=3,LMG,1
 
     EMG(Level)%K = 0.d0  !initial guess of the error
-    nL(:) = nd(:)/2**(L-Level+1)
+    nL(:) = nd(:)/2**(LMG-Level+1)
     call update_bounds(nL)
-    imin1=coords(1)*nd(1)/2**(L-Level)+1
-    jmin1=coords(2)*nd(2)/2**(L-Level)+1
-    kmin1=coords(3)*nd(3)/2**(L-Level)+1
+    imin1=coords(1)*nd(1)/2**(LMG-Level)+1
+    jmin1=coords(2)*nd(2)/2**(LMG-Level)+1
+    kmin1=coords(3)*nd(3)/2**(LMG-Level)+1
     call coarse_fine_interp(EMG(Level)%K,pMG(Level-1)%K,imin1,jmin1,kmin1) !interpolation from coarse level
-    nL(:) = nd(:)/2**(L-Level)
+    nL(:) = nd(:)/2**(LMG-Level)
     call update_bounds(nL)
     call apply_BC_MG(EMG(Level)%K(:,:,:,1),Level)
 
@@ -313,21 +283,78 @@ subroutine NewSolverMG(A,p,maxError,beta,maxit,it,ierr,tres2)
     call get_residual(DataMG(Level)%K,EMG(Level)%K(:,:,:,1),norm,resMax)
   ENDDO
 
-  p = p + pMG(L)%K(:,:,:,1)
-!  call apply_BC(p)
+end subroutine MG_iteration
+
+subroutine NewSolverMG(A,p,maxError,beta,maxit,it,ierr,tres2)
+  use module_grid
+  use module_BC
+  implicit none
+  include 'mpif.h'
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: p
+  real(8), dimension(is:ie,js:je,ks:ke,8), intent(in) :: A
+  real(8), intent(in) :: beta, maxError
+  real(8), intent(out) :: tres2
+  integer, intent(in) :: maxit
+  integer, intent(out) :: it, ierr
+  real(8) :: resMax, end_time, start_time
+  integer :: i,j,k,L,n, Level
+  integer :: is1, js1, ks1, ncall=1
+  integer :: nL(3)
+  integer, parameter :: norm=1
+
+  IF (rank==0.and.recordconvergence) THEN
+    OPEN(UNIT=89,FILE='convergenceMG_history.txt',Access='append')
+    start_time =  MPI_WTIME()
+  ENDIF
+
+  do k=ks,ke; do j=js,je; do i=is,ie
+      DataMG(LMG)%K(i-is+1,j-js+1,k-ks+1,:) = A(i,j,k,:) !fine level
+  enddo; enddo; enddo
+
+  L = LMG
+  DO Level=LMG-1,1,-1
+    nL(:) = nd(:)/2**(LMG-Level)
+    call update_bounds(nL)
+    is1=coords(1)*nd(1)/2**(LMG-Level-1)+1+Ng
+    js1=coords(2)*nd(2)/2**(LMG-Level-1)+1+Ng
+    ks1=coords(3)*nd(3)/2**(LMG-Level-1)+1+Ng
+    call fill_coefficients(DataMG(Level+1)%K,DataMG(Level)%K,is1,js1,ks1)
+  ENDDO
+
+  !compute residual at the finest level
   call update_bounds(nd)
-  call compute_residual(A,p,norm,resMax)
+  call get_residual(DataMG(LMG)%K,pMG(LMG)%K(:,:,:,1),norm,resMax)
 
   resMax = resMax/dble(Nx*Ny*Nz)
   call MPI_ALLREDUCE(resMax, tres2, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr) 
-  if(norm==2) tres2=sqrt(tres2*dble(Nx*Ny*Nz))/dble(Nx*Ny*Nz)
-  if (tres2<maxError) exit
+
+  pMG(LMG)%K(:,:,:,1)    = p
+
+  DO it=1,maxit,1
+
+    call MG_iteration(beta)
+
+    p = p + pMG(LMG)%K(:,:,:,1)
+    call update_bounds(nd)
+    call compute_residual(A,p,norm,resMax)
+
+    resMax = resMax/dble(Nx*Ny*Nz)
+    call MPI_ALLREDUCE(resMax, tres2, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr) 
+    if(norm==2) tres2=sqrt(tres2*dble(Nx*Ny*Nz))/dble(Nx*Ny*Nz)
+
+    if(rank==0.and.recordconvergence) THEN
+      end_time =  MPI_WTIME()
+      WRITE(89,*), ncall, it, end_time-start_time, tres2
+    ENDIF
+
+    if (tres2<maxError) exit
 
   ENDDO
 
   call update_bounds(nd) !restore default values (MG finished)
 
   if(it==maxit+1 .and. rank==0) write(*,*) 'Warning: LinearSolver reached maxit: ||res||: ',tres2
+  ncall = ncall + 1
 
 end subroutine NewSolverMG
 

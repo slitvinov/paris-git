@@ -143,7 +143,7 @@ Program paris
 
   call InitCondition
 
-  if (MultiGrid) call init_MG
+  if (MultiGrid) call init_MG(1)
 
 #ifdef PHASE_CHANGE
   call ReadHeatParameters
@@ -223,6 +223,7 @@ Program paris
      endif
 
      if (test_MG) then
+       call linfunc(rho,rho1,rho2,DensMean)
        p=0.d0; call Setup_testMG(rho,A)
        call NewSolver(A,p,maxError,beta,maxit,it,ierr)
        call get_MGtest_err(p)
@@ -3361,7 +3362,7 @@ subroutine ReadParameters
                         ResNormOrderPressure,         ErrorScaleHYPRE, DynamicAdjustPoiTol,      & 
                         OutVelSpecified,  MaxFluxRatioPresBC, LateralBdry,                       & 
                         HYPRESolverType, SwitchHYPRESolver, DivergeTol,  uinjectPertAmp,         &
-                        plane, n_p, out_sub, test_MG, MultiGrid
+                        plane, n_p, out_sub, test_MG, MultiGrid, nrelax
  
   Nx = 0; Ny = 4; Nz = 4 ! cause absurd input file that lack nx value to fail. 
   Ng=2;xLength=1d0;yLength=1d0;zLength=1d0
