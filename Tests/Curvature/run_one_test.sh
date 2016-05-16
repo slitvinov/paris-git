@@ -71,7 +71,7 @@ sed s/REFINEMENTTEMP/$refinement/g inputvof.template | sed s/TYPETEMP/$type/g  |
 
 mpirun -np $npstart paris > tmpout 2>&1
 
-success=`tail -1 tmpout | grep -c "Paris exits succesfully"`
+success=`tail -10 tmpout | grep -c "Paris exits succesfully"`
 if [ $success -ne 1 ]; then
     exit 1
 fi
