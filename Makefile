@@ -11,7 +11,7 @@ FLAGS = -O3 -cpp  -fimplicit-none -ffpe-summary=invalid,zero,overflow # -DOLD_BD
 FLAGSDEBUG = -cpp -g -gstabs -O2  -fimplicit-none # -ffpe-summary=invalid,zero,overflow
 HARDFLAGS = -fbounds-check -ffpe-trap=invalid,zero,overflow -Wall # -ffpe-trap=invalid,zero,overflow,underflow,precision,denormal 
 
-CFLAGS = -O # -g -gstabs
+CFLAGS = -O -Wall # -g -gstabs
 BINDIR = $(HOME)/bin
 
 # select option for hypre
@@ -140,8 +140,8 @@ averages.o: averages.f90 modules.o solids.o vofmodules.o
 	$(FC) -c $(FFLAGS) $<
 
 pariscompare: compare.o
-	@$(CC) -o pariscompare compare.o -lm
-	@mv pariscompare $(BINDIR)
+	$(CC) -o pariscompare compare.o -lm
+	mv pariscompare $(BINDIR)
 
 
 pariscompare3D: compare_4cols.o
@@ -149,8 +149,8 @@ pariscompare3D: compare_4cols.o
 	mv pariscompare3D $(BINDIR)
 
 parisdeconv: parisdeconv.o
-	@$(CC) -o parisdeconv parisdeconv.o -lm
-	@mv parisdeconv $(BINDIR)
+	$(CC) -o parisdeconv parisdeconv.o -lm
+	mv parisdeconv $(BINDIR)
 
 .c.o:   $< 
-	@cc -c $(CFLAGS) $< 
+	$(CC) -c $(CFLAGS) $< 
