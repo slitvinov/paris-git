@@ -19,16 +19,16 @@ int main (int argc, char * argv[])
 	     "\n");
       exit(1);
     }
-  float tolerance;
-  sscanf(argv[3],"%g",&tolerance);
+  double tolerance;
+  sscanf(argv[3],"%lf",&tolerance);
   int relative=0;
   if(argc >= 5)  sscanf(argv[4],"%d",&relative);
   int output=0;
   if(argc >= 6)  sscanf(argv[5],"%d",&output);
 
-  float errmax = 0.;
-  float error, error2, y2norm2;
-
+  double errmax = 0.;
+  double  error, error2, y2norm2=0.;
+  
   FILE * fd1;FILE * fd2;
   float * x1 = ( float *) malloc(MAXLINES*sizeof(float));
   float * x2 = ( float *) malloc(MAXLINES*sizeof(float));
