@@ -101,7 +101,7 @@ int main(int argc, char * argv[]) // argc: argument count, # of arguments read f
       while ((serial_line != EOF) && (found == 0)) {
       	double diff;
       	//test if found
-      	if ((fabsf(ref[0]-comp[0])<cell_tolerance) && (fabsf(ref[1]-comp[1])<cell_tolerance) && (fabsf(ref[2]-comp[2])<cell_tolerance)) {
+      	if ((fabs(ref[0]-comp[0])<cell_tolerance) && (fabs(ref[1]-comp[1])<cell_tolerance) && (fabs(ref[2]-comp[2])<cell_tolerance)) {
       	  //calc diff
       	  diff = ref[3]-comp[3];
 	  error2+= diff*diff;
@@ -117,7 +117,7 @@ int main(int argc, char * argv[]) // argc: argument count, # of arguments read f
       	}
       	else {
       	  serial_line = fscanf(mono,"%lg %lg %lg %lg",&comp[0],&comp[1],&comp[2],&comp[3]);
-      	  if ((fabsf(ser_start[0]-comp[0])<cell_tolerance) && (fabsf(ser_start[1]-comp[1])<cell_tolerance) && (fabsf(ser_start[2]-comp[2])<cell_tolerance)) {
+      	  if ((fabs(ser_start[0]-comp[0])<cell_tolerance) && (fabs(ser_start[1]-comp[1])<cell_tolerance) && (fabs(ser_start[2]-comp[2])<cell_tolerance)) {
       	    printf("Error! Discrete point unmatched\n");
       	    exit(1);
       	  }

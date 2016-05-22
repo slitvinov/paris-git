@@ -56,6 +56,7 @@ int main (int argc, char * argv[])
       if(returnscan1 < 2 ) 
 	{ 
 	  fprintf(stderr,"In directory "); ierr=system("pwd");
+	  if(ierr != 0) exit(3);
 	  fprintf(stderr,"%s: error on line %d \n"
 		  "counted only %d item instead of at least 2 in file %s\n", 
 		  argv[0],nlines,returnscan1,argv[1]);
@@ -64,6 +65,7 @@ int main (int argc, char * argv[])
       if(returnscan2 < 2) 
 	{ 
 	  fprintf(stderr,"In directory "); ierr=system("pwd");
+	  if(ierr != 0) exit(3);
 	  fprintf(stderr,"%s: error on line %d \n"
 		  "counted only %d item instead of at least 2 in file %s\n", 
 		  argv[0],nlines,returnscan2,argv[2]);
