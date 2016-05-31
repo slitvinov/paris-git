@@ -93,9 +93,7 @@
            w_cmask(i,j,k) = 0
         endif
      endif
-!!$     if (implode_flag(tag_id(i,j,k))) then
-!!$        write(*,'("Implode_flag true")')
-!!$     endif
+
      if (phase(i,j,k) == 0 .or. (implode_flag(tag_id(i,j,k))) ) then
         pcmask(i,j,k)=0
         u_cmask(i,j,k)=0
@@ -1794,7 +1792,7 @@ subroutine setuppoisson_fs_hypre(utmp,vtmp,wtmp,rho,dt,coeff,height,kap,bub_id)
   integer :: i,j,k,nbr,ierr,l
   integer :: reqd(12),stat(MPI_STATUS_SIZE,12)
   real(8) :: Source
-  real(8) :: wt_g, wt_l, avg_kap, n_kap
+  real(8) :: wt_g, wt_l, avg_kap
   
   !OPEN(unit=121,file='mods.txt',access='append')
   x_mod=dxh((is+ie)/2); y_mod=dyh((js+je)/2); z_mod=dzh((ks+ke)/2) !assumes an unstretched grid
@@ -1893,59 +1891,49 @@ subroutine setuppoisson_fs_hypre(utmp,vtmp,wtmp,rho,dt,coeff,height,kap,bub_id)
   call ghost_x(x_mod,1,reqd(1:4)); call ghost_y(y_mod,1,reqd(5:8)); call ghost_z(z_mod,1,reqd(9:12)) 
   call MPI_WAITALL(12,reqd(1:12),stat(:,1:12),ierr)
 
+  uncomp_curv=0; n_avg_kap=0; L2_err=0.0d0; Linf_err=0.0d0
+  kappa_theory = -2.0d0*dx(is)/r_min
   do k=ks,ke; do j=js,je; do i=is,ie
      if(vof_phase(i,j,k)==1) then
         do l=-1,1,2
            avg_kap=0.0d0; n_kap=0.d0
            if (vof_phase(i+l,j,k)==0) then
-              if (vof_flag(i+l,j,k)==2 .and. kap(i+l,j,k)<1.d6) then
-                 n_kap=n_kap+1.d0
-                 avg_kap = avg_kap + kap(i+l,j,k)
-              endif
-              if (vof_flag(i,j,k)==2 .and. kap(i,j,k)<1.d6 ) then
-                 n_kap=n_kap+1.d0
-                 avg_kap=avg_kap + kap(i,j,k)
-              endif
-              if (n_kap>=9.99d-1) then
-                 avg_kap=avg_kap/n_kap
+              if (kap(i+l,j,k)>1.0d6) then
+                 avg_kap = kap(i,j,k)
               else
                  call pariserror('No curvature found in liq-gas pair for FS bubble')
               endif
+              n_avg_kap=n_avg_kap+1
+              err=ABS(avg_kap-kappa_theory)
+              L2_err=L2_err+err**2.0d0
+              Linf_err=MAX(err,Linf_err)
               P_gx(i,j,k) = sigma*avg_kap/dx(i) !!filaments and droplets of one cell will be an issue here
            endif
               
            avg_kap=0.0d0; n_kap=0.d0
            if (vof_phase(i,j+l,k)==0) then
-             if (vof_flag(i,j+l,k)==2 .and. kap(i,j+l,k)<1.d6) then
-                 n_kap=n_kap+1.d0
-                 avg_kap = avg_kap + kap(i,j+l,k)
-              endif
-              if (vof_flag(i,j,k)==2 .and. kap(i,j,k)<1.d6 ) then
-                 n_kap=n_kap+1.d0
-                 avg_kap=avg_kap + kap(i,j,k)
-              endif
-              if (n_kap>=9.99d-1) then
-                 avg_kap=avg_kap/n_kap
+              if (kap(i,j+l,k)>1.0d6) then
+                 avg_kap = kap(i,j,k)
               else
                  call pariserror('No curvature found in liq-gas pair for FS bubble')
               endif
+              n_avg_kap=n_avg_kap+1
+              err=ABS(avg_kap-kappa_theory)
+              L2_err=L2_err+err**2.0d0
+              Linf_err=MAX(err,Linf_err)
               P_gy(i,j,k) = sigma*avg_kap/dy(j)
            endif
            
            if (vof_phase(i,j,k+l)==0) then
-              if (vof_flag(i,j,k+l)==2 .and. kap(i,j,k+l)<1.d6) then
-                 n_kap=n_kap+1.d0
-                 avg_kap = avg_kap + kap(i,j,k+l)
-              endif
-              if (vof_flag(i,j,k)==2 .and. kap(i,j,k)<1.d6 ) then
-                 n_kap=n_kap+1.d0
-                 avg_kap=avg_kap + kap(i,j,k)
-              endif
-              if (n_kap>=9.99d-1) then
-                 avg_kap=avg_kap/n_kap
+              if (kap(i,j,k+l)>1.0d6) then
+                 avg_kap = kap(i,j,k)
               else
                  call pariserror('No curvature found in liq-gas pair for FS bubble')
               endif
+              n_avg_kap=n_avg_kap+1
+              err=ABS(avg_kap-kappa_theory)
+              L2_err=L2_err+err**2.0d0
+              Linf_err=MAX(err,Linf_err)
               P_gz(i,j,k) = sigma*avg_kap/dz(k)
            endif
         enddo
@@ -1953,6 +1941,17 @@ subroutine setuppoisson_fs_hypre(utmp,vtmp,wtmp,rho,dt,coeff,height,kap,bub_id)
   enddo; enddo; enddo
   call ghost_x(P_gx,1,reqd(1:4)); call ghost_y(P_gy,1,reqd(5:8)); call ghost_z(P_gz,1,reqd(9:12)) 
   call MPI_WAITALL(12,reqd(1:12),stat(:,1:12),ierr)
+  !! Debugging uncomputed curvatures
+  call MPI_ALLREDUCE(uncomp_curv,uncomp_curv_global, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_Active, ierr)
+  call MPI_ALLREDUCE(n_avg_kap,n_glob, 1, MPI_INTEGER, MPI_SUM, MPI_COMM_Active, ierr)
+  call MPI_ALLREDUCE(L2_err,L2_glob, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_Active, ierr)
+  call MPI_ALLREDUCE(Linf_err,Linf_glob, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_Active, ierr)
+  L2_glob = sqrt(L2_glob)/n_glob
+  if (rank==0) then
+     write(*,'("Number of average curvatures reqd , uncomputed: ",2I8)')n_glob, uncomp_curv_global
+     write(*,'("Curvature error norms L2: ",e14.5," L_inf: ",e14.5)')L2_glob,Linf_glob
+     write(*,'(" ")')
+  endif
   !--------------------------------------------------------------------------------------------------------
   do k=ks,ke; do j=js,je; do i=is,ie
      if (vof_phase(i,j,k)==0 .and. .not.implode_flag(bub_id(i,j,k))) then
@@ -1975,9 +1974,9 @@ subroutine setuppoisson_fs_hypre(utmp,vtmp,wtmp,rho,dt,coeff,height,kap,bub_id)
         endif
         if (pcmask(i,j,k).ne.0) write(*,'("Error topology, phase 0, pcmask :",i8)')pcmask(i,j,k)
      else if (vof_phase(i,j,k)==1) then
-       coeff(i,j,k,1:6) = 0.0d0 
-       coeff(i,j,k,7) = 1.0d0
-       coeff(i,j,k,8) = P_gas(i,j,k) !Should now work for polytropic law and vacuum
+       A(i,j,k,1:6) = 0.0d0 
+       A(i,j,k,7) = 1.0d0
+       A(i,j,k,8) = P_gas(i,j,k) !Should now work for polytropic law and vacuum
      endif
   enddo;enddo;enddo
 
