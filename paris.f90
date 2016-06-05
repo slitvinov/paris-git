@@ -979,7 +979,11 @@ subroutine TimeStepSize(deltaT,vof_phase)
         write(*,*) "Error:Max velocity 100 times larger than physical value",itimestep,rank, vmax,vmax_phys 
         call pariserror("Max velocity 100 times larger than physical value, something wrong!") 
      else 
-        dtadv  = h/(max(vmax,vmax_phys))
+        if (max(vmax,vmax_phys) > 1.d-12 ) then
+           dtadv  = h/(max(vmax,vmax_phys))
+        else
+           dtadv = dt
+        endif
      end if ! vmax
      mydt = CFL*dtadv
      mydt = min(mydt,MaxDt)
