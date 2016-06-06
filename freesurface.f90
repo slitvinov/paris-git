@@ -1774,24 +1774,27 @@ subroutine remove_drops(phase,vof,fill_all)
   call MPI_ALLREDUCE(fill,fill_all, 1, MPI_LOGICAL, MPI_LOR, MPI_COMM_Active, ierr)
 end subroutine remove_drops
 
-subroutine setuppoisson_fs_hypre(utmp,vtmp,wtmp,vof_phase,rho,dt,A,cvof,height,kap,bub_id)
+!subroutine setuppoisson_fs_hypre(utmp,vtmp,wtmp,vof_phase,rho,dt,A,cvof,height,kap,bub_id)
+subroutine setuppoisson_fs_hypre(utmp,vtmp,wtmp,rho,dt,coeff,height,kap,bub_id)
   use module_grid
   use module_BC
   use module_freesurface
   use module_IO
   use module_2phase
+  use module_VOF
   implicit none
   include 'mpif.h'
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax,6), intent(in) :: height
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: utmp,vtmp,wtmp
-  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: cvof,kap
-  real(8), dimension(is:ie,js:je,ks:ke,8), intent(inout) :: A
-  integer, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: vof_phase, bub_id
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: kap!cvof,kap
+  !real(8), dimension(is:ie,js:je,ks:ke,8), intent(inout) :: A
+  real(8), dimension(is:ie,js:je,ks:ke,8), intent(out) :: coeff
+  integer, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: bub_id!vof_phase, bub_id
   real(8), intent(in) :: dt, rho
   integer :: i,j,k,nbr,ierr,l
   integer :: reqd(12),stat(MPI_STATUS_SIZE,12)
   real(8) :: Source
-  real(8) :: wt_g, wt_l, avg_kap
+  real(8) :: wt_g, wt_l, avg_kap, n_kap
   
   !OPEN(unit=121,file='mods.txt',access='append')
   x_mod=dxh((is+ie)/2); y_mod=dyh((js+je)/2); z_mod=dzh((ks+ke)/2) !assumes an unstretched grid
@@ -1799,22 +1802,22 @@ subroutine setuppoisson_fs_hypre(utmp,vtmp,wtmp,vof_phase,rho,dt,A,cvof,height,k
   do k=ks,ke; do j=js,je; do i=is,ie
      Source = 0.d0
      if (implode_flag(bub_id(i,j,k)) .and. vof_phase(i,j,k) == 1) Source = v_source(i,j,k)
-     A(i,j,k,1) = dt/(dx(i)*dx(i)*rho)
-     A(i,j,k,2) = dt/(dx(i)*dx(i)*rho)
-     A(i,j,k,3) = dt/(dy(j)*dy(j)*rho)
-     A(i,j,k,4) = dt/(dy(j)*dy(j)*rho)
-     A(i,j,k,5) = dt/(dz(k)*dz(k)*rho)
-     A(i,j,k,6) = dt/(dz(k)*dz(k)*rho)
-     A(i,j,k,7) = sum(A(i,j,k,1:6))
-     A(i,j,k,8) =  -(Source + (utmp(i,j,k)-utmp(i-1,j,k))/dx(i) &
+     coeff(i,j,k,1) = dt/(dx(i)*dx(i)*rho)
+     coeff(i,j,k,2) = dt/(dx(i)*dx(i)*rho)
+     coeff(i,j,k,3) = dt/(dy(j)*dy(j)*rho)
+     coeff(i,j,k,4) = dt/(dy(j)*dy(j)*rho)
+     coeff(i,j,k,5) = dt/(dz(k)*dz(k)*rho)
+     coeff(i,j,k,6) = dt/(dz(k)*dz(k)*rho)
+     coeff(i,j,k,7) = sum(coeff(i,j,k,1:6))
+     coeff(i,j,k,8) =  -(Source + (utmp(i,j,k)-utmp(i-1,j,k))/dx(i) &
           +  (vtmp(i,j,k)-vtmp(i,j-1,k))/dy(j) &
           +  (wtmp(i,j,k)-wtmp(i,j,k-1))/dz(k) )
      ! Debugging A8 NaN
-     if (A(i,j,k,8) /= A(i,j,k,8)) then
+     if (coeff(i,j,k,8) /= coeff(i,j,k,8)) then
         write(*,'("A8 NaN, liq_gas at x y z: ",3e14.5)')x(i),y(j),z(k)
         write(*,'("Limits: ",6I8)')is,ie,js,je,ks,ke
         write(*,'("ijk rank",4I4)')i,j,k,rank
-        write(*,'("A branches: ",8e14.5)')A(i,j,k,:)
+        write(*,'("A branches: ",8e14.5)')coeff(i,j,k,:)
         write(*,'("Cvof 1-7: ",7e14.5)')cvof(i-1,j,k),cvof(i+1,j,k),cvof(i,j-1,k),cvof(i,j+1,k),&
              cvof(i,j,k-1),cvof(i,j,k+1),cvof(i,j,k)
         write(*,'("Phase 1-7: ",7I8)')vof_phase(i-1,j,k),vof_phase(i+1,j,k),vof_phase(i,j-1,k),vof_phase(i,j+1,k),&
@@ -1893,33 +1896,55 @@ subroutine setuppoisson_fs_hypre(utmp,vtmp,wtmp,vof_phase,rho,dt,A,cvof,height,k
   do k=ks,ke; do j=js,je; do i=is,ie
      if(vof_phase(i,j,k)==1) then
         do l=-1,1,2
+           avg_kap=0.0d0; n_kap=0.d0
            if (vof_phase(i+l,j,k)==0) then
-              if (kap(i+l,j,k)>1.0d6) then
-                 avg_kap = kap(i,j,k)
+              if (vof_flag(i+l,j,k)==2 .and. kap(i+l,j,k)<1.d6) then
+                 n_kap=n_kap+1.d0
+                 avg_kap = avg_kap + kap(i+l,j,k)
+              endif
+              if (vof_flag(i,j,k)==2 .and. kap(i,j,k)<1.d6 ) then
+                 n_kap=n_kap+1.d0
+                 avg_kap=avg_kap + kap(i,j,k)
+              endif
+              if (n_kap>=9.99d-1) then
+                 avg_kap=avg_kap/n_kap
               else
-                 wt_g=x_mod(i+(l-1)/2,j,k)/dx(i)
-                 wt_l=1.0d0-wt_g
-                 avg_kap=kap(i,j,k)*wt_g+kap(i+l,j,k)*wt_l
+                 call pariserror('No curvature found in liq-gas pair for FS bubble')
               endif
               P_gx(i,j,k) = sigma*avg_kap/dx(i) !!filaments and droplets of one cell will be an issue here
            endif
+              
+           avg_kap=0.0d0; n_kap=0.d0
            if (vof_phase(i,j+l,k)==0) then
-              if (kap(i,j+l,k)>1.0d6) then
-                 avg_kap = kap(i,j,k)
+             if (vof_flag(i,j+l,k)==2 .and. kap(i,j+l,k)<1.d6) then
+                 n_kap=n_kap+1.d0
+                 avg_kap = avg_kap + kap(i,j+l,k)
+              endif
+              if (vof_flag(i,j,k)==2 .and. kap(i,j,k)<1.d6 ) then
+                 n_kap=n_kap+1.d0
+                 avg_kap=avg_kap + kap(i,j,k)
+              endif
+              if (n_kap>=9.99d-1) then
+                 avg_kap=avg_kap/n_kap
               else
-                 wt_g=y_mod(i,j+(l-1)/2,k)/dy(j)
-                 wt_l=1.0d0-wt_g
-                 avg_kap=kap(i,j,k)*wt_g/(wt_g+wt_l)+kap(i,j+l,k)*wt_l/(wt_g+wt_l)
+                 call pariserror('No curvature found in liq-gas pair for FS bubble')
               endif
               P_gy(i,j,k) = sigma*avg_kap/dy(j)
            endif
+           
            if (vof_phase(i,j,k+l)==0) then
-              if (kap(i,j,k+l)>1.0d6) then
-                 avg_kap = kap(i,j,k)
+              if (vof_flag(i,j,k+l)==2 .and. kap(i,j,k+l)<1.d6) then
+                 n_kap=n_kap+1.d0
+                 avg_kap = avg_kap + kap(i,j,k+l)
+              endif
+              if (vof_flag(i,j,k)==2 .and. kap(i,j,k)<1.d6 ) then
+                 n_kap=n_kap+1.d0
+                 avg_kap=avg_kap + kap(i,j,k)
+              endif
+              if (n_kap>=9.99d-1) then
+                 avg_kap=avg_kap/n_kap
               else
-                 wt_g=z_mod(i,j,k+(l-1)/2)/dz(k)
-                 wt_l=1.0d0-wt_g
-                 avg_kap=kap(i,j,k)*wt_g/(wt_g+wt_l)+kap(i,j,k+l)*wt_l/(wt_g+wt_l)
+                 call pariserror('No curvature found in liq-gas pair for FS bubble')
               endif
               P_gz(i,j,k) = sigma*avg_kap/dz(k)
            endif
@@ -1932,17 +1957,17 @@ subroutine setuppoisson_fs_hypre(utmp,vtmp,wtmp,vof_phase,rho,dt,A,cvof,height,k
   do k=ks,ke; do j=js,je; do i=is,ie
      if (vof_phase(i,j,k)==0 .and. .not.implode_flag(bub_id(i,j,k))) then
 
-        A(i,j,k,1) = 2.d0*dt/((dx(i)+x_mod(i-1,j,k))*x_mod(i-1,j,k)*rho)
-        A(i,j,k,2) = 2.d0*dt/((dx(i)+x_mod(i  ,j,k))*x_mod(i  ,j,k)*rho)
-        A(i,j,k,3) = 2.d0*dt/((dy(j)+y_mod(i,j-1,k))*y_mod(i,j-1,k)*rho)
-        A(i,j,k,4) = 2.d0*dt/((dy(j)+y_mod(i,j  ,k))*y_mod(i,j  ,k)*rho)
-        A(i,j,k,5) = 2.d0*dt/((dz(k)+z_mod(i,j,k-1))*z_mod(i,j,k-1)*rho)
-        A(i,j,k,6) = 2.d0*dt/((dz(k)+z_mod(i,j,k  ))*z_mod(i,j,k  )*rho)
-        A(i,j,k,7) = sum(A(i,j,k,1:6))
-        A(i,j,k,8) = A(i,j,k,8) + A(i,j,k,1)*P_gx(i-1,j,k) + A(i,j,k,2)*P_gx(i+1,j,k)&
-             +A(i,j,k,3)*P_gy(i,j-1,k)+A(i,j,k,4)*P_gy(i,j+1,k)&
-             +A(i,j,k,5)*P_gz(i,j,k-1)+A(i,j,k,6)*P_gz(i,j,k+1)
-        if (A(i,j,k,8) /= A(i,j,k,8)) then
+        coeff(i,j,k,1) = 2.d0*dt/((dx(i)+x_mod(i-1,j,k))*x_mod(i-1,j,k)*rho)
+        coeff(i,j,k,2) = 2.d0*dt/((dx(i)+x_mod(i  ,j,k))*x_mod(i  ,j,k)*rho)
+        coeff(i,j,k,3) = 2.d0*dt/((dy(j)+y_mod(i,j-1,k))*y_mod(i,j-1,k)*rho)
+        coeff(i,j,k,4) = 2.d0*dt/((dy(j)+y_mod(i,j  ,k))*y_mod(i,j  ,k)*rho)
+        coeff(i,j,k,5) = 2.d0*dt/((dz(k)+z_mod(i,j,k-1))*z_mod(i,j,k-1)*rho)
+        coeff(i,j,k,6) = 2.d0*dt/((dz(k)+z_mod(i,j,k  ))*z_mod(i,j,k  )*rho)
+        coeff(i,j,k,7) = sum(coeff(i,j,k,1:6))
+        coeff(i,j,k,8) = coeff(i,j,k,8) + coeff(i,j,k,1)*P_gx(i-1,j,k) + coeff(i,j,k,2)*P_gx(i+1,j,k)&
+             +coeff(i,j,k,3)*P_gy(i,j-1,k)+coeff(i,j,k,4)*P_gy(i,j+1,k)&
+             +coeff(i,j,k,5)*P_gz(i,j,k-1)+coeff(i,j,k,6)*P_gz(i,j,k+1)
+        if (coeff(i,j,k,8) /= coeff(i,j,k,8)) then
            write(*,'("A8 NaN, error imminent. Neigbours mods :",6e14.5)')x_mod(i-1,j,k),x_mod(i,j,k),&
                 y_mod(i,j-1,k),y_mod(i,j,k),z_mod(i,j,k-1),z_mod(i,j,k)
            write(*,'("A8 NaN, error imminent. P_g :",6e14.5,2I8)')P_gx(i-1,j,k),P_gx(i+1,j,k),&
@@ -1950,11 +1975,11 @@ subroutine setuppoisson_fs_hypre(utmp,vtmp,wtmp,vof_phase,rho,dt,A,cvof,height,k
         endif
         if (pcmask(i,j,k).ne.0) write(*,'("Error topology, phase 0, pcmask :",i8)')pcmask(i,j,k)
      else if (vof_phase(i,j,k)==1) then
-       A(i,j,k,1:6) = 0.0d0 
-       A(i,j,k,7) = 1.0d0
-       A(i,j,k,8) = P_gas(i,j,k) !Should now work for polytropic law and vacuum
+       coeff(i,j,k,1:6) = 0.0d0 
+       coeff(i,j,k,7) = 1.0d0
+       coeff(i,j,k,8) = P_gas(i,j,k) !Should now work for polytropic law and vacuum
      endif
   enddo;enddo;enddo
 
-  call Poisson_BCs(A)
+  call Poisson_BCs(coeff)
 end subroutine setuppoisson_fs_hypre

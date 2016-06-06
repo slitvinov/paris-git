@@ -458,7 +458,8 @@ Program paris
            else
               if (FS_Hypre) then
                  call get_all_curvatures(tmp,itimestep)
-                 call setuppoisson_fs_hypre(u,v,w,vof_phase,rho1,dt,A,cvof,height,tmp,tag_id)
+                 !call setuppoisson_fs_hypre(u,v,w,vof_phase,rho1,dt,A,cvof,height,tmp,tag_id)
+                 call setuppoisson_fs_hypre(u,v,w,rho1,dt,A,height,tmp,tag_id)
               else
                  solver_flag = 1
                  call setuppoisson_fs_heights(u,v,w,vof_phase,rho1,dt,A,cvof,tag_id)
