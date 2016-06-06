@@ -390,6 +390,10 @@ contains
           if (rank == 0) call pariserror("ReadVOFParameters: no 'inputFS' file and FreeSurface is on.")
        endif
        close(in)
+       if (RP_test .and. FS_HYPRE) then
+          if (rank==0) print *,'For FS RP test, FS_HYPRE is not available. Switching to standard Gauss-Seidel'
+          FS_HYPRE=.false.
+       endif
     endif
 
   end subroutine ReadVOFParameters
