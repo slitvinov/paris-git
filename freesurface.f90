@@ -1799,8 +1799,8 @@ subroutine setuppoisson_fs_hypre(utmp,vtmp,wtmp,rho,dt,coeff,height,kap,bub_id)
   real(8) :: Source
   real(8) :: avg_kap, n_kap
   !!Debugging for curvature errors
-  real(8) :: err, err_global, L2_err, Linf_err, kappa_theory, L2_glob, Linf_glob
-  integer :: uncomp_curv, uncomp_curv_global, n_avg_kap, n_glob
+!!$  real(8) :: err, err_global, L2_err, Linf_err, kappa_theory, L2_glob, Linf_glob
+!!$  integer :: uncomp_curv, uncomp_curv_global, n_avg_kap, n_glob
   
   !OPEN(unit=121,file='mods.txt',access='append')
   x_mod=dxh((is+ie)/2); y_mod=dyh((js+je)/2); z_mod=dzh((ks+ke)/2) !assumes an unstretched grid
@@ -1899,8 +1899,8 @@ subroutine setuppoisson_fs_hypre(utmp,vtmp,wtmp,rho,dt,coeff,height,kap,bub_id)
   call ghost_x(x_mod,1,reqd(1:4)); call ghost_y(y_mod,1,reqd(5:8)); call ghost_z(z_mod,1,reqd(9:12)) 
   call MPI_WAITALL(12,reqd(1:12),stat(:,1:12),ierr)
 
-  uncomp_curv=0; n_avg_kap=0; L2_err=0.0d0; Linf_err=0.0d0
-  kappa_theory = -2.0d0*dx(is)/r_min
+!!$  uncomp_curv=0; n_avg_kap=0; L2_err=0.0d0; Linf_err=0.0d0
+!!$  kappa_theory = -2.0d0*dx(is)/r_min
   do k=ks,ke; do j=js,je; do i=is,ie
      if( .not.implode_flag(bub_id(i,j,k)) .and. vof_phase(i,j,k)==1) then
         do l=-1,1,2
@@ -1919,10 +1919,10 @@ subroutine setuppoisson_fs_hypre(utmp,vtmp,wtmp,rho,dt,coeff,height,kap,bub_id)
               else
                  call pariserror('No curvature found in liq-gas pair for FS bubble')
               endif
-              n_avg_kap=n_avg_kap+1
-              err=ABS(avg_kap-kappa_theory)
-              L2_err=L2_err+err**2.0d0
-              Linf_err=MAX(err,Linf_err)
+!!$              n_avg_kap=n_avg_kap+1
+!!$              err=ABS(avg_kap-kappa_theory)
+!!$              L2_err=L2_err+err**2.0d0
+!!$              Linf_err=MAX(err,Linf_err)
               P_gx(i,j,k) = sigma*avg_kap/dx(i) !!filaments and droplets of one cell will be an issue here
            endif
               
@@ -1941,10 +1941,10 @@ subroutine setuppoisson_fs_hypre(utmp,vtmp,wtmp,rho,dt,coeff,height,kap,bub_id)
               else
                  call pariserror('No curvature found in liq-gas pair for FS bubble')
               endif
-              n_avg_kap=n_avg_kap+1
-              err=ABS(avg_kap-kappa_theory)
-              L2_err=L2_err+err**2.0d0
-              Linf_err=MAX(err,Linf_err)
+!!$              n_avg_kap=n_avg_kap+1
+!!$              err=ABS(avg_kap-kappa_theory)
+!!$              L2_err=L2_err+err**2.0d0
+!!$              Linf_err=MAX(err,Linf_err)
               P_gy(i,j,k) = sigma*avg_kap/dy(j)
            endif
            
@@ -1962,10 +1962,10 @@ subroutine setuppoisson_fs_hypre(utmp,vtmp,wtmp,rho,dt,coeff,height,kap,bub_id)
               else
                  call pariserror('No curvature found in liq-gas pair for FS bubble')
               endif
-              n_avg_kap=n_avg_kap+1
-              err=ABS(avg_kap-kappa_theory)
-              L2_err=L2_err+err**2.0d0
-              Linf_err=MAX(err,Linf_err)
+!!$              n_avg_kap=n_avg_kap+1
+!!$              err=ABS(avg_kap-kappa_theory)
+!!$              L2_err=L2_err+err**2.0d0
+!!$              Linf_err=MAX(err,Linf_err)
               P_gz(i,j,k) = sigma*avg_kap/dz(k)
            endif
         enddo
@@ -1974,16 +1974,16 @@ subroutine setuppoisson_fs_hypre(utmp,vtmp,wtmp,rho,dt,coeff,height,kap,bub_id)
   call ghost_x(P_gx,1,reqd(1:4)); call ghost_y(P_gy,1,reqd(5:8)); call ghost_z(P_gz,1,reqd(9:12)) 
   call MPI_WAITALL(12,reqd(1:12),stat(:,1:12),ierr)
   !! Debugging uncomputed curvatures
-  call MPI_ALLREDUCE(uncomp_curv,uncomp_curv_global, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_Active, ierr)
-  call MPI_ALLREDUCE(n_avg_kap,n_glob, 1, MPI_INTEGER, MPI_SUM, MPI_COMM_Active, ierr)
-  call MPI_ALLREDUCE(L2_err,L2_glob, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_Active, ierr)
-  call MPI_ALLREDUCE(Linf_err,Linf_glob, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_Active, ierr)
-  L2_glob = sqrt(L2_glob)/n_glob
-  if (rank==0) then
-     write(*,'("Number of average curvatures reqd , uncomputed: ",2I8)')n_glob, uncomp_curv_global
-     write(*,'("Curvature error norms L2: ",e14.5," L_inf: ",e14.5)')L2_glob,Linf_glob
-     write(*,'(" ")')
-  endif
+!!$  call MPI_ALLREDUCE(uncomp_curv,uncomp_curv_global, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_Active, ierr)
+!!$  call MPI_ALLREDUCE(n_avg_kap,n_glob, 1, MPI_INTEGER, MPI_SUM, MPI_COMM_Active, ierr)
+!!$  call MPI_ALLREDUCE(L2_err,L2_glob, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_Active, ierr)
+!!$  call MPI_ALLREDUCE(Linf_err,Linf_glob, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_Active, ierr)
+!!$  L2_glob = sqrt(L2_glob)/n_glob
+!!$  if (rank==0) then
+!!$     write(*,'("Number of average curvatures reqd , uncomputed: ",2I8)')n_glob, uncomp_curv_global
+!!$     write(*,'("Curvature error norms L2: ",e14.5," L_inf: ",e14.5)')L2_glob,Linf_glob
+!!$     write(*,'(" ")')
+!!$  endif
   !--------------------------------------------------------------------------------------------------------
   do k=ks,ke; do j=js,je; do i=is,ie
      if (vof_phase(i,j,k)==0 .and. .not.implode_flag(bub_id(i,j,k))) then
