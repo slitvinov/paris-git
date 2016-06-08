@@ -334,12 +334,13 @@ subroutine NewSolverMG(A,p,maxError,beta,maxit,it,ierr,tres2)
 
   !compute residual at the finest level
   call update_bounds(nd)
+  pMG(LMG)%K(:,:,:,1)    = p
   call get_residual(DataMG(LMG)%K,pMG(LMG)%K(:,:,:,1),norm,resMax)
 
   resMax = resMax/dble(Nx*Ny*Nz)
   call MPI_ALLREDUCE(resMax, tres2, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr) 
 
-  pMG(LMG)%K(:,:,:,1)    = p
+  pMG(LMG)%K(:,:,:,1)    = 0.d0
 
   DO it=1,maxit,1
 
