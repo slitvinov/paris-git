@@ -64,6 +64,10 @@
 !!$
 !!$endsubroutine fs_sweep
 !-------------------------------------------------------------------------------------------------
+!This subroutine sets up neighbour levels inside the gas (void) phase for bubble calculations.
+!The breakdown is like this: level "0" in the liquid (or interface?), "1" first cell layer inside
+!the gas, and "2" the second layer. Note that only "1" cells are needed for pressure calculation,
+!"2" for velocity.
  subroutine set_topology(phase,iout)
   use module_grid
   use module_freesurface
@@ -164,6 +168,7 @@
   enddo
 end subroutine set_topology
 !-------------------------------------------------------------------------------------------------
+!checking for: imploding bubbles, and for the liquid-inside-bubble entrapment situation
 subroutine check_topology(is_gas)
   use module_grid
   use module_2phase
@@ -224,7 +229,7 @@ subroutine check_topology(is_gas)
               if (volume<0.4*(xLength*yLength*zLength))&
                    write(*,'("Merged element ",I5," found in rank ",I5,"with volume: "e14.5)')bub,rank,volume
               if (volume < 50.0*dx(is)**3.d0) then
-                 call clear_stray_liquid(dropid)
+                 call clear_stray_liquid(dropid) !<-clears liquid inside bubbles
                  write(*,'("Removing detached liquid (merged) in rank: ",I5)')rank
                  remove = .true.
               endif
@@ -236,7 +241,7 @@ subroutine check_topology(is_gas)
   endif
   call MPI_ALLREDUCE(remove,fill_ghost, 1, MPI_LOGICAL, MPI_LOR, MPI_COMM_Active, ierr)
 contains 
-  subroutine bub_implode(bub_id,merged)
+  subroutine bub_implode(bub_id,merged) !uses bub_id from lpp-type procedures
     use module_vof
     use module_flow
     implicit none
@@ -248,6 +253,7 @@ contains
     max_implode = 0
     remove =.false.
     do k=ks,ke; do j=js,je; do i=is,ie
+       
        if (tag_id(i,j,k)==bub_id) then !check if we are in the correct bubble
           if (.not.implode_flag(tag_id(i,j,k))) then
              implode_flag(tag_id(i,j,k)) = .true.
@@ -307,6 +313,7 @@ subroutine extrapolate_velocities()
   real(8) :: varx
   
   !Simple 1st order extrapolation: Velocities of neighbours at lower topological level averaged
+  !Applies the linear equation from FreeSurface documentation (report)
   if (order_extrap == 1) then
      do level = 1, X_level
         do k=ks,ke; do j=js,je; do i=is,ie
@@ -383,7 +390,7 @@ subroutine extrapolate_velocities()
               endif
            endif
         enddo; enddo; enddo
-        call do_ghost_vector(u,v,w)
+        call do_ghost_vector(u,v,w) !<mpi
      enddo
   else if (order_extrap ==2) then
      do level = 1, X_level !Loop extrapolation levels
@@ -418,7 +425,7 @@ subroutine extrapolate_velocities()
               if (x_success) w(i,j,k)=varx
            endif
         enddo; enddo; enddo !end loop i,j,k
-        call do_ghost_vector(u,v,w)
+        call do_ghost_vector(u,v,w) !mpi again
      enddo !end loop levels
   endif
 contains
@@ -477,6 +484,8 @@ contains
     enddo
     !solve matrix locally
     if (fit_cells>3) then
+       !calling Stanley's FindInverseMatrix to solve for the extrapolated
+       !velocity, since it is a matrix equation
        call FindInverseMatrix(x_m,x_im,4,inverse_success)
        if (inverse_success) then
 !!$          !check product matrix*inverse
@@ -499,6 +508,7 @@ contains
              var=var+x_im(1,col)*rhs(col)                                                                                       
           enddo
           !write(*,'("Extrapolated velocity: ",e14.5)')var
+          !debug
           if (var /= var) then
              open(unit=70,file="Extr_v_NaN.txt",position="append")
              write(70,'("Extrapolated vel NaN after fit success at time step: ",I10)')itimestep
@@ -603,6 +613,7 @@ contains
   end subroutine setupmatrix
 end subroutine extrapolate_velocities
 !=============================================================================================================================================
+!for a divergence correction in the 2nd projection
 subroutine discrete_divergence(u,v,w,iout)
   use module_grid
   use module_freesurface
@@ -645,6 +656,8 @@ subroutine discrete_divergence(u,v,w,iout)
 115 format(I8,5e14.5)
 end subroutine discrete_divergence
 !--------------------------------------------------------------------------------------------------------------------
+!Older (obsoleted) procedure to get reference pressure in single bubble Rayleigh-Plesset test
+!"don't worry about it too much:)"
 subroutine get_ref_volume(vof)
   use module_grid
   use module_2phase
@@ -979,7 +992,7 @@ subroutine VTK_scalar_struct(index,iout,var)
   close(8)
 end subroutine VTK_scalar_struct
 !==============================================================================================================================
-! Routine to numerically integrate the Rayleigh-Plesset equation
+! Routine to numerically integrate the Rayleigh-Plesset equation (-> for the test suite)
 subroutine Integrate_RP(dt,t,rho)
   use module_freesurface
   implicit none 
@@ -1055,6 +1068,8 @@ contains
   end function pressure
 end subroutine write_RP_test
 !====================================================================================================================================================
+!In the RP test where the p_inf is give, this sets the boundary pressure (on domain boundary)
+!to a level that would agree with that p_inf.
 subroutine set_RP_pressure(p,rho)
   use module_grid
   use module_2phase
@@ -1113,6 +1128,7 @@ contains
   end function pressure
 end subroutine set_RP_pressure
 !====================================================================================================================================================
+!initial gas pressure for R-P
 subroutine initialize_P_RP(p,rho)
   use module_grid
   use module_2phase
@@ -1193,6 +1209,7 @@ subroutine tag_bubbles(phase_ref,iout,time_stats)
   endif
 end subroutine tag_bubbles
 !==================================================================================================================
+!This allows to set a non-zero P_gas inside the bubbles 
 subroutine set_bubble_pressure
   use module_grid
   use module_Lag_part
@@ -1229,6 +1246,8 @@ subroutine set_bubble_pressure
   endif
 end subroutine set_bubble_pressure
 !==================================================================================================================
+!Smoothens (in time, iters) the boundary velocity condition (check out the itimestep condition).
+!could theoretically be used to manipulate this condition in time
 subroutine inflow_accelerate
   use module_grid
   use module_BC
@@ -1552,6 +1571,7 @@ contains
   end subroutine liq_gas2
 end subroutine setuppoisson_fs_heights
 !==============================================================================================================
+!calculates theta (height) when HF is not available (by using a staggered cell and fl3d).
 subroutine staggered_cut(cvof,i,j,k,theta,phase,d)
   use module_grid
   use module_freesurface
@@ -1730,7 +1750,7 @@ contains
   end subroutine err_curve
 end subroutine curvature_sphere
 !=======================================================================================================
-subroutine remove_drops(phase,vof,fill_all)
+subroutine remove_drops(phase,vof,fill_all) !some cleaning
   use module_grid
   use module_freesurface
   implicit none

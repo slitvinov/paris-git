@@ -316,12 +316,17 @@ Program paris
               if ((.not.STGhost).and.(.not.FreeSurface).and.(sigma.gt.TINY_DOUBLE)) &
                    call surfaceForce(du,dv,dw,rho)
               call my_timer(8)
+              
               if (FreeSurface) then
                  !call fs_sweep(itimestep,time) !Will include all calls below, to be implemented
                  if (check_stray_liquid .and. mod(itimestep,n_stray_liquid)==0) then
+                    !calls below are just for cleaning liquid which got into gas
+                    !check structures
                     call tag_bubbles(0,itimestep,time)
                     call check_topology(.false.)
+                    !for dealloc
                     call ReleaseTag2DropTable
+                    !that's valid if you have to fill the ghost cells because u remved sth
                     if (fill_ghost) then
                        call clean_debris
                        call do_all_ghost(cvof)
@@ -329,6 +334,7 @@ Program paris
                        call get_vof_phase(cvof) !cvof updated above from min to max
                     endif
                  endif
+                 !removing small gas pockets
                  if (.not. (test_capwave .or. test_plane)) then
                     call tag_bubbles(1,itimestep,time)
                     if (.not.RP_test) then
@@ -344,6 +350,8 @@ Program paris
                        endif
                     endif
                  endif
+                 !so above code is basically removing stuff and setting tags
+                 !after possible removal above
                  call set_topology(vof_phase,itimestep) !vof_phase updated in vofsweeps
                  call set_bubble_pressure
                  if (.not. (test_capwave .or. test_plane)) call ReleaseTag2DropTable
