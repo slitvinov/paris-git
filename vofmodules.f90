@@ -638,6 +638,7 @@ contains
           if (nb < 2) &
                call pariserror('For cubic lattice bubble test there has to be at least 2 bubbles per coord direction')
           call cubic_lattice_bubbles
+          call restrict_bubbles("sphere")
        endif
        call MPI_BCAST(NumBubble, 1, MPI_INTEGER, root_rank, MPI_Comm_Cart, ierr)
        call MPI_BCAST(rad, NumBubble, MPI_REAL8, &
@@ -847,6 +848,72 @@ contains
 !!$            index,xc(index),yc(index),zc(index),rad(index)
     enddo; enddo; enddo
   end subroutine cubic_lattice_bubbles
+
+    !===================================================================================[primitive restrictor WA]
+    subroutine restrict_bubbles(shape)
+    use module_2phase
+#ifdef __INTEL_COMPILER
+    use IFPORT
+#endif
+    implicit none
+    character(len=6), intent(in) :: shape
+    integer :: ib,cib,tokill,numbub2
+    real(8) :: dist,rad_max,scx,scy,scz
+    real(8), dimension(:,:), allocatable :: listcopy
+    !call deb_inf("|restrict bubbles ")
+
+    tokill=0
+    
+    !select desired shape, then start deletion    
+    select case(shape) !for now, centered with fixed radius
+    case("sphere")
+       !sphere radius
+       rad_max=0.46*xlength
+       !sphere center
+       scx=xlength/2.d0;scy=ylength/2.d0;scz=zlength/2.d0
+       do ib=1,numbubble;
+          dist=sqrt((xc(ib)-scx)**2+(yc(ib)-scy)**2+(zc(ib)-scz)**2)
+          if(dist>rad_max) then
+             print *,'killing',ib,'with distance',dist,'radmax is',rad_max
+             tokill=tokill+1
+             rad(ib)=0.d0
+          endif          
+       enddo
+       !decrease number of bubbles:
+       numbub2=numbubble-tokill
+       write(*,*) "restrictor: will kill",tokill,"of",numbubble,"bubbles leaving",numbub2
+
+       !The block below is a primitive attempt to (1) copy the nonzero bubbles, (2) zero the bubble
+       !vectors xc,yc,zc and rad and (3) copy the stuff back. This way, all bubbles are at the beginning
+       !of the list.
+       allocate(listcopy(1:numbub2,1:4))
+       !make another pass with rewrite
+       cib=1
+       do ib=1,numbubble
+          if(rad(ib)>0) then
+             listcopy(cib,1)=xc(ib);listcopy(cib,2)=yc(ib);listcopy(cib,3)=zc(ib)
+             listcopy(cib,4)=rad(ib)             
+             cib=cib+1
+          endif
+       enddo
+       numbubble=numbub2
+       xc=0;yc=0;zc=0;rad=0
+       do ib=1,numbubble
+          xc(ib)=listcopy(ib,1)
+          yc(ib)=listcopy(ib,2)
+          zc(ib)=listcopy(ib,3)
+          rad(ib)=listcopy(ib,4)
+       enddo
+
+
+    case default
+       if(rank==0 ) call pariserror("No such shape in bubble restrictor")
+       stop
+    end select
+    deallocate(listcopy)
+    return
+  end subroutine restrict_bubbles
+  
   !=================================================================================================
   !   Generate bubbles in a face centered cubic lattice 
   !   Total bubbles should equal:
