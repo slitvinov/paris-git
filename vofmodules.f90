@@ -134,6 +134,7 @@ contains
 ! 12 edge cells belong to 2 vertices -> 2/64
 ! 6 face cells belong to 4 vertices -> 4/64
 ! 8/4 + 6*4/64 + 12*2/64 + 8/64 = 1
+    call deb_inf("|Init linfunct")
     b1=8D0/64
     b2=4D0/64
     b3=2D0/64
@@ -146,6 +147,7 @@ contains
     implicit none
     real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(out) :: field
     integer :: i,j,k,n
+    call deb_inf("|Filter ")
     field=cvof
     do n=1,nfilter
        call do_all_ghost(field)
@@ -171,7 +173,7 @@ contains
     integer, intent(in) :: MeanFlag
     integer :: i,j,k
     real(8) :: inva1=0d0,inva2=0d0
-
+    call deb_inf("|Linfunc ")
     if(.not.linfunc_initialized) call initialize_linfunc
 
     if ( MeanFlag == HarmMean ) then 
@@ -220,7 +222,7 @@ contains
     integer, intent(in) :: MeanFlag
     integer :: i,j,k
     real(8) :: inva1=0d0,inva2=0d0
-
+    call deb_inf("|Linfunclocal ")
     if(.not.linfunc_initialized) call initialize_linfunc
 
     if ( MeanFlag == HarmMean ) then 
@@ -409,6 +411,7 @@ contains
     integer :: ierr,dir,orientation,bdry
     character :: dc(3) = (/ "x","y","z" /)
     call ReadVOFParameters
+    call deb_inf("|Initialize VOF ")
 ! Check grid
     if(read_x.or.read_y.or.read_z) then
        if((xform.ne.0.d0).or.(yform.ne.0.d0).or.(zform.ne.0.d0)) then
@@ -428,7 +431,7 @@ contains
     vof_phase = 2
     if (out_centroid) opened_cent=.false.
     !allocate matrices for Free Surface
-    if(FreeSurface) then
+    fs: if(FreeSurface) then
        allocate(u_cmask(imin:imax,jmin:jmax,kmin:kmax), v_cmask(imin:imax,jmin:jmax,kmin:kmax), &
             w_cmask(imin:imax,jmin:jmax,kmin:kmax), x_mod(imin:imax,jmin:jmax,kmin:kmax), &
             y_mod(imin:imax,jmin:jmax,kmin:kmax), z_mod(imin:imax,jmin:jmax,kmin:kmax), &
@@ -449,7 +452,7 @@ contains
        do bdry=1,6
           if (.not.bdry_cond(bdry) == 3) inflow = .false.
        enddo
-    endif
+    endif fs
     if ( itime_scheme == 2 ) then  
       allocate(cvofold(imin:imax,jmin:jmax,kmin:kmax))
       cvofold = 0.d0
@@ -538,6 +541,7 @@ contains
     integer :: i,j,k
     real (8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: c
     integer   , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: cflag
+    call deb_inf("|Get Flags And Clip ")
     if(ng.lt.2) call pariserror("wrong ng")
     do k=kmin,kmax
        do j=jmin,jmax
@@ -563,6 +567,7 @@ contains
     use module_flow
     integer :: i,j,k
     real (8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: c
+    call deb_inf("|Get vof phase ")
     do k=kmin,kmax
        do j=jmin,jmax
           do i=imin,imax
@@ -595,6 +600,7 @@ contains
     integer, parameter :: root_rank = 0
     integer :: i,j,k
     real(8) :: ryz, sine, NozzleThickness
+    call deb_inf("|Init conditions vof ")
     
     if( test_D2P .or. ( test_tag .and. NumBubble >= 50 ) ) then 
        if ( rank == root_rank ) then
@@ -634,6 +640,7 @@ contains
     endif
 
     if (test_lattice_bubs) then
+       call deb_inf("|-> testing bubble lattice")
        if ( rank == root_rank ) then
           if (nb < 2) &
                call pariserror('For cubic lattice bubble test there has to be at least 2 bubbles per coord direction')
@@ -652,6 +659,7 @@ contains
     endif
 
     if (test_fcc_lattice) then
+       call deb_inf("|-> test fcc lattice")
        if ( rank == root_rank ) then
           if (n_cell < 2) &
                call pariserror('For cubic lattice bubble test there has to be at least 2 cells per coord dir')
@@ -669,6 +677,7 @@ contains
     endif
 
     if(test_heights.or.test_capwave) then 
+       call deb_inf("|-> test heights")
        if(cylinder_dir==0) then
           write(*,*) "IVOF: Warning: cylinder_dir=0 set to 2"
           cylinder_dir=2
@@ -689,6 +698,7 @@ contains
 
     ! hard code for initialized a short jet inside the nozzle
     if (test_jet ) then 
+       call deb_inf("|-> test jet")
       if ( inject_type == 3 ) then
          NozzleThickness = NozzleThick2Cell*dx(is)
          do i = is,ie; do j=js,je; do k = ks,ke
@@ -710,6 +720,7 @@ contains
     end if ! test_jet
 
     if ( test_KHI2D ) then 
+       call deb_inf("|-> test KHI2D")
       do i = imin,imax; do j=jmin,jmax; do k = kmin,kmax
          sine = yLength*0.5d0 + 0.002*xLength*sin(2.d0*PI*x(i)/xLength) 
          !if ( y(j) > 0.5d0*yLength*(1.d0 + 0.1d0*sin(2.d0*PI*x(i)/xLength)) ) then 
@@ -728,6 +739,7 @@ contains
     end if ! test_KHI2D
 
     if ( test_PhaseInversion ) then 
+       call deb_inf("|-> test_PhaseInversion")
       do i = is,ie; do j=js,je; do k = ks,ke
          if ( bdry_cond(3) == 1 ) then       ! Quasi-2D, periodic in z direction 
             if (x(i) < 0.5d0*xLength .and. y(j) < 0.5d0*yLength ) then 
@@ -744,6 +756,7 @@ contains
     end if ! test_PhaseInversion
 
     if (test_shear_multiphase) then
+       call deb_inf("|-> test_shearmulti")
       do i = is,ie; do j=js,je; do k = ks,ke
         if ( (y(j)-0.5d0)**2 < 0.01d0 ) then
           cvof(i,j,k) = 1.d0
@@ -752,6 +765,7 @@ contains
     end if
 
     if (test_fsdrop) then
+       call deb_inf("|-> test fsdrop")
        if (.not. FreeSurface) call pariserror('FS has to be switched on for the FS plane test')
        do i=is,ie; do j=js,je; do k=ks,ke
           cvof(i,j,k) = 1.d0-cvof(i,j,k)
@@ -786,6 +800,7 @@ contains
 #ifndef __INTEL_COMPILER
     real :: rand
 #endif
+    call deb_inf("|Random bubbles ")
     rand_seed = ABS(TIME())
     call srand(rand_seed)
     if(NumBubble>2) then 
@@ -834,6 +849,7 @@ contains
 #ifndef __INTEL_COMPILER
     real :: rand
 #endif
+    call deb_inf("|cubic lattice bubbles ")
     rand_seed = ABS(TIME())
     call srand(rand_seed)
     NumBubble = nb*nb*nb
@@ -860,7 +876,7 @@ contains
     integer :: ib,cib,tokill,numbub2
     real(8) :: dist,rad_max,scx,scy,scz
     real(8), dimension(:,:), allocatable :: listcopy
-    !call deb_inf("|restrict bubbles ")
+    call deb_inf("|restrict bubbles ")
 
     tokill=0
     
@@ -930,6 +946,7 @@ contains
 #ifndef __INTEL_COMPILER
     real :: rand
 #endif
+    call deb_inf("|FCC Lattice Bubbles ")
     rand_seed = ABS(TIME())
     call srand(rand_seed)
     index=2
@@ -1048,7 +1065,7 @@ contains
     endif
 #endif
 
-   
+    call deb_inf("|LS2VOF ")
 
     if(use_vofi) then
 #ifdef HAVE_VOFI
@@ -1186,7 +1203,7 @@ contains
     real(8) :: count
     integer :: calc_imax
     integer :: dirselect(0:3), d, is2D,max_flag
-
+          call deb_inf("|LS2VOF Refined ")
 ! initialization
     count=0.d0
     refinethis = .false.
@@ -1325,7 +1342,7 @@ contains
     real(8) vofh1, vofh2
     real(8) alpha,fl3dnew,stencil3x3(-1:1,-1:1,-1:1)
     real(8) dm(3),x0(3),deltax(3)
-
+          call deb_inf("|Get Half Fractions ")
     vofh1 = c(i,j,k)
     vofh2 = c(i,j,k)
     if ((c(i,j,k).gt.0.d0).and.(c(i,j,k).lt.1.d0)) then
@@ -1354,7 +1371,7 @@ contains
     use module_tmpvar
     implicit none
     integer, intent(in) :: tswap
-
+          call deb_inf("|vofsweeps ")
     if (VOF_advect=='Dick_Yue') call c_mask(work(:,:,:,2))
     if (MOD(tswap,3).eq.0) then  ! do z then x then y 
        call swp(w,cvof,vof_flag,3,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3))
@@ -1382,7 +1399,7 @@ contains
   real(8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), intent(in)  :: us
   real(8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), intent(out) :: mom
   real(8) :: rhoavg
-
+          call deb_inf("|get momentum centered ")
   tmp = cvof
   work(:,:,:,1) = 0.d0
   work(:,:,:,2) = 0.d0
@@ -1415,7 +1432,7 @@ contains
   real(8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), intent(in)  :: us
   real(8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), intent(out) :: mom
   real(8) :: rhoavg
-
+          call deb_inf("|get momentum staggered ")
   tmp = cvof
   work(:,:,:,1) = 0.d0
   work(:,:,:,2) = 0.d0
@@ -1461,7 +1478,7 @@ contains
   real(8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: mom
   real(8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: us,der
   real(8) :: cflag0,rhoavg0,cflag1, rhoavg1
-
+          call deb_inf("|getvelmomcent ")
   call init_i0j0k0 (d,i0,j0,k0)
 
   do k=ks-1,ke+1
@@ -1496,7 +1513,7 @@ subroutine get_velocity_from_momentum_staggered (mom,us,der,d)
   real(8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: mom
   real(8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: us,der
   real(8) :: cflag,rhoavg
-
+          call deb_inf("|getvelmomstag ")
   call init_i0j0k0 (d,i0,j0,k0)
 
   kini=ks
@@ -1542,7 +1559,7 @@ subroutine vofandmomsweepsstaggered(tswap,t)
   integer, intent(in) :: tswap
   real(8) :: t
   logical :: staggeredmom =.true.
-
+          call deb_inf("|vofandmomsweepstag ")
   if (staggeredmom) then
      do dir=1,3
         if (dir.eq.1) then
@@ -1703,7 +1720,7 @@ end subroutine vofandmomsweepsstaggered
     integer, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: fl  ! vof_flag
     integer :: fb(6),d,l,m,n,c(3),try(2:3),sign,orientation,flag,flhere
     real(8) :: cvhere
-
+          call deb_inf("|setvof boundary conditions ")
     do orientation=1,6
        cond = vofbdry_cond(orientation)
        if(cond=='wet') then
@@ -1840,7 +1857,7 @@ end subroutine vofandmomsweepsstaggered
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(out) :: cstag
   integer :: i,j,k,d
   integer :: i0,j0,k0
-
+          call deb_inf("|get stag fractions ")
   call init_i0j0k0 (d,i0,j0,k0)
 
   work(:,:,:,1) = 0.d0

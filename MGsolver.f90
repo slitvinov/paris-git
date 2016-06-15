@@ -39,7 +39,7 @@ subroutine init_MG(nvar)
   integer, intent(in) :: nvar
   integer :: Ld(3), nL(3)
   integer :: i,ierr
-
+  call deb_inf("|init MG")
   nd(1) = ie-is+1; nd(2) = je-js+1; nd(3) = ke-ks+1
   IF (IAND (nd(1), nd(1)-1).NE.0) STOP 'multigrid requires 2^n+1 nodes per direction'
   IF (IAND (nd(2), nd(2)-1).NE.0) STOP 'multigrid requires 2^n+1 nodes per direction'
@@ -90,7 +90,7 @@ subroutine get_residual(A,p,norm,error_L1norm)
   real(8), intent(out) :: error_L1norm
   integer, intent(in)  :: norm
   integer :: i,j,k
-
+  call deb_inf("|MG get residual")
   error_L1norm = 0.d0
 
   do k=ks,ke; do j=js,je; do i=is,ie
@@ -114,7 +114,7 @@ subroutine compute_residual(A,p,norm,error_L1norm)
   integer :: i,j,k
 
   error_L1norm = 0.d0
-
+  call deb_inf("|MG compute resid")
   do k=ks,ke; do j=js,je; do i=is,ie
       error_L1norm = error_L1norm + abs(A(i,j,k,8)     - &
         A(i,j,k,7)*p(i,j,k)    + &
@@ -133,6 +133,7 @@ subroutine coarse_fine_interp(pf,pc,imin1,jmin1,kmin1)
     real(8) :: pf(imin1:,jmin1:,kmin1:,:), pc(imin:,jmin:,kmin:,:)
     integer :: i,j,k,is1,js1,ks1
     
+    call deb_inf("|MG compare fine interp")
     is1=imin1+Ng; js1=jmin1+Ng; ks1=kmin1+Ng
     !interpolation from coarse level
     do i=is,ie; do j=js,je; do k=ks,ke
@@ -155,7 +156,7 @@ subroutine coarse_from_fine(Af,Ac,is1,js1,ks1)
     integer :: is1,js1,ks1
     integer :: i,j,k,i1,j1,k1
     real(8) :: Af(is1:,js1:,ks1:,:), Ac(is:,js:,ks:,:)
-
+    call deb_inf("|MG coarsefromfine")
     Ac(:,:,:,8) = 0.d0
     DO i=is,ie; DO j=js,je; DO k=ks,ke
     DO i1=0,1; DO j1=0,1; DO k1=0,1
@@ -172,7 +173,7 @@ subroutine fill_coefficients(Af, Ac, is1, js1, ks1)
   implicit none
   integer :: i,j,k,is1,js1,ks1
   real(8) :: Ac(is:,js:,ks:,:), Af(is1:,js1:,ks1:,:)
-
+  call deb_inf("|MG fill")
     DO k=ks,ke; DO j=js,je; DO i=is,ie
         Ac(i,j,k,:) =  0.125d0*(                       &
                 Af(2*(i-is)+is1,  2*(j-js)+js1,  2*(k-ks)+ks1,:) + &
@@ -228,7 +229,7 @@ subroutine MG_iteration(beta, norm)
   integer :: is1, js1, ks1, imin1, jmin1, kmin1
   integer :: ncall=1
   integer :: nL(3)
-
+  call deb_inf("|MG iter")
   !-------------
   DO Level=LMG,2,-1
 
@@ -324,7 +325,7 @@ subroutine NewSolverMG(A,p,maxError,beta,maxit,it,ierr,tres2)
   integer :: ncall=1
   integer :: nL(3)
   integer, parameter :: norm=1
-
+  call deb_inf("|MG newsolver")
   IF (rank==0.and.recordconvergence) THEN
     OPEN(UNIT=89,FILE='convergenceMG_history.txt',Access='append')
     start_time =  MPI_WTIME()
@@ -378,7 +379,7 @@ subroutine get_MGtest_err(p)
   integer :: i,j,k,ierr
   real(8) :: res, pi=3.14159265359, ref
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: p
-
+  call deb_inf("|MG testerr")
   res = 0.d0; ref = 0.d0
   do k=ks,ke; do j=js,je; do i=is,ie
       res = res + &

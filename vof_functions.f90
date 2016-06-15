@@ -57,9 +57,9 @@ FUNCTION AL3DNEW(nr,cc)
    else
      m2 = np3
   endif
-  cch = DMIN1(cc,1.d0-cc)                              ! limit to: 0 < cch < 1/2
-  denom = DMAX1(6.d0*m1*m2*m3,1.d-50)                           ! get cch ranges
-  c01 = m1*m1*m1/denom
+  cch = DMIN1(cc,1.d0-cc)                   ! limit to: 0 < cch < 1/2
+  denom = DMAX1(6.d0*m1*m2*m3,1.d-50)       ! get cch ranges [warning this is known
+  c01 = m1*m1*m1/denom                      ! to be precision-sensitive]
   c02  = c01 + 0.5d0*(m2-m1)/m3
   m12 = m1 + m2
   if (m12 <= m3) then
@@ -86,8 +86,8 @@ FUNCTION AL3DNEW(nr,cc)
   else                                  
      p = m12*m3 + m1*m2 - 0.25d0                                     
      q = 1.5d0*m1*m2*m3*(0.5d0-cch)
-     pst = DSQRT(p)
-     arc = athird*DACOS(q/(p*pst))
+     pst = DSQRT(abs(p))
+     arc = athird*DACOS(q/(p*pst+1.d-50))
      csarc = DCOS(arc)
      AL3DNEW = pst*(DSQRT(3.d0*(1.d0-csarc*csarc)) - csarc) + 0.5d0     ! case (4b)
   endif

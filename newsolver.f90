@@ -43,7 +43,8 @@ subroutine NewSolver(A,p,maxError,beta,maxit,it,ierr)
   real(8) :: tres2
   integer, intent(in) :: maxit
   integer, intent(out) :: it, ierr
-
+  
+  call deb_inf("|NewSolver ")
   if (MultiGrid) then
       call NewSolverMG(A,p,maxError,beta,maxit,it,ierr,tres2)
   else
@@ -65,6 +66,7 @@ subroutine relax_step(A,p,beta,L)
   real(8), intent(in) :: beta
   integer :: L
   integer, parameter :: relaxtype=1
+  call deb_inf("|relax step")
 
   if(relaxtype==2) then 
       call LineRelax(A,p,beta,L)
@@ -94,6 +96,7 @@ subroutine NewSolver_std(A,p,maxError,beta,maxit,it,ierr, tres2)
   logical :: mask(imin:imax,jmin:jmax,kmin:kmax)
   integer, parameter :: norm=1
   integer, save :: itime=0
+  call deb_inf("|newsolver std")
 ! Open file for convergence history
   if(rank==0.and.recordconvergence) then
      OPEN(UNIT=89,FILE=TRIM(out_path)//'/convergence_history-'//TRIM(int2text(itime,padding))//'.txt')
@@ -140,6 +143,7 @@ contains
     logical :: diverged=.false.
     logical :: extended=.true.
     integer :: l
+    call deb_inf("|catch div")
     if(extended) then
        do k=ks,ke; do j=js,je; do i=is,ie
           do l=1,8
@@ -180,7 +184,7 @@ subroutine apply_BC(p)
   real(8) :: p(imin:imax,jmin:jmax,kmin:kmax)
   integer :: L,ierr
   integer :: req(12),sta(MPI_STATUS_SIZE,12)
-
+  call deb_inf("|Apply_BC")
   call ghost_x(p,1,req( 1: 4))
   call ghost_y(p,1,req( 5: 8))
   call ghost_z(p,1,req( 9:12))
@@ -196,7 +200,7 @@ subroutine apply_BC_MG(p,L)
   real(8) :: p(imin:imax,jmin:jmax,kmin:kmax)
   integer :: L,ierr
   integer :: req(12),sta(MPI_STATUS_SIZE,12)
-
+  call deb_inf("|apply_bc_mg")
   call ghost_MG_x(p,1,req( 1: 4),L)
   call ghost_MG_y(p,1,req( 5: 8),L)
   call ghost_MG_z(p,1,req( 9:12),L)
@@ -217,7 +221,7 @@ subroutine RedBlackRelax(A,p,beta,L)
   real(8), intent(in) :: beta
   integer :: L
   integer :: i,j,k,isw,jsw,ksw,ipass
-
+  call deb_inf("|readblack_relax")
   ksw=1
   do ipass=1,2
      jsw=ksw
@@ -254,6 +258,7 @@ subroutine LineRelax(A,p,beta,L)
   real(8), intent(in) :: beta
   integer :: i,j,k
   integer :: L
+  call deb_inf("|linerelax")
 !--------------------------------------ITERATION LOOP--------------------------------------------  
   do k=ks,ke; do j=js,je; do i=is,ie
      p(i,j,k)=(1d0-beta)*p(i,j,k) + (beta/A(i,j,k,7))*(              &
@@ -288,7 +293,7 @@ subroutine check_poisson_setup(A,tmp,umask,vmask,wmask)
   real(8) :: tintsource,maxtmp,mintmp
   integer :: i,j,k,l
   logical :: diverged=.false.
-
+  call deb_inf("|CheckPoissonSetup")
 ! verify that we shall not divide by zero
 
   do k=ks,ke; do j=js,je; do i=is,ie
@@ -363,6 +368,8 @@ subroutine check_corrected_vel(u,umask,iout)
   integer :: i,j,k,ierr,i1,i2
   real(8), dimension(:), allocatable, save :: flux,fullflux,fluxm,fullfluxm
   logical :: initialized = .false.
+  call deb_inf("|check_corrected_vel")
+  
   if(.not. initialized) then 
      allocate(flux(nx+2*Ng),fullflux(nx+2*Ng))
      allocate(fluxm(nx+2*Ng),fullfluxm(nx+2*Ng))

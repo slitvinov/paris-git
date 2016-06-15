@@ -220,6 +220,7 @@ contains
    subroutine initialize_LPP()
 
       implicit none
+    call deb_inf("|LPP init")
       call ReadLPPParameters
 
       allocate( parts(max_num_part,0:nPdomain-1) )
@@ -296,7 +297,7 @@ contains
          tracked_phase, ConvertMergeDrop,DoOutputLPP,vol_debris
 
       in=32
-
+    call deb_inf("|LPP read")
       ! Set default values 
       DropStatisticsMethod = 0 
       DoConvertVOF2LPP = .false.
@@ -399,7 +400,7 @@ contains
     
       integer, intent(in) :: tswap
       real(8), intent(in) :: time
-
+    call deb_inf("|LPP vof sweeps")
       ! Only do tagging and conversion in specific time steps
       if ( MOD(tswap,ntimestepTag) == 0 ) then
          call tag_drop()
@@ -453,7 +454,7 @@ contains
 
     real(8) :: stencil3x3(-1:1,-1:1,-1:1),mxyz(3),AREA3D
     real(8), dimension(imin:imax,jmin:jmax,kmin:kmax) :: tag_phase
-  
+    call deb_inf("|LPP tag drop")
     if (.not. LPP_initialized) then 
       call initialize_LPP()
       LPP_initialized = .true.
@@ -678,7 +679,7 @@ contains
       integer , parameter :: ngh=2
       integer , parameter :: root=0
       integer :: num_drop_rank, num_drop_merge_rank
-
+    call deb_inf("|LPP tag drop all")
       ! Broadcast num_drop(rank) to all processes
       num_drop_rank       = num_drop      (rank)
       num_drop_merge_rank = num_drop_merge(rank)
@@ -725,7 +726,7 @@ contains
       logical :: WarningFlag, over_maxnum_diff_tag
       integer :: total_num_tagmerge,tagmerge,tagmerge1
       integer :: ipx,ipy,ipz
-
+    call deb_inf("|LPP merge drop pieces")
       ! Check ghost cells of droplet pieces
       if ( num_drop_merge(rank) > 0 ) then 
       do idrop = 1, num_drop_merge(rank) 
@@ -1044,6 +1045,7 @@ contains
       logical :: file_exist
       character(len=30) :: filename 
       type(element) :: element_NULL
+    call deb_inf("|LPP dropstats")
       element_NULL%xc = 0.d0;element_NULL%yc = 0.d0;element_NULL%zc = 0.d0
       element_NULL%uc = 0.d0;element_NULL%vc = 0.d0;element_NULL%wc = 0.d0
       element_NULL%duc = 0.d0;element_NULL%dvc = 0.d0;element_NULL%dwc = 0.d0
@@ -1275,7 +1277,7 @@ contains
                  offsets(0:1), extent,r8extent 
       integer :: max_num_drop_merge_use 
       integer :: irank, idrop
-
+    call deb_inf("|LPP collect drop merge")
       max_num_drop_merge_use = maxval(num_drop_merge)
       allocate( drops_merge_comm(max_num_drop_merge_use,0:nPdomain-1) )
 
@@ -1342,7 +1344,7 @@ contains
       integer :: req(2),sta(MPI_STATUS_SIZE,2),MPI_Comm,ireq,ierr
       integer :: MPI_drop_merge_comm_type, oldtypes(0:1), blockcounts(0:1), & 
                  offsets(0:1), extent,r8extent 
-
+    call deb_inf("|LPP distribdropmerge")
       !  Setup MPI derived type for drop_merge_comm
       offsets (0) = 0 
       oldtypes(0) = MPI_REAL8 
@@ -1402,7 +1404,7 @@ contains
       include 'mpif.h'
       integer :: req(6),sta(MPI_STATUS_SIZE,6),MPI_Comm,ireq,ierr
       integer :: idrop, irank
-
+    call deb_inf("|LPP Create Tag 2 Drop Table")
       allocate( tag_dropid   (1:total_num_tag) )
       allocate( tag_rank     (1:total_num_tag) )
       allocate( tag_mergeflag(1:total_num_tag) )
@@ -1491,6 +1493,8 @@ contains
     integer ::nf,i1,i2,j1,j2,k1,k2,i,j,k
     real(8) :: cfiltered
     character(len=30) :: rootname,filename
+    call deb_inf("|LPP output tag")
+
     rootname=trim(out_path)//'/VTK/tag'//TRIM(int2text(nf,padding))//'-'
     if(rank==0) call append_tag_visit_file(TRIM(rootname))
 
@@ -1532,6 +1536,7 @@ contains
     implicit none
     character(*) :: rootname
     integer prank
+    call deb_inf("|LPP append tag visit")
     if(rank.ne.0) call pariserror('rank.ne.0 in append_tag')
     if(tag_opened==0) then
        OPEN(UNIT=88,FILE='tag.visit')
@@ -1579,7 +1584,7 @@ contains
       integer :: ib,ipart
 
       type(drop), dimension(NumBubble) :: drops_ex
-
+    call deb_inf("|LPP test droppartconv")
       ! tag droplets and calculate drop properties
       call tag_drop()
       if ( nPdomain > 1 ) then 
@@ -1751,6 +1756,7 @@ contains
       real(8) :: ufp,vfp,wfp,dist2,wt
       real(8) :: volcell
       integer :: num_part_rank
+    call deb_inf("|LPP convert VOF to LPP")
 
       if ( num_drop(rank) > 0 ) then 
       do idrop = 1,num_drop(rank)
@@ -1955,6 +1961,7 @@ contains
       integer :: tag0
       logical :: ConvertDropRegion 
       logical :: ConvertDropShape 
+    call deb_inf("|LPP Criteria")
 
       ConvertDropFlag = .false.
       ConvertDropShape = .false.
@@ -2035,7 +2042,7 @@ contains
       integer :: idrop,droptag,droprank
       real(8) :: vol_drop,d_cut
       integer :: shift,i1,i2,j1,j2,k1,k2   
-
+    call deb_inf("|LPP mark regaway")
       RegAwayInterface = .true.
       d_cut = (6.d0*vol_cut/PI)**OneThird
       shift = INT(dble(ConvertRegSizeToDiam)*0.5d0*d_cut/(xh(is+1)-xh(is)))
@@ -2080,7 +2087,7 @@ contains
       integer :: iter
       integer, parameter :: iter_max = 10
       real(8), parameter :: toler = 1.e-9
-
+    call deb_inf("|LPP Undistrib Vel")
       taup = rhop*dp*dp/18.0d0/muf & 
             *(3.d0 + 3.d0*muf/mup)/(3.d0 + 2.d0*muf/mup)
       a  = 1.d0 - rhof/rhop
@@ -2273,6 +2280,7 @@ contains
       integer :: ierr
       real(8) :: volcell
       integer :: num_part_rank
+    call deb_inf("|Convert LPP 2 VOF")
 
       if ( num_part(rank) > 0 ) then
       num_part_old = num_part(rank)
@@ -2390,7 +2398,7 @@ contains
 ! END TEMPORARY 
       real(8) :: cam
       real(8),parameter :: alpha = 4.d0 
-
+    call deb_inf("|LPP build flowfield VOF")
 ! TEMPORARY  
          UseCreepingFlow = .false.
 !         write(*,*) ' Creeping flow solution is used for LPP2VOF conversion!'
@@ -2522,6 +2530,7 @@ contains
 
       integer :: ipart
             
+    call deb_inf("|LPP Compute PartForce")
       rhof = rho1
       rhop = rho2
       muf  = mu1
@@ -2647,6 +2656,7 @@ contains
       character(len=30) :: rootname
       real(8) :: urel2, Re,We
 
+    call deb_inf("|LPP output params")
       urel2 = (up-uf)*(up-uf) + (vp-vf)*(vp-vf) + (wp-wf)*(wp-wf)
       Re = sqrt(urel2)*rho1*dp/(mu1+1.d-16)
       We = urel2*rho1*dp/(sigma+1.d-16)
@@ -2698,7 +2708,7 @@ contains
       real(8) :: ConvertRegSize
       real(8) :: xh1,xh2,x1,x2,yh1,yh2,y1,y2,zh1,zh2,z1,z2
       integer :: i1,i2,j1,j2,k1,k2
-
+    call deb_inf("|LPP get fluid props")
       ! Check particle location
       if ( xp > xh(imax) .or. xp < (xh(imin)-dx(is)) ) then 
          write(*,*) ip,jp,kp,xp,yp,zp,(xh(imin)-dx(is)),xh(imax)
@@ -2781,7 +2791,7 @@ contains
       real(8) :: massLPP, massVOF, mfLPP
       real(8), parameter :: mfLPPsmall = 1.0d-40
       real :: erf
-
+    call deb_inf("|LPP 2way coupling")
       if (TwoWayCouplingFlag == TwoWayCouplingFilterForce) then
          
          !  Setup MPI derived type for particle 
@@ -2867,7 +2877,7 @@ contains
       integer, intent (in) :: iStage
       integer :: ipart
       real(8) :: volcell
-
+    call deb_inf("|LPP Update PartSol")
       if ( num_part(rank) > 0 ) then 
          do ipart = 1,num_part(rank)
 ! TEMPORARY - Not update particle position if volume too small   
@@ -2921,7 +2931,7 @@ contains
 
    subroutine StoreOldPartSol()
       implicit none
-
+    call deb_inf("|LPP store oldparsol")
       if ( num_part(rank) > 0 ) then 
          parts(1:num_part(rank),rank)%xcOld = parts(1:num_part(rank),rank)%element%xc 
          parts(1:num_part(rank),rank)%ycOld = parts(1:num_part(rank),rank)%element%yc 
@@ -2936,7 +2946,7 @@ contains
 
    subroutine AveragePartSol()
       implicit none
-     
+    call deb_inf("|LPP average partsol")
       ! Update particle solution for 2nd order time integration
       parts(1:num_part(rank),rank)%element%xc = & 
          0.5d0*( parts(1:num_part(rank),rank)%element%xc + parts(1:num_part(rank),rank)%xcOld ) 
@@ -2971,7 +2981,7 @@ contains
       
       integer :: i,j,k,ipart,i1,j1,k1
       real(8) :: xp,yp,zp
-
+    call deb_inf("|LPP Update Particle Location in Cell")
       ! A fast version for uniform mesh
       do ipart = 1,num_part(rank)
          ! x direction 
@@ -3057,7 +3067,7 @@ contains
       integer :: ranknew
       integer :: c1,c2,c3
       logical :: PartNeedTransfer, PartExitDomain 
-
+    call deb_inf("|LPP collect crossblocks")
       allocate( num_part_cross(0:nPdomain-1) )
       allocate( parts_cross_id     (max_num_part_cross,0:nPdomain-1) )
       allocate( parts_cross_id_rank(max_num_part_cross) )
@@ -3188,6 +3198,7 @@ contains
       integer :: maxnum_part_cross, MPI_int_row
       type(element) :: element_NULL
       integer :: num_part_cross_rank,num_part_rank
+    call deb_inf("|LPP transfer partcross")
    
       element_NULL%xc = 0.d0;element_NULL%yc = 0.d0;element_NULL%zc = 0.d0
       element_NULL%uc = 0.d0;element_NULL%vc = 0.d0;element_NULL%wc = 0.d0
@@ -3287,7 +3298,7 @@ contains
       integer :: ipart,ipart1,ierr
       type(element) :: element_NULL
       integer :: num_part_rank
-   
+    call deb_inf("|LPP SetPartBCs")
       element_NULL%xc = 0.d0;element_NULL%yc = 0.d0;element_NULL%zc = 0.d0
       element_NULL%uc = 0.d0;element_NULL%vc = 0.d0;element_NULL%wc = 0.d0
       element_NULL%duc = 0.d0;element_NULL%dvc = 0.d0;element_NULL%dwc = 0.d0
@@ -3374,7 +3385,7 @@ contains
    subroutine ImposePartBC(ipart,rank,d)
       implicit none
       integer, intent (in) :: ipart,rank,d
-
+    call deb_inf("|LPP Impose Part BC")
       if ( lppbdry_cond(d) == 'periodic' ) then
          call PartBC_periodic(ipart,rank,d)
       else if ( lppbdry_cond(d) == 'reflect' ) then 
@@ -3387,7 +3398,7 @@ contains
    subroutine PartBC_periodic(ipart,rank,d)
       implicit none
       integer, intent (in) :: ipart,rank,d
-      
+    call deb_inf("|LPP Part BC perio")
       if ( d == 1 ) then 
          parts(ipart,rank)%ic = parts(ipart,rank)%ic + Nx
          parts(ipart,rank)%element%xc = parts(ipart,rank)%element%xc + xLength
@@ -3420,7 +3431,7 @@ contains
    subroutine PartBC_reflect(ipart,rank,d)
       implicit none
       integer, intent (in) :: ipart,rank,d
-      
+    call deb_inf("|LPP Part BC reflect")
       if ( d == 1 ) then 
          parts(ipart,rank)%ic = 2* Ng    +1-parts(ipart,rank)%ic 
          parts(ipart,rank)%element%xc = -parts(ipart,rank)%element%xc 
@@ -3493,7 +3504,7 @@ contains
       real(8), intent(out) :: vel,sdvel
 
       integer :: si,sj,sk
-
+    call deb_inf("|LPP 3lin Interp FV")
       if ( dir == 1 ) then ! Trilinear interpolation for u
          si = -1;sj = -1;sk = -1 
          if ( yp > y(jp) ) sj =  0 
@@ -3587,7 +3598,7 @@ contains
       integer :: i,j,k
       integer :: i1,i2,j1,j2,k1,k2
       real(8) :: numcell
-
+    call deb_inf("|LPP Compute AFV")
       call FindCellIndexBdryConvertRegUnifMesh(L,i1,ip,i2,j1,jp,j2,k1,kp,k2)
 
       um = 0.d0
@@ -3691,7 +3702,7 @@ contains
       integer :: num_part_seeded(0:nPdomain-1),rankseed,c1,c2,c3
       real(8) :: dummyreal,uf,vf,wf
       integer,parameter :: largeint = 1234567890
-
+    call deb_inf("|LPP seed particles")
       SeedParticlesNow = .false.
       if ( SeedParticlesFlag == SeedParticlesNone ) then 
          return 
@@ -3884,7 +3895,7 @@ contains
                                  zmin_part_seed,zmax_part_seed,umin_part_seed,umax_part_seed,&
                                  vmin_part_seed,vmax_part_seed,wmin_part_seed,wmax_part_seed
             real(8),intent(out) :: dp,volp,xp,yp,zp,up,vp,wp
-
+      call deb_inf("|LPP generate random particle")
             call random_number(rand) 
             dp = dmin_part_seed + rand*(dmax_part_seed-dmin_part_seed)
             volp = PI*dp*dp*dp/6.d0

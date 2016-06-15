@@ -106,6 +106,7 @@ module module_front
     include 'mpif.h'
     integer :: i, ierr, root !, numProcess
 
+    call deb_inf("|Init Front")
     test_frdroplet=.true.
     FirstEmptyPoint = 1;  NumEmptyPoint = MaxPoint
     FirstEmptyElem  = 1;  NumEmptyElem  = MaxElem
@@ -182,6 +183,7 @@ module module_front
     real(8) :: pi, dph, phi, theta, pt(4*nps*nps+2,3), xp(3)
     integer :: iq,i2,i1,iip,ist,iie,ia,ib,ic,id,icp(4*2*nps*nps,3),ine(4*2*nps*nps,3),iqq,ne,np, &
                indpt(4*nps*nps+2), indel(4*2*nps*nps), point, elem, i
+    call deb_inf("|Add Sphere")
     pi=4d0*ATAN(1d0)
     dph=0.5d0*pi/dfloat(nps)
 !    ee is nonzero to create deformed bubbles
@@ -341,6 +343,7 @@ module module_front
     integer :: iunit, front, elem, point, ifr, i, j, iTimeStep
     real(8), intent(in) :: time
     character(len=100) :: filename
+    call deb_inf("|backup front")
     filename = trim(out_path)//'/backup_front'
     call system('mv '//trim(filename)//' '//trim(filename)//'.old')
     iunit=7
@@ -384,6 +387,7 @@ module module_front
                elem1, point1, indpt(MaxPoint), indel(MaxPoint), ind(3), iTimeStep
     real(8), intent(out) :: time
     real(8) :: volume
+    call deb_inf("|Backup front read")
     iunit=7
     OPEN(UNIT=iunit,FILE=trim(out_path)//'/backup_front',status='old',action='read')
     read(iunit,"('time=',es25.16e3,' iTime= ',I8,' Fronts= ',I8)")time, itimestep, FrontLength1
@@ -437,6 +441,7 @@ module module_front
     implicit none
     integer :: nf, iunit, front, elem, point, ifr, i
     real(8) :: time, xp(3)
+    call deb_inf("|Print fronts")
     iunit=7
     OPEN(UNIT=iunit,FILE=trim(out_path)//'/front'//int2text(nf,3)//'.dat')
     write(iunit,*)'variables = "x","y","z"' !,"u","v","w"'
@@ -470,6 +475,7 @@ module module_front
     integer :: nf,iunit, front, elem, point, ifr, i
     real(8) :: time, xp(3)
     iunit=7
+    call deb_inf("|Print fronts 2")
     OPEN(UNIT=iunit,FILE=trim(out_path)//'/front'//int2text(nf,3)//'.vtk')
     front = FrontFirst
     do ifr = 1, FrontLength
@@ -529,7 +535,7 @@ module module_front
     real   , dimension(TotalPoint) :: xp, yp, zp
     integer, dimension(3*TotalElem)  :: nodelist
     character(len=30) :: outfile
-
+    call deb_inf("| Printfronts3 (silo)")
     nnodes = 0
     nzones = 0
     Lnodelist=0
@@ -630,7 +636,7 @@ end subroutine write_integer
     complex(8) :: roots(3)
     real(8), parameter :: r3=1.0d0/3.0d0
     integer :: elem, i, p1, p2, p3, front, ifr
-
+    call deb_inf("|FT find volume")
     front = FrontFirst
     do ifr = 1,FrontLength
       p1 = PointFirst(front)
@@ -758,7 +764,7 @@ end subroutine write_integer
     real(8) :: frontCenter(3), x1(3), dr(3), factor, r3, shift(3)
     integer :: point, i, front, ifr, ip, jfr, front2
     real(8) :: pi=3.141592653
-
+    call deb_inf("|FT Correct Vol")
     front = FrontFirst
     do ifr = 1, FrontLength
       if(abs(FrontProps(1,front)/FrontProps(2,front)-1d0)>maxErrorVol)then
@@ -807,6 +813,7 @@ end subroutine write_integer
     implicit none
     real(8) :: xp(3)
     integer :: point,i1, Ndomain
+    call deb_inf("|Map Coords")
     Ndomain = floor(xp(1)/xLength)
     xp(1) = xp(1)-xLength*Ndomain
     do i1=Ng,Nx+Ng-1
@@ -842,6 +849,7 @@ end subroutine write_integer
     implicit none
     real(8) :: xp(3)
     integer :: point,i,i1
+    call deb_inf("|Get Coords")
     i = floor(PointCoords(point,1)-0.5);   i1 = Ng+modulo(i-Ng,Nx)
     !if(i>Nx .or. i<1)call pariserror("Error: GetCoords"); 
     xp(1)=xh(i1)+dx(i1+1)*(PointCoords(point,1)-dfloat(i)-0.5)+xLength*floor(dfloat(i-Ng)/dfloat(Nx))
@@ -864,7 +872,7 @@ end subroutine write_integer
     real(8), dimension(3) :: xcen, xn, xn1, sm, x1, x2, x3, x21, x32 !, area
     real(8), dimension(3,3) :: xm, xs
     integer :: front, elem, ifr, point, i, p1, p2, p3
-
+    call deb_inf("|FT Calc Surface Tension")
     ! reset the surface tension force
     front = FrontFirst
     do ifr = 1, FrontLength
@@ -940,7 +948,7 @@ end subroutine write_integer
     integer :: point,ir,jr,kr,irh,jrh,krh,ii,jj,kk,iih,jjh,kkh,i1,j1,k1 !,i,front,ifr
     integer :: req(12),sta(MPI_STATUS_SIZE,12), ierr
     pd2 = 3.14159265358979323846/2d0
-
+    call deb_inf("|Front 2Grid Vector")
     ! add up the surface tension forces onto the fixed grid
 !    front = FrontFirst
 !    do ifr = 1, FrontLength
@@ -1093,7 +1101,7 @@ end subroutine write_integer
                colorp, xn(3),rn
     integer :: point,ir,jr,kr,irh,jrh,krh,ii,jj,kk,iih,jjh,kkh,i1,j1,k1
     pd2 = 3.14159265358979323846/2d0
-
+    call deb_inf("|Advance Front2")
     ! add up the surface tension forces onto the fixed grid
     do point = 1, NumLocPoint
 
@@ -1214,6 +1222,7 @@ end subroutine write_integer
     integer, allocatable, dimension(:), save :: ptcount !, send_type
     logical, save :: first_time=.true.
     real(8) :: xp, yp, zp
+    call deb_inf("|Distribute Front")
     if(first_time) then
       first_time = .false.
       allocate(ptcount(0:nPdomain) ) !,send_type(0:nPdomain) )
@@ -1279,7 +1288,7 @@ end subroutine write_integer
     include 'mpif.h'
     character(len=4), intent(in) :: send_recv
     integer :: ierr, req(2), sta(MPI_STATUS_SIZE,2)
-
+    call deb_inf("|GetFront")
     if(send_recv=='recv')then
       ! get the front from the front master process
       call MPI_IRECV(PointCoordsBuff(1,1),9*MaxPoint   ,MPI_DOUBLE_PRECISION, nPdomain,0, &
@@ -1317,7 +1326,7 @@ end subroutine write_integer
 !        write(*,*)'[fsmooth] warning: fix mxpt'
 !        stop
 !      endif
-
+    call deb_inf("|Smooth Front")
       ntp(1:MaxPoint) = 0
       ntpts(1:MaxPoint,1:25) = 0
       
@@ -1411,6 +1420,7 @@ end subroutine write_integer
     implicit none
     integer :: ipass, front, elem, ifr, i, p1, p2, p3, n1, n2, n3, nn, iflg, irough
     real(8) :: s1, s2, s3, ss
+    call deb_inf("|Regrid Front")
     do ipass=1,6
 !-------------------------------------------Add elements------------------------------------------
       front = FrontFirst
@@ -1498,6 +1508,7 @@ end subroutine write_integer
     implicit none
     integer :: irough, front, elem, ifr, i
     real(8) :: aamin, aamax
+    call deb_inf("|FT Front Quality")
     aamin=amin*amin*1.7/4.0
     aamax=amax*amax*1.7/4.0
     irough=0                              ! Check for rough spots
@@ -1530,6 +1541,7 @@ end subroutine write_integer
   subroutine DeleteElement(m,front,n1,iflg)
     implicit none
     integer :: m,front,n1,n2,n3,mc,nc1,nc2,nc3,p(8), iflg, i, j, m1, m2, m3, mc1, mc2, mo
+    call deb_inf("|FT delete element")
     call nflocal(m,n1,n2,n3,mc,nc1,nc2,nc3,p)
     do i=1,3
       if( ( ElemCorner(ElemNgbr(mc,nc1),i).ne.p(1) ).and. &
@@ -1605,6 +1617,7 @@ end subroutine write_integer
   subroutine AddElement(m,front,n1)
     implicit none
     integer :: m,front,n1,n2,n3,mc,nc1,nc2,nc3,p(8), i, newpt, newm, newmc, mm3, mmc1
+    call deb_inf("|FT Add element")
     call nflocal(m,n1,n2,n3,mc,nc1,nc2,nc3,p)
     do i=1,3
       if( ( ElemCorner(ElemNgbr(mc,nc1),i).ne.p(1) ).and. &
@@ -1671,6 +1684,7 @@ end subroutine write_integer
   subroutine nflocal(m,n1,n2,n3,mc,nc1,nc2,nc3,p)
     implicit none
     integer :: m,n1,n2,n3,mc,nc1,nc2,nc3,p(8), i
+    call deb_inf("|nfLocal")
     mc=ElemNgbr(m,n1)
     n2=n1+1;    if(n2.gt.3)n2=n2-3
     n3=n2+1;    if(n3.gt.3)n3=n3-3
@@ -1820,7 +1834,7 @@ integer :: nroot
       complex(8) :: x(3)
       real(8) :: pi=3.141592654
       real(8) :: DD, p, q, phi, temp1, temp2, y1,y2,y3, u, v, y2r, y2i
-
+      call deb_inf("|cubic FT")
 DD=0d0;  p=0d0;  q=0d0;  phi=0d0;  temp1=0d0;  temp2=0d0;  y1=0d0; y2=0d0; y3=0d0;  u=0d0;  v=0d0;  y2r=0d0;  y2i=0d0
 
 ! Step 0: If a is 0 use the quadratic formula. -------------------------
