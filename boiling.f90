@@ -46,7 +46,6 @@ contains
     namelist /heatparameters/ Cp1, Cp2, h_fg, kc1, kc2, T_sat, T0_1, T0_2,&
          BDRY_T, BC_T, ec1, ec2
 
-    call deb_inf("|Read Heat Params ")
     Cp1 = 1.0d0; Cp2 = 10.0; h_fg=1.0d30; 
     kc1=1.0d0; kc2=1.0d3; T_sat=1.0d0
     T0_1=1.0d1; T0_2=1.0d1
@@ -98,7 +97,6 @@ contains
     use module_flow
     implicit none
     integer :: i,j,k
-    call deb_inf("|TempDiffusion ")
     do i=is,ie; do j=js,je;  do k=ks,ke
        dTe(i,j,k) = dTe(i,j,k) + 1.d0/(rho(i,j,k)*cp(i,j,k))*&
             ( (kc(i+1,j,k)+kc(i,j,k))*(Te(i+1,j,k)-Te(i,j,k)) -&
@@ -125,7 +123,7 @@ contains
     integer, dimension(imin:imax,jmin:jmax,kmin:kmax) :: dummy_flag 
     integer, intent(in) :: tswap
     integer :: i,j,k
-    call deb_inf("|Vof Energy Sweeps ")
+
     !get cell energies, energies at s-1 and e+1 needed for BC's
     do i=is-1,ie+1; do j=js-1,je+1;  do k=ks-1,ke+1
        energy(i,j,k) = rho(i,j,k)*cp(i,j,k)*Te(i,j,k)
@@ -186,7 +184,6 @@ contains
     real(8) nr(3), stencil3x3(-1:1,-1:1,-1:1)
     intrinsic dmax1,dmin1
     !***
-    call deb_inf("|swpz energy ")
     call init_i0j0k0 (d,i0,j0,k0)
     if(ng.lt.2) call pariserror("wrong ng")
 
@@ -316,7 +313,7 @@ contains
     implicit none
     real(8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: c
     integer :: i,j,k
-    call deb_inf("|get dt from E ")
+
     do k=ks,ke
        do j=js,je
           do i=is,ie
@@ -332,7 +329,7 @@ contains
   subroutine SetTempBc
     implicit none
     integer :: i,j,k
-    call deb_inf("|set BC temp ")
+
     !BC on x-
     if (coords(1)==0) then
        do j=js,je; do k=ks,ke

@@ -31,7 +31,6 @@ subroutine swp(us,c,f,d,vof1,vof2,vof3)
   real (8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: us
   real (8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: c,vof1,vof2,vof3
   integer, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: f
-  call deb_inf("|SWP ")
   if (VOF_advect=='Dick_Yue') then  ! Weymouth-Yue = Eulerian Implicit + central cell stuff
      call swpr(us,c,f,d,vof1,vof2,vof3)  
   elseif (VOF_advect=='CIAM') then  ! CIAM == Lagrangian Explicit
@@ -54,7 +53,6 @@ subroutine swp_stg(us,c,f,d,vof1,vof2,vof3,dir)
   real (8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: us
   real (8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: c,vof1,vof2,vof3
   integer, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: f
-  call deb_inf("|SWP STG ")
   if (VOF_advect=='Dick_Yue') then  ! Yue-Weymouth = Eulerian Implicit + central cell stuff
      call pariserror("*** not implemented yet")
   elseif (VOF_advect=='CIAM') then  ! CIAM == Lagrangian Explicit
@@ -79,7 +77,7 @@ subroutine swpmom(us,c,d,mom1,mom2,mom3,mom,t)
   real(8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: c
   real(8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: mom1,mom2,mom3
   real(8) :: t
-  call deb_inf("|SWPMOM ")
+
   if (VOF_advect=='Dick_Yue') then  ! Yue-Weymouth = Eulerian Implicit + central cell stuff
      call swprmom(us,c,d,mom1,mom2,mom3,mom,t)
   elseif (VOF_advect=='CIAM') then  ! CIAM == Lagrangian Explicit
@@ -100,7 +98,7 @@ subroutine swpmom_stg(us,c,d,mom1,mom2,mom3,mom,dir,t)
   real(8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: c
   real(8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: mom1,mom2,mom3
   real(8) :: t
-  call deb_inf("|SWP momentum staggered ")
+
   if (VOF_advect=='Dick_Yue') then  ! Yue-Weymouth = Eulerian Implicit + central cell stuff
      call pariserror("*** not implemented yet")
   elseif (VOF_advect=='CIAM') then  ! CIAM == Lagrangian Explicit
@@ -140,7 +138,6 @@ subroutine swpz(us,c,f,d,vof1,vof2,vof3)
   real(8) nr(3),deltax(3),x0(3)
   intrinsic dmax1,dmin1
   !***
-  call deb_inf("|swap z ")
   call init_i0j0k0 (d,i0,j0,k0)
 
   if(ng.lt.2) call pariserror("wrong ng")
@@ -258,7 +255,6 @@ subroutine swpz_stg(us,c,f,d,vof1,vof2,vof3,dir)
   real(8) nr(3),deltax(3),x0(3)
   intrinsic dmax1,dmin1
   !***
-  call deb_inf("|swpz_stg ")
   call init_i0j0k0 (d,i0,j0,k0)
   call init_i0j0k0 (dir,i2,j2,k2)
 
@@ -360,7 +356,6 @@ subroutine swpzmom(us,c,d,mom1,mom2,mom3,mom,t)
   real(8) nr(3), stencil3x3(-1:1,-1:1,-1:1)
   intrinsic dmax1,dmin1
   !***
-  call deb_inf("|swpz mom ")
   call init_i0j0k0 (d,i0,j0,k0)
 
   if(ng.lt.2) call pariserror("wrong ng")
@@ -457,7 +452,6 @@ subroutine swpzmom_stg(us,c,d,mom1,mom2,mom3,mom,dir,t)
   real(8) nr(3), stencil3x3(-1:1,-1:1,-1:1)
   intrinsic dmax1,dmin1
   !***
-  call deb_inf("|spwz mom stg ")
   call init_i0j0k0 (d,i0,j0,k0)
   call init_i0j0k0 (dir,i2,j2,k2)
 
@@ -562,7 +556,7 @@ subroutine fit_plane_new(vof,d,a1,a2,stencil3x3,mxyz,alpha,error)
   real(8) mxyz(3), stencil3x3(-1:1,-1:1,-1:1)
   logical error
   intrinsic dmax1,dmin1
-  call deb_inf("|fit plane new ")
+
   error=.TRUE.
   call mycs(stencil3x3,mxyz)
 ! TEMPORARY - Note: avoid calculating alpha when mxyz is zero, which occurs when cvof is 
@@ -606,8 +600,7 @@ SUBROUTINE swpr(us,c,f,dir,vof1,cg,vof3)
     REAL(8) :: AL3DNEW, FL3DNEW, x0(3), deltax(3)
     real(8) :: mxyz(3),stencil3x3(-1:1,-1:1,-1:1)
     INTRINSIC DMAX1,DMIN1
-    !
-    call deb_inf("|swpr ")
+!
   if(ng < 2) call pariserror("wrong ng")
   ii=0; jj=0; kk=0
   if (dir == 1) then
@@ -700,7 +693,7 @@ SUBROUTINE swprmom(us,c,dir,mom1,cg,mom3,mom,t)
     REAL(8) :: AL3DNEW, FL3DNEW, x0(3), deltax(3)
     real(8) :: mxyz(3),stencil3x3(-1:1,-1:1,-1:1)
     INTRINSIC DMAX1,DMIN1
-    call deb_inf("|swpr mom ")
+
   if(ng < 2) call pariserror("wrong ng")
   ii=0; jj=0; kk=0
   if (dir == 1) then
@@ -778,7 +771,6 @@ subroutine ls2vof_in_cell(stencil3x3,c,nflag)
   real(8) :: fl3dnew
   real(8) :: mxyz(3),stencil3x3(-1:1,-1:1,-1:1)
 
-  !call deb_inf("|ls2vof_in_cell ") !overkill!
   zero=0d0
   one=1d0
   !***

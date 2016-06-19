@@ -78,7 +78,6 @@ contains
   subroutine initialize_surface_tension()
     implicit none
     integer :: minM
-    call deb_inf("|Initialize surface tension ")
     allocate(height(imin:imax,jmin:jmax,kmin:kmax,6))
     if(nx.ge.500000.or.ny.gt.500000.or.nz.gt.500000) call pariserror("nx too large")
     if(NDEPTH.gt.20) call pariserror("ndepth too large")
@@ -112,7 +111,6 @@ contains
     integer :: ierr,i,iout
     integer :: glob_count(ngc)
     character(len=85) :: glob_desc(ngc)
-    call deb_inf("|print st stats ")
     if(st_initialized) then
        call MPI_ALLREDUCE(geom_case_count, glob_count, ngc, MPI_INTEGER, MPI_SUM, MPI_COMM_Cart, ierr)  
        if(rank==0) then
@@ -160,7 +158,6 @@ contains
     integer :: i0,j0,k0
     real(8) :: mxyz(3)
     integer :: req(36),sta(MPI_STATUS_SIZE,36)
-    call deb_inf("|Get Normals ")
     if(.not.st_initialized) call initialize_surface_tension()
     if(recomputenormals) call pariserror("recomputenormals is true, normals not allocated")
 
@@ -196,7 +193,6 @@ contains
     logical :: debug
     integer :: iout,l,j,k
     integer :: prank
-    call deb_inf("|Get all heights ")
     if(.not.st_initialized) call initialize_surface_tension()
 
     !*** Initialize
@@ -275,7 +271,6 @@ contains
     real(8) :: height_p     !  partial height 
     integer :: i,j,k,s,c0,c1,c(3),ctop
     integer :: sign, flag_other_end, climitp1, normalsign
-    call deb_inf("|GH pass 1 ")
     ! NDEPTH is the depth of layers tested above or below the reference cell. 
     ! including the central layer and the empty/full cells
     ! NDEPTH*2 + 1 = 7 means a 7 x 3^2 stencil including full/empty. 
@@ -384,7 +379,6 @@ contains
     real(8) :: ha,hb,cmiddle
     integer :: l,m,n,c0,cb,c(3),try(3)
     integer :: sign, sabove, sbelow
-    call deb_inf("|GH Pass 2 ")
     ! NDEPTH is the depth of layers tested above or below the reference cell. 
     try(1)=d 
     m=1
@@ -511,7 +505,6 @@ contains
     logical :: dirnotfound,heightnotfound
     integer :: si,sj,sk
 
-    call deb_inf("|get Local Heights ")
     i = i1(0,0,1)
     j = j1(0,0,1)
     k = k1(0,0,1)
@@ -659,7 +652,7 @@ contains
     integer, allocatable, dimension(:,:,:) :: kappaflag
     integer, parameter :: UNDECIDED = 5
     integer, parameter :: UNCOMPUTABLE = 4
-    call deb_inf("|Get all curvatures pop ")
+
     if(.not.st_initialized) call initialize_surface_tension()
     allocate(kappaflag(imin:imax,jmin:jmax,kmin:kmax))
 
@@ -839,7 +832,7 @@ contains
     real(8) :: fit(NPOS,3),weights(NPOS)
     real(8) :: mxyz(3),mv(3),stencil3x3(-1:1,-1:1,-1:1)
     real(8) :: wg, kappasign, area3d
-    call deb_inf("|Curvature Pop Pass1 ")
+
     call map3x3in2x2(i1,j1,k1,i0,j0,k0)
     !   define in which order directions will be tried 
     !   direction closest to normal first
@@ -968,7 +961,7 @@ contains
     real(8) :: fit(NPOS,3),weights(NPOS)
     real(8) :: centroid(3),mxyz(3),mv(3),stencil3x3(-1:1,-1:1,-1:1)
     real(8) :: wg, kappasign
-    call deb_inf("|Curv Pop Pass 2 ")
+    
     if(recomputenormals) then
        do m=-1,1; do n=-1,1; do l=-1,1
           stencil3x3(m,n,l) = cvof(i0+m,j0+n,k0+l)
@@ -1066,7 +1059,7 @@ contains
       ! x_new_i = e_ji x_old_j
       real(8) :: testm(3,3), id(3,3), error
       integer :: i,j
-    !call deb_inf("|Parabola fit with rotation ")
+
       if(do_rotation) then
          ! normal = direction z
          ! e_z' = m
@@ -1142,7 +1135,7 @@ contains
       integer :: ifit, im,jm, nposit
       logical :: inv_success
       real(8) :: x1,x2,x3,x4,y1,y2,y3,y4,wg
-     !call deb_inf("|Parabola fit ")
+
       fit_success=.false.
       a = 0.d0
       ! evaluate the linear system for least-square fit
@@ -1230,7 +1223,7 @@ contains
       real(8) :: m
       real(8), dimension(n,2*n) :: augmatrix ! augmented matrix
       real(8), dimension(:,:), allocatable :: test
-    call deb_inf("|Find Inverse Matrix ")
+
       ! augment input matrix with an identity matrix
       do i = 1,n
          do j = 1,2*n
@@ -1320,7 +1313,7 @@ contains
       integer :: l,m,n
       real(8) :: nr(3)
       real(8) :: stencil3x3(-1:1,-1:1,-1:1)
-    call deb_inf("|area centroid ")
+
       if(recomputenormals) then
          do l=-1,1; do m=-1,1; do n=-1,1
             stencil3x3(l,m,n) = cvof(i+l,j+m,k+n)
@@ -1347,7 +1340,7 @@ contains
       real(8) :: invx,invy,invz
       real(8) :: alpha, al3dold, nr(3)
       real(8) :: stencil3x3(-1:1,-1:1,-1:1)
-    call deb_inf("|area centroid (old) ")
+
       ! find cut area centroid 
       !***
       !     (1) normal vector: dmx,dmy,dmz, and |dmx|+|dmy|+|dmz| = 1.
@@ -1710,7 +1703,7 @@ contains
       real(8) :: rhoavg,invdeltax
       integer :: i,j,k,d
       integer :: i0,j0,k0
-    call deb_inf("|Project velocity staggered ")
+
       call init_i0j0k0 (d,i0,j0,k0)
       call get_staggered_fractions (tmp,d) 
 
@@ -1769,7 +1762,7 @@ contains
       real(8) :: rhoavg, invdeltax
       integer :: i,j,k,d
       integer :: i0,j0,k0
-    call deb_inf("|Get Poisson Matrix X ")
+
       call init_i0j0k0 (d,i0,j0,k0)
       call get_staggered_fractions (tmp,d) 
       if (d.eq.1) then
@@ -1830,7 +1823,7 @@ contains
       real(8), dimension(is:ie,js:je,ks:ke,8), intent(out) :: A
       real(8), intent(in) :: dt, VolumeSource
       integer :: i,j,k,l
-    call deb_inf("|Setup Poisson Ghost")
+
       A(:,:,:,8) = 0.d0
 
       call get_Poisson_matrix_x(A(:,:,:,1),A(:,:,:,2),A(:,:,:,8),umask,dt,1)
@@ -1855,7 +1848,7 @@ contains
       real(8) :: cent(3)
       integer :: i,j,k,nf
       character(len=30) :: rootname
-    call deb_inf("|Output Centroids ")
+
       rootname=TRIM(out_path)//'/centroid-'//TRIM(int2text(nf,padding))//'-'
       if (rank==0) call append_3d_file(TRIM(rootname))
 

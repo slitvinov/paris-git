@@ -80,7 +80,7 @@
   integer :: req(4),sta(MPI_STATUS_SIZE,4)
   integer :: i,j,k,level,iout,ierr
   integer :: level3, l3sum
-  call deb_inf("|FS set topology")
+
   !initialize all masks to 3
   if (.not.initialize_fs) call pariserror("Error: Free surface variables not initialized")
   u_cmask = 3; v_cmask = 3; w_cmask = 3; pcmask = 3
@@ -185,7 +185,6 @@ subroutine check_topology(is_gas)
   logical :: remove,signal
   logical, intent(in) :: is_gas
 
-  call deb_inf("|FS check topo")
   signal = .false.
   fill_ghost = .false.
   remove = .false.
@@ -251,7 +250,6 @@ contains
     real(8) :: d_clean 
     integer :: max_implode
     logical :: merged
-    call deb_inf("|FS bub implode")
     max_implode = 0
     remove =.false.
     do k=ks,ke; do j=js,je; do i=is,ie
@@ -313,7 +311,8 @@ subroutine extrapolate_velocities()
   integer, dimension(-2:2,-2:2,-2:2) :: velmask
   logical :: x_success
   real(8) :: varx
-  call deb_inf("|FS extrapolate")
+  
+  !Simple 1st order extrapolation: Velocities of neighbours at lower topological level averaged
   !Applies the linear equation from FreeSurface documentation (report)
   if (order_extrap == 1) then
      do level = 1, X_level
@@ -443,7 +442,6 @@ contains
     real(8) :: den, psi, maxc
     integer :: fit_cells
     logical :: inverse_success, extra_vel_found
-    call deb_inf("|FS setup matrix")
     var = 0.0d0
     fit_cells=0
     rhs=0.0d0
@@ -629,7 +627,6 @@ subroutine discrete_divergence(u,v,w,iout)
   integer :: i,j,k,l,iout,ierr,prank
   character(len=30) :: filename
 
-  call deb_inf("|FS discrete div")
   divtot = 0d0; n_level = 0d0
 
   do k=ks,ke; do j=js,je; do i=is,ie
@@ -673,7 +670,6 @@ subroutine get_ref_volume(vof)
   real(8) :: V_loc
   integer :: i,j,k,ierr
 
-  call deb_inf("|FS get ref vol")
   !V_0 = 4d0/3d0*pi*(R_ref**3d0)
   V_loc = 0.0d0
   do k=ks,ke; do j=js,je; do i=is,ie
@@ -712,8 +708,6 @@ subroutine FreeSolver(A,p,maxError,beta,maxit,it,ierr,iout,time,tres2)
   integer, parameter :: norm=2, relaxtype=1
   integer, save :: itime=0
   logical :: use_L_inf = .true.
-
-  call deb_inf("|FS freesolver")
 ! Open file for convergence history
   if(rank==0.and.recordconvergence) then
      OPEN(UNIT=89,FILE=TRIM(out_path)//'/convergence_history-'//TRIM(int2text(itime,padding))//'.txt')
@@ -812,7 +806,6 @@ contains
     logical :: diverged=.false.
     logical :: extended=.true.
     integer :: l
-    call deb_inf("|FS catch div")
     if(extended) then
        do k=ks,ke; do j=js,je; do i=is,ie
           do l=1,8
@@ -872,7 +865,6 @@ subroutine RedBlackRelax_fs(A,p,beta)
   integer :: req(12),sta(MPI_STATUS_SIZE,12)
   integer :: i,j,k,ierr
   integer :: isw,jsw,ksw,ipass
-  call deb_inf("|FS redblack1")
   ksw=1
   do ipass=1,2
      jsw=ksw
@@ -913,7 +905,6 @@ subroutine LineRelax_fs(A,p,beta)
   real(8), dimension(is:ie,js:je,ks:ke,8), intent(in) :: A
   real(8), intent(in) :: beta
   integer :: i,j,k
-  call deb_inf("|fs linerelax")
 !--------------------------------------ITERATION LOOP--------------------------------------------  
   do k=ks,ke; do j=js,je; do i=is,ie
      if ((pcmask(i,j,k)==0 .and. solver_flag==1).or.((pcmask(i,j,k)==1 .or. pcmask(i,j,k)==2) .and. solver_flag==2)) then
@@ -941,7 +932,6 @@ subroutine append_visit_fs(index,iout)
   character(len=10) :: file
   character(len=40) :: file_root
   integer index, iout, prank
-  call deb_inf("|FS appendvisit")
   if(rank.ne.0) call pariserror("rank.ne.0 in append")
   file = TRIM(visit_file(index))
   if(.not.vtk_open(index)) then
@@ -970,7 +960,6 @@ subroutine VTK_scalar_struct(index,iout,var)
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax) :: var 
   character(len=40) :: file_root
   integer index, iout, i,j,k
-  call deb_inf("|FS vtk scalar struct")
   file_root = TRIM(out_path)//'/VTK/'//TRIM(file_short(index))//TRIM(int2text(iout,padding))//'-'
   !Write to VTK file
   OPEN(UNIT=8,FILE=TRIM(file_root)//TRIM(int2text(rank,padding))//'.vtk')
@@ -1013,7 +1002,7 @@ subroutine Integrate_RP(dt,t,rho)
   integer, parameter :: nvar = 2
   real(8) :: y(nvar), ytmp(nvar),rho
   real(8) :: dydt1(nvar), dydt2(nvar),dydt3(nvar),dydt0(nvar),dydt4(nvar)
-  call deb_inf("|FS integrate")
+
     ! start at previous RP values
     y(1) = R_RK
     y(2) = dR_RK
@@ -1061,7 +1050,6 @@ subroutine write_RP_test(t,rho)
   implicit none
   real(8) :: t, vol, p_mid, p_corner, rho
   real(8), parameter :: pi=3.141592653589793238462643383
-  call deb_inf("|FS write RP test")
   vol = 4d0/3d0*pi*R_RK**3d0
   p_mid = pressure(0.5d0)
   p_corner = pressure(sqrt(2d0)/2d0)
@@ -1092,7 +1080,6 @@ subroutine set_RP_pressure(p,rho)
   real(8) :: r, rho
   integer :: i,j,k
 
-  call deb_inf("|FS set rp press")
   if (coords(1)==0) then 
      do k=ks-1,ke+1; do j=js-1,je+1
         r = sqrt((x(is-1)-xc(1))**2d0 + (y(j)-yc(1))**2d0 + (z(k)-zc(1))**2d0)
@@ -1150,7 +1137,6 @@ subroutine initialize_P_RP(p,rho)
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: p
   real(8) :: r, P_l, rho
   integer :: i,j,k,ierr
-  call deb_inf("|FS init PRP")
   P_l = P_ref*(R_ref/R_RK)**(3d0*gamma)-2d0*sigma/R_RK
   if (rank==0) write(*,'("RP test, P_l, R_RK, dR_RK, ddR_RK: ",4e14.5)')P_l,R_RK, dR_RK, ddR_RK
   do k=ks,ke; do j=js,je; do i=is,ie
@@ -1197,7 +1183,7 @@ subroutine tag_bubbles(phase_ref,iout,time_stats)
   integer, intent(in) :: phase_ref
   integer :: ierr
   logical, allocatable :: implode_global(:) 
- call deb_inf("|FS tagbubbles")
+ 
   tracked_phase = phase_ref
   call tag_drop()
   if ( nPdomain > 1 ) call tag_drop_all
@@ -1234,7 +1220,7 @@ subroutine set_bubble_pressure
   !real(8), dimension(imin:imax,jmin:jmax,kmin:kmax) :: P_g
   real(8) :: volume
   integer :: i,j,k,dropid
- call deb_inf("|FS set bubble pressure")
+ 
   P_gas = 0.0d0
   if ((NumBubble>0) .and. (P_ref > 1.d-14) .and. .not. (test_capwave .or. test_plane)) then
      do k=ks,ke; do j=js,je; do i=is,ie
@@ -1271,7 +1257,7 @@ subroutine inflow_accelerate
   real(8) :: factor
   real(8), parameter :: pi=3.141592653589793238462643383
   integer :: i,j,k
-  call deb_inf("|FS inflow accel")
+  
   if (itimestep < 2) then
      factor = 0.0d0
   else
@@ -1349,7 +1335,6 @@ subroutine setuppoisson_fs_heights(utmp,vtmp,wtmp,rho,dt,coeff,bub_id)
   integer :: i,j,k,nbr
   integer :: reqd(24),stat(MPI_STATUS_SIZE,24)
   
-  call deb_inf("|FS setupPoisson fs heights")
   if (.not.(solver_flag==1 .or. solver_flag==2)) call pariserror('Solver_flag FS needs to be either 1 or 2')
   if (solver_flag == 1) then
      call liq_gas2()
@@ -1399,7 +1384,7 @@ contains
     real(8) :: Source
     integer :: i,j,k,l,ierr
     real(8) :: avg_kap, n_kap
-    call deb_inf("|FS liq gas2")
+    
     !OPEN(unit=121,file='mods.txt',access='append')
     call get_all_curvatures(kap,2)
     x_mod=dxh((is+ie)/2); y_mod=dyh((js+je)/2); z_mod=dzh((ks+ke)/2) !assumes an unstretched grid
@@ -1599,7 +1584,7 @@ subroutine staggered_cut(cvof,i,j,k,theta,phase,d)
   real(8) :: alpha2, c_ref, c_nbr, c_stag, c_min=1.0d-1, test
   real(8) :: al3dnew, FL3DNEW
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: cvof
-  call deb_inf("|FS staggered cut")
+
   if (.not.(phase==1 .or. phase==0)) call pariserror('cell phase has to be 0 or 1 in staggered_cut call')
 
   loc = 0
@@ -1712,7 +1697,6 @@ subroutine curvature_sphere(t)
   real(8) :: kap_sphere, max_loc, err_inf, gh_cells, t_cells, t
   real(8) :: V_loc, V_t
   logical :: check
-  call deb_inf("|FS curvature sphere")
   ! initialize errors
   errnorm = 0.0d0; err_glob=0.0d0; gh_cells = 0.0d0; max_loc = 0.0d0
 
@@ -1776,7 +1760,7 @@ subroutine remove_drops(phase,vof,fill_all) !some cleaning
   logical :: clearcells, fill, fill_all
   integer :: i,j,k,ierr
   integer :: inr,jnr,knr,phase_ref
-  call deb_inf("|FS remove drops")
+
   fill = .false.
   do i=is,ie; do j=js,je; do k=ks,ke
      clearcells = .true.
@@ -1834,7 +1818,6 @@ subroutine setuppoisson_fs_hypre(utmp,vtmp,wtmp,rho,dt,coeff,height,kap,bub_id)
   integer :: reqd(12),stat(MPI_STATUS_SIZE,12)
   real(8) :: Source
   real(8) :: avg_kap, n_kap
-  call deb_inf("|FS setupPoisson hypre")
   !!Debugging for curvature errors
 !!$  real(8) :: err, err_global, L2_err, Linf_err, kappa_theory, L2_glob, Linf_glob
 !!$  integer :: uncomp_curv, uncomp_curv_global, n_avg_kap, n_glob

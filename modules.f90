@@ -69,7 +69,6 @@ module module_grid
   integer :: imin, imax, jmin, jmax, kmin, kmax
   real(8), parameter :: TINY_DOUBLE=1d-300 
   logical :: test_MG=.false., MultiGrid=.false.
-  logical :: debug_mode=.false. !wa
   logical, parameter :: recordconvergence=.false.
   integer :: nrelax=3
 ! added by SZ
@@ -301,7 +300,6 @@ contains
     include 'mpif.h'
     integer :: n,ierr2,itimestep,iTimeStepRestart
     real(8) :: totaltime, ZZ
-    call deb_inf("|wrap_up_timer")
     if(rank>0) return
     end_loop = MPI_WTIME(ierr2)
     ZZ = nx*ny*nz/npx/npy/npz*(itimestep-iTimeStepRestart)/(end_loop-start_loop)
@@ -459,7 +457,6 @@ contains
     real(8) :: norm=0.d0, coeff, vmax
     logical :: DoVOF
     intrinsic dsqrt
-    call deb_inf("|write vec gnuplot ")
     !
     ! writing u,v
     !
@@ -520,7 +517,7 @@ contains
     real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: du, dv, dw
     integer, intent(in) :: iout
     integer :: i,j,k
-    call deb_inf("|write vec gnuplot")
+    
     OPEN(UNIT=20,FILE=TRIM(out_path)//'/Mag_accel-'//TRIM(int2text(rank,padding))//'-'//TRIM(int2text(iout,padding))//'.txt')
     k=(ks+ke)/2
     do i=is,ie; do j=js,je
@@ -538,7 +535,6 @@ contains
     real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: w
     real(8), intent(in) :: time
     integer :: i,j,k
-    call deb_inf("|output droplet")
     i=nx/2
     j=ny/2
     k=3*nz/4
@@ -557,7 +553,6 @@ contains
     implicit none
     character(*) :: rootname
     integer prank
-    call deb_inf("|append visit file")
     if(rank.ne.0) call pariserror("rank.ne.0 in append")
     
     if(opened==0) then
@@ -584,7 +579,6 @@ contains
     implicit none
     character(*) :: rootname
     integer prank
-    call deb_inf("|append 3d file")
     if(rank.ne.0) call pariserror("rank.ne.0 in append")
     
     if(.not. opened_cent) then
@@ -625,7 +619,6 @@ subroutine backup_write
   implicit none
   integer ::i,j,k
   character(len=100) :: filename
-  call deb_inf("|backup write")
   filename = trim(out_path)//'/backup_'//int2text(rank,padding)
   !call system('touch '//trim(filename)//'; mv '//trim(filename)//' '//trim(filename)//'.old')
   OPEN(UNIT=7,FILE=trim(filename),status='REPLACE')
@@ -650,7 +643,6 @@ subroutine backup_read
   
   implicit none
   integer ::i,j,k,i1,i2,j1,j2,k1,k2,ierr
-  call deb_inf("|backup read")
   OPEN(UNIT=7,FILE=trim(out_path)//'/backup_'//int2text(rank,padding),status='old',action='read')
   read(7,*)time,itimestep,i1,i2,j1,j2,k1,k2
   if(i1/=is .or. i2/=ie .or. j1/=js .or. j2/=je .or. k1/=ks .or. k2/=ke) &
@@ -692,7 +684,7 @@ subroutine output1(nf,i1,i2,j1,j2,k1,k2)
   implicit none
   integer :: nf,i1,i2,j1,j2,k1,k2,i,j,k
   logical, save :: first_time=.true.
-  call deb_inf("|output 1")
+  
   if(first_time)then
     first_time = .false.
     OPEN(UNIT=7,FILE=trim(out_path)//'/grid_'//int2text(rank,3)//'.dat')
@@ -735,14 +727,12 @@ end subroutine output1
 subroutine output2(nf,i1,i2,j1,j2,k1,k2)
   use module_flow
   use module_grid
+
   !use IO_mod
   implicit none
   integer ::nf,i1,i2,j1,j2,k1,k2,i,j,k, itype=5
   !  logical, save :: first_time=.true.
   character(len=30) :: rootname,filename
-  
-  call deb_inf("|output 2")
-
   rootname=TRIM(out_path)//'/VTK/plot'//TRIM(int2text(nf,padding))//'-'
 
   if(rank==0) call append_visit_file(TRIM(rootname))
@@ -806,7 +796,6 @@ subroutine output3(nf,i1,i2,j1,j2,k1,k2)
   integer ::nf,i1,i2,j1,j2,k1,k2,i,j,k, itype=5
 !  logical, save :: first_time=.true.
   character(len=30) :: rootname,filename
-  call deb_inf("|output 3")
   rootname=TRIM(out_path)//'/VTK/plot'//TRIM(int2text(nf,padding))//'-'
 
   if(rank==0) call append_visit_file(TRIM(rootname))
@@ -889,7 +878,7 @@ module module_BC
   subroutine update_bounds(n)
       implicit none
       integer, intent(in) :: n(3)
-    call deb_inf("|update_bounds")
+
       is=coords(1)*n(1)+1+Ng; imin=is-Ng
       js=coords(2)*n(2)+1+Ng; jmin=js-Ng
       ks=coords(3)*n(3)+1+Ng; kmin=ks-Ng
@@ -913,7 +902,7 @@ module module_BC
     implicit none
     include 'mpif.h'
     real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: umask,vmask,wmask
-    call deb_inf("|set_press_bc")
+
   ! for walls set the mask to zero  ! @@@ Aijk coefficients should be changed too. 
     if(bdry_cond(1)==0 .or. bdry_cond(1)==2) then
       if(coords(1)==0    ) umask(is-1,js-1:je+1,ks-1:ke+1)=0d0
@@ -955,7 +944,6 @@ module module_BC
     real(8) :: t,dt,fluxin,tfluxin,uaverage
     real(8) :: fluxout(6),tfluxout(6),tfluxout_all,fluxratio,uinj
     integer :: i,j,k,ierr,seed
-    call deb_inf("|Set Vel BC")
     ! Note: local and global divergence free cannot be perfectly satisfied 
     ! at the mean time for pressure BC (p=p0,du/dn=0), in BC=6, the global 
     ! divergence free is guaranteed by matching the inflow condiction. 
@@ -1334,7 +1322,6 @@ module module_BC
     integer, intent(in) :: d
     real(8) :: t,flux,tflux,uaverage,uinj
     integer :: i,j,k,ierr,seed
-    call deb_inf("|Set Momentum BC")
     ! solid obstacles
     u = u*mask
     mom = mom*mask
@@ -1626,7 +1613,7 @@ module module_BC
     include 'mpif.h'
     integer :: req(48),sta(MPI_STATUS_SIZE,48)
     integer :: ierr
-    call deb_inf("|do_ghost_vector")
+
     call ghost_x(us1  ,2,req( 1: 4));  call ghost_x(us2,2,req( 5: 8)); call ghost_x(us3,2,req( 9:12)) 
     call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
     call ghost_y(us1  ,2,req( 1: 4));  call ghost_y(us2,2,req( 5: 8)); call ghost_y(us3,2,req( 9:12)) 
@@ -1747,7 +1734,6 @@ module module_BC
     implicit none
     include 'mpif.h'
     real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: fx, fy, fz
-    call deb_inf("|setvectorBC")
     ! Add the vector outside the domain to the neighboring cell inside the domain
     ! This is used for color gradient vector and surface tension forces
     if(bdry_cond(1)==0 .and. coords(1)==0    ) then
@@ -1789,7 +1775,7 @@ module module_BC
     include 'mpif.h'
     integer :: ilen, jlen, klen, ierr, dir
     integer :: srcL, srcR, destL, destR, face(2)
-    call deb_inf("|init_ghost")
+
     SELECT CASE (dir)
     CASE (1)
         jlen=jmax-jmin+1; klen=kmax-kmin+1; !ilen=ngh
@@ -2065,7 +2051,7 @@ subroutine lghost_x(F,ngh,req)
     integer :: jlen, klen, ierr !,sta(MPI_STATUS_SIZE,4)
     integer, save :: srcL, srcR, destL, destR, face(2)
     logical, save :: first_time=.true.
-    call deb_inf("|lghost_X")
+
     if(ngh>Ng) call pariserror("ghost error: not enough ghost layers to fill")
     if(first_time) then
       first_time=.false.
@@ -2094,7 +2080,7 @@ subroutine lghost_x(F,ngh,req)
     integer :: ilen, klen, ierr !,sta(MPI_STATUS_SIZE,4)
     integer, save :: srcL, srcR, destL, destR, face(2)
     logical, save :: first_time=.true.
-    call deb_inf("|lghost_Y")
+
     if(ngh>Ng) call pariserror("ghost error: not enough ghost layers to fill")
     if(first_time)then
       first_time=.false.
@@ -2123,7 +2109,7 @@ subroutine lghost_x(F,ngh,req)
     integer :: ilen, jlen, ierr !,sta(MPI_STATUS_SIZE,4)
     integer, save :: srcL, srcR, destL, destR, face(2)
     logical, save :: first_time=.true.
-    call deb_inf("|lghostZ")
+
     if(ngh>Ng) call pariserror("ghost error: not enough ghost layers to fill")
     if(first_time)then
       first_time=.false.
@@ -2319,7 +2305,7 @@ module module_poisson
     integer, intent(in) :: mpi_comm_in,iis,iie,jjs,jje,kks,kke,Nx,Ny,Nz,bdry_cond(3)
     integer :: ierr, periodic_array(3), i
     integer, dimension(:,:), allocatable :: offsets
-    call deb_inf("|Poisson_init")
+    
     mpi_comm_poi = mpi_comm_in
     is = iis;   ie = iie;   Mx = ie-is+1
     js = jjs;   je = jje;   My = je-js+1
@@ -2391,7 +2377,6 @@ module module_poisson
 #ifdef DEBUG_HYPRE
    if ( rank == 0 ) timeConstruct=MPI_WTIME(ierr)
 #endif
-    call deb_inf("|Poisson_solve")
     num_iterations = 0
     nvalues = mx * my * mz * nstencil
     allocate(values(nvalues), stat=ierr)
@@ -2556,7 +2541,6 @@ module module_poisson
     implicit none
     include 'mpif.h'
     integer :: ierr
-    call deb_inf("|Poisson_finalize")
     call HYPRE_StructGridDestroy(grid_obj, ierr)
     call HYPRE_StructStencilDestroy(stencil, ierr)
     call HYPRE_StructMatrixDestroy(Amat, ierr)
@@ -2596,7 +2580,6 @@ subroutine SetupDensity(dIdx,dIdy,dIdz,A,color) !,mask)
   integer :: i,j,k
   logical, save :: first=.true.
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax) :: dI
-  call deb_inf("|setup density")
   do k=ks,ke; do j=js,je; do i=is,ie
       A(i,j,k,1) = 1d0/dx(i)/dxh(i-1)
       A(i,j,k,2) = 1d0/dx(i)/dxh(i  )
@@ -2670,7 +2653,7 @@ subroutine SetupPoisson(utmp,vtmp,wtmp,umask,vmask,wmask,rhot,dt,A,pmask,VolumeS
   real(8), dimension(is:ie,js:je,ks:ke,8), intent(out) :: A
   real(8), intent(in) :: dt, VolumeSource
   integer :: i,j,k
-  call deb_inf("|SetupPoisson")
+  
   do k=ks,ke; do j=js,je; do i=is,ie
     !    if(mask(i,j,k))then
     A(i,j,k,1) = 2d0*dt*umask(i-1,j,k)/(dx(i)*dxh(i-1)*(rhot(i-1,j,k)+rhot(i,j,k)))
@@ -2699,7 +2682,7 @@ subroutine Poisson_BCs(A)
   
   real(8), dimension(is:ie,js:je,ks:ke,8), intent(out) :: A
   real(8), dimension(4) :: P_bc
-  call deb_inf("|Posson_BCs")
+
   P_bc = 0d0
   ! dp/dn = 0 for inflow bc on face 1 == x- : do not correct u(is-1)
   ! inflow bc on other faces not implemented yet.  !@@ generalize this ! 
@@ -2842,7 +2825,7 @@ subroutine Poisson_BCs(A)
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: pmask
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: umask,vmask,wmask,rhot
   integer :: i,j,k
-  call deb_inf("|check_debug_Poisson")
+
   ! What follows is a lot of debugging for small A7 values and checking the matrix 
   do k=ks,ke; do j=js,je; do i=is,ie
     if(A(i,j,k,7) .lt. 1d-50)  then
@@ -2908,7 +2891,6 @@ subroutine SetupUvel(u,du,rho,mu,rho1,mu1,dt,A)
   real(8), intent(in) :: dt,rho1,mu1
   real(8) :: rhom
   integer :: i,j,k
-  call deb_inf("|Setup uvel")
   if(TwoPhase) then
      do k=ks,ke; do j=js,je; do i=is,ie;
         rhom = 0.5d0*(rho(i+1,j,k)+rho(i,j,k))
@@ -2975,7 +2957,6 @@ subroutine SetupVvel(v,dv,rho,mu,rho1,mu1,dt,A)
   real(8), intent(in) :: dt,rho1,mu1
   real(8) :: rhom
   integer :: i,j,k
-  call deb_inf("|setup Vvel")
   if(TwoPhase) then
      do k=ks,ke; do j=js,je; do i=is,ie;
         rhom = 0.5d0*(rho(i,j+1,k)+rho(i,j,k))
@@ -3044,7 +3025,6 @@ subroutine SetupWvel(w,dw,rho,mu,rho1,mu1,dt,A)
   real(8), intent(in) :: dt,rho1,mu1
   real(8) :: rhom
   integer :: i,j,k
-  call deb_inf("|setup Wvel")
   if(TwoPhase) then
      do k=ks,ke; do j=js,je; do i=is,ie;
         rhom = 0.5d0*(rho(i,j,k+1)+rho(i,j,k))
@@ -3109,7 +3089,7 @@ subroutine Setup_testMG(rhot,A)
   real(8), dimension(is:ie,js:je,ks:ke,8), intent(out) :: A
   integer :: i,j,k
   real(8) :: pi=3.14159265359
-  call deb_inf("|setup test MG")
+  
   do k=ks,ke; do j=js,je; do i=is,ie
     A(i,j,k,1) = 2d0/(dx(i)*dxh(i-1)*(rhot(i-1,j,k)+rhot(i,j,k)))
     A(i,j,k,2) = 2d0/(dx(i)*dxh(i  )*(rhot(i+1,j,k)+rhot(i,j,k)))
@@ -3148,7 +3128,6 @@ subroutine LinearSolver(A,p,maxError,beta,maxit,it,ierr)
   integer :: i,j,k
   integer :: req(12),sta(MPI_STATUS_SIZE,12)
   logical :: mask(imin:imax,jmin:jmax,kmin:kmax)
-  call deb_inf("|Linear Solver")
 !--------------------------------------ITERATION LOOP--------------------------------------------  
   do it=1,maxit
     do k=ks,ke; do j=js,je; do i=is,ie
@@ -3210,7 +3189,6 @@ subroutine LinearSolver1(A,u,umask,maxError,beta,maxit,it,ierr)
   integer :: i,j,k
   integer :: req(12),sta(MPI_STATUS_SIZE,12)
   logical :: mask(imin:imax,jmin:jmax,kmin:kmax)
-  call deb_inf("|Linear Solver 1")
 !--------------------------------------ITERATION LOOP--------------------------------------------  
   do it=1,maxit
     do k=ks,ke; do j=js,je; do i=is,ie
@@ -3264,7 +3242,6 @@ subroutine calcResidual(A,p,NormOrder, residual)
   integer, intent(in) :: NormOrder
   real(8) :: res, Residual,locres
   integer :: i,j,k, ierr
-  call deb_inf("|calc Residual")
   res = 0d0
   do k=ks,ke; do j=js,je; do i=is,ie
       locres = dabs(-p(i,j,k) * A(i,j,k,7) +                         &
@@ -3304,7 +3281,6 @@ subroutine calcResidual1(A,p,pmask,Residual)
   real(8), dimension(is:ie,js:je,ks:ke,8), intent(in) :: A
   real(8) :: res, totalres, Residual
   integer :: i,j,k, ierr
-  call deb_inf("|calc Residual1")
   res = 0d0
   do k=ks,ke; do j=js,je; do i=is,ie
     res=res+pmask(i,j,k)*abs(-p(i,j,k) * A(i,j,k,7) +                             &
@@ -3357,7 +3333,6 @@ subroutine calcsum_shift(p,porosity,sx,sy,sz)
   real(8), intent(out) :: porosity
   real(8) volume
   integer :: i,j,k, ierr
-  call deb_inf("|calcsum_shift")
   flow=0.d0
   volume=Nx*Ny*Nz
   do k=ks,ke; do j=js,je; do i=is,ie;
@@ -3403,24 +3378,3 @@ function calc_imax(f)
        z = 1.d0
     end if
   end subroutine THRESHOLD
-
-  !Wojtek
-subroutine deb_inf(str_inf)
-  use module_grid, only: rank, debug_mode
-  implicit none
-
-  character(len=*),intent(in) :: str_inf
-  integer(kind=4) :: cdat(3)
-  real :: elapsed(2),total
-
-  if(debug_mode .and. rank==0) then
-     call flush
-     total = etime(elapsed)
-     call itime(cdat)
-     write(*,1124,advance='yes') str_inf, cdat,elapsed(1)
-     !       write(lun,1124,advance='yes') str_inf, cdat,elapsed(1)
-1124 format ( a, '; on ', i2.2, ':', i2.2, ':', i2.2,' user:',f13.7)
-     !call sleep(1)
-  endif
-
-end subroutine deb_inf

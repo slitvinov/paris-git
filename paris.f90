@@ -46,7 +46,7 @@
 !=================================================================================================
 !=================================================================================================
 !-------------------------------------------------------------------------------------------------
-program paris
+Program paris
   use module_flow
   use module_grid
   use module_timer
@@ -860,7 +860,6 @@ subroutine project_velocity ()
   implicit none
   integer :: i,j,k
 
-  call deb_inf("|project velocity")
   if (.not.FreeSurface) then
      if (STGhost) then
         call project_velocity_staggered(u,umask,dt,p,1)
@@ -958,8 +957,7 @@ subroutine TimeStepSize(deltaT,vof_phase)
 #ifdef PHASE_CHANGE
   real(8) :: dtTdiff
 #endif
-  call deb_inf("|TimestepSize")
- 
+
   vmax_phys = max(1.d-3,max(ugas_inject,uliq_inject))
   if(rank<nPdomain)then
      h  = minval(dx)
@@ -1039,7 +1037,6 @@ subroutine interface_max_min
   integer :: i,j,k,ierr
   real(8) :: int_max_y
   
-  call deb_inf("|intmaxmin")
   int_max_y = -10000000
 
   call do_all_ghost(cvof)
@@ -1086,7 +1083,6 @@ subroutine calcStats
   integer :: i0,j0,k0
   real(8) :: stencil3x3(-1:1,-1:1,-1:1),mxyz(3),AREA3D
 
-  call deb_inf("|calc stats")
   nstatarray=25
   if(nstatarray > 100) call pariserror("nstatarray too large")
   mystats(1:nstatarray)=0d0
@@ -1246,7 +1242,6 @@ end subroutine calcStats
       integer :: iprobe,i,j,k
       character(len=30) :: filename 
 
-      call deb_inf("|probes...")
       do iprobe = 1,num_probes
          i = ijk_probe(iprobe,1)
          j = ijk_probe(iprobe,2)
@@ -1323,7 +1318,6 @@ end subroutine calcStats
 
       integer :: rootout 
 
-      call deb_inf("|calc turb stats...")
       ! initialize
       if ( .not. calcTurbStats_initialized ) then
          calcTurbStats_initialized = .true.
@@ -1613,7 +1607,6 @@ end subroutine calcStats
       subroutine backup_turb_write
          integer ::i,j
          character(len=100) :: filename
-         call deb_inf("|back turb write")
          filename = trim(out_path)//'/backup_turb_'//int2text(rank,padding)
          !call system('touch '//trim(filename)//'; mv '//trim(filename)//' '//trim(filename)//'.old')
          OPEN(UNIT=101,FILE=trim(filename),status='REPLACE')
@@ -1628,7 +1621,6 @@ end subroutine calcStats
          integer ::i,j
          character(len=100) :: filename
          logical :: file_exist
-         call deb_inf("|back turb read")
          filename = trim(out_path)//'/backup_turb_'//int2text(rank,padding)
          inquire(FILE=filename,EXIST=file_exist)
          if ( file_exist ) then 
@@ -1659,7 +1651,6 @@ subroutine pressure_stats(t)
   real(8) :: p_liq, p_avg_liq, p_min_global, p_max_global, vol_liq, vol_liq_tot, vol
   real(8) :: p_dyn, p_dyn_avg, ke_box, ke_box_avg
 
-  call deb_inf("|pressure stats")
   p_face = 0.0d0
   vol_face = 0.0d0
   !sum pressures on x+ face
@@ -1815,7 +1806,6 @@ subroutine temp_stats
   implicit none
   integer :: i,j,k
 
-  call deb_inf("|phase change")
   !if (rank==0) then
   OPEN(UNIT=20,FILE='temp_stats.txt',position='append')
   j=(js+je)/2
@@ -1837,7 +1827,6 @@ subroutine press_indices
   implicit none
   integer :: q
 
-  call deb_inf("|pressure indices")
   p_ind(1) = floor(Nx*coord_min/xLength) + Ng
   p_ind(2) = floor(Nx*(coord_min+var_coord)/xLength) + Ng
 
@@ -1861,7 +1850,6 @@ subroutine momentumConvection()
   use module_tmpvar
   use module_IO
 
-  call deb_inf("|momentum convection")
   if (AdvectionScheme=='QUICK') then
     call momentumConvectionQUICK(u,v,w,du,dv,dw)
   elseif (  AdvectionScheme=='ENO' .or. & 
@@ -1901,7 +1889,6 @@ subroutine momentumConvection_onedim(u,v,w,phi,dphi,d,AdvScheme)
   integer, dimension(3) :: is0,is1,ie0,ie1
   integer :: i0,j0,k0
 !-------------------------------------ENO interpolation u-velocity--------------------------------
-  call deb_inf("|mom conv 1d")
   call init_i0j0k0 (d,i0,j0,k0)
 
   is0(1)=is-1; is0(2)=js-1; is0(3)=ks-1
@@ -1982,7 +1969,6 @@ subroutine momentumConvectionENO(u,v,w,du,dv,dw)
   real(8), external :: minabs
   integer :: i,j,k
 !-------------------------------------ENO interpolation u-velocity--------------------------------
-  call deb_inf("|mom conv ENO")
   do k=ks,ke; do j=js,je; do i=is,ieu+1
     if (u(i-1,j,k)+u(i,j,k)>0.0) then
       work(i,j,k,1)=u(i-1,j,k)+0.5*minabs((u(i,j,k)-u(i-1,j,k)),(u(i-1,j,k)-u(i-2,j,k)))
@@ -2091,7 +2077,6 @@ subroutine momentumConvectionUpWind(u,v,w,du,dv,dw)
   real(8), external :: minabs
   integer :: i,j,k
 !-------------------------------------UpWind interpolation u-velocity--------------------------------
-  call deb_inf("|mom conv Upwind ")
   do k=ks,ke; do j=js,je; do i=is,ieu+1
     if (u(i-1,j,k)+u(i,j,k)>0.0) then
       work(i,j,k,1)=u(i-1,j,k)
@@ -2201,7 +2186,6 @@ subroutine momentumConvectionQUICK(u,v,w,du,dv,dw)
 !  real(8), external :: inter
 !  real(8) :: y00,y11,y22
 !-----------------------------------QUICK interpolation u-velocity--------------------------------
-  call deb_inf("|mom conv quick ")
   do k=ks,ke; do j=js,je; do i=is,ieu+1
     if (u(i-1,j,k)+u(i,j,k)>0.0) then
       work(i,j,k,1) = inter(xh(i-1),xh(i),xh(i-2),x(i),u(i-1,j,k),u(i,j,k),u(i-2,j,k))  !
@@ -2333,7 +2317,6 @@ subroutine momentumConvectionVerstappen (u,v,w,du,dv,dw)
   real(8), external :: minabs
   integer :: i,j,k
 
-  call deb_inf("|mom conv Verstappen ")
   !fixme: This only works for regular uniform grids
   do k=ks,ke;  do j=js,je; do i=is,ieu
       work(i,j,k,1) = (u(i,j,k) + u(i+1,j,k))*u(i+1,j,k) &
@@ -2400,7 +2383,6 @@ subroutine momentumConvectionBCG()
   integer :: i,j,k,ierr
   integer :: req(48),sta(MPI_STATUS_SIZE,48)
  
-  call deb_inf("|mom conv BCG ")
   !prediction stage
   call predict_velocity(u,du,1,dt,u,v,w,work(:,:,:,1))
   call predict_velocity(v,dv,2,dt,v,u,w,work(:,:,:,2))
@@ -2533,7 +2515,6 @@ subroutine predict_velocity(u,du,d,dt,upred,vpred,wpred,unew)
   real(8) :: dt, uc, unorm, grad, dxcell,dxcell2
   real(8) :: fyy, fzz
   
-  call deb_inf("|mom conv predict ")
   call init_i0j0k0 (d,i0,j0,k0)
   iaux = 0; jaux = 0; kaux = 0
   onex = 0; oney = 0; onez = 0
@@ -2599,7 +2580,6 @@ end subroutine predict_velocity
 subroutine init_i0j0k0 (d,i0,j0,k0)
   integer d,i0,j0,k0
 
-  call deb_inf("|init ijk ")
   i0=0;j0=0;k0=0
 
   if (d.eq.1) then
@@ -2621,7 +2601,6 @@ subroutine momentumDiffusion(u,v,w,rho,mu,du,dv,dw)
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(out) :: du, dv, dw
   integer :: i,j,k
 !-------------------------------------PREDICTED u-velocity-DIFFUSION------------------------------
-  call deb_inf("|momentum diffusion ")
   do k=ks,ke; do j=js,je; do i=is,ieu
     du(i,j,k)= du(i,j,k)+(   &
      +(1./dy(j))*( 0.25*(mu(i,j,k)+mu(i+1,j,k)+mu(i+1,j+1,k)+mu(i,j+1,k))*               &
@@ -2672,7 +2651,6 @@ subroutine explicitMomDiff(u,v,w,rho,mu,du,dv,dw)
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(out) :: du, dv, dw
   integer :: i,j,k
 !-------------------------------------PREDICTED u-velocity-DIFFUSION------------------------------
-  call deb_inf("|explicit mom diff ")
   do k=ks,ke; do j=js,je; do i=is,ieu
     du(i,j,k)= du(i,j,k)+(   &
       (1./dxh(i))*2.*(   mu(i+1,j,k)*(1./dx(i+1))*(u(i+1,j,k)-u(i,j,k)) -                &
@@ -2738,7 +2716,6 @@ subroutine volumeForce(rho,rho1,rho2,dpdx,dpdy,dpdz,BuoyancyCase,fx,fy,fz,gx,gy,
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: du, dv, dw, fx,fy,fz
   real(8) :: rro
   integer :: i,j,k
-  call deb_inf("|volume force ")
   if(BuoyancyCase==0) then
     rro = 0.0
   elseif(BuoyancyCase==1) then
@@ -2786,8 +2763,6 @@ subroutine surfaceForce(du,dv,dw,rho)
   real(8) :: kappa,deltax
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: du, dv, dw, rho
   integer :: i,j,k,n,ierr
-  call deb_inf("|surface force ")
-  
   deltax=dx(nx)
   call get_all_curvatures(tmp,0)
   call my_timer(7)
@@ -2883,7 +2858,6 @@ subroutine initialize
   include 'mpif.h'
   integer :: ierr, i,j,k
   integer :: nd(3)
-  call deb_inf("|initialize ")
   Nxt=Nx+2*Ng; Nyt=Ny+2*Ng; Nzt=Nz+2*Ng ! total number of cells
 
   if(rank==0) call check_integers()
@@ -3049,7 +3023,6 @@ subroutine InitCondition
   real :: erf
   !   real(8) :: NozzleThickness
   !---------------------------------------------Domain----------------------------------------------
-  call deb_inf("| Init condition")
   if(rank<nPdomain)then
      if(restart)then
         if ( DoFront ) then 
@@ -3283,7 +3256,6 @@ subroutine InitCondition
 contains
   subroutine init_FS()
     implicit none
-    call deb_inf("|Init FS ")
     if (.not. LPP_initialized) then 
       call initialize_LPP()
       LPP_initialized = .true.
@@ -3402,7 +3374,7 @@ subroutine ReadParameters
                         ResNormOrderPressure,         ErrorScaleHYPRE, DynamicAdjustPoiTol,      & 
                         OutVelSpecified,  MaxFluxRatioPresBC, LateralBdry,                       & 
                         HYPRESolverType, SwitchHYPRESolver, DivergeTol,  uinjectPertAmp,         &
-                        plane, n_p, out_sub, test_MG, MultiGrid, nrelax, debug_mode
+                        plane, n_p, out_sub, test_MG, MultiGrid, nrelax
  
   Nx = 0; Ny = 4; Nz = 4 ! cause absurd input file that lack nx value to fail. 
   Ng=2;xLength=1d0;yLength=1d0;zLength=1d0
@@ -3446,7 +3418,6 @@ subroutine ReadParameters
   DivergeTol = 1.d2
   plane = 0.5d0; n_p = 0.0d0
   out_sub = .false.
-  debug_mode = .false.
 
   in=1
   out=2
@@ -3582,8 +3553,7 @@ subroutine check_stability()
   implicit none
   include 'mpif.h'
   real(8) von_neumann
-  call deb_inf("check stability")
-  
+
   if(dt*mu1 /= 0) then 
      von_neumann = dx(ng)**2*rho1/(dt*mu1)
      if(rank==0) print *, "dx**2*rho/(dt*mu) = ", von_neumann
@@ -3602,8 +3572,6 @@ subroutine check_integers()
   use module_grid
   implicit none
   integer :: n,big,nbytes,intype
-  call deb_inf("|Check integers")
-  
   intype = 4
   print *, "-------------------------"
   print *, "array index integer check"
@@ -3686,8 +3654,6 @@ subroutine write_par_var(varname,iout,var)
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax) :: var
   integer :: i,j,k,prank,iout
   character(len=10) :: varname
-
-  call deb_inf("|write_par_var")
 
   if (rank==0) then
      OPEN(UNIT=21,FILE=TRIM(varname)//'-holder-'//TRIM(int2text(iout,padding))//'.txt')

@@ -42,7 +42,6 @@ contains
   subroutine test_VOF_HF()
     implicit none
     integer :: calc_imax
-    call deb_inf("|test_VOF_HF")
     if(calc_imax(vof_flag)/=2) then
        write(*,*) calc_imax(vof_flag), "expecting maximum flag = 2"
        call pariserror("bad flags")
@@ -64,7 +63,7 @@ contains
     integer i,j,k,d,index, direction
     real(8) h, th, ka, kb, ja, jb
     integer :: normalsign
-    call deb_inf("|output_heights")
+
     OPEN(UNIT=89,FILE=TRIM(out_path)//'/heightb-'//TRIM(int2text(rank,padding))//'.txt')
     OPEN(UNIT=90,FILE=TRIM(out_path)//'/reference-'//TRIM(int2text(rank,padding))//'.txt')
 
@@ -253,8 +252,6 @@ contains
     integer :: sumCount,nindepend
     integer :: nposit, ntests
     real(8), allocatable :: kapparray(:,:,:)
-    call deb_inf("|output_curvature")
-
     allocate(kapparray(imin:imax,jmin:jmax,kmin:kmax))
     ib = 1
     kappamin = 1d20
@@ -357,8 +354,6 @@ contains
     integer :: i,j,k,iem,jem,n
     real(8) :: centroid(3),x1,y1,x2,y2
     real(8) :: centroid_scaled(2), deltax
-    call deb_inf("|plot_curvature")
-
     k = (Nz+4)/2
     deltax=dx(nx/2)
     if(rank==0.and.cylinder_dir==3) then
@@ -409,7 +404,6 @@ contains
     integer, intent(in)  :: i,j,k
     real(8), intent(out) :: hx,hy
     real(8) deltax
-    call deb_inf("|plotheights")
 
     deltax=dx(nx/2)
     hx = height(i,j,k,1)
@@ -425,7 +419,7 @@ contains
     integer :: l,m,n
     real(8) :: nr(3),dmx,dmy, al3dnew,deltax
     real(8) :: stencil3x3(-1:1,-1:1,-1:1)
-    call deb_inf("|plotcutareacentroid")
+
     deltax=dx(nx/2)
 
     if(recomputenormals) then
@@ -496,7 +490,6 @@ contains
     REAL(8), SAVE :: reference_vel
     REAL(8), dimension(3), SAVE :: reference_pos
     integer, SAVE :: counter = 0
-    call deb_inf("|do_droplet_test")
     
     file_name = 'droplet_results'
     file_name2 = 'inertia_data'
@@ -673,7 +666,7 @@ end subroutine do_droplet_test
     LOGICAL, SAVE :: first_access = .true.
     LOGICAL, SAVE :: first_open = .true.
     logical :: letsdebug = .false.
-    call deb_inf("|h_of_KHI2D")
+
     IF(first_access) then 
        allocate(local_h(nx), global_h(nx))
     ENDIF
@@ -784,7 +777,7 @@ end subroutine do_droplet_test
     character(len=30), save :: file_name
     integer prank
     logical, save :: opened=.false.
-    call deb_inf("|output_ALL")
+
     file_name='fields.visit'
 
     if(rank.ne.0) call pariserror('rank.ne.0 in append_VOF')
@@ -813,7 +806,6 @@ end subroutine do_droplet_test
     real(8) :: kap(imin:imax,jmin:jmax,kmin:kmax) 
     !  logical, save :: first_time=.true.
     character(len=30) :: rootname,filename
-    call deb_inf("|output4")
     rootname=TRIM(out_path)//'/VTK/fields'//TRIM(int2text(nf,padding))//'-'
 
 
@@ -952,7 +944,6 @@ end subroutine do_droplet_test
     logical, save :: first_time = .true. 
     integer, save :: nstart
     real(kind=8), save :: tstart
-    call deb_inf("|output6")
     
     if(first_time) then
     tstart = time
@@ -1049,8 +1040,6 @@ end subroutine do_droplet_test
     character(len=4) :: v_name
     integer, parameter :: padding_mpiIO = 5
        
-    call deb_inf("|outputMPI")
-
     path = 'out/VTK'
     file_name = TRIM(path)//'/'//TRIM(v_name)//'-'//i2t(index,padding_mpiIO)//'.data'
     !write(*,*) file_name
@@ -1163,7 +1152,7 @@ end subroutine do_droplet_test
     integer :: i, j, k, ierr2, dbfile, optlist, lfile_name
     integer, dimension(3) :: dims_mesh, dims_cpu, dims_vof, ghostlow, ghosttop
     real(8) :: deltaX
-    call deb_inf("|output5(silo)")
+     
 
     padd = padding
     path = 'out/VTK'
@@ -1390,8 +1379,6 @@ end subroutine do_droplet_test
     real(8) :: time
     logical :: dosub
     integer :: sub
-
-    call deb_inf("|Write Master")
 
 #ifdef HAVE_SILO
     ! Setting mesh types and variable types

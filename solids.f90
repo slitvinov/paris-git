@@ -50,7 +50,6 @@ contains
     implicit none
     include 'mpif.h'
     integer bit,i,j,k
-    call deb_inf("|Solids: open bitmap")
     open(unit=89,file='bitmap-'//trim(int2text(rank,padding))//'.txt')
     do i=is,ie; do j=js,je; do k=ks,ke; 
        read(89,'(I1)') bit
@@ -81,7 +80,6 @@ contains
     implicit none
     character(*) :: rootname
     integer prank
-    call deb_inf("|append_solid_visit")
     if(rank.ne.0) call pariserror("rank.ne.0 in append_solid")
 
     if(solid_opened==0) then
@@ -115,8 +113,7 @@ contains
     ! for 2d nozzle
     real(8), parameter :: PI = 3.14159265359d0
     real(8) :: NozzleThickness,ryz
-    
-    call deb_inf("|init_Solids")
+
     call ReadSolidParameters
     if(dosolids) then
        allocate(solids(imin:imax,jmin:jmax,kmin:kmax))
@@ -214,7 +211,6 @@ contains
     include 'mpif.h'
     real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: solids
     integer i,j,k
-    call deb_inf("|printpor")
     open(unit=105,file=trim(out_path)//'/bitmap-'//trim(int2text(rank,padding))//'.txt')!,&
 !         status='new',action='write')
     do i=is,ie
@@ -370,9 +366,7 @@ contains
       integer ierr,in
       logical file_is_there
       namelist /solidparameters/ dosolids, solid_type, solid_radius,NumSpheres,sxyzrad, &
-           remove_layers,DoOutputSolids
-
-      call deb_inf("|readsolidparams")
+          remove_layers,DoOutputSolids
       dosolids=.false.
       solid_type='SingleSphere'
       solid_radius=0.1d0
@@ -437,7 +431,6 @@ contains
     integer ::nf,i1,i2,j1,j2,k1,k2,i,j,k
     integer :: ierr
     character(len=30) :: rootname
-    call deb_inf("|output_solids")
     rootname=trim(out_path)//'/VTK/solid'//TRIM(int2text(nf,padding))//'-'
     if(rank==0) call append_solid_visit_file(TRIM(rootname))
 
@@ -495,7 +488,7 @@ end subroutine output_solids
     INCLUDE 'mpif.h'
     real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: solids
     integer i,j,k,ins(4),jins, IERR
-    call deb_inf("|print_small_solid")
+
        do k=ks-1,ke+1
           if(rank==0) write(6,*) '-----' , k
           do i=is-1,ie+1
@@ -528,7 +521,6 @@ subroutine final_output(flowrate)
   use module_IO
   implicit none
   real(8) flowrate
-  call deb_inf("|final_output")
   open(unit=121,file=TRIM(out_path)//'/flowrate.txt',position='append')
   write(121,'(e16.8,e16.8)') dx(3),flowrate
   close(121)
@@ -548,7 +540,6 @@ subroutine calcpor(smask,type,porosity)
   real(8), intent(out) :: porosity
   real(8) volume
   integer :: i,j,k, ierr
-  call deb_inf("|calcpor")
   sum=0.d0
   volume=Nx*Ny*Nz
   do k=ks,ke; do j=js,je; do i=is,ie;
