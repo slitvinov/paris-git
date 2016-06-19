@@ -1,0 +1,69 @@
+INSTALLATION
+------------
+
+PARIS needs to be compiled manually. So far, it has been tested
+on several UNIX systems and/or compilers: 
+MacOS X, Debian (aka Ubuntu), RHEL, Blue Gene, ifort, xlf90.
+The mainline version of PARIS is compiled by a standard
+
+make && make install
+
+combo (actually the later command is sufficient). Several requirements:
+1. you must have an active mpif90 (openmpi packages on most UNIX systems)
+2. reasonably new versions of gfortran or intel fortran are assumed.
+3. Several libraries are available or can be used together with PARIS:
+   in mainline code those are VOFI, HYPRE and SILO.
+   Neither of these is supplied with the code. By default, you should obtain
+   them and know their locations.
+
+3a.  to compile with VOFI type:
+       make HAVE_VOFI=1
+     and set:
+       USE_VOFI = T
+
+     in the "inputvof" parameter file.
+  The VOFI_DIR variable holds physical location of the library in your system.
+  This is assumed to be $HOME/lib. You must change it manually if you decide
+  on different location.
+
+3b. Similar prequisites are assumed for HYPRE (used to speed up the Poisson equation
+    solution) and SILO (used for an efficient, parallel output with compression).
+    Both libraries have been created at LLNL and can be found here:
+    http://computation.llnl.gov/projects/hypre-scalable-linear-solvers-multigrid-methods
+    https://wci.llnl.gov/simulation/computer-codes/silo/releases
+
+    If Silo is not compiled, PARIS will output to uncompressed VTK format by default.
+
+Note that after make finishes, the paris executable is put in $HOME/bin by default.
+This can be modified in the Makefile.
+
+4. PARIS installation includes a suite of tests which the solver passes at each
+   new release. To use them, issue the 'make test' command (standard suite),
+   'make longtest' (slightly more tests) or 'make hardtest' (long & hard version
+   using the code compiled with debugging flags).
+
+ 4a. Generally, the test suite is a collection of BASH  scripts. It implicitly assumes that
+     the directory used to hold the paris executable (by default $HOME/bin/) is in users's PATH
+     variable. If the paris executable's location is changed, the user should add its location
+     to PATH in order to use the test suite.
+
+ 4b. The test suite utilizes three utility programs: pariscompare, pariscompare3D and parisdeconv.
+     Written in C, these codes are compiled into three respective executables. Note that those
+     must also be in a location known to the shell (thus declared in PATH).
+
+     To summarize, it is assumed the $HOME/bin directory is in user's PATH, please adjust
+     the locations to fit your system.
+
+ 4c. Note that if several version/revisions/branches of PARIS exist simultaneously in the
+     same system, keeping their respective executables in $HOME/bin may, and will cause conflicts.
+
+
+5.  Mainline PARIS Makefile creates also the 'TAGS' file used by Emacs. This is done using etags.
+A tag file usable by vim could in principle be created using ctags by issuing the proper
+commands, but problems have been reported. If you manage to succesfully use tags in vim,
+write to us. 
+
+
+Wojciech Aniszewski aniszewski@dalembert.upmc.fr & Stephane Zaleski stephane.zaleski@upmc.fr
+   
+ 
