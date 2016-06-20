@@ -1,18 +1,8 @@
 #!/bin/bash
 #set -x
 
-command -v gnuplot >/dev/null 2>&1 || echo "Warning: gnuplot is not installed"
-#CGFontGetGlyphPathIsObsolete=`gnuplot -e "set term pdf; set out 'tmp.pdf'; plot 0" 2>&1 | grep -c obsolete`
-
-export CGFONTGETGLYPH_PARIS_PROBLEM=0
-
-# if [ $CGFontGetGlyphPathIsObsolete -gt 0 ]; then 
-# echo "CGFontGetGlyphPathIsObsolete problem, no pdf output" 
-# echo "This problem occurs when running gnuplot on MacOS X Yosemite version 10.10.1 and above"
-# echo "the full error message may be obtained by running"
-# echo gnuplot -e \"set term pdf\; plot sin\(x\)\" \> \/dev\/null 
-# export CGFONTGETGLYPH_PARIS_PROBLEM=1
-# fi
+cp beginreport.html shorttestreport.html
+hash gnuplot 2>/dev/null || { echo >&2 "PARIS testing works better with gnuplot but it is not installed."; }
 
 for dir in `ls`; do 
     if [ -d $dir ]; then
@@ -24,8 +14,14 @@ for dir in `ls`; do
 		./run.sh > outtest
 # last line in output of test should be PASS or FAIL
 		tail -n 2 outtest
+		if [ -e 'report.html' ]; then
+		    cat report.html >> ../shorttestreport.html
+		fi
 	    fi
 	    cd ..
 	fi
     fi
 done
+cat endreport.html >> shorttestreport.html
+hash Open  2>/dev/null || { exit 0; }
+Open shorttestreport.html

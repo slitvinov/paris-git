@@ -1228,9 +1228,9 @@
                 <Field name="windowValid" type="bool">false</Field>
             </Object>
             <Object name="View3DAttributes">
-                <Field name="viewNormal" type="doubleArray" length="3">-0.0549153 -0.665259 -0.74459 </Field>
+                <Field name="viewNormal" type="doubleArray" length="3">0.143156 -0.246907 -0.958407 </Field>
                 <Field name="focus" type="doubleArray" length="3">0.531225 0.531225 0.75 </Field>
-                <Field name="viewUp" type="doubleArray" length="3">0.0489864 -0.746612 0.663453 </Field>
+                <Field name="viewUp" type="doubleArray" length="3">-0.0199608 -0.968904 0.246629 </Field>
                 <Field name="viewAngle" type="double">30</Field>
                 <Field name="parallelScale" type="double">0.865997</Field>
                 <Field name="nearPlane" type="double">-1.73199</Field>
@@ -4224,10 +4224,10 @@
         </Object>
         <Object name="ViewerSubject">
             <Object name="SourceMap">
-                <Field name="SOURCE00" type="string">localhost:/Users/stephanezaleski/darcs/paris-devel/Tests/CylinderAdvection/vof.visit</Field>
+                <Field name="SOURCE00" type="string">localhost:/Users/stephanezaleski/darcs/paris-devel_0/Tests/CylinderAdvection/vof.visit</Field>
             </Object>
             <Object name="SourcePlugins">
-                <Field name="localhost:/Users/stephanezaleski/darcs/paris-devel/Tests/CylinderAdvection/vof.visit" type="string">VTK_1.0</Field>
+                <Field name="localhost:/Users/stephanezaleski/darcs/paris-devel_0/Tests/CylinderAdvection/vof.visit" type="string">VTK_1.0</Field>
             </Object>
             <Object name="DatabaseCorrelationList">
                 <Field name="needPermission" type="bool">true</Field>
@@ -4245,9 +4245,9 @@
                 <Field name="viewExtentsType" type="string">AVT_ORIGINAL_EXTENTS</Field>
                 <Object name="Windows">
                     <Object name="ViewerWindow">
-                        <Field name="windowSize" type="intArray" length="2">858 856 </Field>
-                        <Field name="windowImageSize" type="intArray" length="2">858 792 </Field>
-                        <Field name="windowLocation" type="intArray" length="2">392 22 </Field>
+                        <Field name="windowSize" type="intArray" length="2">858 855 </Field>
+                        <Field name="windowImageSize" type="intArray" length="2">858 791 </Field>
+                        <Field name="windowLocation" type="intArray" length="2">392 23 </Field>
                         <Field name="cameraView" type="bool">false</Field>
                         <Field name="maintainView" type="bool">false</Field>
                         <Field name="viewExtentsType" type="string">AVT_ORIGINAL_EXTENTS</Field>
@@ -4851,9 +4851,9 @@
                             <Field name="windowValid" type="bool">false</Field>
                         </Object>
                         <Object name="View3DAttributes">
-                            <Field name="viewNormal" type="doubleArray" length="3">-0.0549153 -0.665259 -0.74459 </Field>
+                            <Field name="viewNormal" type="doubleArray" length="3">0.143156 -0.246907 -0.958407 </Field>
                             <Field name="focus" type="doubleArray" length="3">0.531225 0.531225 0.75 </Field>
-                            <Field name="viewUp" type="doubleArray" length="3">0.0489864 -0.746612 0.663453 </Field>
+                            <Field name="viewUp" type="doubleArray" length="3">-0.0199608 -0.968904 0.246629 </Field>
                             <Field name="viewAngle" type="double">30</Field>
                             <Field name="parallelScale" type="double">0.865997</Field>
                             <Field name="nearPlane" type="double">-1.73199</Field>
@@ -4876,6 +4876,42 @@
                         <Object name="AnnotationObjectList">
                             <Object name="AnnotationObject">
                                 <Field name="objectName" type="string">Plot0000</Field>
+                                <Field name="objectType" type="string">LegendAttributes</Field>
+                                <Field name="visible" type="bool">true</Field>
+                                <Field name="active" type="bool">false</Field>
+                                <Field name="position" type="doubleArray" length="3">0.05 0.9 0.0078125 </Field>
+                                <Field name="position2" type="doubleArray" length="3">1 1 0.05 </Field>
+                                <Object name="textColor">
+                                    <Object name="ColorAttribute">
+                                        <Field name="color" type="unsignedCharArray" length="4">0 0 0 255 </Field>
+                                    </Object>
+                                </Object>
+                                <Field name="useForegroundForTextColor" type="bool">true</Field>
+                                <Object name="color1">
+                                    <Object name="ColorAttribute">
+                                        <Field name="color" type="unsignedCharArray" length="4">0 0 0 50 </Field>
+                                    </Object>
+                                </Object>
+                                <Object name="color2">
+                                    <Object name="ColorAttribute">
+                                        <Field name="color" type="unsignedCharArray" length="4">0 0 0 255 </Field>
+                                    </Object>
+                                </Object>
+                                <Field name="text" type="stringVector">"%# -9.4g" </Field>
+                                <Field name="fontFamily" type="string">Arial</Field>
+                                <Field name="fontBold" type="bool">false</Field>
+                                <Field name="fontItalic" type="bool">false</Field>
+                                <Field name="fontShadow" type="bool">false</Field>
+                                <Field name="doubleAttribute1" type="double">0.015</Field>
+                                <Field name="intAttribute1" type="int">993</Field>
+                                <Field name="intAttribute2" type="int">5</Field>
+                                <Field name="intAttribute3" type="int">1</Field>
+                                <Field name="doubleVector1" type="doubleVector"></Field>
+                                <Field name="stringVector1" type="stringVector"></Field>
+                                <Field name="stringVector2" type="stringVector">"0.5" </Field>
+                            </Object>
+                            <Object name="AnnotationObject">
+                                <Field name="objectName" type="string">Plot0002</Field>
                                 <Field name="objectType" type="string">LegendAttributes</Field>
                                 <Field name="visible" type="bool">true</Field>
                                 <Field name="active" type="bool">true</Field>
@@ -4921,11 +4957,11 @@
                         </Object>
                         <Object name="ViewerPlotList">
                             <Object name="timeSliders">
-                                <Field name="SOURCE00" type="int">33</Field>
+                                <Field name="SOURCE00" type="int">20</Field>
                             </Object>
                             <Field name="activeTimeSlider" type="string">SOURCE00</Field>
                             <Object name="plot00">
-                                <Field name="plotName" type="string">Plot0000</Field>
+                                <Field name="plotName" type="string">Plot0002</Field>
                                 <Field name="pluginID" type="string">Contour_1.0</Field>
                                 <Field name="sourceID" type="string">SOURCE00</Field>
                                 <Field name="variableName" type="string">VOF</Field>
@@ -4934,16 +4970,16 @@
                                 <Field name="realized" type="bool">true</Field>
                                 <Object name="ViewerPlot">
                                     <Field name="plotDescription" type="string"></Field>
-                                    <Field name="cacheIndex" type="int">33</Field>
+                                    <Field name="cacheIndex" type="int">20</Field>
                                     <Field name="spatialExtentsType" type="string">AVT_ORIGINAL_EXTENTS</Field>
                                     <Field name="bgColor" type="doubleArray" length="3">1 1 1 </Field>
                                     <Field name="fgColor" type="doubleArray" length="3">0 0 0 </Field>
-                                    <Field name="expandedFlag" type="bool">false</Field>
+                                    <Field name="expandedFlag" type="bool">true</Field>
                                     <Field name="followsTime" type="bool">true</Field>
                                     <Object name="ContourAttributes">
                                         <Object name="defaultPalette">
                                             <Object name="ColorControlPointList">
-                                                <Field name="compactColors" type="unsignedCharVector">255 0 0 255 0 255 0 255 0 0 255 255 0 255 255 255 255 0 255 255 255 255 0 255 255 135 0 255 255 0 135 255 168 168 168 255 255 68 68 255 99 255 99 255 99 99 255 255 40 165 165 255 255 99 255 255 255 255 99 255 255 170 99 255 170 79 255 255 150 0 0 255 0 150 0 255 0 0 150 255 0 109 109 255 150 0 150 255 150 150 0 255 150 84 0 255 160 0 79 255 255 104 28 255 0 170 81 255 68 255 124 255 0 130 255 255 130 0 255 255 </Field>
+                                                <Field name="compactColors" type="unsignedCharVector">255 0 0 255 255 0 255 255 0 0 255 255 0 255 255 255 255 0 255 255 255 255 0 255 255 135 0 255 255 0 135 255 168 168 168 255 255 68 68 255 99 255 99 255 99 99 255 255 40 165 165 255 255 99 255 255 255 255 99 255 255 170 99 255 170 79 255 255 150 0 0 255 0 150 0 255 0 0 150 255 0 109 109 255 150 0 150 255 150 150 0 255 150 84 0 255 160 0 79 255 255 104 28 255 0 170 81 255 68 255 124 255 0 130 255 255 130 0 255 255 </Field>
                                                 <Field name="compactPositions" type="floatVector">0 0.034 0.069 0.103 0.138 0.172 0.207 0.241 0.276 0.31 0.345 0.379 0.414 0.448 0.483 0.517 0.552 0.586 0.621 0.655 0.69 0.724 0.759 0.793 0.828 0.862 0.897 0.931 0.966 1 </Field>
                                                 <Field name="smoothing" type="string">None</Field>
                                                 <Field name="equalSpacingFlag" type="bool">true</Field>
@@ -4979,7 +5015,7 @@
                                                 <Object name="ContourAttributes">
                                                     <Object name="defaultPalette">
                                                         <Object name="ColorControlPointList">
-                                                            <Field name="compactColors" type="unsignedCharVector">255 0 0 255 0 255 0 255 0 0 255 255 0 255 255 255 255 0 255 255 255 255 0 255 255 135 0 255 255 0 135 255 168 168 168 255 255 68 68 255 99 255 99 255 99 99 255 255 40 165 165 255 255 99 255 255 255 255 99 255 255 170 99 255 170 79 255 255 150 0 0 255 0 150 0 255 0 0 150 255 0 109 109 255 150 0 150 255 150 150 0 255 150 84 0 255 160 0 79 255 255 104 28 255 0 170 81 255 68 255 124 255 0 130 255 255 130 0 255 255 </Field>
+                                                            <Field name="compactColors" type="unsignedCharVector">255 0 0 255 255 0 255 255 0 0 255 255 0 255 255 255 255 0 255 255 255 255 0 255 255 135 0 255 255 0 135 255 168 168 168 255 255 68 68 255 99 255 99 255 99 99 255 255 40 165 165 255 255 99 255 255 255 255 99 255 255 170 99 255 170 79 255 255 150 0 0 255 0 150 0 255 0 0 150 255 0 109 109 255 150 0 150 255 150 150 0 255 150 84 0 255 160 0 79 255 255 104 28 255 0 170 81 255 68 255 124 255 0 130 255 255 130 0 255 255 </Field>
                                                             <Field name="compactPositions" type="floatVector">0 0.034 0.069 0.103 0.138 0.172 0.207 0.241 0.276 0.31 0.345 0.379 0.414 0.448 0.483 0.517 0.552 0.586 0.621 0.655 0.69 0.724 0.759 0.793 0.828 0.862 0.897 0.931 0.966 1 </Field>
                                                             <Field name="smoothing" type="string">None</Field>
                                                             <Field name="equalSpacingFlag" type="bool">true</Field>
@@ -5078,7 +5114,7 @@
                 <Object name="RunningEngines">
                     <Object name="MachineProfile">
                         <Field name="hostNickname" type="string"></Field>
-                        <Field name="host" type="string">mac-3.local</Field>
+                        <Field name="host" type="string">macbook-pro-de-stephane-2.local</Field>
                         <Field name="userName" type="string">stephanezaleski</Field>
                         <Field name="hostAliases" type="string"></Field>
                         <Field name="directory" type="string"></Field>

@@ -50,13 +50,16 @@ else
 fi
 
 gnuplot <<EOF &
+set term pngcairo size 600, 600
+set out "pois.png"
 set size square
 set grid
 set nolabel
 set xrange[-0.1:1.1]
 set yrange[-0.05:*]
 plot "out/output1" w lp notitle, 0.5*x*(1-x) w l notitle, 0 w l notitle
-pause 2
+set term aqua size 600, 600
+plot "out/output1" w lp notitle, 0.5*x*(1-x) w l notitle, 0 w l notitle
 exit
 EOF
 
