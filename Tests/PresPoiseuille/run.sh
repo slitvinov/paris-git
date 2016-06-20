@@ -49,7 +49,7 @@ else
     echo "FAIL: directory out not created"
 fi
 
-gnuplot <<EOF &
+gnuplot <<EOF
 set term pngcairo size 600, 600
 set out "pois.png"
 set size square
