@@ -1,10 +1,9 @@
 set xlabel "time"
 set ylabel "w(0,0,R)"
 set yrange [*:*]
-plot "reference.txt" t "reference" w l, "reference-MomCons.txt" t "reference longtest MomCons" w l, "out/droplet-test-vel.txt" t "test simulation nonMOMCONS" w l, 0 notitle
-# Remove because of OS 10.10 problem
-#set term pdf
-#set out "tmp.pdf"
+plot "reference-nonMomCons.txt" t "reference nonMomCons" w l, "out/droplet-test-vel.txt" t "this test simulation nonMOMCONS" w l, 0 notitle
+set term pngcairo
+set out "droplet.png"
 replot
 
 
