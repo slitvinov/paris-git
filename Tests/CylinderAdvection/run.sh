@@ -1,8 +1,8 @@
 #!/bin/bash
 #set -x
 
-#rm -fR out
-#paris > tmpout
+rm -fR out
+paris > tmpout
 echo `awk ' /Step:/ { cpu = $8 } END { print "cpu = " cpu } ' < tmpout`
 pariscompare out/CVoF-00000-03800.txt reference.txt $precision 1 1
 
