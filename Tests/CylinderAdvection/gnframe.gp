@@ -6,8 +6,8 @@
 
 set size square
 
-set xlabel " i "
-set ylabel " j "
+set xlabel " x "
+set ylabel " y "
 set term pngcairo
 set out "tmp.png"
 unset surface
@@ -15,9 +15,12 @@ set contour
 set cntrparam linear
 set view map
 set cntrparam levels discrete 0.5
-#set title "ouptut nr  ".frame
+set cntrlabel onecolor
 
-splot "toplot.tmp" w l notitle lt 1
+#set title "ouptut nr  ".frame
+set grid
+
+splot "toplot.tmp" w l  notitle 
 exit
 
 

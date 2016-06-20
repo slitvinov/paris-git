@@ -27,6 +27,6 @@ cp tmp.png frame$frame.png
 echo -n "."
 done
 echo " "
-convert frame*.png  movie.gif
+convert frame*.png  CAmovie.gif
 
 exit 0

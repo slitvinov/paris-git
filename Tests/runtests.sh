@@ -1,7 +1,6 @@
 #!/bin/bash
 #set -x
 
-cp beginreport.html shorttestreport.html
 hash gnuplot 2>/dev/null || { echo >&2 "PARIS testing works better with gnuplot but it is not installed."; }
 
 for dir in `ls`; do 
@@ -22,6 +21,3 @@ for dir in `ls`; do
 	fi
     fi
 done
-cat endreport.html >> shorttestreport.html
-hash Open  2>/dev/null || { exit 0; }
-Open shorttestreport.html

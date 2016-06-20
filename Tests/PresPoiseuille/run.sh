@@ -63,6 +63,9 @@ plot "out/output1" w lp notitle, 0.5*x*(1-x) w l notitle, 0 w l notitle
 exit
 EOF
 
+# put figure where the html report lives. 
+mv pois.png ../Testreport
+
 
 /bin/rm -f input
 
