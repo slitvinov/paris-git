@@ -1,5 +1,5 @@
 #!/bin/bash
-set -x
+#set -x
 
 cp beginreport.html testreport.html
 hash gnuplot 2>/dev/null || { echo >&2 "PARIS testing works better with gnuplot but it is not installed."; }
@@ -11,14 +11,16 @@ for dir in `ls`; do
 	    cd $dir
 	    if [ -e 'longtest.sh' ]; then
 		echo running long test in $dir
+		chmod +x longtest.sh
+		./longtest.sh
 		if [ -e 'report.html' ]; then
 		    cat report.html >> ../testreport.html
 		fi
 	    else
 		if [ -e 'run.sh' ]; then
 		    echo running short test in $dir
-		    # chmod +x run.sh
-		    #./run.sh 
+		    chmod +x run.sh
+		    ./run.sh 
 		    if [ -e 'report.html' ]; then
 			cat report.html >> ../testreport.html
 		    fi
