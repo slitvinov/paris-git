@@ -82,11 +82,11 @@ test:  install pariscompare parisdeconv pariscompare3D
 
 hardtest:  pariscompare parisdeconv pariscompare3D
 	make clean install FLAGS:="$(FLAGSDEBUG) $(HARDFLAGS)"
-	@echo "The test suite takes less than 4 minutes on a 4-core intel i7 MacBookPro"
+	@echo "The test suite takes less than 4 minutes on an 8-core MacBook Pro mid-2014"
 	@cd Tests; chmod +x ./runtests.sh; ./runtests.sh
 
 longtest:  install pariscompare parisdeconv
-	@echo "This test takes 12 minutes on a 4-core intel i7 MacBookPro"
+	@echo "This test takes 12 minutes on an 8-core MacBook Pro mid-2014"
 	@cd Tests; chmod +x ./runlongtests.sh; ./runlongtests.sh
 
 # single processor test

@@ -13,9 +13,6 @@ for dir in `ls`; do
 		./run.sh > outtest
 # last line in output of test should be PASS or FAIL
 		tail -n 2 outtest
-		if [ -e 'report.html' ]; then
-		    cat report.html >> ../shorttestreport.html
-		fi
 	    fi
 	    cd ..
 	fi

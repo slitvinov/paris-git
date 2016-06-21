@@ -1,8 +1,22 @@
 #!/bin/bash
 #set -x
 
+
+
+
 cp beginreport.html testreport.html
-hash gnuplot 2>/dev/null || { echo >&2 "PARIS testing works better with gnuplot but it is not installed."; }
+if hash gnuplot 2>/dev/null ; then 
+    GPVERSION=`gnuplot -V | awk '{print $2}'`
+    echo gnuplot version $GPVERSION
+    GPMAJORVERSION=`echo $GPVERSION | awk 'BEGIN {FS="."} {print $1}'`
+    if [ $GPMAJORVERSION -lt 5 ] ; then
+	echo You have an old gnuplot version, some test results will not display. 
+    fi
+else
+    echo "You have an old gnuplot version, many test results will not display."
+    GPVERSION=0
+fi
+
 
 if [ ! -d Testreport ] ; then mkdir Testreport; fi
 for dir in `ls`; do 
@@ -31,8 +45,18 @@ for dir in `ls`; do
     fi
 done
 
+echo
+echo "-----------------------------------------------------------------------------"
+echo 
 cat endreport.html >> testreport.html
 mv testreport.html Testreport
+echo The test report is in `pwd`/Testreport/testreport.html. 
+echo If it does not open automatically, open it with your favorite browser. 
+echo
+echo "-----------------------------------------------------------------------------"
+echo 
+
+
 cd Testreport
 if hash Open  2>/dev/null; then 
     Open testreport.html
@@ -41,8 +65,12 @@ elif hash xdg-open 2>/dev/null; then
 elif hash gnome-open 2>/dev/null; then
     gnome-open testreport.html
 else
-    tar xfz tmphtmlreport.tgz Testreport
-    echo "You do not appear to have a working browser"
-    echo "Open the report.html file and the associated images in your favorite browser"
-    echo "All the report files are in htmlreport.tgz" 
+    cd ..
+    tar cfz tmphtmlreport.tgz Testreport
+    echo "You do not appear to have a working browser".
+    echo "Open the report.html file and the associated images in your favorite browser".
+    echo "All the report files are compressed in tmphtmlreport.tgz." 
+echo
+echo "-----------------------------------------------------------------------------"
+echo 
 fi
