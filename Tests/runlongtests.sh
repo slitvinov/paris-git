@@ -36,12 +36,13 @@ echo "--------------------------------------------------------------------------
 echo 
 cat endreport.html >> testreport.html
 mv testreport.html Testreport
+tar cfz tmphtmlreport.tgz Testreport
 echo The test report is in `pwd`/Testreport/testreport.html. 
-echo If it does not open automatically, open it with your favorite browser. 
-echo
-echo "-----------------------------------------------------------------------------"
+echo All the report files are compressed in tmphtmlreport.tgz.
+echo If you are testing remotely you can transfer this file to your local machine,
+echo uncompress it and open testreport.html with your favorite browser.
 echo 
-
+echo "-----------------------------------------------------------------------------"
 
 cd Testreport
 if hash Open  2>/dev/null; then 
@@ -50,13 +51,4 @@ elif hash xdg-open 2>/dev/null; then
     xdg-open testreport.html
 elif hash gnome-open 2>/dev/null; then
     gnome-open testreport.html
-else
-    cd ..
-    tar cfz tmphtmlreport.tgz Testreport
-    echo "You do not appear to have a working browser".
-    echo "Open the report.html file and the associated images in your favorite browser".
-    echo "All the report files are compressed in tmphtmlreport.tgz." 
-echo
-echo "-----------------------------------------------------------------------------"
-echo 
 fi
