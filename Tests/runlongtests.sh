@@ -4,8 +4,6 @@
 cp beginreport.html testreport.html
 hash gnuplot 2>/dev/null || { echo "You do not have gnuplot, many test results will not display."; }
 
-exit
-
 if [ ! -d Testreport ] ; then mkdir Testreport; fi
 for dir in `ls`; do 
     if [ -d $dir ]; then
