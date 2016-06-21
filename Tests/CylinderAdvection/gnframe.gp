@@ -14,8 +14,8 @@ unset surface
 set contour
 set cntrparam linear
 set view map
+unset clabel
 set cntrparam levels discrete 0.5
-set cntrlabel onecolor
 
 #set title "ouptut nr  ".frame
 set grid

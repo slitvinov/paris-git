@@ -1,9 +1,6 @@
 #!/bin/bash
 #set -x
 
-
-
-
 cp beginreport.html testreport.html
 hash gnuplot 2>/dev/null || { echo "You do not have gnuplot, many test results will not display."; }
 
