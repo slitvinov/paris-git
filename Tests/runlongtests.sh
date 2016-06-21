@@ -5,18 +5,9 @@
 
 
 cp beginreport.html testreport.html
-if hash gnuplot 2>/dev/null ; then 
-    GPVERSION=`gnuplot -V | awk '{print $2}'`
-    echo gnuplot version $GPVERSION
-    GPMAJORVERSION=`echo $GPVERSION | awk 'BEGIN {FS="."} {print $1}'`
-    if [ $GPMAJORVERSION -lt 5 ] ; then
-	echo You have an old gnuplot version, some test results will not display. 
-    fi
-else
-    echo "You do not have gnuplot, many test results will not display."
-    GPVERSION=0
-fi
+hash gnuplot 2>/dev/null || { echo "You do not have gnuplot, many test results will not display."; }
 
+exit
 
 if [ ! -d Testreport ] ; then mkdir Testreport; fi
 for dir in `ls`; do 
