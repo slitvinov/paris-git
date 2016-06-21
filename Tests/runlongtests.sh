@@ -13,7 +13,7 @@ if hash gnuplot 2>/dev/null ; then
 	echo You have an old gnuplot version, some test results will not display. 
     fi
 else
-    echo "You have an old gnuplot version, many test results will not display."
+    echo "You do not have gnuplot, many test results will not display."
     GPVERSION=0
 fi
 
