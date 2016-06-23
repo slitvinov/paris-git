@@ -1320,47 +1320,38 @@ module module_BC
     real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: mask
     real(8), intent(in) :: rho1,rho2
     integer, intent(in) :: d
-    real(8) :: t,flux,tflux,uaverage,uinj
+    real(8) :: t,fluxin,tfluxin,uaverage, uinj
     integer :: i,j,k,ierr,seed
     ! solid obstacles
     u = u*mask
     mom = mom*mask
 
-    ! wall boundary condition
-    if(bdry_cond(1)==0 .and. coords(1)==0    ) then
-        if (d.eq.1) then
-            mom(is-1,:,:)=0d0
-            mom(is-2,:,:)=-mom(is,:,:)
-        else !y,z
-            mom(is-1,:,:)=(2*WallVel(1,2)-u(is,:,:))*(rho2*c(is,:,:) + rho1*(1.d0 - c(is,:,:))) !CHECK!!
-        endif
-    endif
-    
+    ! inflow boundary condition y-
+    fluxin=0
     ! inflow boundary condition x- with injection
-    seed = 1317*(INT(t/1.23d-10)+1)
-    call random_seed(seed)
     if(bdry_cond(1)==3 .and. coords(1)==0    ) then
+        seed = 1317*(INT(t/1.23d-10)+1)
+        call random_seed(seed)
         if (d.eq.1) then
-        flux=0
         do j=jmin,jmax
           do k=kmin,kmax
              uinj = uinject(j,k,t)
              mom(is-1,j,k)=WallVel(1,1)*uinj*(rho2*c(is-1,j,k) + rho1*(1.d0 - c(is-1,j,k)))
-#ifndef OLD_BDRY_COND
              mom(is-2,j,k)=WallVel(1,1)*uinj*(rho2*c(is-1,j,k) + rho1*(1.d0 - c(is-1,j,k)))
-             if(j<=je.and.j>=js.and.k<=ke.and.k>=ks) flux=flux+WallVel(1,1)*uinj
-#endif
+          enddo
+        enddo
+        do j=js,je
+          do k=ks,ke
+             fluxin = fluxin + u(is-1,j,k)
           enddo
         enddo
         else
             mom(is-1,:,:) = 0.d0
         endif
     endif
-    call MPI_ALLREDUCE(flux, tflux, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr)
-    uaverage=tflux/(ny*nz)
+    call MPI_ALLREDUCE(fluxin, tfluxin, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr)
+    uaverage=tfluxin/(ny*nz)
 
-
-    ! inflow boundary condition y-
     if(bdry_cond(2)==3 .and. coords(2)==0    ) then
        if (d.eq.2) then
         do i=imin,imax
@@ -1399,6 +1390,7 @@ module module_BC
            mom(ie,:,:) = 0.d0
        endif
     endif
+
      ! inflow on y+
     if(bdry_cond(5)==3 .and. coords(2)==nPy-1   ) then
         if (d.eq.2) then
@@ -1425,6 +1417,17 @@ module module_BC
            mom(:,:,ke) = 0.d0
        endif
     endif    
+
+    ! wall boundary condition
+    if(bdry_cond(1)==0 .and. coords(1)==0    ) then
+        if (d.eq.1) then
+            mom(is-1,:,:)=0d0
+            mom(is-2,:,:)=-mom(is,:,:) ! to be corrected, it is not exact
+        else !y,z
+            mom(is-1,:,:)=(2*WallVel(1,2)-u(is,:,:))*(rho2*c(is,:,:) + rho1*(1.d0 - c(is,:,:))) !CHECK!!
+        endif
+    endif
+    
 
     if(bdry_cond(4)==0 .and. coords(1)==nPx-1) then 
         if (d.eq.1) then
@@ -1566,8 +1569,6 @@ module module_BC
        endif
     endif
 
-! DROP THE IFNDEF OLD_BDRY_COND IN WHAT FOLLOWS
-
     if (bdry_cond(2)==5 .and. coords(2)==0) then
         if (d.eq.2) then
            mom(:,js-1,:)= mom(:,js,:)
@@ -1603,7 +1604,7 @@ module module_BC
             mom(:,:,ke+1)=mom(:,:,ke)
         endif
     endif
-    
+
   end subroutine SetMomentumBC
 
 !=================================================================================================
