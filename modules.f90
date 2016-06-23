@@ -439,7 +439,9 @@ module module_IO
   integer :: nout, out, output_format, nbackup, nstats, termout, nfile
   integer :: nsteps_probe
   character(len=20) :: out_path, x_file, y_file, z_file
+  character(len=20) :: u_file, v_file, w_file
   logical :: read_x, read_y, read_z, restart, ICOut, restartFront, restartAverages, zip_data
+  logical :: read_u, read_v, read_w
   logical :: out_mom, output_fields(5)
   logical :: out_centroid, opened_cent
   logical :: out_sub

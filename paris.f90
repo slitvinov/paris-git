@@ -3000,6 +3000,40 @@ end subroutine initialize
 !   Sets the initial conditions
 !   called in:    program paris
 !-------------------------------------------------------------------------------------------------
+subroutine read_cgd_file(filename, var)
+
+  use module_grid
+  use module_flow
+  use module_BC
+
+  implicit none
+  include 'mpif.h'
+
+  character(len=20) :: filename
+  real (8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: var
+  real (8) :: val
+  integer  :: i,j,k
+
+  open(unit=12,file=trim(filename),status='old',action='read')
+  do i=1,4
+    read(12,*); 
+  enddo
+  do i=1,Nx; do j=1,Ny; do k=1,Nz
+    read(12,*) val
+    if ((i.ge.is-Ng).and.(i.le.ie)) then 
+      if ((j.ge.js-Ng).and.(j.le.je)) then 
+        if ((k.ge.ks-Ng).and.(k.le.ke)) then 
+          var(i+Ng,j+Ng,k+Ng) = val
+        endif
+      endif
+    endif
+  enddo; enddo; enddo
+  close(12); 
+  call do_all_ghost(var);
+
+end subroutine read_cgd_file
+!-------------------------------------------------------------------------------------------------
+
 subroutine InitCondition
   
   use module_grid
@@ -3065,6 +3099,28 @@ subroutine InitCondition
         color = 0.;  v = 0;  w = 0.
         u = U_init;
 
+        !init from cgd file if given in the input file
+        if (read_u) then
+          call read_cgd_file(u_file, tmp)
+          do i=is-1,ie; do j=js,je; do k=ks,ke
+            u(i,j,k) = 0.5d0*(tmp(i,j,k) + tmp(i+1,j,k))
+          enddo; enddo; enddo
+        endif
+
+        if (read_v) then
+          call read_cgd_file(v_file, tmp)
+          do i=is,ie; do j=js-1,je; do k=ks,ke
+            v(i,j,k) = 0.5d0*(tmp(i,j,k) + tmp(i,j+1,k))
+          enddo; enddo; enddo
+        endif
+
+        if (read_w) then
+          call read_cgd_file(w_file, tmp)
+          do i=is,ie; do j=js,je; do k=ks-1,ke
+            w(i,j,k) = 0.5d0*(tmp(i,j,k) + tmp(i,j,k+1))
+          enddo; enddo; enddo
+        endif
+        
         if(DoLPP) then 
            call SeedParticles
         end if ! DoLPP
@@ -3375,7 +3431,8 @@ subroutine ReadParameters
                         ResNormOrderPressure,         ErrorScaleHYPRE, DynamicAdjustPoiTol,      & 
                         OutVelSpecified,  MaxFluxRatioPresBC, LateralBdry,                       & 
                         HYPRESolverType, SwitchHYPRESolver, DivergeTol,  uinjectPertAmp,         &
-                        plane, n_p, out_sub, test_MG, MultiGrid, nrelax
+                        plane, n_p, out_sub, test_MG, MultiGrid, nrelax,u_file, v_file, w_file,  &
+                        read_u, read_v, read_w
  
   Nx = 0; Ny = 4; Nz = 4 ! cause absurd input file that lack nx value to fail. 
   Ng=2;xLength=1d0;yLength=1d0;zLength=1d0
@@ -3391,6 +3448,7 @@ subroutine ReadParameters
   DoVOF = .true.;   DoFront = .false.;   Implicit=.false.;   U_init=0d0;   VolumeSource=0d0  
   CFL = 0.5;   EndTime = 0.;  MaxDt = 5d-2;   smooth = .true.;   nsmooth = 20
   output_format = 2;   read_x=.false.;   read_y=.false.;   read_z=.false.
+  read_u=.false.;   read_v=.false.;   read_w=.false.
   restart = .false.;  nBackup = 2000;  NumBubble=0
   xyzrad = 0.d0;  hypre=.false.;  dtFlag = 2;  ICout=.false.;   WallVel = 0d0
   inject_type=2 ! redundant
