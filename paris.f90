@@ -1032,6 +1032,7 @@ subroutine interface_max_min
   use module_grid
   use module_flow
   use module_VOF
+  use module_BC
   implicit none
   include "mpif.h"
   integer :: i,j,k,ierr

@@ -26,6 +26,7 @@
 !-------------------------------------------------------------------------------------------------
 subroutine swp(us,c,f,d,vof1,vof2,vof3)
   use module_vof
+  use module_BC
   implicit none
   integer, intent(in) :: d
   real (8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: us
@@ -48,6 +49,7 @@ end subroutine swp
 
 subroutine swp_stg(us,c,f,d,vof1,vof2,vof3,dir)
   use module_vof
+  use module_BC
   implicit none
   integer, intent(in) :: d,dir
   real (8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: us
@@ -71,6 +73,7 @@ end subroutine swp_stg
 
 subroutine swpmom(us,c,d,mom1,mom2,mom3,mom,t)
   use module_vof
+  use module_BC
   implicit none
   integer, intent(in) :: d
   real(8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: us,mom
@@ -92,6 +95,7 @@ end subroutine swpmom
 
 subroutine swpmom_stg(us,c,d,mom1,mom2,mom3,mom,dir,t)
   use module_vof
+  use module_BC
   implicit none
   integer, intent(in) :: d,dir
   real(8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: us,mom

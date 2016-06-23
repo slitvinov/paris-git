@@ -39,6 +39,7 @@ module module_VOF
   use module_grid
   use module_IO
   use module_tmpvar
+  use module_BC
   implicit none
   real(8), dimension(:,:,:), allocatable, target :: cvof ! VOF tracer variable
   real(8), dimension(:,:,:), allocatable :: cvofold 
@@ -1284,37 +1285,6 @@ contains
     end where
   end subroutine c_mask
   !=================================================================================================
-  subroutine do_all_ghost(var)
-    use module_BC
-    implicit none
-    real(8), dimension(:,:,:) :: var
-    integer, parameter :: ngh=2
-    include 'mpif.h'
-    integer :: req(48),sta(MPI_STATUS_SIZE,48)
-    integer :: ierr
-
-       call ghost_x(var,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
-       call ghost_y(var,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
-       call ghost_z(var,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
-
-  end subroutine do_all_ghost
-  !=================================================================================================
-  subroutine do_all_ighost(var)
-    use module_BC
-    implicit none
-    integer, dimension(:,:,:) :: var 
-    integer, parameter :: ngh=2
-    include 'mpif.h'
-    integer :: req(48),sta(MPI_STATUS_SIZE,48)
-    integer :: ierr
-
-       call ighost_x(var,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
-       call ighost_y(var,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
-       call ighost_z(var,ngh,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
-
-  end subroutine do_all_ighost
-  !=================================================================================================
-
   subroutine get_half_fractions(c,d,i,j,k,vofh1,vofh2)
 
     implicit none

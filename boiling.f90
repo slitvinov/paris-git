@@ -167,6 +167,7 @@ contains
   subroutine swpz_energy(us,c,d)
     use module_VOF
     use module_flow
+    use module_BC
     implicit none
     logical error
     integer i,j,k
