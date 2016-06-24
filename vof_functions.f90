@@ -162,7 +162,6 @@ END FUNCTION CC3DNEW
 ! [nr]*[x] = nr1*x1 + nr2*x2 + nr3*x3 = alpha
 ! INPUT: normal coefficients in nr(3), plane constant alpha, starting
 !        point x0(3), sides dx(3)
-! NOTE : the normal coefficients MUST satisfy the relation |nr1|+|nr2|+|nr3|=1
 !-------------------------------------------------------------------------------
 FUNCTION FL3DNEW(nr,alpha,x0,dx)
 
