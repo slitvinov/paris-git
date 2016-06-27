@@ -1383,7 +1383,7 @@ contains
 
   integer i,j,k,d
   integer i0,j0,k0
-  real(8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), intent(in)  :: us
+  real(8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), intent(inout)  :: us
   real(8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), intent(out) :: mom
   real(8) :: rhoavg
 
@@ -1413,6 +1413,8 @@ contains
         enddo
      enddo
   enddo
+
+  call SetMomentumBC(us,cvof,mom,d,umask,rho1,rho2,0.d0) 
 
   call do_all_ghost(tmp)
   call do_all_ghost(mom)

@@ -1318,7 +1318,8 @@ module module_BC
     
     implicit none
     include 'mpif.h'
-    real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: u, c, mom
+    real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: mom, u
+    real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: c
     real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: mask
     real(8), intent(in) :: rho1,rho2
     integer, intent(in) :: d
