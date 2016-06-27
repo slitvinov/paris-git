@@ -15,7 +15,7 @@ ampini=$(head -n 1 interface.dat | awk '{printf("%10.9f",$2 - 1.50)}')
 
 awk '{print $1, ($2-1.50)/'$ampini'*0.01}' interface.dat > $tmp/sim
 awk '{print $2}' prosperetti > $tmp/theory
-paste $tmp/sim $tmp/theory | awk 'NF ==3'> comparison.dat
+paste $tmp/sim $tmp/theory > comparison.dat
 
 err=$(awk 'BEGIN{sum = 0}{ sum=sum+sqrt(($3-$2)*($3-$2))}END{ print sum/NR}' comparison.dat)
 

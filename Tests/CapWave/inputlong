@@ -72,7 +72,7 @@ Ng      = 2
 
 XLENGTH = 1d0
 YLENGTH = 3d0
-ZLENGTH = 0.125d0
+ZLENGTH = 0.0625d0
                    ! domain size in x,y,z direction
 
 read_x   = F       ! read the grid file for x-grid; If true xLength and xform are neglected
