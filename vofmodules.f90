@@ -95,6 +95,7 @@ module module_VOF
   logical :: mixed_heights
   logical :: use_full_heights
   logical :: debug_par
+  logical :: staggeredmom =.true.
 
   real(8) :: b1,b2,b3,b4,hshift
   integer :: nfilter
@@ -275,7 +276,7 @@ contains
          out_centroid, do_clean_debris,&
          clean_debris_method,nsteps_clean_debris,clean_debris_neighbours,&
          filter_random_seeds, nb, n_cell,&
-         cwg_threshold
+         cwg_threshold, staggeredmom
     namelist /FSparameters/ X_level, RP_test, gamma, R_ref, P_ref,&
          VTK_OUT, NOUT_VTK, step_max, limit, curve_stats, order_extrap,&
          do_2nd_projection, check_stray_liquid, n_stray_liquid, &
@@ -1511,7 +1512,6 @@ subroutine vofandmomsweepsstaggered(tswap,t)
   integer dir
   integer, intent(in) :: tswap
   real(8) :: t
-  logical :: staggeredmom =.true.
 
   if (staggeredmom) then
      do dir=1,3
