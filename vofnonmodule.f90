@@ -724,11 +724,12 @@ SUBROUTINE swpr_stg(us,c,f,d,vof1,cg,vof3, dir)
   do k=ks,ke
      do j=js,je
         do i=is,ie
-           a2 = 0.5d0*(us(i,j,k)+us(i+i2,j+j2,k+k2))*dt/dxh(i)
+           a2 = 0.5d0*(us(i,j,k)+us(i+i2,j+j2,k+k2))*dt/dxyz
            a1 = 0.5d0*(us(i-i0,j-j0,k-k0)+us(i-i0+i2,j-j0+j2,k-k0+k2))*dt/dxyz
 
            c(i,j,k) = c(i,j,k) - (vof3(i,j,k) - vof1(i+i0,j+j0,k+k0)) + & 
                       (vof3(i-i0,j-j0,k-k0) - vof1(i,j,k)) + cg(i,j,k)*(a2-a1);
+
 !!$           c(i,j,k) = DMAX1(0.d0,DMIN1(1.d0,c(i,j,k)))
            if (c(i,j,k) < EPSC) then
               c(i,j,k) = 0.d0
@@ -777,11 +778,10 @@ SUBROUTINE swprmom(us,c,d,mom1,cg,mom3,mom,dir,t)
   dxyz = dxh(is)
   call test_cell_size()
 
-  mom1(i,j,k)  = 0.d0; mom3(i,j,k)  = 0.d0
-
   do k=ks-1,ke+1
      do j=js-1,je+1
         do i=is-1,ie+1
+          mom1(i,j,k)  = 0.d0; mom3(i,j,k)  = 0.d0
            a2 = us(i,j,k)*dt/dxyz
            a1 = us(i-ii,j-jj,k-kk)*dt/dxyz
            !  default: fluxes=0. (good also for c=0.)
@@ -876,31 +876,30 @@ SUBROUTINE swprmom_stg(us,c,d,mom1,cg,mom3,mom,dir,t)
   call test_cell_size()
 
   if(ng < 2) call pariserror("wrong ng")
-  if (dir == 1) then
+  if (d == 1) then
      dm1 => dmx;  dm2 => dmy;  dm3 => dmz 
-  else if (dir == 2) then
+  else if (d == 2) then
      dm1 => dmy;  dm2 => dmz;  dm3 => dmx 
-  else if (dir == 3) then
+  else if (d == 3) then
      dm1 => dmz;  dm2 => dmx;  dm3 => dmy 
   endif
 
-  mom1(i,j,k)  = 0.d0; mom3(i,j,k)  = 0.d0
 
   do k=ks-1,ke+1
      do j=js-1,je+1
         do i=is-1,ie+1
-           a2 = 0.5d0*(us(i,j,k)+us(i+i2,j+j2,k+k2))*dt/dxh(i)
+          mom1(i,j,k)  = 0.d0; mom3(i,j,k)  = 0.d0
+           a2 = 0.5d0*(us(i,j,k)+us(i+i2,j+j2,k+k2))*dt/dxyz
            a1 = 0.5d0*(us(i-i0,j-j0,k-k0)+us(i-i0+i2,j-j0+j2,k-k0+k2))*dt/dxyz
-
            !  default: fluxes=0. (good also for c=0.)
            ro1 = (rho2*c(i-i0,j-j0,k-k0)+rho1*(1.d0-c(i-i0,j-j0,k-k0)))
            ro2 = (rho2*c(i,j,k)+rho1*(1.d0-c(i,j,k)))
            ro3 = (rho2*c(i+i0,j+j0,k+k0)+rho1*(1.d0-c(i+i0,j+j0,k+k0)))
 
            uadv1 = interpole3(mom(i-i0,j-j0,k-k0)/ro1,mom(i,j,k)/ro2,mom(i+i0,j+j0,k+k0)/ro3,AdvectionScheme,-a1)           
-!           uadv1 = mom(i,j,k)/ro2 
+           uadv1 = mom(i,j,k)/ro2 
            uadv3 = interpole3(mom(i-i0,j-j0,k-k0)/ro1,mom(i,j,k)/ro2,mom(i+i0,j+j0,k+k0)/ro3,AdvectionScheme,a2)           
-!           uadv3 = mom(i,j,k)/ro2 
+           uadv3 = mom(i,j,k)/ro2 
 
            mom1(i,j,k) = 0.d0; mom3(i,j,k) = 0.d0
            !  c = 1.
@@ -915,13 +914,13 @@ SUBROUTINE swprmom_stg(us,c,d,mom1,cg,mom3,mom,dir,t)
               x0=0d0
               deltax=1d0
               if(a1<0d0) then
-                 deltax(dir)=-a1
+                 deltax(d)=-a1
                  vof = FL3DNEW(mxyz,alpha,x0,deltax)
                  mom1(i,j,k) = (rho2*vof + rho1*(-a1 - vof))*uadv1
               endif
               if(a2>0d0) then
-                 x0(dir)=1d0-a2
-                 deltax(dir)=a2
+                 x0(d)=1d0-a2
+                 deltax(d)=a2
                  vof = FL3DNEW(mxyz,alpha,x0,deltax)
                  mom3(i,j,k) = (rho2*vof + rho1*(a2 - vof))*uadv3
               endif
@@ -945,18 +944,17 @@ SUBROUTINE swprmom_stg(us,c,d,mom1,cg,mom3,mom,dir,t)
   do k=ks,ke
      do j=js,je
         do i=is,ie
-           a2 = 0.5d0*(us(i,j,k)+us(i+i2,j+j2,k+k2))*dt/dxh(i)
+           a2 = 0.5d0*(us(i,j,k)+us(i+i2,j+j2,k+k2))*dt/dxyz
            a1 = 0.5d0*(us(i-i0,j-j0,k-k0)+us(i-i0+i2,j-j0+j2,k-k0+k2))*dt/dxyz
 
            uavg = mom(i,j,k)/(rho2*c(i,j,k)+rho1*(1.d0-c(i,j,k)))
            mom(i,j,k)= mom(i,j,k) -  (mom3(i,j,k) - mom1(i+i0,j+j0,k+k0)) + & 
-                      (mom3(i-i0,j-j0,k-k0) - mom1(i,j,k)) 
-           if (cg(i,j,k).gt.0.d0) then
-                   mom(i,j,k)= mom(i,j,k) + rho2*uavg*(a2-a1)
-           endif
+                      (mom3(i-i0,j-j0,k-k0) - mom1(i,j,k)) + &
+                      (rho2-rho1)*cg(i,j,k)*uavg*(a2-a1)
         enddo
      enddo
   enddo
+
   ! apply proper boundary conditions 
   call SetMomentumBC(us,c,mom,dir,umask,rho1,rho2,t) 
 

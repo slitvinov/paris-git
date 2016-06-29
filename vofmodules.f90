@@ -1275,9 +1275,10 @@ contains
     return
   end subroutine ls2vof_refined
   !=================================================================================================
-  subroutine c_mask(cbinary)
+  subroutine c_mask(cvof, cbinary)
     implicit none
     real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(out) :: cbinary
+    real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: cvof
 
     where (cvof > 0.5d0)
        cbinary = 1.d0
@@ -1326,7 +1327,7 @@ contains
     implicit none
     integer, intent(in) :: tswap
 
-    if (VOF_advect=='Dick_Yue') call c_mask(work(:,:,:,2))
+    if (VOF_advect=='Dick_Yue') call c_mask(cvof, work(:,:,:,2))
     if (MOD(tswap,3).eq.0) then  ! do z then x then y 
        call swp(w,cvof,vof_flag,3,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3))
        call swp(u,cvof,vof_flag,1,work(:,:,:,1),work(:,:,:,2),work(:,:,:,3))
@@ -1527,7 +1528,7 @@ subroutine vofandmomsweepsstaggered(tswap,t)
 
         tmp_flag = vof_flag
 
-        if (VOF_advect=='Dick_Yue') call c_mask(work(:,:,:,2))
+        if (VOF_advect=='Dick_Yue') call c_mask(tmp, work(:,:,:,2))
         if (MOD(tswap,3).eq.0) then  ! do z then x then y 
            call swpmom_stg(w,tmp,3,work(:,:,:,1),work(:,:,:,2), &
                 work(:,:,:,3),momentum,dir,t)
@@ -1547,9 +1548,9 @@ subroutine vofandmomsweepsstaggered(tswap,t)
         elseif (MOD(tswap,3).eq.1) then ! do y z x
 
            call swpmom_stg(v,tmp,2,work(:,:,:,1),work(:,:,:,2), &
-                work(:,:,:,3),momentum,dir,t)
+                           work(:,:,:,3),momentum,dir,t)
            call swp_stg(v,tmp,tmp_flag,2,work(:,:,:,1),work(:,:,:,2),&
-                work(:,:,:,3),dir)
+                        work(:,:,:,3),dir)
 
            call swpmom_stg(w,tmp,3,work(:,:,:,1),work(:,:,:,2), &
                 work(:,:,:,3),momentum,dir,t)
@@ -1602,7 +1603,7 @@ subroutine vofandmomsweepsstaggered(tswap,t)
 
         tmp_flag = vof_flag
 
-        if (VOF_advect=='Dick_Yue') call c_mask(work(:,:,:,2))
+        if (VOF_advect=='Dick_Yue') call c_mask(tmp, work(:,:,:,2))
         if (MOD(tswap,3).eq.0) then  ! do z then x then y 
            call swpmom(w,tmp,3,work(:,:,:,1),work(:,:,:,2), &
                 work(:,:,:,3),momentum,t)
