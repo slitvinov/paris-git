@@ -12,13 +12,13 @@
 !
 ! This program is distributed in the hope that it will be useful,
 ! but WITHOUT ANY WARRANTY; without even the implied warranty of
-! MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	See the GNU
+! MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
 ! General Public License for more details.
 !
 ! You should have received a copy of the GNU General Public License
 ! along with this program; if not, write to the Free Software
 ! Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
-! 02111-1307, USA.  
+! 02111-1307, USA.
 !=================================================================================================
 !=================================================================================================
 !!$subroutine fs_sweep(iout,t)
@@ -30,7 +30,7 @@
 !!$  use module_BC
 !!$  use module_lag_part
 !!$  implicit none
-!!$  include 'mpif.h' 
+!!$  include 'mpif.h'
 !!$  real(8) :: t
 !!$  integer :: iout
 !!$
@@ -68,14 +68,14 @@
 !The breakdown is like this: level "0" in the liquid (or interface?), "1" first cell layer inside
 !the gas, and "2" the second layer. Note that only "1" cells are needed for pressure calculation,
 !"2" for velocity.
- subroutine set_topology(phase,iout)
+subroutine set_topology(phase,iout)
   use module_grid
   use module_freesurface
   use module_IO
   use module_BC
   use module_lag_part
   implicit none
-  include 'mpif.h' 
+  include 'mpif.h'
   integer, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: phase
   integer :: req(4),sta(MPI_STATUS_SIZE,4)
   integer :: i,j,k,level,iout,ierr
@@ -93,7 +93,7 @@
         if (phase(i,j+1,k) == 0) then
            v_cmask(i,j,k) = 0
         endif
-        if (phase(i,j,k+1) == 0) then 
+        if (phase(i,j,k+1) == 0) then
            w_cmask(i,j,k) = 0
         endif
      endif
@@ -116,7 +116,7 @@
   call ighost_z(w_cmask,2,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
   call ighost_x(pcmask,2,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
   call ighost_y(pcmask,2,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
-  call ighost_z(pcmask,2,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr) 
+  call ighost_z(pcmask,2,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
   !Set levels 1 to X_level
   do level=1,X_level
      do k=ks,ke; do j=js,je; do i=is,ie
@@ -164,7 +164,7 @@
      call ighost_z(w_cmask,2,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
      call ighost_x(pcmask,2,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
      call ighost_y(pcmask,2,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
-     call ighost_z(pcmask,2,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr) 
+     call ighost_z(pcmask,2,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
   enddo
 end subroutine set_topology
 !-------------------------------------------------------------------------------------------------
@@ -178,7 +178,7 @@ subroutine check_topology(is_gas)
   use module_BC
   use module_Lag_part
   implicit none
-  include 'mpif.h' 
+  include 'mpif.h'
   real(8) :: volume
   integer :: dropid
   integer :: i,j,k,bub,ierr,rankid
@@ -196,7 +196,7 @@ subroutine check_topology(is_gas)
         !write(*,'("Volume of drop ",I5," in rank ",I5", : ",e14.5)')bub,rank,volume
         if (volume > 1.d-9*dx(is)**3.d0) then
            if (is_gas) then
-              if (volume < 125.0*dx(is)**3.d0) then   
+              if (volume < 125.0*dx(is)**3.d0) then
                  !write(*,'("Volume <  of drop ",I5," in rank ",I5", : ",e14.5)')bub,rank,volume
                  call bub_implode(dropid,.false.)
               endif
@@ -215,7 +215,7 @@ subroutine check_topology(is_gas)
      enddo
   endif
 
-  if ( num_drop_merge(rank) > 0 ) then 
+  if ( num_drop_merge(rank) > 0 ) then
      do bub=1,num_drop_merge(rank)
         volume = drops_merge(bub)%element%vol
         !write(*,'("Volume of drop_merge ",I5," in rank ",I5", : ",e14.5)')bub,rank,volume
@@ -225,7 +225,7 @@ subroutine check_topology(is_gas)
                  !write(*,'("Volume < of drop_merge ",I5," in rank ",I5", : ",e14.5)')bub,rank,volume
                  call bub_implode(dropid,.true.)
               endif
-           else 
+           else
               if (volume<0.4*(xLength*yLength*zLength))&
                    write(*,'("Merged element ",I5," found in rank ",I5,"with volume: "e14.5)')bub,rank,volume
               if (volume < 50.0*dx(is)**3.d0) then
@@ -240,20 +240,20 @@ subroutine check_topology(is_gas)
      enddo
   endif
   call MPI_ALLREDUCE(remove,fill_ghost, 1, MPI_LOGICAL, MPI_LOR, MPI_COMM_Active, ierr)
-contains 
+contains
   subroutine bub_implode(bub_id,merged) !uses bub_id from lpp-type procedures
     use module_vof
     use module_flow
     implicit none
     integer :: i,j,k,bub_id,inbr,jnbr,knbr
     integer :: req(4),sta(MPI_STATUS_SIZE,4),ierr
-    real(8) :: d_clean 
+    real(8) :: d_clean
     integer :: max_implode
     logical :: merged
     max_implode = 0
     remove =.false.
     do k=ks,ke; do j=js,je; do i=is,ie
-       
+
        if (tag_id(i,j,k)==bub_id) then !check if we are in the correct bubble
           if (.not.implode_flag(tag_id(i,j,k))) then
              implode_flag(tag_id(i,j,k)) = .true.
@@ -279,7 +279,7 @@ contains
     endif
 
   end subroutine bub_implode
-!-----------------------------------------------------------------------
+  !-----------------------------------------------------------------------
   subroutine clear_stray_liquid(bub_id)
     use module_vof
     implicit none
@@ -311,7 +311,7 @@ subroutine extrapolate_velocities()
   integer, dimension(-2:2,-2:2,-2:2) :: velmask
   logical :: x_success
   real(8) :: varx
-  
+
   !Simple 1st order extrapolation: Velocities of neighbours at lower topological level averaged
   !Applies the linear equation from FreeSurface documentation (report)
   if (order_extrap == 1) then
@@ -457,8 +457,8 @@ contains
              psi=1.0d0/den
           else
              psi=1.0d0
-          endif      
-          dh(1)=1.0d0   
+          endif
+          dh(1)=1.0d0
           dh(2)=inr*dx(is) !only unstretched regular grids
           dh(3)=jnr*dy(js)
           dh(4)=knr*dz(ks)
@@ -505,7 +505,7 @@ contains
           !write(*,'("Matrix inverted successfully using ",I4, "points.")')fit_cells
           do col=1,4
              !write(*,'("Inverted row, col",I4,e14.5)')col,x_im(4,col)
-             var=var+x_im(1,col)*rhs(col)                                                                                       
+             var=var+x_im(1,col)*rhs(col)
           enddo
           !write(*,'("Extrapolated velocity: ",e14.5)')var
           !debug
@@ -532,7 +532,7 @@ contains
              write(70,'("Pcmask 1-7: ",7I8)')pcmask(i-1,j,k),pcmask(i+1,j,k),pcmask(i,j-1,k),pcmask(i,j+1,k),&
                   pcmask(i,j,k-1),pcmask(i,j,k+1),pcmask(i,j,k)
              write(70,'("  ")')
-             close(70) 
+             close(70)
           else
              extra_vel_found=.true.
           endif
@@ -567,7 +567,7 @@ contains
              write(70,'("Pcmask 1-7: ",7I8)')pcmask(i-1,j,k),pcmask(i+1,j,k),pcmask(i,j-1,k),pcmask(i,j+1,k),&
                   pcmask(i,j,k-1),pcmask(i,j,k+1),pcmask(i,j,k)
              write(70,'("  ")')
-             close(70) 
+             close(70)
           else
              extra_vel_found=.true. !1st order
           endif
@@ -598,7 +598,7 @@ contains
              write(70,'("Pcmask 1-7: ",7I8)')pcmask(i-1,j,k),pcmask(i+1,j,k),pcmask(i,j-1,k),pcmask(i,j+1,k),&
                   pcmask(i,j,k-1),pcmask(i,j,k+1),pcmask(i,j,k)
              write(70,'("  ")')
-             close(70) 
+             close(70)
           else
              extra_vel_found=.true.
           endif
@@ -620,7 +620,7 @@ subroutine discrete_divergence(u,v,w,iout)
   use module_IO
   implicit none
   include 'mpif.h'
-  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: u,v,w 
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: u,v,w
   real(8), dimension(is:ie+1,js:je+1,ks:ke+1) :: div
   real(8), dimension(0:3) :: divtot, domain, n_level, n_total
   real(8) :: avg2
@@ -677,14 +677,14 @@ subroutine get_ref_volume(vof)
   enddo; enddo; enddo
   call MPI_ALLREDUCE(V_loc, V_0, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_Domain, ierr)
   R_RK = rad(1)
-  dR_RK = 0d0 
+  dR_RK = 0d0
   P_inf = BoundaryPressure(1)
 end subroutine get_ref_volume
 !--------------------------------------------------------------------------------------------------------------------
-! This is a straight copy of NewSolver. The idea is to not clutter NewSolver with all the FreeSurface flags and tests, 
+! This is a straight copy of NewSolver. The idea is to not clutter NewSolver with all the FreeSurface flags and tests,
 ! therefore it was copied here and named FreeSolver.
 !Solves the following linear equiation:
-! A7*Pijk = A1*Pi-1jk + A2*Pi+1jk + A3*Pij-1k + 
+! A7*Pijk = A1*Pi-1jk + A2*Pi+1jk + A3*Pij-1k +
 !           A4*Pij+1k + A5*Pijk-1 + A6*Pijk+1 + A8
 !-------------------------------------------------------------------------------------------------
 subroutine FreeSolver(A,p,maxError,beta,maxit,it,ierr,iout,time,tres2)
@@ -708,7 +708,7 @@ subroutine FreeSolver(A,p,maxError,beta,maxit,it,ierr,iout,time,tres2)
   integer, parameter :: norm=2, relaxtype=1
   integer, save :: itime=0
   logical :: use_L_inf = .true.
-! Open file for convergence history
+  ! Open file for convergence history
   if(rank==0.and.recordconvergence) then
      OPEN(UNIT=89,FILE=TRIM(out_path)//'/convergence_history-'//TRIM(int2text(itime,padding))//'.txt')
   endif
@@ -721,78 +721,78 @@ subroutine FreeSolver(A,p,maxError,beta,maxit,it,ierr,iout,time,tres2)
   enddo; enddo; enddo
   call ghost_x(p,1,req( 1: 4)); call ghost_y(p,1,req( 5: 8)); call ghost_z(p,1,req( 9:12))
   call MPI_WAITALL(12,req,sta,ierr)
-  !--------------------------------------ITERATION LOOP--------------------------------------------  
+  !--------------------------------------ITERATION LOOP--------------------------------------------
   do it=1,maxit
-     if(relaxtype==2) then 
+     if(relaxtype==2) then
         call LineRelax_fs(A,p,beta)
      elseif(relaxtype==1) then
         call RedBlackRelax_fs(A,p,beta)
      endif
-!---------------------------------CHECK FOR CONVERGENCE-------------------------------------------
-    res1 = 0d0; res2=0.d0; resinf=0.d0; intvol=0.d0; cells = 0d0; res_local=0.d0
-    call ghost_x(p,1,req( 1: 4)); call ghost_y(p,1,req( 5: 8)); call ghost_z(p,1,req( 9:12))
-    do k=ks+1,ke-1; do j=js+1,je-1; do i=is+1,ie-1
-       if ((pcmask(i,j,k)==0 .and. solver_flag==1)&
-            .or.((pcmask(i,j,k)==1 .or. pcmask(i,j,k)==2) .and. solver_flag==2)) then
-          res_local = abs(-p(i,j,k) * A(i,j,k,7) +                           &
-               A(i,j,k,1) * p(i-1,j,k) + A(i,j,k,2) * p(i+1,j,k) +            &
-               A(i,j,k,3) * p(i,j-1,k) + A(i,j,k,4) * p(i,j+1,k) +            &
-               A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8) )
-          res2=res2+res_local**norm
-          resinf=MAX(resinf,res_local)
-          cells = cells + 1.d0
-          if (res2/=res2) then  
-             write(*,*)'ERROR: RES2 NaN'
-             write(*,'("Res_local, res2: ",2e14.5)')res_local,res2
-             call debug_details(i,j,k,A)
-             call pariserror('FreeSolver Res NaN')
-          endif
-       endif
-    enddo; enddo; enddo
-    call MPI_WAITALL(12,req,sta,ierr)
-    mask=.true.
-    mask(is+1:ie-1,js+1:je-1,ks+1:ke-1)=.false.
-    do k=ks,ke; do j=js,je; do i=is,ie
-       if(mask(i,j,k) .and. ((pcmask(i,j,k)==0 .and. solver_flag==1) .or. &
-            ((pcmask(i,j,k)==1 .or. pcmask(i,j,k)==2) .and. solver_flag==2))) then
-          res_local=abs(-p(i,j,k) * A(i,j,k,7) +&
-               A(i,j,k,1) * p(i-1,j,k) + A(i,j,k,2) * p(i+1,j,k) +            &
-               A(i,j,k,3) * p(i,j-1,k) + A(i,j,k,4) * p(i,j+1,k) +            &
-               A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8) )
-          res2=res2+res_local**norm
-          resinf=MAX(resinf,res_local)
-          cells = cells + 1d0
-          if (res2/=res2) then 
-             write(*,*)'ERROR: RES2 NaN, proc border'
-             write(*,'("Res_local, res2: ",e14.5)')res_local,res2
-             call debug_details(i,j,k,A)
-             call pariserror('FreeSolver Res NaN in proc border')
-          endif
-       endif
-    enddo; enddo; enddo
-    call catch_divergence_fs(res2,cells,ierr)
-    call MPI_ALLREDUCE(res2, tres2, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr)
-    call MPI_ALLREDUCE(resinf, resinf_all, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_Comm_Cart, ierr)
-    call MPI_ALLREDUCE(cells, tcells, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr)
-    if(norm==2) tres2=sqrt(tres2)
-    if (tcells >= 0) then
-       tres2 = tres2/tcells
-    else
-       tres2 = 0
-    endif
-    if(rank==0.and.mod(it,10) == 0.and.recordconvergence) write(89,310) it, solver_flag, tres2
-310 format(2I6,'  ',(e14.5))
-    if (.not. use_L_inf) then
-       if (tres2<maxError) then 
-          if(rank==0.and.recordconvergence) close(89)
-          exit
-       endif
-    else
-       if (resinf_all<maxError) then 
-          if(rank==0.and.recordconvergence) close(89)
-          exit
-       endif
-    endif
+     !---------------------------------CHECK FOR CONVERGENCE-------------------------------------------
+     res1 = 0d0; res2=0.d0; resinf=0.d0; intvol=0.d0; cells = 0d0; res_local=0.d0
+     call ghost_x(p,1,req( 1: 4)); call ghost_y(p,1,req( 5: 8)); call ghost_z(p,1,req( 9:12))
+     do k=ks+1,ke-1; do j=js+1,je-1; do i=is+1,ie-1
+        if ((pcmask(i,j,k)==0 .and. solver_flag==1)&
+             .or.((pcmask(i,j,k)==1 .or. pcmask(i,j,k)==2) .and. solver_flag==2)) then
+           res_local = abs(-p(i,j,k) * A(i,j,k,7) +                           &
+                A(i,j,k,1) * p(i-1,j,k) + A(i,j,k,2) * p(i+1,j,k) +            &
+                A(i,j,k,3) * p(i,j-1,k) + A(i,j,k,4) * p(i,j+1,k) +            &
+                A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8) )
+           res2=res2+res_local**norm
+           resinf=MAX(resinf,res_local)
+           cells = cells + 1.d0
+           if (res2/=res2) then
+              write(*,*)'ERROR: RES2 NaN'
+              write(*,'("Res_local, res2: ",2e14.5)')res_local,res2
+              call debug_details(i,j,k,A)
+              call pariserror('FreeSolver Res NaN')
+           endif
+        endif
+     enddo; enddo; enddo
+     call MPI_WAITALL(12,req,sta,ierr)
+     mask=.true.
+     mask(is+1:ie-1,js+1:je-1,ks+1:ke-1)=.false.
+     do k=ks,ke; do j=js,je; do i=is,ie
+        if(mask(i,j,k) .and. ((pcmask(i,j,k)==0 .and. solver_flag==1) .or. &
+             ((pcmask(i,j,k)==1 .or. pcmask(i,j,k)==2) .and. solver_flag==2))) then
+           res_local=abs(-p(i,j,k) * A(i,j,k,7) +&
+                A(i,j,k,1) * p(i-1,j,k) + A(i,j,k,2) * p(i+1,j,k) +            &
+                A(i,j,k,3) * p(i,j-1,k) + A(i,j,k,4) * p(i,j+1,k) +            &
+                A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8) )
+           res2=res2+res_local**norm
+           resinf=MAX(resinf,res_local)
+           cells = cells + 1d0
+           if (res2/=res2) then
+              write(*,*)'ERROR: RES2 NaN, proc border'
+              write(*,'("Res_local, res2: ",e14.5)')res_local,res2
+              call debug_details(i,j,k,A)
+              call pariserror('FreeSolver Res NaN in proc border')
+           endif
+        endif
+     enddo; enddo; enddo
+     call catch_divergence_fs(res2,cells,ierr)
+     call MPI_ALLREDUCE(res2, tres2, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr)
+     call MPI_ALLREDUCE(resinf, resinf_all, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_Comm_Cart, ierr)
+     call MPI_ALLREDUCE(cells, tcells, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr)
+     if(norm==2) tres2=sqrt(tres2)
+     if (tcells >= 0) then
+        tres2 = tres2/tcells
+     else
+        tres2 = 0
+     endif
+     if(rank==0.and.mod(it,10) == 0.and.recordconvergence) write(89,310) it, solver_flag, tres2
+310  format(2I6,'  ',(e14.5))
+     if (.not. use_L_inf) then
+        if (tres2<maxError) then
+           if(rank==0.and.recordconvergence) close(89)
+           exit
+        endif
+     else
+        if (resinf_all<maxError) then
+           if(rank==0.and.recordconvergence) close(89)
+           exit
+        endif
+     endif
   enddo
 
   if(rank==0.and.recordconvergence) close(89)
@@ -840,7 +840,7 @@ contains
           write(*,'("Res2, cells, solver_flag :",2e14.5,I8)')res2,cells,solver_flag
        endif
        call pariserror("freesolver error")
-    else if (res2 .ne. res2) then 
+    else if (res2 .ne. res2) then
        if(rank<=100) then
           print*, 'it:',it,'Pressure residual value is invalid at rank', rank
           write(*,'("Res2, cells, solver_flag :",2e14.5,I8)')res2,cells,solver_flag
@@ -905,7 +905,7 @@ subroutine LineRelax_fs(A,p,beta)
   real(8), dimension(is:ie,js:je,ks:ke,8), intent(in) :: A
   real(8), intent(in) :: beta
   integer :: i,j,k
-!--------------------------------------ITERATION LOOP--------------------------------------------  
+  !--------------------------------------ITERATION LOOP--------------------------------------------
   do k=ks,ke; do j=js,je; do i=is,ie
      if ((pcmask(i,j,k)==0 .and. solver_flag==1).or.((pcmask(i,j,k)==1 .or. pcmask(i,j,k)==2) .and. solver_flag==2)) then
         p(i,j,k)=(1d0-beta)*p(i,j,k) + (beta/A(i,j,k,7))*(              &
@@ -957,7 +957,7 @@ subroutine VTK_scalar_struct(index,iout,var)
   use module_IO
   use module_freesurface
   implicit none
-  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax) :: var 
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax) :: var
   character(len=40) :: file_root
   integer index, iout, i,j,k
   file_root = TRIM(out_path)//'/VTK/'//TRIM(file_short(index))//TRIM(int2text(iout,padding))//'-'
@@ -995,7 +995,7 @@ end subroutine VTK_scalar_struct
 ! Routine to numerically integrate the Rayleigh-Plesset equation (-> for the test suite)
 subroutine Integrate_RP(dt,t,rho)
   use module_freesurface
-  implicit none 
+  implicit none
   integer :: j
   real(8) :: dt, t, Volume
   real(8), parameter :: pi=3.141592653589793238462643383
@@ -1003,40 +1003,40 @@ subroutine Integrate_RP(dt,t,rho)
   real(8) :: y(nvar), ytmp(nvar),rho
   real(8) :: dydt1(nvar), dydt2(nvar),dydt3(nvar),dydt0(nvar),dydt4(nvar)
 
-    ! start at previous RP values
-    y(1) = R_RK
-    y(2) = dR_RK
-    ! RK4
-    !1st step
-    ytmp(:)  = y(:)
-    call func(ytmp,dydt0)
-    !2nd step
-    do j=1,nvar
-       ytmp(j) = y(j) + dydt0(j)*dt/2.d0
-    enddo
-    call func(ytmp,dydt1)
-    !3rd step
-    do j=1,nvar
-       ytmp(j) = y(j) + dydt1(j)*dt/2.d0
-    enddo
-    call func(ytmp,dydt2)
-    !4th step
-    do j=1,nvar
-       ytmp(j) = y(j) + dydt2(j)*dt
-    enddo
-    call func(ytmp,dydt3)
+  ! start at previous RP values
+  y(1) = R_RK
+  y(2) = dR_RK
+  ! RK4
+  !1st step
+  ytmp(:)  = y(:)
+  call func(ytmp,dydt0)
+  !2nd step
+  do j=1,nvar
+     ytmp(j) = y(j) + dydt0(j)*dt/2.d0
+  enddo
+  call func(ytmp,dydt1)
+  !3rd step
+  do j=1,nvar
+     ytmp(j) = y(j) + dydt1(j)*dt/2.d0
+  enddo
+  call func(ytmp,dydt2)
+  !4th step
+  do j=1,nvar
+     ytmp(j) = y(j) + dydt2(j)*dt
+  enddo
+  call func(ytmp,dydt3)
 
-    do j=1,nvar
-       y(j) = y(j) + dt*(dydt0(j)/6d0 + dydt1(j)/3d0 + dydt2(j)/3d0 + dydt3(j)/6d0)
-    enddo
-    Volume = 4d0/3d0*pi*y(1)**3d0
-    call func(y,dydt4)
-    R_RK = y(1); dR_RK = y(2); ddR_RK = dydt4(2)
-    
+  do j=1,nvar
+     y(j) = y(j) + dt*(dydt0(j)/6d0 + dydt1(j)/3d0 + dydt2(j)/3d0 + dydt3(j)/6d0)
+  enddo
+  Volume = 4d0/3d0*pi*y(1)**3d0
+  call func(y,dydt4)
+  R_RK = y(1); dR_RK = y(2); ddR_RK = dydt4(2)
+
 contains
-subroutine func(y,dydt)
-  use module_2phase
-  use module_freesurface
+  subroutine func(y,dydt)
+    use module_2phase
+    use module_freesurface
     real(8) :: P_c
     real(8) :: y(2), dydt(2)
     P_c = P_ref*(R_ref/y(1))**(3d0*gamma)-2d0*sigma/y(1)
@@ -1045,7 +1045,7 @@ subroutine func(y,dydt)
   end subroutine func
 end subroutine Integrate_RP
 !=======================================================================================================================================
-subroutine write_RP_test(t,rho) 
+subroutine write_RP_test(t,rho)
   use module_freesurface
   implicit none
   real(8) :: t, vol, p_mid, p_corner, rho
@@ -1080,7 +1080,7 @@ subroutine set_RP_pressure(p,rho)
   real(8) :: r, rho
   integer :: i,j,k
 
-  if (coords(1)==0) then 
+  if (coords(1)==0) then
      do k=ks-1,ke+1; do j=js-1,je+1
         r = sqrt((x(is-1)-xc(1))**2d0 + (y(j)-yc(1))**2d0 + (z(k)-zc(1))**2d0)
         p(is-1,j,k) = pressure(r)
@@ -1090,19 +1090,19 @@ subroutine set_RP_pressure(p,rho)
      do k=ks-1,ke+1; do j=js-1,je+1
         r = sqrt((x(ie+1)-xc(1))**2d0 + (y(j)-yc(1))**2d0 + (z(k)-zc(1))**2d0)
         p(ie+1,j,k) = pressure(r)
-     enddo; enddo 
+     enddo; enddo
   endif
   if(coords(2)==0) then
      do k=ks-1,ke+1; do i=is-1,ie+1
         r = sqrt((x(i)-xc(1))**2d0 + (y(js-1)-yc(1))**2d0 + (z(k)-zc(1))**2d0)
         p(i,js-1,k) = pressure(r)
-     enddo; enddo 
+     enddo; enddo
   endif
   if(coords(2)==Npy-1) then
      do k=ks-1,ke+1; do i=is-1,ie+1
         r = sqrt((x(i)-xc(1))**2d0 + (y(je+1)-yc(1))**2d0 + (z(k)-zc(1))**2d0)
         p(i,je+1,k) = pressure(r)
-     enddo; enddo  
+     enddo; enddo
   endif
 
   ! Pressure BC for z-
@@ -1110,14 +1110,14 @@ subroutine set_RP_pressure(p,rho)
      do j=js-1,je+1; do i=is-1,ie+1
         r = sqrt((x(i)-xc(1))**2d0 + (y(j)-yc(1))**2d0 + (z(ks-1)-zc(1))**2d0)
         p(i,j,ks-1) = pressure(r)
-     enddo; enddo 
+     enddo; enddo
   endif
   ! Pressure BC for z+
   if(coords(3)==Npz-1) then
      do j=js-1,je+1; do i=is-1,ie+1
         r = sqrt((x(i)-xc(1))**2d0 + (y(j)-yc(1))**2d0 + (z(ke+1)-zc(1))**2d0)
         p(i,j,ke+1) = pressure(r)
-     enddo; enddo 
+     enddo; enddo
   endif
 contains
   function pressure(r)
@@ -1162,9 +1162,9 @@ subroutine debug_details(i,j,k,A)
   write(40,*) "p",  p(i,j,k)
   write(40,'("A branches: ",8e14.5)')A(i,j,k,:)
   write(40,'("P neighbours ",6e14.5)')p(i-1,j,k),p(i+1,j,k),p(i,j-1,k),p(i,j+1,k),&
-                  p(i,j,k-1),p(i,j,k+1)
+       p(i,j,k-1),p(i,j,k+1)
   write(40,'("Mods ",6e14.5)')x_mod(i-1,j,k),x_mod(i,j,k),y_mod(i,j-1,k),y_mod(i,j,k),&
-                  z_mod(i,j,k-1),z_mod(i,j,k)
+       z_mod(i,j,k-1),z_mod(i,j,k)
   write(40,'("Limits: ",6I8)')is,ie,js,je,ks,ke
   write(40,*) "ijk rank",i,j,k,rank
   write(40,'("Pcmask 1-7: ",7I8)')pcmask(i-1,j,k),pcmask(i+1,j,k),pcmask(i,j-1,k),pcmask(i,j+1,k),&
@@ -1182,8 +1182,8 @@ subroutine tag_bubbles(phase_ref,iout,time_stats)
   integer :: iout, flag
   integer, intent(in) :: phase_ref
   integer :: ierr
-  logical, allocatable :: implode_global(:) 
- 
+  logical, allocatable :: implode_global(:)
+
   tracked_phase = phase_ref
   call tag_drop()
   if ( nPdomain > 1 ) call tag_drop_all
@@ -1209,7 +1209,7 @@ subroutine tag_bubbles(phase_ref,iout,time_stats)
   endif
 end subroutine tag_bubbles
 !==================================================================================================================
-!This allows to set a non-zero P_gas inside the bubbles 
+!This allows to set a non-zero P_gas inside the bubbles
 subroutine set_bubble_pressure
   use module_grid
   use module_Lag_part
@@ -1220,7 +1220,7 @@ subroutine set_bubble_pressure
   !real(8), dimension(imin:imax,jmin:jmax,kmin:kmax) :: P_g
   real(8) :: volume
   integer :: i,j,k,dropid
- 
+
   P_gas = 0.0d0
   if ((NumBubble>0) .and. (P_ref > 1.d-14) .and. .not. (test_capwave .or. test_plane)) then
      do k=ks,ke; do j=js,je; do i=is,ie
@@ -1241,7 +1241,7 @@ subroutine set_bubble_pressure
            endif
         endif
      enddo;enddo;enddo
-  else 
+  else
      P_gas = P_ref
   endif
 end subroutine set_bubble_pressure
@@ -1254,14 +1254,26 @@ subroutine inflow_accelerate
   use module_freesurface
   use module_flow
   implicit none
-  real(8) :: factor
-  real(8), parameter :: pi=3.141592653589793238462643383
+  real(8) :: factor,ix=0.d0
+  real(8), parameter :: pi=4.d0*atan(1.d0)
   integer :: i,j,k
-  
+  !20160628 new variable fs_refactor added [WA]
+
   if (itimestep < 2) then
      factor = 0.0d0
   else
-     factor = (1.d0 + sin(-pi/2.d0 + DBLE((itimestep-2)*1.0)/DBLE(step_max*1.0)*pi))/2.0
+     if(fs_refactor) then
+        !WA: factor varies sinusoidally, which
+        !is stretched over entire time of simulation
+        ix=time/endtime
+        factor = sin(2.d0*pi*ix)
+     else
+        !LCM: factor varies smoothly from 0 to 1:
+        !which takes step_max steps
+        ix=DBLE((itimestep)*1.0)/DBLE(step_max*1.0)
+        factor = 0.5d0*(1.d0 + sin(-pi/2.d0 +ix*pi))
+     endif
+
   endif
   !if (rank==0) Write(*,'("Factor: ",e14.5)')factor
   ! inflow boundary condition x- with injection
@@ -1286,7 +1298,7 @@ subroutine inflow_accelerate
   if(bdry_cond(3)==3 .and. coords(3)==0   ) then
      do i=imin,imax
         do j=jmin,jmax
-           w(i,j,ks-1)= w(i,j,ks-1)*factor 
+           w(i,j,ks-1)= w(i,j,ks-1)*factor
            w(i,j,ks-2)= w(i,j,ks-2)*factor
         enddo
      enddo
@@ -1305,7 +1317,7 @@ subroutine inflow_accelerate
      do i=imin,imax
         do k=kmin,kmax
            v(i,je,k)=v(i,je,k)*factor
-           v(i,je+1,k)=v(i,je+1,k)*factor 
+           v(i,je+1,k)=v(i,je+1,k)*factor
         enddo
      enddo
   endif
@@ -1313,12 +1325,13 @@ subroutine inflow_accelerate
   if(bdry_cond(6)==3 .and. coords(3)==nPz-1   ) then
      do i=imin,imax
         do j=jmin,jmax
-           w(i,j,ke)=w(i,j,ke)*factor 
+           w(i,j,ke)=w(i,j,ke)*factor
            w(i,j,ke+1)=w(i,j,ke+1)*factor
         enddo
      enddo
   endif
-  
+
+  if(rank==0) print *,'step:',itimestep,'t=',time,'tend=',endtime,'x=',ix,'factor:',factor
 end subroutine inflow_accelerate
 !===================================================================================================================================
 subroutine setuppoisson_fs_heights(utmp,vtmp,wtmp,rho,dt,coeff,bub_id)
@@ -1334,15 +1347,15 @@ subroutine setuppoisson_fs_heights(utmp,vtmp,wtmp,rho,dt,coeff,bub_id)
   real(8), intent(in) :: dt, rho
   integer :: i,j,k,nbr
   integer :: reqd(24),stat(MPI_STATUS_SIZE,24)
-  
+
   if (.not.(solver_flag==1 .or. solver_flag==2)) call pariserror('Solver_flag FS needs to be either 1 or 2')
   if (solver_flag == 1) then
      call liq_gas2()
-  else !(solver_flag == 2)   
+  else !(solver_flag == 2)
      if (.not.(solver_flag==2)) call pariserror('ERROR: Solver flag for FS must be set to either 1 or 2')
      do k=ks,ke; do j=js,je; do i=is,ie
         if (pcmask(i,j,k)==1 .or. pcmask(i,j,k)==2) then !rho is 1d0
-              
+
            coeff(i,j,k,1) = 1.d0/(dx(i)*dxh(i-1))
            coeff(i,j,k,2) = 1.d0/(dx(i)*dxh(i))
            coeff(i,j,k,3) = 1.d0/(dy(j)*dyh(j-1))
@@ -1380,11 +1393,11 @@ contains
     use module_surface_tension
     use module_2phase
     implicit none
-    real(8) :: kap(imin:imax,jmin:jmax,kmin:kmax) 
+    real(8) :: kap(imin:imax,jmin:jmax,kmin:kmax)
     real(8) :: Source
     integer :: i,j,k,l,ierr
     real(8) :: avg_kap, n_kap
-    
+
     !OPEN(unit=121,file='mods.txt',access='append')
     call get_all_curvatures(kap,2)
     x_mod=dxh((is+ie)/2); y_mod=dyh((js+je)/2); z_mod=dzh((ks+ke)/2) !assumes an unstretched grid
@@ -1402,7 +1415,7 @@ contains
        coeff(i,j,k,8) =  -(Source + (utmp(i,j,k)-utmp(i-1,j,k))/dx(i) &
             +  (vtmp(i,j,k)-vtmp(i,j-1,k))/dy(j) &
             +  (wtmp(i,j,k)-wtmp(i,j,k-1))/dz(k) )
-! Debugging A8 NaN
+       ! Debugging A8 NaN
        if (coeff(i,j,k,8) /= coeff(i,j,k,8)) then
           write(*,'("A8 NaN, liq_gas at x y z: ",3e14.5)')x(i),y(j),z(k)
           write(*,'("Limits: ",6I8)')is,ie,js,je,ks,ke
@@ -1419,10 +1432,10 @@ contains
           write(*,'("Velocities in div u: ",6e14.5)')utmp(i,j,k),utmp(i-1,j,k),vtmp(i,j,k),vtmp(i,j-1,k),&
                wtmp(i,j,k),wtmp(i,j,k-1)
        endif
-!===============================================================================================================
+       !===============================================================================================================
        !----Cav-liquid neighbours, set P_g in cavity cells
        if (.not.implode_flag(bub_id(i,j,k))) then
-          ! Set Laplace jumps for surface tension 
+          ! Set Laplace jumps for surface tension
           if(vof_phase(i,j,k)==1) then
              if (vof_phase(i+1,j,k)==0) then
                 x_mod(i,j,k)=-1.d0*height(i+1,j,k,1)*dx(i)
@@ -1449,7 +1462,7 @@ contains
                 !write(121,10)x(i),y(j),z(k+1),0d0,0d0,-z_mod(i,j,k)
              endif
           endif ! Cavity cell
-          
+
           if(vof_phase(i,j,k)==0) then
              if (vof_phase(i+1,j,k)==1) then
                 x_mod(i,j,k)=height(i,j,k,2)*dx(i)
@@ -1479,74 +1492,74 @@ contains
        endif ! we are not imploding
     enddo; enddo; enddo
 10  format(6e14.5)
-    !close(121)    
-    call ghost_x(x_mod,1,reqd(1:4)); call ghost_y(y_mod,1,reqd(5:8)); call ghost_z(z_mod,1,reqd(9:12)) 
+    !close(121)
+    call ghost_x(x_mod,1,reqd(1:4)); call ghost_y(y_mod,1,reqd(5:8)); call ghost_z(z_mod,1,reqd(9:12))
     call MPI_WAITALL(12,reqd(1:12),stat(:,1:12),ierr)
-    
+
     do k=ks,ke; do j=js,je; do i=is,ie
        if ( (.not.implode_flag(bub_id(i,j,k))) .and. vof_phase(i,j,k)==1) then
-                 do l=-1,1,2
-           avg_kap=0.0d0; n_kap=0.d0
-           if (vof_phase(i+l,j,k)==0) then
-              if (vof_flag(i+l,j,k)==2 .and. kap(i+l,j,k)<1.d6) then
-                 n_kap=n_kap+1.d0
-                 avg_kap = avg_kap + kap(i+l,j,k)
-              endif
-              if (vof_flag(i,j,k)==2 .and. kap(i,j,k)<1.d6 ) then
-                 n_kap=n_kap+1.d0
-                 avg_kap=avg_kap + kap(i,j,k)
-              endif
-              if (n_kap>=9.99d-1) then
-                 avg_kap=avg_kap/n_kap
-              else
-                 call pariserror('No curvature found in liq-gas pair for FS bubble')
-              endif
-              P_gx(i,j,k) = sigma*avg_kap/dx(i) !!filaments and droplets of one cell will be an issue here
-           endif
-              
-           avg_kap=0.0d0; n_kap=0.d0
-           if (vof_phase(i,j+l,k)==0) then
-             if (vof_flag(i,j+l,k)==2 .and. kap(i,j+l,k)<1.d6) then
-                 n_kap=n_kap+1.d0
-                 avg_kap = avg_kap + kap(i,j+l,k)
-              endif
-              if (vof_flag(i,j,k)==2 .and. kap(i,j,k)<1.d6 ) then
-                 n_kap=n_kap+1.d0
-                 avg_kap=avg_kap + kap(i,j,k)
-              endif
-              if (n_kap>=9.99d-1) then
-                 avg_kap=avg_kap/n_kap
-              else
-                 call pariserror('No curvature found in liq-gas pair for FS bubble')
-              endif
-              P_gy(i,j,k) = sigma*avg_kap/dy(j)
-           endif
-           
-           if (vof_phase(i,j,k+l)==0) then
-              if (vof_flag(i,j,k+l)==2 .and. kap(i,j,k+l)<1.d6) then
-                 n_kap=n_kap+1.d0
-                 avg_kap = avg_kap + kap(i,j,k+l)
-              endif
-              if (vof_flag(i,j,k)==2 .and. kap(i,j,k)<1.d6 ) then
-                 n_kap=n_kap+1.d0
-                 avg_kap=avg_kap + kap(i,j,k)
-              endif
-              if (n_kap>=9.99d-1) then
-                 avg_kap=avg_kap/n_kap
-              else
-                 call pariserror('No curvature found in liq-gas pair for FS bubble')
-              endif
-              P_gz(i,j,k) = sigma*avg_kap/dz(k)
-           endif
-        enddo
-     endif
+          do l=-1,1,2
+             avg_kap=0.0d0; n_kap=0.d0
+             if (vof_phase(i+l,j,k)==0) then
+                if (vof_flag(i+l,j,k)==2 .and. kap(i+l,j,k)<1.d6) then
+                   n_kap=n_kap+1.d0
+                   avg_kap = avg_kap + kap(i+l,j,k)
+                endif
+                if (vof_flag(i,j,k)==2 .and. kap(i,j,k)<1.d6 ) then
+                   n_kap=n_kap+1.d0
+                   avg_kap=avg_kap + kap(i,j,k)
+                endif
+                if (n_kap>=9.99d-1) then
+                   avg_kap=avg_kap/n_kap
+                else
+                   call pariserror('No curvature found in liq-gas pair for FS bubble')
+                endif
+                P_gx(i,j,k) = sigma*avg_kap/dx(i) !!filaments and droplets of one cell will be an issue here
+             endif
+
+             avg_kap=0.0d0; n_kap=0.d0
+             if (vof_phase(i,j+l,k)==0) then
+                if (vof_flag(i,j+l,k)==2 .and. kap(i,j+l,k)<1.d6) then
+                   n_kap=n_kap+1.d0
+                   avg_kap = avg_kap + kap(i,j+l,k)
+                endif
+                if (vof_flag(i,j,k)==2 .and. kap(i,j,k)<1.d6 ) then
+                   n_kap=n_kap+1.d0
+                   avg_kap=avg_kap + kap(i,j,k)
+                endif
+                if (n_kap>=9.99d-1) then
+                   avg_kap=avg_kap/n_kap
+                else
+                   call pariserror('No curvature found in liq-gas pair for FS bubble')
+                endif
+                P_gy(i,j,k) = sigma*avg_kap/dy(j)
+             endif
+
+             if (vof_phase(i,j,k+l)==0) then
+                if (vof_flag(i,j,k+l)==2 .and. kap(i,j,k+l)<1.d6) then
+                   n_kap=n_kap+1.d0
+                   avg_kap = avg_kap + kap(i,j,k+l)
+                endif
+                if (vof_flag(i,j,k)==2 .and. kap(i,j,k)<1.d6 ) then
+                   n_kap=n_kap+1.d0
+                   avg_kap=avg_kap + kap(i,j,k)
+                endif
+                if (n_kap>=9.99d-1) then
+                   avg_kap=avg_kap/n_kap
+                else
+                   call pariserror('No curvature found in liq-gas pair for FS bubble')
+                endif
+                P_gz(i,j,k) = sigma*avg_kap/dz(k)
+             endif
+          enddo
+       endif
     enddo; enddo; enddo
-    call ghost_x(P_gx,1,reqd(1:4)); call ghost_y(P_gy,1,reqd(5:8)); call ghost_z(P_gz,1,reqd(9:12)) 
+    call ghost_x(P_gx,1,reqd(1:4)); call ghost_y(P_gy,1,reqd(5:8)); call ghost_z(P_gz,1,reqd(9:12))
     call MPI_WAITALL(12,reqd(1:12),stat(:,1:12),ierr)
     !--------------------------------------------------------------------------------------------------------
     do k=ks,ke; do j=js,je; do i=is,ie
        if (vof_phase(i,j,k)==0 .and. (.not.implode_flag(bub_id(i,j,k))) ) then
-          
+
           coeff(i,j,k,1) = 2.d0*dt/((dx(i)+x_mod(i-1,j,k))*x_mod(i-1,j,k)*rho)
           coeff(i,j,k,2) = 2.d0*dt/((dx(i)+x_mod(i  ,j,k))*x_mod(i  ,j,k)*rho)
           coeff(i,j,k,3) = 2.d0*dt/((dy(j)+y_mod(i,j-1,k))*y_mod(i,j-1,k)*rho)
@@ -1602,7 +1615,7 @@ subroutine staggered_cut(cvof,i,j,k,theta,phase,d)
   call mycs(stencil3x3,n_nbr)
   !=====================
   alpha2 = al3dnew(n_ref,cvof(i,j,k))
-  x0 = 0.0d0; x0(d) = 0.5d0 
+  x0 = 0.0d0; x0(d) = 0.5d0
   dc = 1.0d0; dc(d) = 0.5d0
   c_ref = FL3DNEW(n_ref,alpha2,x0,dc)
 
@@ -1619,7 +1632,7 @@ subroutine staggered_cut(cvof,i,j,k,theta,phase,d)
      n_stag(3) = nr(3)/(ABS(nr(1))+ABS(nr(2))+ABS(nr(3)))
   else
      if (phase==1) then
-        n_stag=n_ref 
+        n_stag=n_ref
      else
         n_stag=n_nbr
      endif
@@ -1710,7 +1723,7 @@ subroutine curvature_sphere(t)
   ! Curvature for perfect sphere
   kap_sphere = -1.0d0*((32.0d0*pi)/(V_t*3.0d0))**(1.0/3.0)
   !write(*,'("Curvature sphere: ",e14.5)')kap_sphere
-! Get calculated curvature
+  ! Get calculated curvature
   call get_all_curvatures(kap,2)
   do k=ks,ke; do j=js,je; do i=is,ie
      if(vof_phase(i,j,k)==1) then
@@ -1821,7 +1834,7 @@ subroutine setuppoisson_fs_hypre(utmp,vtmp,wtmp,rho,dt,coeff,height,kap,bub_id)
   !!Debugging for curvature errors
 !!$  real(8) :: err, err_global, L2_err, Linf_err, kappa_theory, L2_glob, Linf_glob
 !!$  integer :: uncomp_curv, uncomp_curv_global, n_avg_kap, n_glob
-  
+
   !OPEN(unit=121,file='mods.txt',access='append')
   x_mod=dxh((is+ie)/2); y_mod=dyh((js+je)/2); z_mod=dzh((ks+ke)/2) !assumes an unstretched grid
   P_gx = 0d0; P_gy = 0d0; P_gz = 0d0
@@ -1858,7 +1871,7 @@ subroutine setuppoisson_fs_hypre(utmp,vtmp,wtmp,rho,dt,coeff,height,kap,bub_id)
      !===============================================================================================================
      !----Cav-liquid neighbours, set P_g in cavity cells
      if (.not.implode_flag(bub_id(i,j,k))) then
-        ! Set Laplace jumps for surface tension 
+        ! Set Laplace jumps for surface tension
         if(vof_phase(i,j,k)==1) then
            if (vof_phase(i+1,j,k)==0) then
               x_mod(i,j,k)=-1.d0*height(i+1,j,k,1)*dx(i)
@@ -1915,8 +1928,8 @@ subroutine setuppoisson_fs_hypre(utmp,vtmp,wtmp,rho,dt,coeff,height,kap,bub_id)
      endif ! we are not imploding
   enddo; enddo; enddo
 10 format(6e14.5)
-  !close(121)    
-  call ghost_x(x_mod,1,reqd(1:4)); call ghost_y(y_mod,1,reqd(5:8)); call ghost_z(z_mod,1,reqd(9:12)) 
+  !close(121)
+  call ghost_x(x_mod,1,reqd(1:4)); call ghost_y(y_mod,1,reqd(5:8)); call ghost_z(z_mod,1,reqd(9:12))
   call MPI_WAITALL(12,reqd(1:12),stat(:,1:12),ierr)
 
 !!$  uncomp_curv=0; n_avg_kap=0; L2_err=0.0d0; Linf_err=0.0d0
@@ -1945,10 +1958,10 @@ subroutine setuppoisson_fs_hypre(utmp,vtmp,wtmp,rho,dt,coeff,height,kap,bub_id)
 !!$              Linf_err=MAX(err,Linf_err)
               P_gx(i,j,k) = sigma*avg_kap/dx(i) !!filaments and droplets of one cell will be an issue here
            endif
-              
+
            avg_kap=0.0d0; n_kap=0.d0
            if (vof_phase(i,j+l,k)==0) then
-             if (vof_flag(i,j+l,k)==2 .and. kap(i,j+l,k)<1.d6) then
+              if (vof_flag(i,j+l,k)==2 .and. kap(i,j+l,k)<1.d6) then
                  n_kap=n_kap+1.d0
                  avg_kap = avg_kap + kap(i,j+l,k)
               endif
@@ -1967,7 +1980,7 @@ subroutine setuppoisson_fs_hypre(utmp,vtmp,wtmp,rho,dt,coeff,height,kap,bub_id)
 !!$              Linf_err=MAX(err,Linf_err)
               P_gy(i,j,k) = sigma*avg_kap/dy(j)
            endif
-           
+
            if (vof_phase(i,j,k+l)==0) then
               if (vof_flag(i,j,k+l)==2 .and. kap(i,j,k+l)<1.d6) then
                  n_kap=n_kap+1.d0
@@ -1991,7 +2004,7 @@ subroutine setuppoisson_fs_hypre(utmp,vtmp,wtmp,rho,dt,coeff,height,kap,bub_id)
         enddo
      endif
   enddo; enddo; enddo
-  call ghost_x(P_gx,1,reqd(1:4)); call ghost_y(P_gy,1,reqd(5:8)); call ghost_z(P_gz,1,reqd(9:12)) 
+  call ghost_x(P_gx,1,reqd(1:4)); call ghost_y(P_gy,1,reqd(5:8)); call ghost_z(P_gz,1,reqd(9:12))
   call MPI_WAITALL(12,reqd(1:12),stat(:,1:12),ierr)
   !! Debugging uncomputed curvatures
 !!$  call MPI_ALLREDUCE(uncomp_curv,uncomp_curv_global, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_Active, ierr)
@@ -2026,9 +2039,9 @@ subroutine setuppoisson_fs_hypre(utmp,vtmp,wtmp,rho,dt,coeff,height,kap,bub_id)
         endif
         if (pcmask(i,j,k).ne.0) write(*,'("Error topology, phase 0, pcmask :",i8)')pcmask(i,j,k)
      else if (vof_phase(i,j,k)==1) then
-       coeff(i,j,k,1:6) = 0.0d0 
-       coeff(i,j,k,7) = 1.0d0
-       coeff(i,j,k,8) = P_gas(i,j,k) !Should now work for polytropic law and vacuum
+        coeff(i,j,k,1:6) = 0.0d0
+        coeff(i,j,k,7) = 1.0d0
+        coeff(i,j,k,8) = P_gas(i,j,k) !Should now work for polytropic law and vacuum
      endif
   enddo;enddo;enddo
 

@@ -198,7 +198,7 @@ Program paris
         if(test_frdroplet.or.test_droplet) call output_droplet(w,time)
         call SetVelocityBC(u,v,w,umask,vmask,wmask,time,dt,0)
         if (FreeSurface) then
-           if (inflow .and. (itimestep<=step_max)) call inflow_accelerate  
+           if (inflow .and. (itimestep<=step_max .or. fs_refactor)) call inflow_accelerate  
         endif
         !call write_vec_gnuplot(u,v,cvof,p,itimestep,DoVOF)
         call calcstats
@@ -445,7 +445,7 @@ Program paris
            call my_timer(3)
            call SetVelocityBC(u,v,w,umask,vmask,wmask,time,dt,0)
            if (FreeSurface) then
-              if (inflow .and. (itimestep<=step_max)) call inflow_accelerate  
+              if (inflow .and. (itimestep<=step_max .or. fs_refactor)) call inflow_accelerate  
               call my_timer(15)
            endif
            call do_ghost_vector(u,v,w)

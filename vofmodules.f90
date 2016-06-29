@@ -280,7 +280,7 @@ contains
     namelist /FSparameters/ X_level, RP_test, gamma, R_ref, P_ref,&
          VTK_OUT, NOUT_VTK, step_max, limit, curve_stats, order_extrap,&
          do_2nd_projection, check_stray_liquid, n_stray_liquid, &
-         FS_HYPRE
+         FS_HYPRE, fs_refactor, fs_restrictor
     
     vofbdry_cond=['undefined','undefined','undefined','undefined','undefined','undefined']
     test_type='droplet'
@@ -369,6 +369,8 @@ contains
        X_level = 2; RP_test = .false.; gamma = 1.4d0; R_ref = 1.d0; P_ref = 1.d0; 
        VTK_OUT = .false.; NOUT_VTK = 100000; vtk_open = .false.
        step_max = 1
+       fs_refactor = .false.
+       fs_restrictor = .false.
        limit = 1.0d-2
        curve_stats = .false.
        order_extrap = 1
@@ -640,7 +642,7 @@ contains
           if (nb < 2) &
                call pariserror('For cubic lattice bubble test there has to be at least 2 bubbles per coord direction')
           call cubic_lattice_bubbles
-          call restrict_bubbles("sphere")
+          if(fs_restrictor) call restrict_bubbles("sphere")
        endif
        call MPI_BCAST(NumBubble, 1, MPI_INTEGER, root_rank, MPI_Comm_Cart, ierr)
        call MPI_BCAST(rad, NumBubble, MPI_REAL8, &

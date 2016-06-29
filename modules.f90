@@ -418,6 +418,7 @@ module module_freesurface
   real(8) :: R_RK, dR_RK, ddR_RK
   real(8) :: limit
   integer :: X_level, solver_flag=0, step_max
+  logical :: fs_refactor,fs_restrictor
   logical :: FreeSurface, debug=.false., initialize_fs = .false.
   logical :: RP_test, inflow
   logical :: fill_ghost, curve_stats, reset_vof
