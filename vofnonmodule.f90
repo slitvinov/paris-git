@@ -744,7 +744,7 @@ SUBROUTINE swpr_stg(us,c,f,d,vof1,cg,vof3, dir)
 
 end subroutine swpr_stg
 
-SUBROUTINE swprmom(us,c,d,mom1,cg,mom3,mom,dir,t)
+SUBROUTINE swprmom(us,c,d,mom1,cg,mom3,mom,t)
 !***
     USE module_grid
     USE module_flow
@@ -755,7 +755,7 @@ SUBROUTINE swprmom(us,c,d,mom1,cg,mom3,mom,dir,t)
     include 'mpif.h'
     INTEGER :: i,j,k
     INTEGER :: ii,jj,kk,i0,j0,k0
-    INTEGER, INTENT(IN) :: dir, d
+    INTEGER, INTENT(IN) :: d
     REAL (8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), INTENT(INOUT) :: us
     REAL(8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: mom
     REAL (8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), INTENT(INOUT) :: c,mom1,cg,mom3
