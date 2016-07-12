@@ -574,21 +574,23 @@ contains
                end if ! num_cell_drop
             else  ! ghost cells
                tag_flag(isq,jsq,ksq) = 5
-               if ( merge_drop .eqv. .false.) then 
-                  merge_drop = .true.
-                  num_drop      (rank) = num_drop      (rank) - 1
-                  num_drop_merge(rank) = num_drop_merge(rank) + 1
-                  if ( num_drop_merge(rank) > max_num_drop_merge ) & 
-                     call lpperror("Drop merge number exceeds maximum number!") 
-               end if ! merge_drop
-               if ( drops_merge(num_drop_merge(rank))%num_gcell < maxnum_cell_drop) then 
-                  drops_merge(num_drop_merge(rank))%num_gcell = drops_merge(num_drop_merge(rank))%num_gcell + 1
-                  drops_merge_gcell_list(1,drops_merge(num_drop_merge(rank))%num_gcell,num_drop_merge(rank)) = isq
-                  drops_merge_gcell_list(2,drops_merge(num_drop_merge(rank))%num_gcell,num_drop_merge(rank)) = jsq
-                  drops_merge_gcell_list(3,drops_merge(num_drop_merge(rank))%num_gcell,num_drop_merge(rank)) = ksq
-               else
-                  write(*,*) 'Warning: ghost cell number of tag',current_id,'at rank',rank,'reaches max value!'
-               end if ! drops_merge(num_drop_merge(rank))%num_gcell
+               if ( nPdomain > 1 ) then ! no need to merge drop for serial run 
+                  if ( merge_drop .eqv. .false. ) then 
+                     merge_drop = .true.
+                     num_drop      (rank) = num_drop      (rank) - 1
+                     num_drop_merge(rank) = num_drop_merge(rank) + 1
+                     if ( num_drop_merge(rank) > max_num_drop_merge ) & 
+                        call lpperror("Drop merge number exceeds maximum number!") 
+                  end if ! merge_drop
+                  if ( drops_merge(num_drop_merge(rank))%num_gcell < maxnum_cell_drop) then 
+                     drops_merge(num_drop_merge(rank))%num_gcell = drops_merge(num_drop_merge(rank))%num_gcell + 1
+                     drops_merge_gcell_list(1,drops_merge(num_drop_merge(rank))%num_gcell,num_drop_merge(rank)) = isq
+                     drops_merge_gcell_list(2,drops_merge(num_drop_merge(rank))%num_gcell,num_drop_merge(rank)) = jsq
+                     drops_merge_gcell_list(3,drops_merge(num_drop_merge(rank))%num_gcell,num_drop_merge(rank)) = ksq
+                  else
+                     write(*,*) 'Warning: ghost cell number of tag',current_id,'at rank',rank,'reaches max value!'
+                  end if ! drops_merge(num_drop_merge(rank))%num_gcell
+               end if ! nPdomain
             end if ! isq, jsq, ksq
 
             imin_drop = MIN(isq,imin_drop)
