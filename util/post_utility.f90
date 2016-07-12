@@ -17,6 +17,7 @@ PROGRAM post_utility
   LOGICAL :: reorder
   INTEGER(kind = MPI_OFFSET_KIND) :: initial_displacement
 
+  LOGICAL,PARAMETER :: vof_only = .false.
   ! Silo variables************************************************************************
   REAL(8) :: deltaX
   INTEGER :: levarnames, lemeshnames, padd
@@ -29,6 +30,7 @@ PROGRAM post_utility
   !
   ! Read input parameters of the program
   !
+  if ( rank == 0 .and. vof_only ) write(*,*) "Warning: only plot VOF!"
   CALL readInput()
   padd = 5
   !
@@ -360,6 +362,7 @@ CONTAINS
          REAL(u_read,4), dims_vof, &
          3, DB_F77NULL, 0, DB_FLOAT, DB_ZONECENT, DB_F77NULL, ierr2) 
 
+    if ( .not. vof_only ) then 
     u_read = read_MPI('pres',counter) 
 
     ! Appending Pressure variable to *.silo file  
@@ -387,6 +390,7 @@ CONTAINS
     ierr2 = dbputqv1 (dbfile, 'wvel', 4, 'srm', 3, &
          REAL(u_read,4), dims_vof, &
          3, DB_F77NULL, 0, DB_FLOAT, DB_ZONECENT, DB_F77NULL, ierr2) 
+    end if ! vof_only
 
     !END SUBROUTINE appendVariable
 
@@ -442,10 +446,12 @@ CONTAINS
        !write(*,*) 'Paths1 ', fullname
        meshnames(m+1) = TRIM(fullname)
        varnames(m+1) = TRIM(file_n)//TRIM(i2t(m,padd))//'.silo:cvof'
+       if ( .not. vof_only ) then 
        presn(m+1) = TRIM(file_n)//TRIM(i2t(m,padd))//'.silo:pres'
        vec1n(m+1) = TRIM(file_n)//TRIM(i2t(m,padd))//'.silo:uvel'
        vec2n(m+1) = TRIM(file_n)//TRIM(i2t(m,padd))//'.silo:vvel'
        vec3n(m+1) = TRIM(file_n)//TRIM(i2t(m,padd))//'.silo:wvel'
+       end if ! vof_only  
     ENDDO
 
     ! Setting length of multi mesh file pash
@@ -480,6 +486,7 @@ CONTAINS
     err = dbputmvar(dbfile, "cvof", 4, npx*npy*npz, varnames, lvarnames, &
          vartypes, DB_F77NULL, ierr)
 
+    if ( .not. vof_only ) then 
     err = dbputmvar(dbfile, "p", 1, npx*npy*npz, presn, lvarnames, &
          vartypes, DB_F77NULL, ierr)
 
@@ -494,6 +501,7 @@ CONTAINS
 
     err = dbputdefvars(dbfile, 'defvars',7, 1, 'velocity',8, &
          DB_VARTYPE_VECTOR, '{uvel,vvel,wvel}', 16, DB_F77NULL, ierr)
+    end if ! vof_only  
 
     ! Set maximum string length
     err = dbset2dstrlen(oldlen)

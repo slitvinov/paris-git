@@ -1,4 +1,4 @@
-!=================================================================================================
+
 !=================================================================================================
 !
 !
@@ -474,6 +474,7 @@ Program paris
            endif
            ! (div u)*dt < epsilon => div u < epsilon/dt => maxresidual : maxerror/dt 
            if(HYPRE)then
+              tmp = p
               call poi_solve(A,p,maxError/MaxDt*ErrorScaleHYPRE,maxit,it,HYPRESolverType)
               call do_all_ghost(p)
            else
@@ -492,13 +493,17 @@ Program paris
               if (residual/(maxError/MaxDt) > DivergeTol) then 
                  if ( SwitchHYPRESolver .and. HYPRESolverType == 2 ) then
                     ! if HYPRE-PFMG is diverged, retry with SMG
+                    if (rank == 0) write(*,*) "PFMG failed, switch to SMG...",itimestep,ii,residual/(maxError/MaxDt),DivergeTol
                     HYPRESolverType = 1
+                    if (residual/(maxError/MaxDt) > DivergeTol) p = tmp !PFMG may diverge,then use old p as IC for iteration
                     call poi_solve(A,p,maxError/MaxDt*ErrorScaleHYPRE,maxit,it,HYPRESolverType)
                     call do_all_ghost(p)
                     call calcResidual(A,p,ResNormOrderPressure,residual)
-                    if (residual/(maxError/MaxDt) > DivergeTol ) &  
+                    if (residual/(maxError/MaxDt) > DivergeTol ) then  
+                       if (rank == 0) write(*,*) "PFMG/SMG pressure solver diverge!",& 
+                           itimestep,ii,residual/(maxError/MaxDt),DivergeTol,HYPRESolverType
                        call pariserror("PFMG/SMG pressure solver diverge!")
-                    if (rank == 0) write(*,*) "PFMG diverge, switch to SMG...",itimestep,ii
+                    end if ! residual
                  else 
                     call pariserror("Pressure solver diverge! (Adjust DivergeTol or Reduce ErrorScaleHYPRE if HYPRE is used!")
                  end if ! SwitchHYPRESolver
@@ -507,15 +512,6 @@ Program paris
            if(mod(itimestep,termout)==0 .and. ii==1) then
               !if (.not.FreeSurface) call calcResidual(A,p,ResNormOrderPressure,residual)
               call calcResidual(A,p,ResNormOrderPressure,residual)
-              if ( DynamicAdjustPoiTol ) then 
-                 if (HYPRE .and. residual/(maxError/MaxDt) > 2.d0 ) then  
-                    ErrorScaleHYPRE = ErrorScaleHYPRE*0.5d0
-                    if (rank == 0) write(*,*) "ErrorScaleHYPRE is decreased.",ErrorScaleHYPRE
-                 else if (HYPRE .and. residual/(maxError/MaxDt) < 0.5d0 ) then  
-                    ErrorScaleHYPRE = ErrorScaleHYPRE*2.0d0
-                    if (rank == 0) write(*,*) "ErrorScaleHYPRE is increased.",ErrorScaleHYPRE
-                 end if ! HYPRE & residual
-              end if ! DynamicAdjustPoiTol  
               if(rank==0) then
                  write(*,'("              pressure residual*dt:   ",e7.1,&
                    &" maxerror: ",e7.1)') residual*MaxDt,maxerror
@@ -525,6 +521,24 @@ Program paris
                  HYPRESolverType = 2 
                  if (rank == 0) write(*,*) "Switch from HYPRE-SMG to PFMG"
               end if ! SwitchSHYPRESolver
+              if ( DynamicAdjustPoiTol ) then 
+                 if (HYPRE .and. residual/(maxError/MaxDt) > 2.d0 ) then  
+                    ErrorScaleHYPRE = ErrorScaleHYPRE*0.5d0
+                    if (rank == 0) write(*,*) "ErrorScaleHYPRE is decreased.",ErrorScaleHYPRE
+! TEMPORARY 
+                    call poi_solve(A,p,maxError/MaxDt*ErrorScaleHYPRE,maxit,it,HYPRESolverType)
+                    call do_all_ghost(p)
+                    call calcResidual(A,p,ResNormOrderPressure,residual)
+                    if(rank==0) then
+                       write(*,'("Solve again:  pressure residual*dt:   ",e7.1,&
+                         &" maxerror: ",e7.1)') residual*MaxDt,maxerror
+                    end if
+! END TEMPORARY
+                 else if (HYPRE .and. residual/(maxError/MaxDt) < 0.5d0 ) then  
+                    ErrorScaleHYPRE = ErrorScaleHYPRE*2.0d0
+                    if (rank == 0) write(*,*) "ErrorScaleHYPRE is increased.",ErrorScaleHYPRE
+                 end if ! HYPRE & residual
+              end if ! DynamicAdjustPoiTol  
            endif
 
            if(out_sub .and. ii==1 .and. mod(itimestep-itimestepRestart,nout)==0) then
@@ -936,19 +950,20 @@ end subroutine project_velocity
 !=================================================================================================
 ! subroutine TimeStepSize
 !-------------------------------------------------------------------------------------------------
-subroutine TimeStepSize(deltaT,vof_phase)
+subroutine TimeStepSize(deltaT,vof_phase1)
   use module_grid
   use module_flow
   use module_2phase
   use module_IO
   use module_BC
   use module_freesurface
+  use module_VOF
 #ifdef PHASE_CHANGE
   use module_boil
 #endif
   implicit none
   include "mpif.h"
-  integer, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: vof_phase
+  integer, dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: vof_phase1
   real(8) :: deltaT, h, vmax, dtadv, mydt
   real(8) :: vmax_phys
   real(8) :: v_local
@@ -962,28 +977,42 @@ subroutine TimeStepSize(deltaT,vof_phase)
   if(rank<nPdomain)then
      h  = minval(dx)
      if (.not.FreeSurface) then
-        vmax = maxval(sqrt(u(is:ie,js:je,ks:ke)**2+v(is:ie,js:je,ks:ke)**2+w(is:ie,js:je,ks:ke)**2))
+        if ( inject_type == 3 ) then 
+           vmax_phys = max(1.d-3,max(ugas_inject,uliq_inject))
+           vmax      = 0.d0
+           do k=ks,ke; do j=js,je; do i=is,ie
+              v_local = sqrt(u(i,j,k)**2 + v(i,j,k)**2 + w(i,j,k)**2)
+              vmax = MAX(vmax,v_local)
+              if ( vmax > vmax_phys*1.d2 ) then
+                  OPEN(UNIT=88,FILE=TRIM(out_path)//'/message-rank-'//TRIM(int2text(rank,padding))//'.txt')
+                  write(88,*) "Error:Max velocity 100 times larger than physical value",itimestep,rank, vmax,vmax_phys
+                  write(88,*) rank, i,j,k,itimestep 
+                  write(88,*) u(i-1:i+1,j,k)
+                  write(88,*) v(i,j-1:j+1,k)
+                  write(88,*) w(i,j,k-1:k+1)
+                  write(88,*) cvof(i-1:i+1,j,k)
+                  write(88,*) cvof(i,j-1:j+1,k)
+                  write(88,*) cvof(i,j,k-1:k+1)
+                  CLOSE(88)
+                  call pariserror("Max velocity 100 times larger than physical value, something wrong!") 
+              end if ! vmax
+           enddo; enddo; enddo ! i,j,k 
+         else 
+           vmax = maxval(sqrt(u(is:ie,js:je,ks:ke)**2+v(is:ie,js:je,ks:ke)**2+w(is:ie,js:je,ks:ke)**2))
+        end if ! inject_type 
+              
      else
         vmax_phys = 0.d0
         vmax = 0.d0
         do k=ks,ke; do j=js,je; do i=is,ie
-           if (vof_phase(i,j,k)==0) then
+           if (vof_phase1(i,j,k)==0) then
               v_local = sqrt(u(i,j,k)**2 + v(i,j,k)**2 + w(i,j,k)**2)
               vmax = MAX(vmax,v_local)
            endif
         enddo; enddo; enddo 
-     endif
-     if ( inject_type == 3  .and. vmax > vmax_phys*1.d2 ) then
-        write(*,*) "Error:Max velocity 100 times larger than physical value",itimestep,rank, vmax,vmax_phys 
-        call pariserror("Max velocity 100 times larger than physical value, something wrong!") 
-     else 
-        if (max(vmax,vmax_phys) > 1.d-12 ) then
-           dtadv  = h/(max(vmax,vmax_phys))
-        else
-           dtadv = dt
-        endif
-     end if ! vmax
-     mydt = CFL*dtadv
+     endif ! FreeSurface
+     dtadv = h/vmax
+     mydt  = CFL*dtadv
      mydt = min(mydt,MaxDt)
 #ifdef PHASE_CHANGE
      dtTdiff = h**2.d0*min(rho1*Cp1/kc1,rho2*Cp2/kc2)/2.d0
@@ -991,8 +1020,9 @@ subroutine TimeStepSize(deltaT,vof_phase)
 #endif
   else
      mydt=1.0e10
-  endif
+  endif ! rank
   call MPI_ALLREDUCE(mydt, deltat, 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_Active, ierr)
+
 
 end subroutine TimeStepSize
 !=================================================================================================
@@ -1609,7 +1639,7 @@ end subroutine calcStats
          integer ::i,j
          character(len=100) :: filename
          filename = trim(out_path)//'/backup_turb_'//int2text(rank,padding)
-         !call system('touch '//trim(filename)//'; mv '//trim(filename)//' '//trim(filename)//'.old')
+         call system('touch '//trim(filename)//'; mv '//trim(filename)//' '//trim(filename)//'.old')
          OPEN(UNIT=101,FILE=trim(filename),status='REPLACE')
          write(101,*) iSumTurbStats
          do i=is,ie; do j=js,je
@@ -3064,13 +3094,13 @@ subroutine InitCondition
            call backup_read
         else if ( DoVOF ) then 
            call backup_VOF_read
-           call ghost_x(cvof,2,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
-           call ghost_y(cvof,2,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
-           call ghost_z(cvof,2,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
-           call ighost_x(vof_flag,2,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
-           call ighost_y(vof_flag,2,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
-           call ighost_z(vof_flag,2,req(1:4)); call MPI_WAITALL(4,req(1:4),sta(:,1:4),ierr)
            call setVOFBC(cvof,vof_flag)
+           call do_all_ghost(cvof)
+           call do_all_ighost(vof_flag)
+           call setVOFBC(cvof,vof_flag)
+           call do_ghost_vector(u,v,w)
+           if ( do_clean_debris ) call clean_debris
+           if ( DoLPP ) call lppvofsweeps(itimestep,time)  
            if (FreeSurface) then
               call press_indices
               if (rank==0) then
@@ -3431,6 +3461,7 @@ subroutine ReadParameters
                         ResNormOrderPressure,         ErrorScaleHYPRE, DynamicAdjustPoiTol,      & 
                         OutVelSpecified,  MaxFluxRatioPresBC, LateralBdry,                       & 
                         HYPRESolverType, SwitchHYPRESolver, DivergeTol,  uinjectPertAmp,         &
+                        ExcludeBoundCellCalcRes, numCellExclude,                                 &  
                         plane, n_p, out_sub, test_MG, MultiGrid, nrelax,u_file, v_file, w_file,  &
                         read_u, read_v, read_w
  
@@ -3477,6 +3508,7 @@ subroutine ReadParameters
   DivergeTol = 1.d2
   plane = 0.5d0; n_p = 0.0d0
   out_sub = .false.
+  ExcludeBoundCellCalcRes = .false.; numCellExclude = 1
 
   in=1
   out=2

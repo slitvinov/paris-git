@@ -96,7 +96,7 @@
       integer :: id
       integer :: num_diff_tag 
       integer :: diff_tag_list(maxnum_diff_tag)
-      integer :: flag_center_mass
+      integer :: flag_center_mass,dummyint
    end type drop_merge_comm
    type (drop_merge_comm), dimension(:,:), allocatable :: drops_merge_comm
 
@@ -1288,7 +1288,7 @@ contains
       call MPI_TYPE_EXTENT(MPI_REAL8, r8extent, ierr) 
       offsets    (1) = blockcounts(0)*r8extent 
       oldtypes   (1) = MPI_INTEGER  
-      blockcounts(1) = 1+1+maxnum_diff_tag+1  
+      blockcounts(1) = 1+1+maxnum_diff_tag+1+1  
 
       call MPI_TYPE_STRUCT(2, blockcounts, offsets, oldtypes, & 
                                   MPI_drop_merge_comm_type, ierr) 
@@ -1919,7 +1919,7 @@ contains
 
             ! transfer droplet properties to particle if center of mass located
             ! in this droplet piece
-            if ( drops_merge(idrop)%flag_center_mass == 1 ) then 
+            if ( drops_merge(idrop)%flag_center_mass == 1 ) then
                num_part(rank) = num_part(rank) + 1
                parts(num_part(rank),rank)%element = drops_merge(idrop)%element
                
@@ -4274,7 +4274,7 @@ module module_output_lpp
       integer ::ipart
       character(len=100) :: filename
       filename = trim(out_path)//'/backuplpp_'//int2text(rank,padding)
-      !call system('mv '//trim(filename)//' '//trim(filename)//'.old')
+      call system('touch '//trim(filename)//'; mv '//trim(filename)//' '//trim(filename)//'.old')
       OPEN(UNIT=7,FILE=trim(filename),status='REPLACE')
       write(7,1100)time,itimestep,num_part(rank)
       if ( num_part(rank) > 0 ) then 

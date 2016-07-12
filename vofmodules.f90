@@ -54,7 +54,8 @@ module module_VOF
 
   real(8), parameter  :: A_h = 2d0  ! For initialisation of height test
   real(8), parameter  :: TINY = 1d-50
-  real(8), parameter  :: EPSC = 1.d-12  ! for clipping vof and setting flags
+
+  real(8) :: EPSC    ! for clipping vof and setting flags
 
   character(20) :: vofbdry_cond(6),test_type,vof_advect,cond
   integer :: parameters_read=0, refinement=-1 
@@ -276,7 +277,8 @@ contains
          out_centroid, do_clean_debris,&
          clean_debris_method,nsteps_clean_debris,clean_debris_neighbours,&
          filter_random_seeds, nb, n_cell,&
-         cwg_threshold, staggeredmom
+         cwg_threshold,EPSC,staggeredmom
+      
     namelist /FSparameters/ X_level, RP_test, gamma, R_ref, P_ref,&
          VTK_OUT, NOUT_VTK, step_max, limit, curve_stats, order_extrap,&
          do_2nd_projection, check_stray_liquid, n_stray_liquid, &
@@ -312,6 +314,8 @@ contains
     filter_random_seeds = .false.
     nb = 3; n_cell=3
     cwg_threshold=0d0
+    EPSC = 1.d-12
+    staggeredmom = .true.
 
     in=31
 
@@ -2012,7 +2016,7 @@ subroutine backup_VOF_write
   integer ::i,j,k
   character(len=100) :: filename
   filename = trim(out_path)//'/backup_'//int2text(rank,padding)
-  !call system('touch '//trim(filename)//'; mv '//trim(filename)//' '//trim(filename)//'.old')
+  call system('touch '//trim(filename)//'; mv '//trim(filename)//' '//trim(filename)//'.old')
   OPEN(UNIT=7,FILE=trim(filename),status='REPLACE',ACTION='write')
   !Note: p at ghost layers are needed for possion solver 
   write(7,1100)time,itimestep,imin,imax,jmin,jmax,kmin,kmax
@@ -2101,7 +2105,7 @@ end subroutine backup_VOF_read
 
        ni=clean_debris_neighbours;nj=clean_debris_neighbours;nk=clean_debris_neighbours
        if (Nz == 2) nk = 0 !assume Nz=2 for 2d case
-       sum1 = (1+ni*2)*(1+nj*2)*(1+nk*2)
+       sum1 = dble((1+ni*2)*(1+nj*2)*(1+nk*2))
        do i=is,ie; do j=js,je; do k=ks,ke
          sum_cvof = 0.d0 
          do i0=-ni,ni; do j0=-nj,nj; do k0=-nk,nk

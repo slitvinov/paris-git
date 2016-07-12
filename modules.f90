@@ -623,7 +623,7 @@ subroutine backup_write
   integer ::i,j,k
   character(len=100) :: filename
   filename = trim(out_path)//'/backup_'//int2text(rank,padding)
-  !call system('touch '//trim(filename)//'; mv '//trim(filename)//' '//trim(filename)//'.old')
+  call system('touch '//trim(filename)//'; mv '//trim(filename)//' '//trim(filename)//'.old')
   OPEN(UNIT=7,FILE=trim(filename),status='REPLACE')
   write(7,1100)time,itimestep,is,ie,js,je,ks,ke
   do k=ks,ke; do j=js,je; do i=is,ie
@@ -875,6 +875,8 @@ module module_BC
   logical :: OutVelSpecified
   logical :: LateralBdry(6) ! A LateralBdry is defined as parallel to the main stream  
   real(8) :: MaxFluxRatioPresBC  
+  logical :: ExcludeBoundCellCalcRes 
+  integer :: numCellExclude 
   contains
 !=================================================================================================
 
@@ -2317,6 +2319,14 @@ module module_poisson
      END FUNCTION GetNumIterationsGMRES
   end interface
   interface
+     FUNCTION GetNumIterationsBiCGSTAB (isolver,inum) &
+          bind(C, name="HYPRE_StructBiCGSTABGetNumIterations")
+       integer :: GetNumIterationsBiCGSTAB
+       integer :: inum
+       integer (kind = 8) , VALUE :: isolver
+     END FUNCTION GetNumIterationsBiCGSTAB
+  end interface
+  interface
      FUNCTION GetFinalRelative (isolver,rnum) &
           bind(C, name="HYPRE_StructSMGGetFinalRelativeResidualNorm")
        integer :: GetFinalRelative
@@ -2403,9 +2413,10 @@ module module_poisson
     integer, intent(out):: num_iterations
     integer, intent(in) :: HYPRESolverType
 !     real(8) :: final_res_norm
-    integer, parameter :: HYPRESolverSMG  = 1 
-    integer, parameter :: HYPRESolverPFMG = 2
-    integer, parameter :: HYPRESolverGMRES = 3
+    integer, parameter :: HYPRESolverSMG        = 1 
+    integer, parameter :: HYPRESolverPFMG       = 2
+    integer, parameter :: HYPRESolverGMRES      = 3
+    integer, parameter :: HYPRESolverBiCGSTAB   = 4
 #ifdef DEBUG_HYPRE
     real(8) :: timeConstruct,timeSetup,timeSolve,timeCleanup,timeTotal
 #endif
@@ -2487,16 +2498,23 @@ module module_poisson
     ! 1: Weighted Joacobi (default)
     ! 2: Red/Black Gauss-Seidel (symmetric: RB pre- and post-relaxation)
     ! 3: Red/Black Gauss-Seidel (nonsymmetric: RB pre- and post-relaxation)
-    call HYPRE_StructPFMGSetRelaxType(solver, 2, ierr) 
+    call HYPRE_StructPFMGSetRelaxType(solver, 1, ierr) 
     call HYPRE_StructPFMGSetNumPreRelax(solver, 1, ierr)
     call HYPRE_StructPFMGSetNumPostRelax(solver, 1, ierr)
     call HYPRE_StructPFMGSetup(solver, Amat, Bvec, Xvec, ierr)
-   else if ( HYPRESolverType == HYPRESolverGMRES ) then  
-    call HYPRE_StructGMRESCreate(mpi_comm_poi, solver,ierr)
-    call HYPRE_StructGMRESSetMaxIter(solver, maxit,ierr)
-    call HYPRE_StructGMRESSetTol(solver, MaxError, ierr)
-    !call HYPRE_StructGMRESSetLogging(solver, 1 ,ierr)
-    
+   else if ( HYPRESolverType == HYPRESolverGMRES .or. & 
+             HYPRESolverType == HYPRESolverBiCGSTAB   ) then
+    if (HYPRESolverType == HYPRESolverGMRES) then 
+       call HYPRE_StructGMRESCreate(mpi_comm_poi, solver,ierr)
+       call HYPRE_StructGMRESSetMaxIter(solver, maxit,ierr)
+       call HYPRE_StructGMRESSetTol(solver, MaxError, ierr)
+       !call HYPRE_StructGMRESSetLogging(solver, 1 ,ierr)
+    else if (HYPRESolverType == HYPRESolverBiCGSTAB) then 
+       call HYPRE_StructBiCGSTABCreate(mpi_comm_poi, solver,ierr)
+       call HYPRE_StructBiCGSTABSetMaxIter(solver, maxit,ierr)
+       call HYPRE_StructBiCGSTABSetTol(solver, MaxError, ierr)
+    end if ! HYPRESolverType
+       
     ! Use PFMG as preconditioner
     call HYPRE_StructPFMGCreate(mpi_comm_poi, precond, ierr)
     call HYPRE_StructPFMGSetMaxIter(precond, 10, ierr)
@@ -2505,8 +2523,14 @@ module module_poisson
     call HYPRE_StructPFMGSetRelChange(precond, 1, ierr) 
     call HYPRE_StructPFMGSetRelaxType(precond, 2, ierr) 
     precond_id = 1   ! Set PFMG as preconditioner
-    call HYPRE_StructGMRESSetPrecond(solver,precond_id,precond,ierr)
-    call HYPRE_StructGMRESSetup(solver, Amat, Bvec, Xvec, ierr)
+    
+    if (HYPRESolverType == HYPRESolverGMRES) then 
+       call HYPRE_StructGMRESSetPrecond(solver,precond_id,precond,ierr)
+       call HYPRE_StructGMRESSetup(solver, Amat, Bvec, Xvec, ierr)
+    else if (HYPRESolverType == HYPRESolverBiCGSTAB) then 
+       call HYPRE_StructBiCGSTABSetPrecond(solver,precond_id,precond,ierr)
+       call HYPRE_StructBiCGSTABSetup(solver, Amat, Bvec, Xvec, ierr)
+    end if ! HYPRESolverType
    end if ! HYPRESolverType
 #ifdef DEBUG_HYPRE
    if (rank == 0 ) then
@@ -2527,6 +2551,9 @@ module module_poisson
    else if ( HYPRESolverType == HYPRESolverGMRES ) then  
       call HYPRE_StructGMRESSolve(solver, Amat, Bvec, Xvec, ierr)
       ierr = GetNumIterationsGMRES(solver, num_iterations)
+   else if ( HYPRESolverType == HYPRESolverBiCGSTAB ) then  
+      call HYPRE_StructBiCGSTABSolve(solver, Amat, Bvec, Xvec, ierr)
+      ierr = GetNumIterationsBiCGSTAB(solver, num_iterations)
    end if ! HYPRESolverType
 #ifdef DEBUG_HYPRE
    if (rank == 0 ) then
@@ -2549,6 +2576,9 @@ module module_poisson
       call HYPRE_StructPFMGDestroy(solver, ierr)
     else if ( HYPRESolverType == HYPRESolverGMRES ) then  
       call HYPRE_StructGMRESDestroy(solver, ierr)
+      call HYPRE_StructPFMGDestroy(precond, ierr)
+    else if ( HYPRESolverType == HYPRESolverBiCGSTAB ) then  
+      call HYPRE_StructBiCGSTABDestroy(solver, ierr)
       call HYPRE_StructPFMGDestroy(precond, ierr)
     end if ! HYPRESolverType
 #ifdef DEBUG_HYPRE
@@ -3278,8 +3308,23 @@ subroutine calcResidual(A,p,NormOrder, residual)
   integer, intent(in) :: NormOrder
   real(8) :: res, Residual,locres
   integer :: i,j,k, ierr
+  logical :: BoundaryCell
+  integer :: iExc
   res = 0d0
   do k=ks,ke; do j=js,je; do i=is,ie
+      if ( ExcludeBoundCellCalcRes ) then
+         BoundaryCell = .false.
+         do iExc=1,numCellExclude
+            if ( i==ng+iExc .or. i==ng+Nx+1-iExc .or. & 
+                 j==ng+iExc .or. j==ng+Ny+1-iExc .or. &
+                 k==ng+iExc .or. k==ng+Nz+1-iExc )    & 
+               BoundaryCell = .true.
+         end do ! iExc
+         if ( BoundaryCell ) then 
+            locres = 0.d0 
+            cycle
+         end if ! BoundaryCell
+      end if ! ExcludeBoundCellCalcRes
       locres = dabs(-p(i,j,k) * A(i,j,k,7) +                         &
       A(i,j,k,1) * p(i-1,j,k) + A(i,j,k,2) * p(i+1,j,k) +            &
       A(i,j,k,3) * p(i,j-1,k) + A(i,j,k,4) * p(i,j+1,k) +            &
