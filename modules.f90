@@ -2660,7 +2660,8 @@ subroutine SetupDensity(dIdx,dIdy,dIdz,A,color) !,mask)
   enddo; enddo; enddo
 
   if(bdry_cond(1)==0)then
-    if(coords(1)==0    ) A(is,:,:,8)=A(is,:,:,8)+A(is,:,:,1)
+    if(coords(1)==0    ) A(is,:,:,8)=A(is,:,:,8)+A(is,:,:,1) ! @@@ should this be
+                                                             ! A(is,:,:,7)=A(is,:,:,7)+A(is,:,:,1) ?
     if(coords(1)==nPx-1) A(ie,:,:,8)=A(ie,:,:,8)+A(ie,:,:,2)
     if(coords(1)==0    ) A(is,:,:,1) = 0d0
     if(coords(1)==nPx-1) A(ie,:,:,2) = 0d0
