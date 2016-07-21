@@ -896,10 +896,10 @@ SUBROUTINE swprmom_stg(us,c,d,mom1,cg,mom3,mom,dir,t)
            ro2 = (rho2*c(i,j,k)+rho1*(1.d0-c(i,j,k)))
            ro3 = (rho2*c(i+i0,j+j0,k+k0)+rho1*(1.d0-c(i+i0,j+j0,k+k0)))
 
-           uadv1 = interpole3(mom(i-i0,j-j0,k-k0)/ro1,mom(i,j,k)/ro2,mom(i+i0,j+j0,k+k0)/ro3,AdvectionScheme,-a1)           
-           uadv1 = mom(i,j,k)/ro2 
-           uadv3 = interpole3(mom(i-i0,j-j0,k-k0)/ro1,mom(i,j,k)/ro2,mom(i+i0,j+j0,k+k0)/ro3,AdvectionScheme,a2)           
-           uadv3 = mom(i,j,k)/ro2 
+           uadv1 = interpole3(mom(i-i0,j-j0,k-k0)/ro1,mom(i,j,k)/ro2,mom(i+i0,j+j0,k+k0)/ro3, &
+                   AdvectionScheme,-0.5d0*(1.d0+a1))           
+           uadv3 = interpole3(mom(i-i0,j-j0,k-k0)/ro1,mom(i,j,k)/ro2,mom(i+i0,j+j0,k+k0)/ro3, &
+                   AdvectionScheme,0.5d0*(1.d0-a2))           
 
            mom1(i,j,k) = 0.d0; mom3(i,j,k) = 0.d0
            !  c = 1.
