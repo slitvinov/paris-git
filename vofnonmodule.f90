@@ -138,7 +138,7 @@ subroutine swpz(us,c,f,d,vof1,vof2,vof3)
   real (8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: us
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: c,vof1,vof2,vof3
   real(8) mm1,mm2, dxyz
-  real(8) a1,a2,alpha,fl3dnew, stencil3x3(-1:1,-1:1,-1:1)
+  real(8) a1,a2,alpha,fl3d, stencil3x3(-1:1,-1:1,-1:1)
   real(8) nr(3),deltax(3),x0(3)
   intrinsic dmax1,dmin1
   !***
@@ -179,16 +179,16 @@ subroutine swpz(us,c,f,d,vof1,vof2,vof3)
               if(a1.lt.0d0) then
                  x0(d)=a1
                  deltax(d)=-a1
-                 vof1(i,j,k) = fl3dnew(nr,alpha,x0,deltax)
+                 vof1(i,j,k) = fl3d(nr,alpha,x0,deltax)
               endif
               if(a2.gt.0d0) then
                  x0(d)=1.d0
                  deltax(d)=a2
-                 vof3(i,j,k) = fl3dnew(nr,alpha,x0,deltax)
+                 vof3(i,j,k) = fl3d(nr,alpha,x0,deltax)
               endif
               x0(d)=mm1
               deltax(d)=mm2
-              vof2(i,j,k) = fl3dnew(nr,alpha,x0,deltax)
+              vof2(i,j,k) = fl3d(nr,alpha,x0,deltax)
            endif
 
            ! check vof contributions
@@ -250,7 +250,7 @@ subroutine swpz_stg(us,c,f,d,vof1,vof2,vof3,dir)
   real (8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: us
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: c,vof1,vof2,vof3
   real(8) mm1,mm2, dxyz
-  real(8) a1,a2,alpha,fl3dnew, stencil3x3(-1:1,-1:1,-1:1)
+  real(8) a1,a2,alpha,fl3d, stencil3x3(-1:1,-1:1,-1:1)
   real(8) nr(3),deltax(3),x0(3)
   intrinsic dmax1,dmin1
   !***
@@ -292,16 +292,16 @@ subroutine swpz_stg(us,c,f,d,vof1,vof2,vof3,dir)
               if(a1.lt.0d0) then
                  x0(d)=a1
                  deltax(d)=-a1
-                 vof1(i,j,k) = fl3dnew(nr,alpha,x0,deltax)
+                 vof1(i,j,k) = fl3d(nr,alpha,x0,deltax)
               endif
               if(a2.gt.0d0) then
                  x0(d)=1d0
                  deltax(d)=a2
-                 vof3(i,j,k) = fl3dnew(nr,alpha,x0,deltax)
+                 vof3(i,j,k) = fl3d(nr,alpha,x0,deltax)
               endif
               x0(d)=mm1
               deltax(d)=mm2
-              vof2(i,j,k) = fl3dnew(nr,alpha,x0,deltax)
+              vof2(i,j,k) = fl3d(nr,alpha,x0,deltax)
            endif
         enddo
      enddo
@@ -346,7 +346,7 @@ subroutine swpzmom(us,c,d,mom1,mom2,mom3,mom,t)
   real(8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: mom1,mom2,mom3
   real(8) mm1,mm2,vof,dxyz
   real(8) t,a1,a2,alpha,uavg
-  REAL(8) deltax(3),x0(3),fl3dnew
+  REAL(8) deltax(3),x0(3),fl3d
   real(8) nr(3), stencil3x3(-1:1,-1:1,-1:1)
   intrinsic dmax1,dmin1
   !***
@@ -378,18 +378,18 @@ subroutine swpzmom(us,c,d,mom1,mom2,mom3,mom,t)
               if(a1.lt.0d0) then
                  x0(d)=a1
                  deltax(d)=-a1
-                 vof = fl3dnew(nr,alpha,x0,deltax)
+                 vof = fl3d(nr,alpha,x0,deltax)
                  mom1(i,j,k) = (rho2*vof + rho1*(-a1 - vof))*uavg
               endif
               if(a2.gt.0d0) then
                  x0(d)=1d0
                  deltax(d)=a2
-                 vof = fl3dnew(nr,alpha,x0,deltax)
+                 vof = fl3d(nr,alpha,x0,deltax)
                  mom3(i,j,k) = (rho2*vof + rho1*(a2 - vof))*uavg
               endif
               x0(d)=mm1
               deltax(d)=mm2
-              vof = fl3dnew(nr,alpha,x0,deltax)
+              vof = fl3d(nr,alpha,x0,deltax)
               mom2(i,j,k) = (rho2*vof + rho1*(mm2 - vof))*uavg
            else
               if(a1.lt.0d0) then
@@ -439,7 +439,7 @@ subroutine swpzmom_stg(us,c,d,mom1,mom2,mom3,mom,dir,t)
   real(8) mm1,mm2,vof, dxyz
   real(8) t,a1,a2,alpha,uavg
   real(8) uadv1, uadv3, ro1, ro2, ro3
-  REAL(8) deltax(3),x0(3),fl3dnew
+  REAL(8) deltax(3),x0(3),fl3d
   real(8) nr(3), stencil3x3(-1:1,-1:1,-1:1)
   intrinsic dmax1,dmin1
   !***
@@ -479,18 +479,18 @@ subroutine swpzmom_stg(us,c,d,mom1,mom2,mom3,mom,dir,t)
               if(a1.lt.0d0) then
                  x0(d)=a1
                  deltax(d)=-a1
-                 vof = fl3dnew(nr,alpha,x0,deltax)
+                 vof = fl3d(nr,alpha,x0,deltax)
                  mom1(i,j,k) = (rho2*vof + rho1*(-a1 - vof))*uadv1
               endif
               if(a2.gt.0d0) then
                  x0(d)=1d0
                  deltax(d)=a2
-                 vof = fl3dnew(nr,alpha,x0,deltax)
+                 vof = fl3d(nr,alpha,x0,deltax)
                  mom3(i,j,k) = (rho2*vof + rho1*(a2 - vof))*uadv3
               endif
               x0(d)=mm1
               deltax(d)=mm2
-              vof = fl3dnew(nr,alpha,x0,deltax)
+              vof = fl3d(nr,alpha,x0,deltax)
               mom2(i,j,k) = (rho2*vof + rho1*(mm2 - vof))*uavg
            else
               if(a1.lt.0d0) then
@@ -523,7 +523,7 @@ end subroutine swpzmom_stg
 subroutine fit_plane_new(vof,d,a1,a2,stencil3x3,mxyz,alpha,error)
   use module_grid
   integer, intent(in) :: d
-  real(8) a1,a2,alpha,al3dnew,vof
+  real(8) a1,a2,alpha,al3d,vof
   real(8) mxyz(3), stencil3x3(-1:1,-1:1,-1:1)
   logical error
   intrinsic dmax1,dmin1
@@ -535,7 +535,7 @@ subroutine fit_plane_new(vof,d,a1,a2,stencil3x3,mxyz,alpha,error)
   if ( mxyz(1) == 0.d0 .and. mxyz(2) == 0.d0 .and. mxyz(3) == 0.d0 ) return
 ! END TEMPORARY  
 
-  alpha = al3dnew(mxyz,vof)
+  alpha = al3d(mxyz,vof)
   mxyz(d) = mxyz(d)/(1.0d0 - a1 + a2)
   alpha = alpha + mxyz(d)*a1
   
@@ -568,7 +568,7 @@ SUBROUTINE swpr(us,c,f,dir,vof1,cg,vof3)
     REAL(8), TARGET :: dmx,dmy,dmz,dxyz
     REAL(8), POINTER :: dm1,dm2,dm3
     REAL(8) :: a1,a2,alpha
-    REAL(8) :: AL3DNEW, FL3DNEW, x0(3), deltax(3)
+    REAL(8) :: al3d, fl3d, x0(3), deltax(3)
     real(8) :: mxyz(3),stencil3x3(-1:1,-1:1,-1:1)
     INTRINSIC DMAX1,DMIN1
 !
@@ -603,18 +603,18 @@ SUBROUTINE swpr(us,c,f,dir,vof1,cg,vof3)
                  stencil3x3(i0,j0,k0) = c(i+i0,j+j0,k+k0)
               enddo;enddo;enddo
               call mycs(stencil3x3,mxyz)
-              alpha = AL3DNEW(mxyz,c(i,j,k))
+              alpha = al3d(mxyz,c(i,j,k))
               ! Eulerian advection
               x0=0d0
               deltax=1d0
               if(a1<0d0) then
                  deltax(dir)=-a1
-                 vof1(i,j,k) = FL3DNEW(mxyz,alpha,x0,deltax)
+                 vof1(i,j,k) = fl3d(mxyz,alpha,x0,deltax)
               endif
               if(a2>0d0) then
                  x0(dir)=1d0-a2
                  deltax(dir)=a2
-                 vof3(i,j,k) = FL3DNEW(mxyz,alpha,x0,deltax)
+                 vof3(i,j,k) = fl3d(mxyz,alpha,x0,deltax)
               endif
            endif
         enddo
@@ -662,7 +662,7 @@ SUBROUTINE swpr_stg(us,c,f,d,vof1,cg,vof3, dir)
     REAL(8), TARGET :: dmx,dmy,dmz
     REAL(8), POINTER :: dm1,dm2,dm3
     REAL(8) :: a1,a2,alpha, dxyz
-    REAL(8) :: AL3DNEW, FL3DNEW, x0(3), deltax(3)
+    REAL(8) :: al3d, fl3d, x0(3), deltax(3)
     real(8) :: mxyz(3),stencil3x3(-1:1,-1:1,-1:1)
     INTRINSIC DMAX1,DMIN1
 
@@ -701,18 +701,18 @@ SUBROUTINE swpr_stg(us,c,f,d,vof1,cg,vof3, dir)
                  stencil3x3(i1,j1,k1) = c(i+i1,j+j1,k+k1)
               enddo;enddo;enddo
               call mycs(stencil3x3,mxyz)
-              alpha = AL3DNEW(mxyz,c(i,j,k))
+              alpha = al3d(mxyz,c(i,j,k))
               ! Eulerian advection
               x0=0d0
               deltax=1d0
               if(a1<0d0) then
                  deltax(d)=-a1
-                 vof1(i,j,k) = FL3DNEW(mxyz,alpha,x0,deltax)
+                 vof1(i,j,k) = fl3d(mxyz,alpha,x0,deltax)
               endif
               if(a2>0d0) then
                  x0(d)=1d0-a2
                  deltax(d)=a2
-                 vof3(i,j,k) = FL3DNEW(mxyz,alpha,x0,deltax)
+                 vof3(i,j,k) = fl3d(mxyz,alpha,x0,deltax)
               endif
            endif
         enddo
@@ -762,7 +762,7 @@ SUBROUTINE swprmom(us,c,d,mom1,cg,mom3,mom,t)
     REAL(8), TARGET :: dmx,dmy,dmz,dxyz
     REAL(8), POINTER :: dm1,dm2,dm3
     REAL(8) :: a1,a2,alpha,vof,uavg,t
-    REAL(8) :: AL3DNEW, FL3DNEW, x0(3), deltax(3)
+    REAL(8) :: al3d, fl3d, x0(3), deltax(3)
     REAL(8) :: mxyz(3),stencil3x3(-1:1,-1:1,-1:1)
     INTRINSIC DMAX1,DMIN1
 
@@ -794,19 +794,19 @@ SUBROUTINE swprmom(us,c,d,mom1,cg,mom3,mom,t)
                  stencil3x3(i0,j0,k0) = c(i+i0,j+j0,k+k0)
               enddo;enddo;enddo
               call mycs(stencil3x3,mxyz)
-              alpha = AL3DNEW(mxyz,c(i,j,k))
+              alpha = al3d(mxyz,c(i,j,k))
               ! Eulerian advection
               x0=0d0
               deltax=1d0
               if(a1<0d0) then
                  deltax(d)=-a1
-                 vof = FL3DNEW(mxyz,alpha,x0,deltax)
+                 vof = fl3d(mxyz,alpha,x0,deltax)
                  mom1(i,j,k) = (rho2*vof + rho1*(-a1 - vof))*uavg
               endif
               if(a2>0d0) then
                  x0(d)=1d0-a2
                  deltax(d)=a2
-                 vof = FL3DNEW(mxyz,alpha,x0,deltax)
+                 vof = fl3d(mxyz,alpha,x0,deltax)
                  mom3(i,j,k) = (rho2*vof + rho1*(a2 - vof))*uavg
               endif
            else
@@ -865,7 +865,7 @@ SUBROUTINE swprmom_stg(us,c,d,mom1,cg,mom3,mom,dir,t)
     REAL(8), POINTER :: dm1,dm2,dm3
     REAL(8) :: a1,a2,alpha,vof,uavg,t, uadv1, uadv3
     REAL(8) :: ro1, ro2, ro3, dxyz
-    REAL(8) :: AL3DNEW, FL3DNEW, x0(3), deltax(3)
+    REAL(8) :: al3d, fl3d, x0(3), deltax(3)
     real(8) :: mxyz(3),stencil3x3(-1:1,-1:1,-1:1)
     INTRINSIC DMAX1,DMIN1
 
@@ -909,19 +909,19 @@ SUBROUTINE swprmom_stg(us,c,d,mom1,cg,mom3,mom,dir,t)
                  stencil3x3(i1,j1,k1) = c(i+i1,j+j1,k+k1)
               enddo;enddo;enddo
               call mycs(stencil3x3,mxyz)
-              alpha = AL3DNEW(mxyz,c(i,j,k))
+              alpha = al3d(mxyz,c(i,j,k))
               ! Eulerian advection
               x0=0d0
               deltax=1d0
               if(a1<0d0) then
                  deltax(d)=-a1
-                 vof = FL3DNEW(mxyz,alpha,x0,deltax)
+                 vof = fl3d(mxyz,alpha,x0,deltax)
                  mom1(i,j,k) = (rho2*vof + rho1*(-a1 - vof))*uadv1
               endif
               if(a2>0d0) then
                  x0(d)=1d0-a2
                  deltax(d)=a2
-                 vof = FL3DNEW(mxyz,alpha,x0,deltax)
+                 vof = fl3d(mxyz,alpha,x0,deltax)
                  mom3(i,j,k) = (rho2*vof + rho1*(a2 - vof))*uadv3
               endif
            else
@@ -967,7 +967,7 @@ subroutine ls2vof_in_cell(stencil3x3,c,nflag)
   integer, intent(out):: nflag
   real(8) :: zero(3), one(3), norml1
   real(8) :: alpha
-  real(8) :: fl3dnew
+  real(8) :: fl3d
   real(8) :: mxyz(3),stencil3x3(-1:1,-1:1,-1:1)
 
   zero=0d0
@@ -1005,7 +1005,7 @@ subroutine ls2vof_in_cell(stencil3x3,c,nflag)
      c = 0.d0
      nflag = 0 
   else 
-     c = fl3dnew(mxyz,alpha,zero,one)
+     c = fl3d(mxyz,alpha,zero,one)
      nflag = 2
   end if
   return

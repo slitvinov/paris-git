@@ -1301,7 +1301,7 @@ contains
     integer :: i1,j1,k1
     real(8)  , dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: c
     real(8) vofh1, vofh2
-    real(8) alpha,fl3dnew,stencil3x3(-1:1,-1:1,-1:1)
+    real(8) alpha,fl3d,stencil3x3(-1:1,-1:1,-1:1)
     real(8) dm(3),x0(3),deltax(3)
 
     vofh1 = c(i,j,k)
@@ -1318,9 +1318,9 @@ contains
           x0=0d0
           deltax=1d0
           deltax(d)=0.5d0
-          vofh1 = 2.0d0*fl3dnew(dm,alpha,x0,deltax)
+          vofh1 = 2.0d0*fl3d(dm,alpha,x0,deltax)
           x0(d)=0.5d0
-          vofh2 = 2.0d0*fl3dnew(dm,alpha,x0,deltax)
+          vofh2 = 2.0d0*fl3d(dm,alpha,x0,deltax)
        endif
     endif
 

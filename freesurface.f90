@@ -1595,7 +1595,7 @@ subroutine staggered_cut(cvof,i,j,k,theta,phase,d)
   real(8), dimension(-1:1,-1:1,-1:1) :: stencil3x3
   real(8) :: n_ref(3), n_nbr(3), x0(3), dc(3), n_stag(3), nr(3)
   real(8) :: alpha2, c_ref, c_nbr, c_stag, c_min=1.0d-1, test
-  real(8) :: al3dnew, FL3DNEW
+  real(8) :: al3d, fl3d
   real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: cvof
 
   if (.not.(phase==1 .or. phase==0)) call pariserror('cell phase has to be 0 or 1 in staggered_cut call')
@@ -1614,15 +1614,15 @@ subroutine staggered_cut(cvof,i,j,k,theta,phase,d)
   enddo;enddo;enddo
   call mycs(stencil3x3,n_nbr)
   !=====================
-  alpha2 = al3dnew(n_ref,cvof(i,j,k))
+  alpha2 = al3d(n_ref,cvof(i,j,k))
   x0 = 0.0d0; x0(d) = 0.5d0
   dc = 1.0d0; dc(d) = 0.5d0
-  c_ref = FL3DNEW(n_ref,alpha2,x0,dc)
+  c_ref = fl3d(n_ref,alpha2,x0,dc)
 
-  alpha2 = al3dnew(n_nbr,cvof(i+loc(1),j+loc(2),k+loc(3)))
+  alpha2 = al3d(n_nbr,cvof(i+loc(1),j+loc(2),k+loc(3)))
   x0=0.0d0
   dc = 1.0d0; dc(d) = 0.5d0
-  c_nbr = FL3DNEW(n_nbr,alpha2,x0,dc)
+  c_nbr = fl3d(n_nbr,alpha2,x0,dc)
   c_stag = c_ref+c_nbr
 
   if (min(c_ref,c_nbr)>c_min) then
@@ -1645,7 +1645,7 @@ subroutine staggered_cut(cvof,i,j,k,theta,phase,d)
      call pariserror('Normals not normalised')
   endif
 
-  alpha2=al3dnew(n_stag,c_stag)
+  alpha2=al3d(n_stag,c_stag)
   if (ABS(n_stag(d))>1.0d-12) then
      test = (alpha2 - (n_stag(1)+n_stag(2)+n_stag(3)-n_stag(d))/2.0d0)/n_stag(d)
      if (phase==1) then

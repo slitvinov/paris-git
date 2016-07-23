@@ -1324,7 +1324,7 @@ contains
          nr(2) = n2(i,j,k)      
          nr(3) = n3(i,j,k)
       endif
-      call cent3D(nr,cvof(i,j,k),centroid)
+      call area_centroid(nr,cvof(i,j,k),centroid)
       centroid = centroid - 0.5d0
     end subroutine NewFindCutAreaCentroid
     !-------------------------------------------------------------------------------------------------------
@@ -1338,7 +1338,7 @@ contains
       integer :: l,m,n
       real(8) :: dmx,dmy,dmz, mxyz(3),px,py,pz
       real(8) :: invx,invy,invz
-      real(8) :: alpha, al3dold, nr(3)
+      real(8) :: alpha, al3d, nr(3)
       real(8) :: stencil3x3(-1:1,-1:1,-1:1)
 
       ! find cut area centroid 
@@ -1380,7 +1380,7 @@ contains
          invz = -1.d0
       endif
       !*(3)*  
-      alpha = al3dold(dmx,dmy,dmz,cvof(i,j,k))
+      alpha = al3d([dmx,dmy,dmz],cvof(i,j,k))
       !*(4)*  
       call PlaneAreaCenter(dmx,dmy,dmz,alpha,px,py,pz)
       !*(5)*

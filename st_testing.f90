@@ -417,7 +417,7 @@ contains
     integer, intent(in)  :: i,j,k
     real(8), intent(out) :: centroid(3),x1,y1,x2,y2
     integer :: l,m,n
-    real(8) :: nr(3),dmx,dmy, al3dnew,deltax
+    real(8) :: nr(3),dmx,dmy, al3d,deltax
     real(8) :: stencil3x3(-1:1,-1:1,-1:1)
 
     deltax=dx(nx/2)
@@ -435,22 +435,22 @@ contains
     dmx = nr(1)
     dmy = nr(2)
     if(abs(nr(3)).gt.EPS_GEOM) call pariserror("PCAC: invalid dmz.")
-    call cent3D(nr,cvof(i,j,k),centroid)
+    call area_centroid(nr,cvof(i,j,k),centroid)
     centroid = centroid - 0.5d0
 ! nx x + ny y = alpha
 ! y = 0 
-    x1 = al3dnew(nr,cvof(i,j,k))/dmx
+    x1 = al3d(nr,cvof(i,j,k))/dmx
     y1 = 0d0
     if(x1.gt.1d0) then
        ! eliminate this case, try next one
        x1 = 1d0
-       y1 =  al3dnew(nr,cvof(i,j,k))/dmy - x1*dmx/dmy
+       y1 =  al3d(nr,cvof(i,j,k))/dmy - x1*dmx/dmy
     endif
     x2 = 0d0  
-    y2 = al3dnew(nr,cvof(i,j,k))/dmy
+    y2 = al3d(nr,cvof(i,j,k))/dmy
     if(y2.gt.1d0) then
        y2 = 1d0
-       x2 = al3dnew(nr,cvof(i,j,k))/dmx - y2*dmy/dmx
+       x2 = al3d(nr,cvof(i,j,k))/dmx - y2*dmy/dmx
     endif
     ! shift to cell center coordinates
     x1 = x1 - 0.5d0; y1 = y1 - 0.5d0

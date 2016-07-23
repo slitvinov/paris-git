@@ -181,7 +181,7 @@ contains
     real(8) a1,a2,alpha,T_adv
     real(8) rhocp_ll, rhocp_l, rhocp_r, rhocp_rr, rhocp_c
     real(8) T_l, T_r,d_int
-    REAL(8) deltax(3),x0(3),fl3dnew
+    REAL(8) deltax(3),x0(3),fl3d
     real(8) nr(3), stencil3x3(-1:1,-1:1,-1:1)
     intrinsic dmax1,dmin1
     !***
@@ -266,14 +266,14 @@ contains
                 if(a1<0.d0) then
                    x0(d)=a1
                    deltax(d)=-a1
-                   vof = fl3dnew(nr,alpha,x0,deltax)
+                   vof = fl3d(nr,alpha,x0,deltax)
                    en1(i,j,k) = ( rho2*cp2*vof+rho1*cp1*(-a1-vof) )*T_l
                    !if (k==3 .and. i==20) write(*,'("Cut cell en1: ",e14.5)')en1(i,j,k)
                 endif
                 if(a2>0.d0) then
                    x0(d)=1.d0
                    deltax(d)=a2
-                   vof = fl3dnew(nr,alpha,x0,deltax)
+                   vof = fl3d(nr,alpha,x0,deltax)
                    en3(i,j,k) = ( rho2*cp2*vof+rho1*cp1*(a2-vof) )*T_r
                    !if (k==3 .and. i==20) then
                    !   write(*,'("Cut cell en3, vof, a2: ",3e14.5)')en3(i,j,k),vof,a2
@@ -282,7 +282,7 @@ contains
                 endif
                 x0(d)=mm1
                 deltax(d)=mm2
-                vof = fl3dnew(nr,alpha,x0,deltax)
+                vof = fl3d(nr,alpha,x0,deltax)
                 en2(i,j,k) = ( rho2*cp2*vof+rho1*cp1*(mm2-vof) )*T_adv
                 !if (k==3 .and. i==20) then
                 !   write(*,'("Cut cell en2, vof, a1,a2: ",4e14.5)')en2(i,j,k),vof,a1,a2
