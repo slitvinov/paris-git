@@ -1357,9 +1357,9 @@ end subroutine calcStats
          else if ( TurbStatsOrder == 2 ) then 
             num_turb_vars = 27 
          else if ( TurbStatsOrder == 3 ) then
-            num_turb_vars = 33   !83
+            num_turb_vars = 72
          else if ( TurbStatsOrder == 4 ) then
-            num_turb_vars = 72   !83
+            num_turb_vars = 90
          else 
             call pariserror("Statistics of turbulence over 3rd order!")
          end if ! TurbStatsOrder
@@ -1470,10 +1470,7 @@ end subroutine calcStats
                                    + uc(is:ie,js:je,k)*wc(is:ie,js:je,k)*cvof(is:ie,js:je,k)
          turb_vars(is:ie,js:je,33) = turb_vars(is:ie,js:je,33) & 
                                    + vc(is:ie,js:je,k)*wc(is:ie,js:je,k)*cvof(is:ie,js:je,k)
-         end if ! TurbStatsOrder
 
-         ! 4th order stats
-         if ( TurbStatsOrder >= 4 ) then 
          do i=is,ie; do j=js,je
             dudx = (u(i,j,k) - u(i-1,j,k))/dx(i)
             dvdy = (v(i,j,k) - v(i,j-1,k))/dy(j)
@@ -1544,6 +1541,53 @@ end subroutine calcStats
                                    + area(is:ie,js:je,k)**2.d0*n1(is:ie,js:je,k)*n3(is:ie,js:je,k)
          turb_vars(is:ie,js:je,72) = turb_vars(is:ie,js:je,72) &
                                    + area(is:ie,js:je,k)**2.d0*n2(is:ie,js:je,k)*n3(is:ie,js:je,k)
+         end if ! TurbStatsOrder
+
+         ! 4th order stats
+         if ( TurbStatsOrder >= 4 ) then
+
+         turb_vars(is:ie,js:je,73) = turb_vars(is:ie,js:je,73) &
+                                   + uc(is:ie,js:je,k)*uc(is:ie,js:je,k)*uc(is:ie,js:je,k)*cvof(is:ie,js:je,k)
+         turb_vars(is:ie,js:je,74) = turb_vars(is:ie,js:je,74) &
+                                   + uc(is:ie,js:je,k)*vc(is:ie,js:je,k)*vc(is:ie,js:je,k)*cvof(is:ie,js:je,k)
+         turb_vars(is:ie,js:je,75) = turb_vars(is:ie,js:je,75) &
+                                   + uc(is:ie,js:je,k)*wc(is:ie,js:je,k)*wc(is:ie,js:je,k)*cvof(is:ie,js:je,k)
+         turb_vars(is:ie,js:je,76) = turb_vars(is:ie,js:je,76) &
+                                   + vc(is:ie,js:je,k)*uc(is:ie,js:je,k)*uc(is:ie,js:je,k)*cvof(is:ie,js:je,k)
+         turb_vars(is:ie,js:je,77) = turb_vars(is:ie,js:je,77) &
+                                   + vc(is:ie,js:je,k)*vc(is:ie,js:je,k)*vc(is:ie,js:je,k)*cvof(is:ie,js:je,k)
+         turb_vars(is:ie,js:je,78) = turb_vars(is:ie,js:je,78) &
+                                   + vc(is:ie,js:je,k)*wc(is:ie,js:je,k)*wc(is:ie,js:je,k)*cvof(is:ie,js:je,k)
+         turb_vars(is:ie,js:je,79) = turb_vars(is:ie,js:je,79) &
+                                   + wc(is:ie,js:je,k)*uc(is:ie,js:je,k)*uc(is:ie,js:je,k)*cvof(is:ie,js:je,k)
+         turb_vars(is:ie,js:je,80) = turb_vars(is:ie,js:je,80) &
+                                   + wc(is:ie,js:je,k)*vc(is:ie,js:je,k)*vc(is:ie,js:je,k)*cvof(is:ie,js:je,k)
+         turb_vars(is:ie,js:je,81) = turb_vars(is:ie,js:je,81) &
+                                   + wc(is:ie,js:je,k)*wc(is:ie,js:je,k)*wc(is:ie,js:je,k)*cvof(is:ie,js:je,k)
+
+         do i=is,ie; do j=js,je
+            dudx = (u(i,j,k) - u(i-1,j,k))/dx(i)
+            dvdy = (v(i,j,k) - v(i,j-1,k))/dy(j)
+            dwdz = (w(i,j,k) - w(i,j,k-1))/dz(k)
+
+            dvdx = (v(i+1,j,k)+v(i+1,j-1,k)-v(i-1,j,k)-v(i-1,j-1,k))*0.25d0/dx(i)
+            dwdx = (w(i+1,j,k)+w(i+1,j,k-1)-w(i-1,j,k)-w(i-1,j,k-1))*0.25d0/dx(i)
+            dudy = (u(i,j+1,k)+u(i-1,j+1,k)-u(i,j-1,k)-u(i-1,j-1,k))*0.25d0/dy(j)
+            dwdy = (w(i,j+1,k)+w(i,j+1,k-1)-w(i,j-1,k)-w(i,j-1,k-1))*0.25d0/dy(j)
+            dudz = (u(i,j,k+1)+u(i-1,j,k+1)-u(i,j,k-1)-u(i-1,j,k-1))*0.25d0/dz(k)
+            dvdz = (v(i,j,k+1)+v(i,j-1,k+1)-v(i,j,k-1)-v(i,j-1,k-1))*0.25d0/dz(k)
+
+            turb_vars(i,j,82) = turb_vars(i,j,82) + dudx*dudx*cvof(i,j,k)
+            turb_vars(i,j,83) = turb_vars(i,j,83) + dvdy*dvdy*cvof(i,j,k)
+            turb_vars(i,j,84) = turb_vars(i,j,84) + dwdz*dwdz*cvof(i,j,k)
+            turb_vars(i,j,85) = turb_vars(i,j,85) + dvdx*dvdx*cvof(i,j,k)
+            turb_vars(i,j,86) = turb_vars(i,j,86) + dwdx*dwdx*cvof(i,j,k)
+            turb_vars(i,j,87) = turb_vars(i,j,87) + dudy*dudy*cvof(i,j,k)
+            turb_vars(i,j,88) = turb_vars(i,j,88) + dwdy*dwdy*cvof(i,j,k)
+            turb_vars(i,j,89) = turb_vars(i,j,89) + dudz*dudz*cvof(i,j,k)
+            turb_vars(i,j,90) = turb_vars(i,j,90) + dvdz*dvdz*cvof(i,j,k)
+         end do; end do !i,j
+
          end if ! TurbStatsOrder
       end do ! 
 
