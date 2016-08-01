@@ -2015,7 +2015,11 @@ subroutine backup_VOF_write
   implicit none
   integer ::i,j,k
   character(len=100) :: filename
-  filename = trim(out_path)//'/backup_'//int2text(rank,padding)
+  if (OrganizeOutFolder) then
+    filename = trim(out_path)//'/BACKUP/backup_'//int2text(rank,padding)
+  else 
+    filename = trim(out_path)//'/backup_'//int2text(rank,padding)
+  end if ! OrganizeOutFolder 
   call system('touch '//trim(filename)//'; mv '//trim(filename)//' '//trim(filename)//'.old')
   OPEN(UNIT=7,FILE=trim(filename),status='REPLACE',ACTION='write')
   !Note: p at ghost layers are needed for possion solver 
@@ -2040,7 +2044,13 @@ subroutine backup_VOF_read
   use module_freesurface
   implicit none
   integer ::i,j,k,i1,i2,j1,j2,k1,k2
-  OPEN(UNIT=7,FILE=trim(out_path)//'/backup_'//int2text(rank,padding),status='old',action='read')
+  character(len=100) :: filename
+  if (OrganizeOutFolder) then
+    filename = trim(out_path)//'/BACKUP/backup_'//int2text(rank,padding)
+  else 
+    filename = trim(out_path)//'/backup_'//int2text(rank,padding)
+  end if ! OrganizeOutFolder 
+  OPEN(UNIT=7,FILE=trim(filename),status='old',action='read')
   read(7,*)time,itimestep,i1,i2,j1,j2,k1,k2
   if(i1/=imin .or. i2/=imax .or. j1/=jmin .or. j2/=jmax .or. k1/=kmin .or. k2/=kmax) &
     call pariserror("Error: backup_read")

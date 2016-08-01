@@ -1638,12 +1638,16 @@ end subroutine calcStats
       subroutine backup_turb_write
          integer ::i,j
          character(len=100) :: filename
-         filename = trim(out_path)//'/backup_turb_'//int2text(rank,padding)
+         if (OrganizeOutFolder) then
+           filename = trim(out_path)//'/BACKUP_TURB/backup_turb_'//int2text(rank,padding)
+         else 
+           filename = trim(out_path)//'/backup_turb_'//int2text(rank,padding)
+         end if ! OrganizeOutFolder 
          call system('touch '//trim(filename)//'; mv '//trim(filename)//' '//trim(filename)//'.old')
          OPEN(UNIT=101,FILE=trim(filename),status='REPLACE')
          write(101,*) iSumTurbStats
          do i=is,ie; do j=js,je
-            write(101,'(2(E15.8,1X),83(E25.16,1X))') turb_vars(i,j,1:num_turb_vars)
+            write(101,'(83(E25.16,1X))') turb_vars(i,j,1:num_turb_vars)
          enddo; enddo
          CLOSE(UNIT=101)
       end subroutine backup_turb_write
@@ -1652,7 +1656,11 @@ end subroutine calcStats
          integer ::i,j
          character(len=100) :: filename
          logical :: file_exist
-         filename = trim(out_path)//'/backup_turb_'//int2text(rank,padding)
+         if (OrganizeOutFolder) then
+           filename = trim(out_path)//'/BACKUP_TURB/backup_turb_'//int2text(rank,padding)
+         else 
+           filename = trim(out_path)//'/backup_turb_'//int2text(rank,padding)
+         end if ! OrganizeOutFolder 
          inquire(FILE=filename,EXIST=file_exist)
          if ( file_exist ) then 
             OPEN(UNIT=101,FILE=trim(filename),status='unknown',action='read')
@@ -3461,7 +3469,7 @@ subroutine ReadParameters
                         ResNormOrderPressure,         ErrorScaleHYPRE, DynamicAdjustPoiTol,      & 
                         OutVelSpecified,  MaxFluxRatioPresBC, LateralBdry,                       & 
                         HYPRESolverType, SwitchHYPRESolver, DivergeTol,  uinjectPertAmp,         &
-                        ExcludeBoundCellCalcRes, numCellExclude,                                 &  
+                        ExcludeBoundCellCalcRes, numCellExclude, OrganizeOutFolder,             &  
                         plane, n_p, out_sub, test_MG, MultiGrid, nrelax,u_file, v_file, w_file,  &
                         read_u, read_v, read_w
  
@@ -3509,6 +3517,7 @@ subroutine ReadParameters
   plane = 0.5d0; n_p = 0.0d0
   out_sub = .false.
   ExcludeBoundCellCalcRes = .false.; numCellExclude = 1
+  OrganizeOutFolder = .false.
 
   in=1
   out=2
@@ -3540,6 +3549,14 @@ subroutine ReadParameters
      call system('mkdir            '//trim(out_path))
      call system('mkdir            '//trim(out_path)//'/VTK')
      call system('cp input         '//trim(out_path))
+     if (OrganizeOutFolder) then 
+         call system('mkdir            '//trim(out_path)//'/BACKUP')
+         if (DoTurbStats) call system('mkdir  '//trim(out_path)//'/BACKUP_TURB')
+         if (DoLPP) then
+            call system('mkdir            '//trim(out_path)//'/BACKUPLPP')
+            call system('mkdir            '//trim(out_path)//'/ELEMENT_STATS')
+         end if ! DoLPP
+     end if ! OrganizeOutFloder
      !call system('cp paris.f90 '//trim(out_path))
      open(unit=out, file=trim(out_path)//'/output', action='write', iostat=ierr)
      if (ierr .ne. 0) call pariserror("ReadParameters: error opening output file")

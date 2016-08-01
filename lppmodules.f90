@@ -1116,7 +1116,11 @@ contains
 
       ! Output element stats without collective operation
       if (DropStatisticsMethod == DropStatistics_WriteElementDataEachRank ) then
-         filename=TRIM(out_path)//'/element-stats_'//TRIM(int2text(rank,padding))//'.dat'
+         if (OrganizeOutFolder) then
+            filename=TRIM(out_path)//'/ELEMENT_STATS/element-stats_'//TRIM(int2text(rank,padding))//'.dat'
+         else 
+            filename=TRIM(out_path)//'/element-stats_'//TRIM(int2text(rank,padding))//'.dat'
+         end if ! OrganizeOutFolder 
          inquire(FILE=filename,EXIST=file_exist)
          if ( file_exist ) then 
             OPEN(UNIT=102,FILE=filename, STATUS='old', POSITION='append', ACTION='write')
@@ -1231,7 +1235,12 @@ contains
                close(101)
             case(DropStatistics_WriteElementData)
                total_num_element = sum(num_element)
-               open(unit=102,file=TRIM(out_path)//'/element-stats_'//TRIM(int2text(tswap,padding))//'.dat')
+               if (OrganizeOutFolder) then
+                  filename=TRIM(out_path)//'/ELEMENT_STATS/element-stats_'//TRIM(int2text(rank,padding))//'.dat'
+               else 
+                  filename=TRIM(out_path)//'/element-stats_'//TRIM(int2text(rank,padding))//'.dat'
+               end if ! OrganizeOutFolder 
+               open(unit=102,file=TRIM(filename))
                !open(unit=103,file=TRIM(out_path)//'/el-rank-stats_'//TRIM(int2text(tswap,padding))//'.dat')
                write(102,'(E15.6,1X,I7)')   time, total_num_element
                !write(103,'("Total number of elements: ",I12)')total_num_element
@@ -4273,8 +4282,12 @@ module module_output_lpp
       implicit none
       integer ::ipart
       character(len=100) :: filename
-      filename = trim(out_path)//'/backuplpp_'//int2text(rank,padding)
-      call system('touch '//trim(filename)//'; mv '//trim(filename)//' '//trim(filename)//'.old')
+      !call system('touch '//trim(filename)//'; mv '//trim(filename)//' '//trim(filename)//'.old')
+      if (OrganizeOutFolder) then
+        filename = trim(out_path)//'/BACKUPLPP/backuplpp_'//int2text(rank,padding)
+      else 
+        filename = trim(out_path)//'/backuplpp_'//int2text(rank,padding)
+      end if ! OrganizeOutFolder 
       OPEN(UNIT=7,FILE=trim(filename),status='REPLACE')
       write(7,1100)time,itimestep,num_part(rank)
       if ( num_part(rank) > 0 ) then 
@@ -4305,7 +4318,13 @@ module module_output_lpp
    subroutine backup_LPP_read
       implicit none
       integer ::ipart,ierr
-      OPEN(UNIT=7,FILE=trim(out_path)//'/backuplpp_'//int2text(rank,padding),status='old',action='read')
+      character(len=100) :: filename
+      if (OrganizeOutFolder) then
+        filename = trim(out_path)//'/BACKUPLPP/backuplpp_'//int2text(rank,padding)
+      else 
+        filename = trim(out_path)//'/backuplpp_'//int2text(rank,padding)
+      end if ! OrganizeOutFolder 
+      OPEN(UNIT=7,FILE=trim(filename),status='old',action='read')
       read(7,*)time,itimestep,num_part(rank)
       if ( num_part(rank) < 0 ) &
          call pariserror("Error: backuplpp_read")

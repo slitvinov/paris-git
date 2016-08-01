@@ -447,6 +447,7 @@ module module_IO
   logical :: out_centroid, opened_cent
   logical :: out_sub
   real(8) :: tout,timeLastOutput
+  logical :: OrganizeOutFolder
 contains
     !=================================================================================================
   subroutine write_vec_gnuplot(u,v,cvof,p,iout,DoVOF)
@@ -622,7 +623,11 @@ subroutine backup_write
   implicit none
   integer ::i,j,k
   character(len=100) :: filename
-  filename = trim(out_path)//'/backup_'//int2text(rank,padding)
+  if (OrganizeOutFolder) then
+    filename = trim(out_path)//'/BACKUP/backup_'//int2text(rank,padding)
+  else 
+    filename = trim(out_path)//'/backup_'//int2text(rank,padding)
+  end if ! OrganizeOutFolder 
   call system('touch '//trim(filename)//'; mv '//trim(filename)//' '//trim(filename)//'.old')
   OPEN(UNIT=7,FILE=trim(filename),status='REPLACE')
   write(7,1100)time,itimestep,is,ie,js,je,ks,ke
@@ -646,7 +651,13 @@ subroutine backup_read
   
   implicit none
   integer ::i,j,k,i1,i2,j1,j2,k1,k2,ierr
-  OPEN(UNIT=7,FILE=trim(out_path)//'/backup_'//int2text(rank,padding),status='old',action='read')
+  character(len=100) :: filename
+  if (OrganizeOutFolder) then
+    filename = trim(out_path)//'/BACKUP/backup_'//int2text(rank,padding)
+  else 
+    filename = trim(out_path)//'/backup_'//int2text(rank,padding)
+  end if ! OrganizeOutFolder 
+  OPEN(UNIT=7,FILE=trim(filename),status='old',action='read')
   read(7,*)time,itimestep,i1,i2,j1,j2,k1,k2
   if(i1/=is .or. i2/=ie .or. j1/=js .or. j2/=je .or. k1/=ks .or. k2/=ke) &
     call pariserror("Error: backup_read")
