@@ -3436,6 +3436,7 @@ subroutine ReadParameters
   use module_BC
   use module_IO
   use module_front
+  use module_lag_part
   
   implicit none
   include 'mpif.h'
