@@ -638,6 +638,14 @@ contains
   ! In the second pass if curvature is not found it is 
   ! computed from averages if possible and otherwise from centroids. 
   !
+
+  ! kappa_flag=0  9 heights
+  ! kappa_flag=1  mixed heights
+  ! kappa_flag=2  average from the above
+  ! kappa_flag=3  centroids
+  ! kappa_flag=4  no curvature possible  UNCOMPUTABLE
+  ! kappa_flag=5  undecided yet   UNDECIDED
+
   !=================================================================================================
 
   subroutine get_all_curvatures_pop(kapparray,iout)
@@ -901,7 +909,7 @@ contains
        points(:,2) = bpoints(:,try(3))  - origin(try(3))
        points(:,3) = bpoints(:,try(1))  - origin(try(1))   
        weights=1d0
-       weights(1) = 100*area3d(mxyz,cvof(i0,j0,k0))
+       weights(1) = 1d2*area3d(mxyz,cvof(i0,j0,k0))
        ! 4) fit over all positions returned by ind_pos 
        ! call parabola_fit_with_rotation(points,fit,weights,mv,nposit,a,kappasign,fit_success) 
        ! 4) fit only over positions separated by a minimum distance
@@ -928,7 +936,8 @@ contains
   !
   !=================================================================================================
   
-  ! This is a local function for a given cell. 
+  ! This is a local function for a given cell. It attempts to compute the curvature from
+  ! a paraboloid fit of VOF-PLIC facet centroid positions. 
   
   ! On exit:
   
