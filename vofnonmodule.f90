@@ -190,7 +190,8 @@ subroutine swpz(us,c,f,d,vof1,vof2,vof3)
               deltax(d)=mm2
               vof2(i,j,k) = fl3d(nr,alpha,x0,deltax)
            endif
-#ifdef DEBUG_VOF_NAN  ! made this optional, does someone need it ? 
+#ifdef DEBUG_VOF_NAN  
+! made this optional, does someone need it ? 
               ! check vof contributions
               if ( vof1(i,j,k) /= vof1(i,j,k) .or. & 
                    vof2(i,j,k) /= vof2(i,j,k) .or. &  
