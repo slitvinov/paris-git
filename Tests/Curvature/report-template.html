@@ -1,0 +1,21 @@
+<h1>
+Curvature test case
+</h1>
+<p>
+<img SRC="curvature3D.png" height=600 width=600>
+<br>
+<p>
+The volume fractions for a sphere are initialized. Care is taken to 
+achieve high enough accuracy to avoid spurious errors. The curvature is computed
+using the default method in Paris Simulator and compared to the method
+used by Stéphane Popinet in basilisk. A series of diameter values 
+are tested.  A total number of SAMPLESIZE spheres
+are intialized with each diameter to check for all configurations, and
+the maximum Linfinity norm for the set of spheres is shown. 
+
+The height function method is used with a search depth of ndepth=NDEPTH.
+
+The "ParisSim old method" uses mixed heights with no centroid added
+to set of points begin fitted. The addition of the centroid of the face in the current
+cell explains the improvement when using the current method displayed with
+the tag "ParisSim current". 

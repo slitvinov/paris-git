@@ -41,8 +41,12 @@ set log y
 set grid
 set xrange [1:110]
 set xlabel "Grid points per Diameter"
-set ylabel "Curvature error in $dim"
-plot 2/(x*x) t "2/(x*x)", "bsk-$dim-log.txt" u 1:4 t "Basilisk-$dim max max" w lp, "paris-$dim-$ndepth.tmp" u (2*\$1):3 t "ParisSim max max HF + HF fit" w lp, "paris-$dim-$ndepth-old.txt" u (2*\$1):3 t "ParisSim max max HF + HF fit old" w lp
+set ylabel "Curvature Linf error norm in $dim"
+plot 2/(x*x) t "2/(x*x)", "bsk-$dim-log.txt" u 1:4 t "Basilisk-$dim" w lp, "paris-$dim-$ndepth.tmp" u (2*\$1):3 t "ParisSim current" w lp, "paris-$dim-$ndepth-old.txt" u (2*\$1):3 t "ParisSim old method" w lp
+set term pngcairo size 600, 600
+set out "curvature$dim.png"
+set size square
+replot
 EOF
 fi
 
