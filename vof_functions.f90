@@ -406,7 +406,7 @@ SUBROUTINE AREA_CENTROID(nr,cc,xc0)
   else if (ccr <= c02) then 
     al = 0.5d0*(m1 + DSQRT(m1*m1 + 8.d0*m2*m3*(cch - c01)))    
     top = m1*m1 + 3.*al*(al-m1)
-    bot = 3.*(2.*al-m1)
+    bot = DMAX1(3.*(2.*al-m1),eps0)
     ctd0(1) = (3.*al-2.*m1)/bot
     ctd0(2) = top/(m2*bot)
     ctd0(3) = top/(m3*bot)                                            ! case (2)
@@ -542,7 +542,7 @@ SUBROUTINE VOLUME_CENTROID(nr,cc,xc0)
     alh = 0.5d0*(m1 + DSQRT(m1*m1 + 8.d0*m2*m3*(cch - c01)))    
     tmp1 = (2.d0*alh-m1)
     tmp2 = (2.d0*alh*alh - 2.d0*alh*m1 + m1*m1)
-    bot1 = 4.d0*(3.d0*alh*alh - 3.d0*alh*m1 + m1*m1)
+    bot1 = DMAX1(4.d0*(3.d0*alh*alh - 3.d0*alh*m1 + m1*m1),eps0)
     tmp2 = tmp1*tmp2/bot1
     ctd0(1) = 0.5d0 - m1*tmp1/bot1 
     ctd0(2) = tmp2/m2
@@ -688,7 +688,7 @@ SUBROUTINE FLUX_CENTROID(nr,alpha,x0,dx,xc0)
   else if (alr <= m2) then
     tmp1 = (2.d0*alh-m1)
     tmp2 = (2.d0*alh*alh - 2.d0*alh*m1 + m1*m1)
-    bot1 = 4.d0*(3.d0*alh*alh - 3.d0*alh*m1 + m1*m1)
+    bot1 = 4.d0*(3.d0*alr*alr - 3.d0*alh*m1 + m1*m1)
     tmp2 = tmp1*tmp2/bot1
     ctd0(1) = 0.5d0 - m1*tmp1/bot1 
     ctd0(2) = tmp2/m2
