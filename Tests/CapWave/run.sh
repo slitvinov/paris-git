@@ -17,7 +17,7 @@ awk '{print $1, ($2-1.50)/'$ampini'*0.01}' interface.dat > $tmp/sim
 awk '{print $2}' prosperetti > $tmp/theory
 paste $tmp/sim $tmp/theory > comparison.dat
 
-err=$(awk 'BEGIN{sum = 0}{ sum=sum+sqrt(($3-$2)*($3-$2))}END{ print sum/NR}' comparison.dat)
+err=$(awk 'BEGIN{sum = 0}{ sum=sum+(($3-$2)*($3-$2))}END{ print sqrt(sum/NR)}' comparison.dat)
 
 awk '{if ('$err' < 0.001) {print "\033[32;1m PASS\033[0m L2 relative error norm =" '$err'} else {print "\033[31;1m FAIL\033[0m L2 relative error norm =" '$err'}}' comparison.dat | tail -1
 

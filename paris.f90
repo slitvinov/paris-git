@@ -1074,7 +1074,7 @@ subroutine interface_max_min
 
   !checkme: why does it get the border if I search until je?
   do k=ks,ke;  do j=js,je-10;  do i=is,ie
-    if (abs(cvof(i,j,k)-cvof(i,j+1,k)).gt.0.) then
+    if (abs(cvof(i,j,k)-cvof(i,j+1,k)).gt.1d-10) then
       int_max_y = max(int_max_y, y(j)+dy(j)*(cvof(i,j,k) - 0.5d0))
     endif 
   enddo; enddo; enddo;

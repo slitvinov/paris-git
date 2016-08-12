@@ -17,8 +17,22 @@ awk '{print $1, ($2-1.50)/'$ampini'*0.01}' interface.dat > $tmp/sim
 awk '{print $2}' prosperetti > $tmp/theory
 paste $tmp/sim $tmp/theory > comparison.dat
 
-err=$(awk 'BEGIN{sum = 0}{ sum=sum+sqrt(($3-$2)*($3-$2))}END{ print sum/NR}' comparison.dat)
+err=$(awk 'BEGIN{sum = 0}{ sum=sum+(($3-$2)*($3-$2))}END{ print sqrt(sum/NR)}' comparison.dat)
 
 awk '{if ('$err' < 0.001) {print "\033[32;1m PASS\033[0m L2 relative error norm:" '$err'} else {print "\033[31;1m FAIL\033[0m L2 relative error norm:" '$err'}}' comparison.dat | tail -1
 
 rm -rf $tmp
+
+gnuplot <<EOF
+set xlabel "time"
+set ylabel "normalized amplitude a(t)/lambda"
+p "./interface.dat" u (\$1*11.1366559937):((\$2-1.50)/$ampini*0.01) every 10 w p t "Simulation", "./prosperetti" u 1:2 w l t "Reference"
+set term pngcairo
+set out "capwave.png"
+replot
+EOF
+
+if [ -d ../Testreport ] ; then
+    mv capwave.png ../Testreport
+fi
+

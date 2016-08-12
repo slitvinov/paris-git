@@ -64,15 +64,15 @@ npy      = 3
 npz      = 1
                    ! number of processors in x,y,z direction
 
-Nx      = 32
-Ny      = 96
+Nx      = 64
+Ny      = 192
 Nz      = 2
 Ng      = 2
                    ! grid size in x,y,z direction and number of ghost cells
 
 XLENGTH = 1d0
 YLENGTH = 3d0
-ZLENGTH = 0.0625d0
+ZLENGTH = 0.03125d0
                    ! domain size in x,y,z direction
 
 read_x   = F       ! read the grid file for x-grid; If true xLength and xform are neglected

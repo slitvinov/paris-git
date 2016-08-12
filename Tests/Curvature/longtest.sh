@@ -36,6 +36,10 @@ cd ../../Devel/Curvature-test
 cd $here
 
 dim=$d'D'
-cp ../../Devel/Curvature-test/curvature$dim.png ../Testreport
+if [ -d ../Testreport ] ; then
+    mv ../../Devel/Curvature-test/curvature$dim.png ../Testreport
+fi
+
+
 sed s/SAMPLESIZE/$samplesize/g report-template.html | sed s/NDEPTH/$ndepth/g  > report.html
 
