@@ -417,7 +417,16 @@ subroutine swpzmom(us,c,d,mom1,mom2,mom3,mom,t)
     enddo
   enddo
 
-  call SetMomentumBC(us,c,mom,d,umask,rho1,rho2,t) 
+!  call SetMomentumBC(us,c,mom,d,umask,rho1,rho2,t) 
+! TEMPORARY 
+   if ( d == 1 ) then 
+      call SetMomentumBC(us,c,mom,d,umask,rho1,rho2,t)
+   else if ( d == 2 ) then 
+      call SetMomentumBC(us,c,mom,d,vmask,rho1,rho2,t)
+   else if ( d == 3 ) then 
+      call SetMomentumBC(us,c,mom,d,wmask,rho1,rho2,t)
+   end if !d
+! END TEMPORARY 
   !***
 end subroutine swpzmom
 
@@ -518,7 +527,16 @@ subroutine swpzmom_stg(us,c,d,mom1,mom2,mom3,mom,dir,t)
     enddo
   enddo
 
-  call SetMomentumBC(us,c,mom,d,umask,rho1,rho2,t) 
+!  call SetMomentumBC(us,c,mom,d,umask,rho1,rho2,t)
+! TEMPORARY 
+   if ( d == 1 ) then 
+      call SetMomentumBC(us,c,mom,d,umask,rho1,rho2,t)
+   else if ( d == 2 ) then 
+      call SetMomentumBC(us,c,mom,d,vmask,rho1,rho2,t)
+   else if ( d == 3 ) then 
+      call SetMomentumBC(us,c,mom,d,wmask,rho1,rho2,t)
+   end if !d
+! END TEMPORARY 
   !***
 end subroutine swpzmom_stg
 
@@ -840,7 +858,16 @@ SUBROUTINE swprmom(us,c,d,mom1,cg,mom3,mom,t)
      enddo
   enddo
   ! apply proper boundary conditions 
-  call SetMomentumBC(us,c,mom,d,umask,rho1,rho2,t) 
+!  call SetMomentumBC(us,c,mom,d,umask,rho1,rho2,t) 
+! TEMPORARY 
+   if ( d == 1 ) then 
+      call SetMomentumBC(us,c,mom,d,umask,rho1,rho2,t)
+   else if ( d == 2 ) then 
+      call SetMomentumBC(us,c,mom,d,vmask,rho1,rho2,t)
+   else if ( d == 3 ) then 
+      call SetMomentumBC(us,c,mom,d,wmask,rho1,rho2,t)
+   end if !d
+! END TEMPORARY 
 
 end subroutine swprmom
 
@@ -958,7 +985,16 @@ SUBROUTINE swprmom_stg(us,c,d,mom1,cg,mom3,mom,dir,t)
   enddo
 
   ! apply proper boundary conditions 
-  call SetMomentumBC(us,c,mom,dir,umask,rho1,rho2,t) 
+!  call SetMomentumBC(us,c,mom,dir,umask,rho1,rho2,t) 
+! TEMPORARY 
+   if ( dir == 1 ) then 
+      call SetMomentumBC(us,c,mom,dir,umask,rho1,rho2,t)
+   else if ( d == 2 ) then 
+      call SetMomentumBC(us,c,mom,dir,vmask,rho1,rho2,t)
+   else if ( d == 3 ) then 
+      call SetMomentumBC(us,c,mom,dir,wmask,rho1,rho2,t)
+   end if !d
+! END TEMPORARY 
 
 end subroutine swprmom_stg
 

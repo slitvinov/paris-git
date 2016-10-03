@@ -1421,7 +1421,16 @@ contains
      enddo
   enddo
 
-  call SetMomentumBC(us,cvof,mom,d,umask,rho1,rho2,0.d0) 
+!  call SetMomentumBC(us,cvof,mom,d,umask,rho1,rho2,0.d0) 
+! TEMPORARY 
+   if ( d == 1 ) then 
+      call SetMomentumBC(us,cvof,mom,d,umask,rho1,rho2,0.d0)
+   else if ( d == 2 ) then 
+      call SetMomentumBC(us,cvof,mom,d,vmask,rho1,rho2,0.d0)
+   else if ( d == 3 ) then 
+      call SetMomentumBC(us,cvof,mom,d,wmask,rho1,rho2,0.d0)
+   end if !d
+! END TEMPORARY 
 
   call do_all_ghost(tmp)
   call do_all_ghost(mom)
