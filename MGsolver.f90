@@ -326,7 +326,7 @@ subroutine NewSolverMG(A,p,maxError,beta,maxit,it,ierr,tres2)
   integer, parameter :: norm=1
 
   IF (rank==0.and.recordconvergence) THEN
-    OPEN(UNIT=89,FILE='convergenceMG_history.txt',Access='append')
+    OPEN(UNIT=89,FILE='convergenceMG_history.txt',position='append')
     start_time =  MPI_WTIME()
   ENDIF
 
@@ -356,7 +356,7 @@ subroutine NewSolverMG(A,p,maxError,beta,maxit,it,ierr,tres2)
 
     if(rank==0.and.recordconvergence) THEN
       end_time =  MPI_WTIME()
-      WRITE(89,*), ncall, it, end_time-start_time, tres2
+      WRITE(89,*) ncall, it, end_time-start_time, tres2
     ENDIF
 
     if (tres2<maxError) exit

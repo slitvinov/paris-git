@@ -484,7 +484,7 @@ contains
     real(8) :: grad1, grad2, grad3, norm_grad, local_norm, gn
     real(8) :: xgc, ygc, zgc, rx, ry, rz
     real(8), dimension(9):: local_data, bgd
-    character*128 :: file_name, file_name2
+    character(len=128) :: file_name, file_name2
     LOGICAL :: Found
     LOGICAL, SAVE :: first_open = .true.
     REAL(8), SAVE :: reference_vel
@@ -531,13 +531,13 @@ contains
     	
        !Computing kinetic energy of phase 1
        local_data(1) = local_data(1) + rho2*cvof(i,j,k)*(uvel**2 &
-        	+ vvel**2 +wvel**2)*vol
+        + vvel**2 +wvel**2)*vol
        !Computing kinetic energy of phase 2
        local_data(2) = local_data(2) + rho1*(1 - cvof(i,j,k))*(uvel**2 &
-        	+ vvel**2 +wvel**2)*vol
+        + vvel**2 +wvel**2)*vol
        !Computing overall kinetic energy
        local_data(3) = local_data(3) + (rho2*cvof(i,j,k) + rho1*(1 - cvof(i,j,k)))*(uvel**2 &
-       	   + vvel**2 +wvel**2)*vol
+        + vvel**2 +wvel**2)*vol
        !Computing mass phase 1
        local_data(4) = local_data(4) + rho2*cvof(i,j,k)*vol
        !Computing mass phase 2
@@ -554,7 +554,9 @@ contains
        norm_grad = (grad1**2 + grad2**2 + grad3**2)**0.5d0
        if(norm_grad > local_norm) local_norm = norm_grad
        
-    enddo; enddo; enddo	
+        enddo;
+       enddo;
+     enddo
     	
     call MPI_ALLREDUCE(local_data, bgd, 9, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr)
     call MPI_ALLREDUCE(local_norm, gn, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_Comm_Cart, ierr)
@@ -607,27 +609,31 @@ contains
     bgd = 0d0
     
     
-    do k=ks,ke; do j=js,je; do i=is,ie;
-       vol = dx(i) * dy(j) * dz(k)
-       rx = x(i) - xgc
-       ry = y(j) - ygc
-       rz = z(k) - zgc 
-    	
-       !Computing Ixx
-       local_data(1) = local_data(1) + cvof(i,j,k)*(ry*ry + rz*rz)*vol
-       !Computing Iyy
-       local_data(2) = local_data(2) + cvof(i,j,k)*(rx*rx + rz*rz)*vol
-       !Computing Izz
-       local_data(3) = local_data(3) + cvof(i,j,k)*(rx*rx + ry*ry)*vol
-       !Computing Ixy
-       local_data(4) = local_data(4) - cvof(i,j,k)*rx*ry*vol
-       !Computing Ixz
-       local_data(5) = local_data(5) - cvof(i,j,k)*rx*rz*vol
-       !Computing Iyz
-       local_data(6) = local_data(6) - cvof(i,j,k)*ry*rz*vol
-       
-       
-    enddo; enddo; enddo	
+    do k=ks,ke;
+       do j=js,je;
+          do i=is,ie;
+             vol = dx(i) * dy(j) * dz(k)
+             rx = x(i) - xgc
+             ry = y(j) - ygc
+             rz = z(k) - zgc 
+
+             !Computing Ixx
+             local_data(1) = local_data(1) + cvof(i,j,k)*(ry*ry + rz*rz)*vol
+             !Computing Iyy
+             local_data(2) = local_data(2) + cvof(i,j,k)*(rx*rx + rz*rz)*vol
+             !Computing Izz
+             local_data(3) = local_data(3) + cvof(i,j,k)*(rx*rx + ry*ry)*vol
+             !Computing Ixy
+             local_data(4) = local_data(4) - cvof(i,j,k)*rx*ry*vol
+             !Computing Ixz
+             local_data(5) = local_data(5) - cvof(i,j,k)*rx*rz*vol
+             !Computing Iyz
+             local_data(6) = local_data(6) - cvof(i,j,k)*ry*rz*vol
+
+
+          enddo;
+       enddo;
+    enddo
     
     call MPI_ALLREDUCE(local_data, bgd, 9, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr)
     
@@ -661,7 +667,7 @@ end subroutine do_droplet_test
     real(8) :: h, a1_coef, b1_coef, output_time, local_KE, global_KE, diff_vol
     real(8), dimension(:), allocatable :: local_h, global_h
     integer :: ierr
-    character*128 :: file_name, file_name1, file_name2, file_name3
+    character(len=128) :: file_name, file_name1, file_name2, file_name3
     LOGICAL :: Found
     LOGICAL, SAVE :: first_access = .true.
     LOGICAL, SAVE :: first_open = .true.

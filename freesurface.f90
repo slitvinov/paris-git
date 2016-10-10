@@ -4,7 +4,7 @@
 !
 ! Free surface extensions
 ! written by Leon Malan and Stephane Zaleski
-!
+! 
 ! This program is free software; you can redistribute it and/or
 ! modify it under the terms of the GNU General Public License as
 ! published by the Free Software Foundation; either version 2 of the
@@ -202,7 +202,7 @@ subroutine check_topology(is_gas)
               endif
            else
               if (volume<0.4*(xLength*yLength*zLength))&
-                   write(*,'("Single element ",I5," found in rank ",I5,"with volume: "e14.5)')bub,rank,volume
+                   write(*,'("Single element ",I5," found in rank ",I5,"with volume:",e14.5)')bub,rank,volume
               if (volume < 50.0*dx(is)**3.d0) then
                  write(*,'("Removing detached liquid in rank: ",I5)')rank
                  call clear_stray_liquid(dropid)
@@ -227,7 +227,7 @@ subroutine check_topology(is_gas)
               endif
            else
               if (volume<0.4*(xLength*yLength*zLength))&
-                   write(*,'("Merged element ",I5," found in rank ",I5,"with volume: "e14.5)')bub,rank,volume
+                   write(*,'("Merged element ",I5," found in rank ",I5,"with volume:",e14.5)')bub,rank,volume
               if (volume < 50.0*dx(is)**3.d0) then
                  call clear_stray_liquid(dropid) !<-clears liquid inside bubbles
                  write(*,'("Removing detached liquid (merged) in rank: ",I5)')rank
@@ -1178,7 +1178,7 @@ subroutine tag_bubbles(phase_ref,iout,time_stats)
   use module_freesurface
   implicit none
   include 'mpif.h'
-  real(8) :: time_stats
+  real(8), intent(in)  :: time_stats
   integer :: iout, flag
   integer, intent(in) :: phase_ref
   integer :: ierr
