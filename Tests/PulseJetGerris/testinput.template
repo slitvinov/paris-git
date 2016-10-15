@@ -18,7 +18,7 @@ GetPropertiesFromFront = F ! T: uses Front-Tracking data to compute mu, rho and 
 
 ZeroReynolds = F
 Implicit = IMPTEMP     
-hypre    = F       ! T: uses hyprepackage, F: uses SOR solver 
+hypre    = T       ! T: uses hyprepackage, F: uses SOR solver 
 restart  = F       ! T: start the domain from a previous simulation
 restartFront = F   ! T: start the frontfrom  a previous simulation
 restartAverages = F
@@ -30,22 +30,24 @@ EndTime = 1.0      ! When to stop simulation
 MaxDt   = 0.1      ! maximum size of time step
 dtFlag  = 1        ! 1: fixed dt;  2: fixed CFL
 dt      = DTTEMP   ! dt in case of dtFlag=1
-CFL     = 0.9
+CFL     = 0.4
 MAXERROR = MAXERRTEMP    ! Residual for Poisson solver
 MAXERRORVOL = 1d-4
                    ! Numerical parameters
 
 ITIME_SCHEME = 1   ! time scheme: 1:first order Euler, 2: second order quasi Crank-Nicolson
                    ! Should use first order Euler for Stokes flow ! ! ! 
-MAXIT    = 1000
+MAXIT    = 100
 BETA     = 1.3     ! parameters for linear solver
 
+HYPRESolverType = 2
+ErrorScaleHYPRE = 1.0
 !=================================================================================================
 ! Output parameters
 
-termout  = 20
+termout  = 5 
 ICOut    = T        ! output initial condition
-NOUT     = 200      ! write the solution to file every nout time steps
+NOUT     = 50      ! write the solution to file every nout time steps
 output_format = 2   ! 1:tecplot 2:vtk
 out_path = 'out'    ! name of the output directory
 
@@ -88,6 +90,12 @@ ZLENGTH  = 1.0
 
 WallVel(1,1)  = 1. ! can set inflow velocities here
 WallShear(4,1) = 0.0
+
+inject_type = 2
+jetcenter_yc2yLength = 0.5
+jetcenter_zc2zLength = 0.5
+radius_liq_inject = 0.083333333333e0
+uliq_inject = 1.0
 
 U_init =  1d0
 GX      = 0.0
