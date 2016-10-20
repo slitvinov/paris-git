@@ -1011,7 +1011,8 @@ subroutine TimeStepSize(deltaT,vof_phase1)
            endif
         enddo; enddo; enddo 
      endif ! FreeSurface
-     dtadv = h/vmax
+     !print *,"h=",h,"maxv=",vmax,vmax_phys,'freesurf=',FreeSurface     
+     dtadv = h/(max(vmax_phys,vmax))
      mydt  = CFL*dtadv
      mydt = min(mydt,MaxDt)
 #ifdef PHASE_CHANGE
