@@ -3517,7 +3517,7 @@ subroutine ReadParameters
                         HYPRESolverType, SwitchHYPRESolver, DivergeTol,  uinjectPertAmp,         &
                         ExcludeBoundCellCalcRes, numCellExclude, OrganizeOutFolder,             &  
                         plane, n_p, out_sub, test_MG, MultiGrid, nrelax,u_file, v_file, w_file,  &
-                        read_u, read_v, read_w, sym_MG
+                        read_u, read_v, read_w, sym_MG, recordconvergence
  
   Nx = 0; Ny = 4; Nz = 4 ! cause absurd input file that lack nx value to fail. 
   Ng=2;xLength=1d0;yLength=1d0;zLength=1d0
@@ -3633,6 +3633,8 @@ subroutine ReadParameters
   if ( tout > 0.d0 .and. dtFlag == 1) then 
      nout = NINT(tout/dt)
   end if !tout
+
+  if (test_MG) recordconvergence = .TRUE.
 
   if(termout==0) then
      termout=nout

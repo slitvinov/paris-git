@@ -1,24 +1,18 @@
 #!/bin/bash
 #set -x
 
-rm -rf tmpout tmpres
+rm -rf tmpout out convergenceMG_history.txt
 
-touch tmpres
-for it in $(seq 1 1 20); do
-
-rm -rf out
-sed 's/MAXITNUM/'$it'/g' inputtemplate > input
+cp inputtemplate input
 mpirun -np 2 paris > tmpout
-cpu=$(echo `awk ' /cpu/ { cpu = $3 } END { print cpu } ' < tmpout`)
-res=$(echo `awk ' /residual/ { res = $2 } END { print res } ' < tmpout`)
+res=$(tail -1 convergenceMG_history.txt | awk '{print $4} ')
+cpu=$(tail -1 convergenceMG_history.txt | awk '{print $3} ')
 err=$(echo `awk ' /error/ { res = $2 } END { print res } ' < tmpout`)
-echo $res $err $cpu >> tmpres
-done
 
 echo " "
-echo "cpu =" $cpu
+echo "cpu =" $cpu $res $err
 awk '{if ('$res' < 0.00000001 && '$err' < 0.1) {print "\033[32;1m PASS\033[0m Residual '$res' Error '$err' "} 
-         else {print "\033[31;1m FAIL\033[0m Residual '$res' Error '$err' "}}' tmpres | tail -1
+         else {print "\033[31;1m FAIL\033[0m Residual '$res' Error '$err' "}}' tmpout | tail -1
 
 gnuplot <<EOF 
 set size square
@@ -32,7 +26,7 @@ set key outside below
 set pointsize 0.5
 set y2tics
 set ytics nomirror
-plot "tmpres" u 0:1 t 'residual' w lp pt 7, "tmpres" u 0:2 t 'error' w lp pt 7, "tmpres" u 0:3 t 'CPU time' ax x1y2 w p pt 7
+plot "convergenceMG_history.txt" u 2:4 t 'residual' w lp pt 7, "convergenceMG_history.txt" u 2:3 t 'CPU time' ax x1y2 w p pt 7
 pause 3
 set term pdf
 set out 'convergence.pdf'
@@ -40,5 +34,5 @@ replot
 exit
 EOF
 
-rm -rf input tmpout tmpres out
+rm -rf input tmpout out convergenceMG_history.txt
 
