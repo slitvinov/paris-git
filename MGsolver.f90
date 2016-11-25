@@ -131,11 +131,44 @@ subroutine coarse_fine_interp(pf,pc,imin1,jmin1,kmin1)
     implicit none
     integer :: imin1,jmin1,kmin1
     real(8) :: pf(imin1:,jmin1:,kmin1:,:), pc(imin:,jmin:,kmin:,:)
+    real(8) :: residtot
     integer :: i,j,k,is1,js1,ks1
     
     is1=imin1+Ng; js1=jmin1+Ng; ks1=kmin1+Ng
     !interpolation from coarse level
+
+  IF (sym_MG) THEN
     do i=is,ie; do j=js,je; do k=ks,ke
+    !symmetric operator
+      residtot = abs(pf(2*(i-is)+is1,  2*(j-js)+js1,  2*(k-ks)+ks1,1))   + & 
+                 abs(pf(2*(i-is)+is1+1,2*(j-js)+js1,  2*(k-ks)+ks1,1))   + & 
+                 abs(pf(2*(i-is)+is1,  2*(j-js)+js1+1,2*(k-ks)+ks1,1))   + & 
+                 abs(pf(2*(i-is)+is1+1,2*(j-js)+js1+1,2*(k-ks)+ks1,1))  + & 
+                 abs(pf(2*(i-is)+is1,  2*(j-js)+js1,  2*(k-ks)+ks1+1,1)) + & 
+                 abs(pf(2*(i-is)+is1+1,2*(j-js)+js1,  2*(k-ks)+ks1+1,1)) + & 
+                 abs(pf(2*(i-is)+is1,  2*(j-js)+js1+1,2*(k-ks)+ks1+1,1)) + & 
+                 abs(pf(2*(i-is)+is1+1,2*(j-js)+js1+1,2*(k-ks)+ks1+1,1)) + 1.d-15
+
+      pf(2*(i-is)+is1,  2*(j-js)+js1,  2*(k-ks)+ks1,1)   = & 
+          abs(pf(2*(i-is)+is1,  2*(j-js)+js1,  2*(k-ks)+ks1,1))/residtot * pc(i,j,k,1)
+      pf(2*(i-is)+is1+1,2*(j-js)+js1,  2*(k-ks)+ks1,1)   = & 
+          abs(pf(2*(i-is)+is1+1,2*(j-js)+js1,  2*(k-ks)+ks1,1))/residtot * pc(i,j,k,1)
+      pf(2*(i-is)+is1,  2*(j-js)+js1+1,2*(k-ks)+ks1,1)   = & 
+          abs(pf(2*(i-is)+is1,  2*(j-js)+js1+1,2*(k-ks)+ks1,1))/residtot * pc(i,j,k,1)
+      pf(2*(i-is)+is1+1,2*(j-js)+js1+1,2*(k-ks)+ks1,1)   = & 
+          abs(pf(2*(i-is)+is1+1,2*(j-js)+js1+1,2*(k-ks)+ks1,1))/residtot * pc(i,j,k,1)
+      pf(2*(i-is)+is1,  2*(j-js)+js1,  2*(k-ks)+ks1+1,1) = & 
+          abs(pf(2*(i-is)+is1,  2*(j-js)+js1,  2*(k-ks)+ks1+1,1))/residtot * pc(i,j,k,1)
+      pf(2*(i-is)+is1+1,2*(j-js)+js1,  2*(k-ks)+ks1+1,1) = & 
+          abs(pf(2*(i-is)+is1+1,2*(j-js)+js1,  2*(k-ks)+ks1+1,1))/residtot * pc(i,j,k,1)
+      pf(2*(i-is)+is1,  2*(j-js)+js1+1,2*(k-ks)+ks1+1,1) = & 
+          abs(pf(2*(i-is)+is1,  2*(j-js)+js1+1,2*(k-ks)+ks1+1,1))/residtot * pc(i,j,k,1)
+      pf(2*(i-is)+is1+1,2*(j-js)+js1+1,2*(k-ks)+ks1+1,1) = & 
+          abs(pf(2*(i-is)+is1+1,2*(j-js)+js1+1,2*(k-ks)+ks1+1,1))/residtot * pc(i,j,k,1)
+    enddo; enddo; enddo
+  ELSE
+    do i=is,ie; do j=js,je; do k=ks,ke
+    !original non-symmetric operator
       pf(2*(i-is)+is1,  2*(j-js)+js1,  2*(k-ks)+ks1,1)   = pc(i,j,k,1)
       pf(2*(i-is)+is1+1,2*(j-js)+js1,  2*(k-ks)+ks1,1)   = pc(i,j,k,1)
       pf(2*(i-is)+is1,  2*(j-js)+js1+1,2*(k-ks)+ks1,1)   = pc(i,j,k,1)
@@ -145,6 +178,7 @@ subroutine coarse_fine_interp(pf,pc,imin1,jmin1,kmin1)
       pf(2*(i-is)+is1,  2*(j-js)+js1+1,2*(k-ks)+ks1+1,1) = pc(i,j,k,1)
       pf(2*(i-is)+is1+1,2*(j-js)+js1+1,2*(k-ks)+ks1+1,1) = pc(i,j,k,1)
     enddo; enddo; enddo
+  ENDIF
 
 end subroutine coarse_fine_interp
 

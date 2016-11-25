@@ -3517,7 +3517,7 @@ subroutine ReadParameters
                         HYPRESolverType, SwitchHYPRESolver, DivergeTol,  uinjectPertAmp,         &
                         ExcludeBoundCellCalcRes, numCellExclude, OrganizeOutFolder,             &  
                         plane, n_p, out_sub, test_MG, MultiGrid, nrelax,u_file, v_file, w_file,  &
-                        read_u, read_v, read_w
+                        read_u, read_v, read_w, sym_MG
  
   Nx = 0; Ny = 4; Nz = 4 ! cause absurd input file that lack nx value to fail. 
   Ng=2;xLength=1d0;yLength=1d0;zLength=1d0

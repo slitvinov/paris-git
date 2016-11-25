@@ -68,7 +68,7 @@ module module_grid
   integer :: MPI_Comm_Cart, MPI_Comm_Domain, MPI_Comm_Active
   integer :: imin, imax, jmin, jmax, kmin, kmax
   real(8), parameter :: TINY_DOUBLE=1d-300 
-  logical :: test_MG=.false., MultiGrid=.false.
+  logical :: test_MG=.false., MultiGrid=.false., sym_MG=.false.
   logical, parameter :: recordconvergence=.false.
   integer :: nrelax=3
 ! added by SZ

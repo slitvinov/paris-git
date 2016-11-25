@@ -6,6 +6,7 @@ EndTime = 0   ! When to stop simulation
 
                    ! parameters for linear solver
 test_MG = T
+sym_MG = F
 MultiGrid = T
 MAXERROR= 1d-300     ! Residual for Poisson solver
 MAXERRORVOL = 1d-300 ! Tolerance for Front Tracking
