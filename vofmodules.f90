@@ -89,6 +89,7 @@ module module_VOF
   logical :: test_turb = .false.
   logical :: linfunc_initialized = .false.
   logical :: DoMOMCONS = .false.
+  logical :: LinInterp = .false.
   logical :: STGhost = .false.
   logical :: use_Vofi
 !   logical :: oldvof
@@ -278,7 +279,7 @@ contains
          out_centroid, do_clean_debris,&
          clean_debris_method,nsteps_clean_debris,clean_debris_neighbours,&
          filter_random_seeds, nb, n_cell,&
-         cwg_threshold,EPSC,staggeredmom
+         cwg_threshold,EPSC,staggeredmom, LinInterp
       
     namelist /FSparameters/ X_level, RP_test, gamma, R_ref, P_ref,&
          VTK_OUT, NOUT_VTK, step_max, limit, curve_stats, order_extrap,&

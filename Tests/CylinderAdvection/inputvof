@@ -8,6 +8,7 @@ VOF_ADVECT = 'Dick_Yue'
 staggeredmom = T
 ViscMeanIsArith = T
 DoMOMCONS = T
+LinInterp = T
 !=================================================================================================
 
 &end
