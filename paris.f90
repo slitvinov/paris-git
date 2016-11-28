@@ -1154,8 +1154,13 @@ subroutine calcStats
      end if ! DoVOF
      ! y-momentum 
      if(DoVOF) then
+      if (test_turb) then
+        mystats(14)=mystats(14)+((-u(i,j,k)+u(i+1,j,k))/dx(i))**2*vol
+        mystats(15)=mystats(15)+((-v(i,j,k)+v(i,j+1,k))/dy(j))**2*vol
+      else
         mystats(14)=mystats(14)+rho(i,j,k)*0.5d0*(v(i,j,k)+v(i,j+1,k))*vol*(     cvof(i,j,k))
         mystats(15)=mystats(15)+rho(i,j,k)*0.5d0*(v(i,j,k)+v(i,j+1,k))*vol*(1.d0-cvof(i,j,k))
+      endif
      end if ! (DoVOF)
      ! interfacial area
      if (DoVOF ) then

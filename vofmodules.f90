@@ -86,6 +86,7 @@ module module_VOF
   logical :: test_risingbubble = .false.
   logical :: test_lattice_bubs = .false.
   logical :: test_fcc_lattice = .false.
+  logical :: test_turb = .false.
   logical :: linfunc_initialized = .false.
   logical :: DoMOMCONS = .false.
   logical :: STGhost = .false.
@@ -509,6 +510,8 @@ contains
        test_lattice_bubs = .true.
     else if(test_type=='fcc_lat_bubs') then
        test_fcc_lattice = .true.
+    else if(test_type=='Iso_Turbulence') then 
+       test_turb = .true.
     else
        write(*,*) test_type, rank
        call pariserror("unknown initialization")
@@ -683,6 +686,13 @@ contains
        endif
        ipar=cylinder_dir
        call levelset2vof(wave2ls,ipar)
+     else if (test_turb) then
+       do i = is,ie; do j=js,je; do k = ks,ke
+         if (y(j).LT.0.5) then 
+           cvof(i,j,k) = 1.d0 
+           vof_flag(i,j,k) = 1
+         endif
+       enddo; enddo; end do
     else if(NumBubble>0) then
        ! one cylinder in -ipar>0 direction otherwise spheres
        ipar=-cylinder_dir
