@@ -506,14 +506,14 @@ subroutine swpzmom_stg(us,c,d,mom1,mom2,mom3,mom,dir,t)
                  vof = fl3d(nr,alpha,x0,deltax)
                  CALL flux_centroid(nr,alpha,x0,deltax,xcm1)
                  mom3(i,j,k) = (rho2*vof + rho1*(a2 - vof))*uadv1 + &
-                 (rho2*vof*xcm1(d) + rho1*(-a1*a1/2.d0 - vof*xcm1(d)))*(uadv3-uadv1)
+                 (rho2*vof*xcm1(d) + rho1*(-a2*(1.d0+a2/2.d0) - vof*xcm1(d)))*(uadv3-uadv1)
               endif
               x0(d)=mm1
               deltax(d)=mm2
               vof = fl3d(nr,alpha,x0,deltax)
               CALL flux_centroid(nr,alpha,x0,deltax,xcm1)
               mom2(i,j,k) = (rho2*vof + rho1*(mm2 - vof))*uadv1 + &
-              (rho2*vof*xcm1(d) + rho1*(-a1*a1/2.d0 - vof*xcm1(d)))*(uadv3-uadv1)
+              (rho2*vof*xcm1(d) + rho1*(-mm2*(mm1 + mm2/2.d0) - vof*xcm1(d)))*(uadv3-uadv1)
               else
               if(a1.lt.0d0) then
                  x0(d)=a1
@@ -989,7 +989,7 @@ SUBROUTINE swprmom_stg(us,c,d,mom1,cg,mom3,mom,dir,t)
                  vof = fl3d(mxyz,alpha,x0,deltax)
                  CALL flux_centroid(mxyz,alpha,x0,deltax,xcm1)
                  mom3(i,j,k) = (rho2*vof + rho1*(a2 - vof))*uadv1 + &
-                 (rho2*vof*xcm1(d) + rho1*(-a1*a1/2.d0 - vof*xcm1(d)))*(uadv3-uadv1)
+                 (rho2*vof*xcm1(d) + rho1*(-a2*(1.d0-a2/2.d0) - vof*xcm1(d)))*(uadv3-uadv1)
               endif
               else
               if(a1<0d0) then
