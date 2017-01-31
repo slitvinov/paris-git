@@ -470,8 +470,10 @@ subroutine swpzmom_stg(us,c,d,mom1,mom2,mom3,mom,dir,t)
            ro1 = (rho2*c(i-i0,j-j0,k-k0)+rho1*(1.d0-c(i-i0,j-j0,k-k0)))
            ro2 = (rho2*c(i,j,k)+rho1*(1.d0-c(i,j,k)))
            ro3 = (rho2*c(i+i0,j+j0,k+k0)+rho1*(1.d0-c(i+i0,j+j0,k+k0)))
-           uadv1 = interpole3(mom(i-i0,j-j0,k-k0)/ro1,mom(i,j,k)/ro2,mom(i+i0,j+j0,k+k0)/ro3,AdvectionScheme,-0.5d0-a1/2.d0)           
-           uadv3 = interpole3(mom(i-i0,j-j0,k-k0)/ro1,mom(i,j,k)/ro2,mom(i+i0,j+j0,k+k0)/ro3,AdvectionScheme,0.5d0-a2/2.d0)           
+           uadv1 = interpole3(mom(i-i0,j-j0,k-k0)/ro1,mom(i,j,k)/ro2, &
+                   mom(i+i0,j+j0,k+k0)/ro3,AdvectionScheme,-0.5d0-a1/2.d0/(1.d0 - a1 + a2))           
+           uadv3 = interpole3(mom(i-i0,j-j0,k-k0)/ro1,mom(i,j,k)/ro2, &
+                   mom(i+i0,j+j0,k+k0)/ro3,AdvectionScheme,0.5d0-a2/2.d0/(1.d0 - a1 + a2))           
 
            mm1 = dmax1(a1,0.0d0)
            mm2 = 1.d0 - mm1 + dmin1(0.d0,a2)
