@@ -478,7 +478,8 @@ subroutine swpzmom_stg(us,c,d,mom1,mom2,mom3,mom,dir,t)
            mm1 = dmax1(a1,0.0d0)
            mm2 = 1.d0 - mm1 + dmin1(0.d0,a2)
 
-           uavg = mom(i,j,k)/(rho2*c(i,j,k)+rho1*(1.d0-c(i,j,k)))
+           uavg = interpole3(mom(i-i0,j-j0,k-k0)/ro1,mom(i,j,k)/ro2, &
+                   mom(i+i0,j+j0,k+k0)/ro3,AdvectionScheme,(-dmin1(a1,0.) - dmax1(a2,0.d0))/2.d0)
            mom1(i,j,k) = 0.d0; mom2(i,j,k) = 0.d0; mom3(i,j,k) = 0.d0
 
            if ((c(i,j,k) .gt. 0.d0).and.(c(i,j,k) .lt. 1.d0)) then
