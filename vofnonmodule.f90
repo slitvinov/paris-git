@@ -534,7 +534,7 @@ subroutine swpzmom_stg(us,c,d,mom1,mom2,mom3,mom,dir,t)
 
             endif
 
-            uadv1 = interpole3(u1,u2,u3,AdvectionScheme,-0.5d0- dmin1(a1,0.))
+            uadv1 = interpole3(u1,u2,u3,AdvectionScheme,-0.5d0 - dmin1(a1,0.))
             uadv3 = interpole3(u1,u2,u3,AdvectionScheme, 0.5d0 - dmax1(a2,0.d0))
 
             x0(d)=mm1
@@ -1042,7 +1042,7 @@ SUBROUTINE swprmom_stg(us,c,d,mom1,cg,mom3,mom,dir,t)
                  CALL flux_centroid(mxyzc,alphac,x0,deltax,xcm2)
                  CALL flux_centroid(mxyz,alpha,x0,deltax,xcm1)
                  mom3(i,j,k) = (rho2*vof + rho1*(a2 - vof))*uadv1 + &
-                               (rho2*vof*xcm1(d) + rho1*(a2 - vof)*xcm2(d))*(uadv3-uadv1)/a2
+                               (rho2*vof*(xcm1(d)-x0(d)) + rho1*(a2 - vof)*(xcm2(d)-x0(d)))*(uadv3-uadv1)/a2
               endif
               else
               if(a1<0d0) then
