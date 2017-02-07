@@ -209,7 +209,11 @@ Program paris
         if(rank==0) then
            end_time =  MPI_WTIME()
            if (time.eq.0.d0) then
-             open(unit=121,file='stats')
+              open(unit=121,file='stats')
+              ![WA] adding labels 2017/02/07
+              write(121,*) '# 1:time 2:shear_y 3:<u> 4:f_x 5:f_y 6:f_z 7:<rho> 8:<p> 9:<mom>^n 10:<mom>^(n+1) 11:vof 12:c_mass &
+                            & 13: E_k1 14: E_k2 15-16: y_mom 17: ? 18: <p_infl> 19:<p_outfl> 20:Area 21:Ep1 22:Ep2 23:Ens1 24:Ens2 &
+                            & 25:R2_frac 26:Vof_flag2 27:dpdx 28:du/dt 29: time_sim (?)'
            else
              open(unit=121,file='stats',position='append')
            endif
