@@ -687,7 +687,7 @@ Program paris
            if(test_control_droplet) call do_droplet_test(itimestep,time,REAL(nstats*dt,8))
            if ( DoTurbStats .and. time > timeStartTurbStats ) call calcTurbStats(itimestep)
            if( test_KHI2D .or. test_HF ) call h_of_KHI2D(itimestep,time)
-           if (FreeSurface) call pressure_stats(time)
+           call pressure_stats(time)
         endif
         if(mod(itimestep,nsteps_probe)==0) then
            call probes
@@ -1879,12 +1879,18 @@ subroutine pressure_stats(t)
   p_dyn_avg = p_dyn_avg/vol_liq_tot
   ke_box_avg = ke_box_avg/vol_liq_tot
 
+  if (rank==0 .and. itimestep==1) then
+     open(unit=20,file='pressure_stats.txt',position='append')
+     write(20,*) "# 1:time 2:p_face(1-6) 8:p_min 9:p_max 10:pavg_liq 11:p_dyn_avg 12:KE_box_avg 13:Vol_liq"
+     close(20)
+  endif
+  
   if (rank==0) then
      OPEN(UNIT=20,FILE='pressure_stats.txt',position='append')
      write(20,201)t,p_face_global(1:6),p_min_global,p_max_global,p_avg_liq,p_dyn_avg,ke_box_avg,vol_liq_tot
      CLOSE(20)
   endif
-201  format(13es14.6e2)
+201  format(13es14.6e3)
 
 end subroutine pressure_stats
 !=================================================================================================
@@ -3717,7 +3723,7 @@ subroutine check_stability()
 
   if(dt*mu1 /= 0) then 
      von_neumann = dx(ng)**2*rho1/(dt*mu1)
-     if(rank==0) print *, "dx**2*rho/(dt*mu) = ", von_neumann
+     if(rank==0) print *, "dx**2*rho/(dt*mu) = ", von_neumann, "dt=",dt
      if(von_neumann < 6d0.and..not.Implicit) call pariserror("time step too large for viscous terms")
   endif
 
