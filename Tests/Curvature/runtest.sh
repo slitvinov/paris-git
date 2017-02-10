@@ -52,6 +52,7 @@ if [ $minlevel -ne $levelmax ]; then
     echo "testing level $level"
     ./run_stats.sh $nx $init $radius $nstats $d || exit 1
 else
+# I do not remember why - maybe spurious
     echo "not redoing maxlevel"
 fi
 exit 0 
