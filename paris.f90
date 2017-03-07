@@ -124,8 +124,6 @@ Program paris
 
   call initialize
   call check_sanity_in_depth()
-!  print *, "warning: no stability check"
-   call check_stability
 
   if(DoVOF.and.rank<nPdomain) call initialize_VOF
   if(DoLPP) call initialize_LPP
@@ -205,6 +203,8 @@ Program paris
 
         if(dtFlag==2)call TimeStepSize(dt,vof_phase)
         cflmax = get_cfl_and_check(dt)
+        ! stability check positionned after time step chage
+        call check_stability
 
         if(rank==0) then
            end_time =  MPI_WTIME()
