@@ -33,6 +33,10 @@ set yrange [1e-3:10]
 set xlabel "Grid points per Diameter"
 set ylabel "Curvature relative L_inf error in $dim"
 plot  4/(x*x) t "4 x^-2", "WithPopinet/popinet.csv" u (2*\$1):2 t "Popinet, 2009 Fig. 5 max norm" w lp,  "paris-$dim-$ndepth.tmp" u (2*\$1):3 t "ParisSim max max" w lp
+set term pngcairo size 600, 600
+set out "curvature$dim.png"
+set size square
+replot
 EOF
 else
 gnuplot <<EOF

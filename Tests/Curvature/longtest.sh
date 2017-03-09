@@ -21,8 +21,9 @@ then
     cd $here
 fi
 dim=$d'D'
-cp ../../Devel/Curvature-test/curvature$dim.png ../Testreport # unused for now.
-
+if [ -d ../Testreport ] ; then
+    mv ../../Devel/Curvature-test/curvature$dim.png ../Testreport # unused for now.
+fi
 
 d=3
 echo "Launching "$d"D test"
