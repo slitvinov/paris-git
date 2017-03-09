@@ -3723,20 +3723,47 @@ subroutine check_stability()
   use module_2phase
   implicit none
   include 'mpif.h'
-  real(8) von_neumann
+  real(8) :: von_neumann=10,ststab=10,von_neumann1=10,ststab1=10
+  logical :: error=.false.
 
   if(dt*mu1 /= 0) then 
      von_neumann = dx(ng)**2*rho1/(dt*mu1)
-     if(rank==0) print *, "dx**2*rho/(dt*mu) = ", von_neumann, "dt=",dt
-     if(von_neumann < 6d0.and..not.Implicit) call pariserror("time step too large for viscous terms")
-  endif
+     if(rank==0) print *, "dx**2*rho/(dt*mu)       = ", von_neumann, "dt=",dt
+   endif
 
   if(dt*sigma /= 0) then 
-     von_neumann = dx(ng)**3*rho1/(dt**2*sigma)
-     if(rank==0) print *, "dx**3*rho/(dt**2*sigma) = ", von_neumann
-     if(von_neumann < 4d0) call pariserror("time step too large for ST terms")
+     ststab = dx(ng)**3*rho1/(dt**2*sigma)
+     if(rank==0) print *, "dx**3*rho/(dt**2*sigma) = ",ststab , "dt=",dt
   endif
 
+  if(MaxDt*mu1 /= 0) then 
+     von_neumann1 = dx(ng)**2*rho1/(MaxDt*mu1)
+     if(rank==0) print *, "dx**2*rho/(MaxDt*mu)       = ", von_neumann1, "MaxDt=",MaxDt
+  endif
+
+  if(MaxDt*sigma /= 0) then 
+     ststab1 = dx(ng)**3*rho1/(MaxDt**2*sigma)
+     if(rank==0) print *, "dx**3*rho/(MaxDt**2*sigma) = ", ststab1, "MaxDt=",MaxDt
+  endif
+
+  if(von_neumann < 6d0.and..not.Implicit.and.dtFlag==1) then
+     call parismessage("time step too large for viscous terms")
+     error=.true.
+  endif
+  if(von_neumann1 < 6d0.and..not.Implicit.and.dtFlag==2) then
+     call parismessage("Maximum time step too large for viscous term") 
+     error=.true.
+  endif
+  if(ststab < 2d0.and.dtFlag==1) then
+     call parismessage("time step too large for ST term") 
+     error=.true.
+  endif
+  if(ststab1 < 2d0.and.dtFlag==2) then
+     call parismessage("Maximum time step too large for ST term") 
+     error=.true.
+  endif
+  if (error) call pariserror("time step too large, aborting")
+  return
 end subroutine check_stability
 
 subroutine check_integers()

@@ -1,7 +1,9 @@
 set xlabel "time"
 set ylabel "w(0,0,R)"
 set yrange [*:*]
-plot "reference-nonMomCons.txt" t "reference nonMomCons" w l, "out/droplet-test-vel.txt" t "this test simulation nonMOMCONS" w l, 0 notitle
+set xrange [0:0.02]
+plot "reference-MOMCONSTEMP.txt" t "reference MOMCONSTEMP" w l, "out/droplet-test-vel.txt" t "this test simulation MOMCONSTEMP" w p, 0 notitle
+#plot "out/droplet-test-vel.txt" t "this test simulation MOMCONSTEMP" w p, 0 notitle
 set term pngcairo
 set out "droplet.png"
 replot

@@ -10,14 +10,16 @@ if [ $# -gt 0 ]; then
 	echo "using MomCons"
 	momconstrue=T
 	plotlabel=MomCons
-	nfilter=0
+	nfilter=1
+    else
+	echo "usage: $0" 
+	echo "or:    $0 MomCons"
+	exit 1
     fi
 fi
 
-
 sed s/MOMCONSTEMP/$momconstrue/g inputvof.template | sed s/NFILTERTEMP/$nfilter/g > inputvof 
-sed s/nonMOMCONS/$plotlabel/g plot.gp.template > plot.gp
-
+sed s/MOMCONSTEMP/$plotlabel/g plot.gp.template > plot.gp
 
 if [ "$HAVE_SILO" == 1 ]; then
   echo "we have silo"
@@ -39,27 +41,10 @@ rm inputshort
 mv inputshort.bkp inputshort
 
 echo `awk ' /Step:/ { cpu = $8 } END { print "cpu = " cpu } ' < tmpout`
-
-if [ ${CGFONTGETGLYPH_PARIS_PROBLEM:=0} == 0 ]; then
-gnuplot <<EOF
-set xlabel "time"
-set ylabel "w(0,0,R)"
-set term png
-set out "tmp.png"
-load "plot.gp"
-EOF
-else
-gnuplot <<EOF
-set xlabel "time"
-set ylabel "w(0,0,R)"
-set term png
-set out "tmp.png"
-load "plot.gp"
-EOF
-fi
+gnuplot < plot.gp 
 
 precision=2e-2
-pariscompare out/droplet-test-vel.txt reference.txt $precision 1 1
+pariscompare out/droplet-test-vel.txt reference-short-$plotlabel.txt $precision 1 1
 
 
 GREEN="\\033[1;32m"

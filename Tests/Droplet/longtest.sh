@@ -1,13 +1,27 @@
 #!/bin/bash
 #set -x
 
-momconstrue=F
+momconstrue=T
 nfilter=1
-plotlabel=NonMomCons
+plotlabel=MomCons
+
+
+if [ $# -gt 0 ]; then
+    if [ $1 == nonMomCons ]; then
+	echo "using nonMomCons"
+	momconstrue=F
+	plotlabel=nonMomCons
+	nfilter=1
+    else
+	echo "usage: $0" 
+	echo "or:    $0 nonMomCons"
+	exit 1
+    fi
+fi
 
 
 sed s/MOMCONSTEMP/$momconstrue/g inputvof.template | sed s/NFILTERTEMP/$nfilter/g > inputvof 
-sed s/nonMOMCONS/$plotlabel/g plot.gp.template > plot.gp
+sed s/MOMCONSTEMP/$plotlabel/g plot.gp.template > plot.gp
 
 
 
