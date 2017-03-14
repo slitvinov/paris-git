@@ -1,4 +1,3 @@
-
 !=================================================================================================
 !
 !
@@ -414,33 +413,41 @@ Program paris
               endif
               call my_timer(2)
 
-           endif ! not FreeSurface
-           if(Implicit) then   
-              call SetupUvel(u,du,rho,mu,rho1,mu1,dt,A)
-              if(hypre)then
-                 call poi_solve(A,u,maxError,maxit,it,HYPRESolverType)
+
+
+              if(Implicit) then    !! BOILVEL: Need to get/set here
+                 call SetupUvel(u,du,rho,mu,rho1,mu1,dt,A)
+                 if(hypre)then
+                    call poi_solve(A,u,maxError,maxit,it,HYPRESolverType)
+                 else
+                    call LinearSolver1(A,u,umask,maxError,beta,maxit,itu,ierr)
+                 endif
+                 if(mod(itimestep,termout)==0) call calcresidual1(A,u,umask,residualu)
+                 call SetupVvel(v,dv,rho,mu,rho1,mu1,dt,A)
+                 if(hypre)then
+                    call poi_solve(A,v,maxError,maxit,it,HYPRESolverType)
+                 else
+                    call LinearSolver1(A,v,vmask,maxError,beta,maxit,itv,ierr)
+                 endif
+                 if(mod(itimestep,termout)==0) call calcresidual1(A,v,vmask,residualv)
+                 call SetupWvel(w,dw,rho,mu,rho1,mu1,dt,A)
+                 if(hypre)then
+                    call poi_solve(A,w,maxError,maxit,it,HYPRESolverType)
+                 else
+                    call LinearSolver1(A,w,wmask,maxError,beta,maxit,itw,ierr)
+                 endif
+                 if(mod(itimestep,termout)==0) call calcresidual1(A,w,wmask,residualw)
               else
-                 call LinearSolver1(A,u,umask,maxError,beta,maxit,itu,ierr)
-             endif
-             if(mod(itimestep,termout)==0) call calcresidual1(A,u,umask,residualu)
-             call SetupVvel(v,dv,rho,mu,rho1,mu1,dt,A)
-             if(hypre)then
-                call poi_solve(A,v,maxError,maxit,it,HYPRESolverType)
-             else
-                call LinearSolver1(A,v,vmask,maxError,beta,maxit,itv,ierr)
-             endif
-             if(mod(itimestep,termout)==0) call calcresidual1(A,v,vmask,residualv)
-             call SetupWvel(w,dw,rho,mu,rho1,mu1,dt,A)
-             if(hypre)then
-                call poi_solve(A,w,maxError,maxit,it,HYPRESolverType)
-             else
-                call LinearSolver1(A,w,wmask,maxError,beta,maxit,itw,ierr)
+                 u = u + dt * du
+                 v = v + dt * dv
+                 w = w + dt * dw
               endif
-              if(mod(itimestep,termout)==0) call calcresidual1(A,w,wmask,residualw)
            else
-              u = u + dt * du
-              v = v + dt * dv
-              w = w + dt * dw
+              do i=is,ie; do j=js,je; do k=ks,ke
+                 if (u_cmask(i,j,k)==0) u(i,j,k) = u(i,j,k) + dt*du(i,j,k) 
+                 if (v_cmask(i,j,k)==0) v(i,j,k) = v(i,j,k) + dt*dv(i,j,k) 
+                 if (w_cmask(i,j,k)==0) w(i,j,k) = w(i,j,k) + dt*dw(i,j,k) 
+              enddo; enddo; enddo
            endif
            if(out_sub .and. ii==1 .and. mod(itimestep-itimestepRestart,nout)==0) then
               call output5(itimestep/nout,itimestep,1)

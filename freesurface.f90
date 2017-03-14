@@ -98,7 +98,8 @@ subroutine set_topology(phase,iout)
         endif
      endif
 
-     if (phase(i,j,k) == 0 .or. (implode_flag(tag_id(i,j,k))) ) then
+!!$     if (phase(i,j,k) == 0 .or. (implode_flag(tag_id(i,j,k))) ) then
+     if (phase(i,j,k) == 0) then
         pcmask(i,j,k)=0
         u_cmask(i,j,k)=0
         v_cmask(i,j,k)=0
@@ -182,10 +183,10 @@ subroutine check_topology(is_gas)
   real(8) :: volume
   integer :: dropid
   integer :: i,j,k,bub,ierr,rankid
-  logical :: remove,signal
+  logical :: remove
   logical, intent(in) :: is_gas
 
-  signal = .false.
+  implode_flag = .false.
   fill_ghost = .false.
   remove = .false.
   v_source=0.d0
@@ -193,16 +194,18 @@ subroutine check_topology(is_gas)
   if (num_drop(rank)>0) then
      do bub=1,num_drop(rank)
         volume = drops(bub)%element%vol
-        !write(*,'("Volume of drop ",I5," in rank ",I5", : ",e14.5)')bub,rank,volume
+        dropid = drops(bub)%element%id
+        !write(*,'("Volume of drop ",I5," in rank ",I5", : ",2e14.5)')bub,rank,volume,volume/(dx(is)**3.d0)
         if (volume > 1.d-9*dx(is)**3.d0) then
            if (is_gas) then
               if (volume < 125.0*dx(is)**3.d0) then
-                 !write(*,'("Volume <  of drop ",I5," in rank ",I5", : ",e14.5)')bub,rank,volume
+                 !write(*,'("Volume <  125 cells of drop ",I5," in rank ",I5," with id ",I5, " : ",2e14.5)')&
+                 !     bub,rank,dropid,volume,volume/(dx(is)**3.d0)
                  call bub_implode(dropid,.false.)
               endif
            else
-              if (volume<0.4*(xLength*yLength*zLength))&
-                   write(*,'("Single element ",I5," found in rank ",I5,"with volume:",e14.5)')bub,rank,volume
+              !if (volume<0.4*(xLength*yLength*zLength))&
+              !     write(*,'("Single element ",I5," found in rank ",I5,"with volume: "e14.5)')bub,rank,volume
               if (volume < 50.0*dx(is)**3.d0) then
                  write(*,'("Removing detached liquid in rank: ",I5)')rank
                  call clear_stray_liquid(dropid)
@@ -218,6 +221,7 @@ subroutine check_topology(is_gas)
   if ( num_drop_merge(rank) > 0 ) then
      do bub=1,num_drop_merge(rank)
         volume = drops_merge(bub)%element%vol
+        dropid = drops_merge(bub)%element%id
         !write(*,'("Volume of drop_merge ",I5," in rank ",I5", : ",e14.5)')bub,rank,volume
         if (volume > 1.d-9*dx(is)**3.d0) then
            if (is_gas) then
@@ -227,7 +231,7 @@ subroutine check_topology(is_gas)
               endif
            else
               if (volume<0.4*(xLength*yLength*zLength))&
-                   write(*,'("Merged element ",I5," found in rank ",I5,"with volume:",e14.5)')bub,rank,volume
+                   write(*,'("Merged element ",I5," found in rank ",I5,"with volume: "e14.5)')bub,rank,volume
               if (volume < 50.0*dx(is)**3.d0) then
                  call clear_stray_liquid(dropid) !<-clears liquid inside bubbles
                  write(*,'("Removing detached liquid (merged) in rank: ",I5)')rank
@@ -252,20 +256,21 @@ contains
     logical :: merged
     max_implode = 0
     remove =.false.
-    do k=ks,ke; do j=js,je; do i=is,ie
+!!$    do k=ks,ke; do j=js,je; do i=is,ie
+!!$
+!!$       if (tag_id(i,j,k)==bub_id) then !check if we are in the correct bubble
+!!$          if (.not.implode_flag(tag_id(i,j,k))) then
+!!$             implode_flag(tag_id(i,j,k)) = .true.
+!!$             write(*,'("COLLAPSING BUBBLE DETECTED IN RANK: ",I4)')rank
+!!$          endif
+!!$          v_source(i,j,k) = (u(i,j,k)-u(i-1,j,k))/dx(i)+&
+!!$               (v(i,j,k)-v(i,j-1,k))/dy(j)+(w(i,j,k)-w(i,j,k-1))/dz(k)
+!!$       endif
+!!$    enddo; enddo; enddo
 
-       if (tag_id(i,j,k)==bub_id) then !check if we are in the correct bubble
-          if (.not.implode_flag(tag_id(i,j,k))) then
-             implode_flag(tag_id(i,j,k)) = .true.
-             write(*,'("COLLAPSING BUBBLE DETECTED IN RANK: ",I4)')rank
-          endif
-          v_source(i,j,k) = 0.95*(u(i-1,j,k)-u(i,j,k))/dx(i)+&
-               (v(i,j-1,k)-v(i,j,k))/dy(j)+(w(i,j,k-1)-w(i,j,k))/dz(k)
-       endif
-    enddo; enddo; enddo
-
-    if (volume <= 30.0*dx(is)**3.d0) then
+    if (volume <= 64.0*dx(is)**3.d0) then
        remove =.true.
+       write(*,'("Collapsing bubble to be removed in rank ",I4", with rank ID: ",I4)')rank,bub_id
     endif
     if (remove) then
        do k=ks,ke; do j=js,je; do i=is,ie
@@ -1192,7 +1197,7 @@ subroutine tag_bubbles(phase_ref,iout,time_stats)
   if ( MOD(iout,nstats) == 0 ) then
      call drop_statistics(iout,time_stats)
      !! DEBUGGING
-     !call output_tag(iout/nstats,is,ie+1,js,je+1,ks,ke+1)
+!!$     call output_tag(iout/nstats,is,ie+1,js,je+1,ks,ke+1)
 !!$     allocate( implode_global(0:NumBubble*28) )
 !!$     call MPI_ALLREDUCE(implode_flag,implode_global, (NumBubble*28+1), MPI_LOGICAL, MPI_LOR, MPI_COMM_Active, ierr)
 !!$     if (rank == 0) then
@@ -1870,7 +1875,7 @@ subroutine setuppoisson_fs_hypre(utmp,vtmp,wtmp,rho,dt,coeff,height,kap,bub_id)
      endif
      !===============================================================================================================
      !----Cav-liquid neighbours, set P_g in cavity cells
-     if (.not.implode_flag(bub_id(i,j,k))) then
+     !if (.not.implode_flag(bub_id(i,j,k))) then
         ! Set Laplace jumps for surface tension
         if(vof_phase(i,j,k)==1) then
            if (vof_phase(i+1,j,k)==0) then
@@ -1925,7 +1930,7 @@ subroutine setuppoisson_fs_hypre(utmp,vtmp,wtmp,rho,dt,coeff,height,kap,bub_id)
               !write(121,10)x(i),y(j),z(k),0d0,0d0,z_mod(i,j,k)
            endif
         endif ! Liquid cell
-     endif ! we are not imploding
+     !endif ! we are not imploding
   enddo; enddo; enddo
 10 format(6e14.5)
   !close(121)
@@ -1935,7 +1940,8 @@ subroutine setuppoisson_fs_hypre(utmp,vtmp,wtmp,rho,dt,coeff,height,kap,bub_id)
 !!$  uncomp_curv=0; n_avg_kap=0; L2_err=0.0d0; Linf_err=0.0d0
 !!$  kappa_theory = -2.0d0*dx(is)/r_min
   do k=ks,ke; do j=js,je; do i=is,ie
-     if( .not.implode_flag(bub_id(i,j,k)) .and. vof_phase(i,j,k)==1) then
+     !if( .not.implode_flag(bub_id(i,j,k)) .and. vof_phase(i,j,k)==1) then
+     if(vof_phase(i,j,k)==1) then
         do l=-1,1,2
            avg_kap=0.0d0; n_kap=0.d0
            if (vof_phase(i+l,j,k)==0) then
@@ -2019,8 +2025,8 @@ subroutine setuppoisson_fs_hypre(utmp,vtmp,wtmp,rho,dt,coeff,height,kap,bub_id)
 !!$  endif
   !--------------------------------------------------------------------------------------------------------
   do k=ks,ke; do j=js,je; do i=is,ie
-     if (vof_phase(i,j,k)==0 .and. .not.implode_flag(bub_id(i,j,k))) then
-
+     !if (vof_phase(i,j,k)==0 .and. .not.implode_flag(bub_id(i,j,k))) then
+     if (vof_phase(i,j,k)==0) then
         coeff(i,j,k,1) = 2.d0*dt/((dx(i)+x_mod(i-1,j,k))*x_mod(i-1,j,k)*rho)
         coeff(i,j,k,2) = 2.d0*dt/((dx(i)+x_mod(i  ,j,k))*x_mod(i  ,j,k)*rho)
         coeff(i,j,k,3) = 2.d0*dt/((dy(j)+y_mod(i,j-1,k))*y_mod(i,j-1,k)*rho)
