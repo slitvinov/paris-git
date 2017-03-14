@@ -1236,9 +1236,9 @@ contains
             case(DropStatistics_WriteElementData)
                total_num_element = sum(num_element)
                if (OrganizeOutFolder) then
-                  filename=TRIM(out_path)//'/ELEMENT_STATS/element-stats_'//TRIM(int2text(rank,padding))//'.dat'
+                  filename=TRIM(out_path)//'/ELEMENT_STATS/element-stats_'//TRIM(int2text(tswap,padding))//'.dat'
                else 
-                  filename=TRIM(out_path)//'/element-stats_'//TRIM(int2text(rank,padding))//'.dat'
+                  filename=TRIM(out_path)//'/element-stats_'//TRIM(int2text(tswap,padding))//'.dat'
                end if ! OrganizeOutFolder 
                open(unit=102,file=TRIM(filename))
                !open(unit=103,file=TRIM(out_path)//'/el-rank-stats_'//TRIM(int2text(tswap,padding))//'.dat')
