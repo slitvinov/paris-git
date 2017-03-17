@@ -1023,40 +1023,40 @@ SUBROUTINE swprmom_stg(us,c,d,mom1,cg,mom3,mom,dir,t)
               x0=0d0
               deltax=1d0
               if (LinInterp) then
-              if(a1<0d0) then
-                 uadv1 = interpole3(u1,u2,u3,AdvectionScheme,-0.5d0)           
-                 uadv3 = interpole3(u1,u2,u3,AdvectionScheme,-0.5d0-a1)           
-                 deltax(d)=-a1
-                 vof = fl3d(mxyz,alpha,x0,deltax)
-                 CALL flux_centroid(mxyz,alpha,x0,deltax,xcm1)
-                 CALL flux_centroid(mxyzc,alphac,x0,deltax,xcm2)
-                 mom1(i,j,k) = (rho2*vof + rho1*(-a1 - vof))*uadv1 + &
-                               (rho2*vof*xcm1(d) + rho1*(-a1 - vof)*xcm2(d))*(uadv3-uadv1)/(-a1)
-              endif
-              if(a2>0d0) then
-                 uadv1 = interpole3(u1,u2,u3,AdvectionScheme, 0.5d0-a2)           
-                 uadv3 = interpole3(u1,u2,u3,AdvectionScheme, 0.5d0)           
-                 x0(d)=1d0-a2
-                 deltax(d)=a2
-                 vof = fl3d(mxyz,alpha,x0,deltax)
-                 CALL flux_centroid(mxyzc,alphac,x0,deltax,xcm2)
-                 CALL flux_centroid(mxyz,alpha,x0,deltax,xcm1)
-                 mom3(i,j,k) = (rho2*vof + rho1*(a2 - vof))*uadv1 + &
-                               (rho2*vof*(xcm1(d)-x0(d)) + rho1*(a2 - vof)*(xcm2(d)-x0(d)))*(uadv3-uadv1)/a2
-              endif
+                 if(a1<0d0) then
+                    uadv1 = interpole3(u1,u2,u3,AdvectionScheme,-0.5d0)           
+                    uadv3 = interpole3(u1,u2,u3,AdvectionScheme,-0.5d0-a1)           
+                    deltax(d)=-a1
+                    vof = fl3d(mxyz,alpha,x0,deltax)
+                    CALL flux_centroid(mxyz,alpha,x0,deltax,xcm1)
+                    CALL flux_centroid(mxyzc,alphac,x0,deltax,xcm2)
+                    mom1(i,j,k) = (rho2*vof + rho1*(-a1 - vof))*uadv1 + &
+                         (rho2*vof*xcm1(d) + rho1*(-a1 - vof)*xcm2(d))*(uadv3-uadv1)/(-a1)
+                 endif
+                 if(a2>0d0) then
+                    uadv1 = interpole3(u1,u2,u3,AdvectionScheme, 0.5d0-a2)           
+                    uadv3 = interpole3(u1,u2,u3,AdvectionScheme, 0.5d0)           
+                    x0(d)=1d0-a2
+                    deltax(d)=a2
+                    vof = fl3d(mxyz,alpha,x0,deltax)
+                    CALL flux_centroid(mxyzc,alphac,x0,deltax,xcm2)
+                    CALL flux_centroid(mxyz,alpha,x0,deltax,xcm1)
+                    mom3(i,j,k) = (rho2*vof + rho1*(a2 - vof))*uadv1 + &
+                         (rho2*vof*(xcm1(d)-x0(d)) + rho1*(a2 - vof)*(xcm2(d)-x0(d)))*(uadv3-uadv1)/a2
+                 endif
               else
-              if(a1<0d0) then
-                 deltax(d)=-a1
-                 vof = fl3d(mxyz,alpha,x0,deltax)
-                 mom1(i,j,k) = (rho2*vof + rho1*(-a1 - vof))*uadv1
+                 if(a1<0d0) then
+                    deltax(d)=-a1
+                    vof = fl3d(mxyz,alpha,x0,deltax)
+                    mom1(i,j,k) = (rho2*vof + rho1*(-a1 - vof))*uadv1
+                 endif
+                 if(a2>0d0) then
+                    x0(d)=1d0-a2
+                    deltax(d)=a2
+                    vof = fl3d(mxyz,alpha,x0,deltax)
+                    mom3(i,j,k) = (rho2*vof + rho1*(a2 - vof))*uadv3
+                 endif
               endif
-              if(a2>0d0) then
-                 x0(d)=1d0-a2
-                 deltax(d)=a2
-                 vof = fl3d(mxyz,alpha,x0,deltax)
-                 mom3(i,j,k) = (rho2*vof + rho1*(a2 - vof))*uadv3
-              endif
-             endif
            else
               if(a1<0d0) then
                  vof = -a1*c(i,j,k)
