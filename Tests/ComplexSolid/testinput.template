@@ -34,6 +34,7 @@ dt      = DTTEMP    ! dt in case of dtFlag=1
 CFL     = 0.9
 MAXERROR = MAXERRTEMP    ! Residual for Poisson solver
 MAXERRORVOL = 1d-4
+ResNormOrderPressure=1
                    ! Numerical parameters
 
 ITIME_SCHEME = 1   ! time scheme: 1:first order Euler, 2: second order quasi Crank-Nicolson

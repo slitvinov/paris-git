@@ -228,7 +228,7 @@ Program paris
      if (test_MG) then
        call linfunc(rho,rho1,rho2,DensMean)
        p=0.d0; call Setup_testMG(rho,A)
-       call NewSolver(A,p,maxError,beta,maxit,it,ierr)
+       call NewSolver(A,p,maxError,beta,maxit,it,ierr,ResNormOrderPressure)
        call get_MGtest_err(p)
        end_time =  MPI_WTIME()
        cflmax = get_cfl_and_check(dt)
@@ -495,7 +495,7 @@ Program paris
                     call FreeSolver(A,p,maxError/MaxDt,beta,maxit,it,ierr,itimestep,time,residual)
                  endif
               else
-                 call NewSolver(A,p,maxError/MaxDt,beta,maxit,it,ierr)
+                 call NewSolver(A,p,maxError/MaxDt,beta,maxit,it,ierr,ResNormOrderPressure)
               endif
            endif
            ! If maximum iteration is reached, check residual
@@ -525,8 +525,9 @@ Program paris
               call calcResidual(A,p,ResNormOrderPressure,residual)
               if(rank==0) then
                  write(*,'("              pressure residual*dt:   ",e7.1,&
-                   &" maxerror: ",e7.1)') residual*MaxDt,maxerror
-                 write(*,'("              pressure iterations :",I9)')it
+                   &" tolerance : ",e7.1)') residual*MaxDt,maxerror
+                 write(*,'("              pressure iterations :",I9,&
+                   &" norm order: ",I4)') it,ResNormOrderPressure              
               end if
               if ( SwitchHYPRESolver .and. HYPRESolverType == 1 ) then
                  HYPRESolverType = 2 
@@ -570,7 +571,7 @@ Program paris
                  if(hypre)then
                     call poi_solve(A,color,maxError,maxit,it,HYPRESolverType)
                  else
-                    call NewSolver(A,color,maxError,beta,maxit,it,ierr)
+                    call NewSolver(A,color,maxError,beta,maxit,it,ierr,ResNormOrderPressure)
                     if(mod(itimestep,termout)==0) then
                        if(rank==0.and..not.hypre)write(*  ,'("              density  iterations:",I9)')it
                     endif
@@ -2509,7 +2510,7 @@ subroutine momentumConvectionBCG()
     call ghost_z(tmp,1,req(9:12)) 
     call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
   else
-    call NewSolver(A,tmp,maxError/MaxDt,beta,maxit,it,ierr)
+    call NewSolver(A,tmp,maxError/MaxDt,beta,maxit,it,ierr,ResNormOrderPressure)
   endif
   if (.not.FreeSurface) then
     do k=ks,ke;  do j=js,je; do i=is,ieu    ! CORRECT THE u-velocity 
@@ -3361,7 +3362,7 @@ subroutine InitCondition
            call ghost_z(color,1,req( 9:12))
            call MPI_WAITALL(12,req(1:12),sta(:,1:12),ierr)
         else
-           call NewSolver(A,color,maxError,beta,maxit,it,ierr)
+           call NewSolver(A,color,maxError,beta,maxit,it,ierr,ResNormOrderPressure)
            if(rank==0)print*,it,'iterations for initial density.'
         endif
         do k=ks,ke;  do j=js,je; do i=is,ie
@@ -3576,7 +3577,7 @@ subroutine ReadParameters
   nsteps_probe =1; num_probes = 0; ijk_probe = 1; num_probes_cvof = 0; ijk_probe_cvof = 1 
   DoTurbStats = .false.; nStepOutputTurbStats = 1000; TurbStatsOrder = 2
   timeStartTurbStats = 0.d0
-  ResNormOrderPressure = 100; ErrorScaleHYPRE = 1.d-2; DynamicAdjustPoiTol=.true. 
+  ResNormOrderPressure = 2; ErrorScaleHYPRE = 1.d-2; DynamicAdjustPoiTol=.true. 
   OutVelSpecified = .false.
   MaxFluxRatioPresBC = 0.7d0
   LateralBdry = .false.

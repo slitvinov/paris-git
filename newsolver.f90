@@ -31,7 +31,7 @@
 ! A7*Pijk = A1*Pi-1jk + A2*Pi+1jk + A3*Pij-1k + 
 !           A4*Pij+1k + A5*Pijk-1 + A6*Pijk+1 + A8
 !-------------------------------------------------------------------------------------------------
-subroutine NewSolver(A,p,maxError,beta,maxit,it,ierr)
+subroutine NewSolver(A,p,maxError,beta,maxit,it,ierr,norm)
   use module_mgsolver
   use module_grid
   use module_BC
@@ -43,11 +43,12 @@ subroutine NewSolver(A,p,maxError,beta,maxit,it,ierr)
   real(8) :: tres2
   integer, intent(in) :: maxit
   integer, intent(out) :: it, ierr
+  integer, intent(in) :: norm
 
   if (MultiGrid) then
       call NewSolverMG(A,p,maxError,beta,maxit,it,ierr,tres2)
   else
-      call NewSolver_std(A,p,maxError,beta,maxit,it,ierr,tres2)
+      call NewSolver_std(A,p,maxError,beta,maxit,it,ierr,norm,tres2)
   endif
 
   if (test_MG.AND.rank==0) print *, 'residual', tres2
@@ -74,7 +75,7 @@ subroutine relax_step(A,p,beta,L)
 
 end subroutine relax_step
 
-subroutine NewSolver_std(A,p,maxError,beta,maxit,it,ierr, tres2)
+subroutine NewSolver_std(A,p,maxError,beta,maxit,it,ierr,norm,tres2)
   use module_mgsolver
   use module_grid
   use module_BC
@@ -92,7 +93,7 @@ subroutine NewSolver_std(A,p,maxError,beta,maxit,it,ierr, tres2)
   integer :: i,j,k
   integer :: req(12),sta(MPI_STATUS_SIZE,12)
   logical :: mask(imin:imax,jmin:jmax,kmin:kmax)
-  integer, parameter :: norm=1
+  integer, intent(in) :: norm
   integer, save :: itime=0
 ! Open file for convergence history
   if(rank==0.and.recordconvergence) then
