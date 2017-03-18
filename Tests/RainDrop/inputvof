@@ -1,0 +1,41 @@
+&VOFPARAMETERS
+
+
+
+VOFBDRY_COND = 'dry' 'dry' 'dry' 'dry' 'dry' 'dry'
+
+                   ! Type of VOF boundary condition in x,y,z direction: 'wet', '90deg','periodic'
+
+
+
+TEST_TYPE = 'control_droplet'
+
+VOF_ADVECT = 'CIAM'  !'Dick_Yue'
+
+!LinInterp = T 
+
+ViscMeanIsArith = T
+
+refinement = 8
+
+DoMOMCONS = T 
+
+nfilter = 0 
+
+USE_VOFI = T
+
+DO_ROTATION = T
+
+MIXED_HEIGHTS = T
+
+STGhost = F
+
+
+
+!=================================================================================================
+
+
+
+&end
+
+! end of the namelist
