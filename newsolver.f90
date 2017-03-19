@@ -46,7 +46,7 @@ subroutine NewSolver(A,p,maxError,beta,maxit,it,ierr,norm)
   integer, intent(in) :: norm
 
   if (MultiGrid) then
-      call NewSolverMG(A,p,maxError,beta,maxit,it,ierr,tres2)
+      call NewSolverMG(A,p,maxError,beta,maxit,it,ierr,norm,tres2)
   else
       call NewSolver_std(A,p,maxError,beta,maxit,it,ierr,norm,tres2)
   endif
@@ -125,7 +125,7 @@ subroutine NewSolver_std(A,p,maxError,beta,maxit,it,ierr,norm,tres2)
     res2 = res2/dble(Nx*Ny*Nz)
     call catch_divergence(res2,ierr)
     call MPI_ALLREDUCE(res2, tres2, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr)
-    if(norm==2) tres2=sqrt(tres2*dble(Nx*Ny*Nz))/dble(Nx*Ny*Nz)
+    if(norm==2) tres2=sqrt(tres2)
     if(rank==0.and.mod(it,10) == 0.and.recordconvergence) write(89,310) it, tres2
 310 format(I6,'  ',(e14.5))
     if (tres2<maxError) then 

@@ -81,42 +81,42 @@ subroutine finalize_MG
 
 end subroutine finalize_MG
  
-subroutine get_residual(A,p,norm,error_L1norm)
+subroutine get_residual(A,p,norm,error_norm)
   use module_grid
   use module_BC
   implicit none
   include 'mpif.h'
   real(8) :: A(is:ie,js:je,ks:ke,8), p(imin:imax,jmin:jmax,kmin:kmax)
-  real(8), intent(out) :: error_L1norm
+  real(8), intent(out) :: error_norm
   integer, intent(in)  :: norm
   integer :: i,j,k
 
-  error_L1norm = 0.d0
+  error_norm = 0.d0
 
   do k=ks,ke; do j=js,je; do i=is,ie
       A(i,j,k,8) = A(i,j,k,8)     - A(i,j,k,7)*p(i,j,k)    + &
         A(i,j,k,1)*p(i-1,j,k) + A(i,j,k,2)*p(i+1,j,k)  + &
         A(i,j,k,3)*p(i,j-1,k) + A(i,j,k,4)*p(i,j+1,k)  + &
         A(i,j,k,5)*p(i,j,k-1) + A(i,j,k,6)*p(i,j,k+1) 
-    error_L1norm = error_L1norm + abs(A(i,j,k,8))**norm
+    error_norm = error_norm + abs(A(i,j,k,8))**norm
   enddo; enddo; enddo
 
 end subroutine get_residual
 
-subroutine compute_residual(A,p,norm,error_L1norm)
+subroutine compute_residual(A,p,norm,error_norm)
   use module_grid
   use module_BC
   implicit none
   include 'mpif.h'
   real(8) :: A(is:ie,js:je,ks:ke,8), p(imin:imax,jmin:jmax,kmin:kmax)
-  real(8), intent(out) :: error_L1norm
+  real(8), intent(out) :: error_norm
   integer, intent(in)  :: norm
   integer :: i,j,k
 
-  error_L1norm = 0.d0
+  error_norm = 0.d0
 
   do k=ks,ke; do j=js,je; do i=is,ie
-      error_L1norm = error_L1norm + abs(A(i,j,k,8)     - &
+      error_norm = error_norm + abs(A(i,j,k,8)     - &
         A(i,j,k,7)*p(i,j,k)    + &
         A(i,j,k,1)*p(i-1,j,k) + A(i,j,k,2)*p(i+1,j,k)  + &
         A(i,j,k,3)*p(i,j-1,k) + A(i,j,k,4)*p(i,j+1,k)  + &
@@ -343,7 +343,7 @@ subroutine get_MGmatrix_coef(A)
 
 end subroutine get_MGmatrix_coef
 
-subroutine NewSolverMG(A,p,maxError,beta,maxit,it,ierr,tres2)
+subroutine NewSolverMG(A,p,maxError,beta,maxit,it,ierr,norm,tres2)
   use module_grid
   use module_BC
   implicit none
@@ -357,7 +357,7 @@ subroutine NewSolverMG(A,p,maxError,beta,maxit,it,ierr,tres2)
   real(8) :: resMax, end_time, start_time
   integer :: ncall=1
   integer :: nL(3)
-  integer, parameter :: norm=1
+  integer, intent(in) :: norm
 
   IF (rank==0.and.recordconvergence) THEN
     OPEN(UNIT=89,FILE='convergenceMG_history.txt',position='append')
@@ -386,7 +386,7 @@ subroutine NewSolverMG(A,p,maxError,beta,maxit,it,ierr,tres2)
 
     resMax = resMax/dble(Nx*Ny*Nz)
     call MPI_ALLREDUCE(resMax, tres2, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr) 
-    if(norm==2) tres2=sqrt(tres2*dble(Nx*Ny*Nz))/dble(Nx*Ny*Nz)
+    if(norm==2) tres2=sqrt(tres2)
 
     if(rank==0.and.recordconvergence) THEN
       end_time =  MPI_WTIME()

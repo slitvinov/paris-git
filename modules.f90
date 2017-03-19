@@ -3308,7 +3308,7 @@ subroutine LinearSolver1(A,u,umask,maxError,beta,maxit,it,ierr)
 end subroutine LinearSolver1
 !=================================================================================================
 !=================================================================================================
-! Returns the residual. L1 norm of the new divergence. 
+! Returns the residual. Ln norm of the new divergence where n=NormOrder. 
 !-------------------------------------------------------------------------------------------------
 subroutine calcResidual(A,p,NormOrder, residual)
   use module_grid
@@ -3355,7 +3355,7 @@ subroutine calcResidual(A,p,NormOrder, residual)
       residual = residual/dble(Nx)/dble(Ny)/dble(Nz)
   else if ( NormOrder == 2 ) then 
       call MPI_ALLREDUCE(res, residual, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr)
-      residual = dsqrt(residual)/dble(Nx)/dble(Ny)/dble(Nz)
+      residual = dsqrt(residual/dble(Nx)/dble(Ny)/dble(Nz))
   else 
       call MPI_ALLREDUCE(res, residual, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_Comm_Cart, ierr)
   end if ! NormOrder
@@ -3379,7 +3379,7 @@ subroutine calcResidual1(A,p,pmask,Residual)
     res=res+pmask(i,j,k)*abs(-p(i,j,k) * A(i,j,k,7) +                             &
       A(i,j,k,1) * p(i-1,j,k) + A(i,j,k,2) * p(i+1,j,k) +            &
       A(i,j,k,3) * p(i,j-1,k) + A(i,j,k,4) * p(i,j+1,k) +            &
-      A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8) )**2
+      A(i,j,k,5) * p(i,j,k-1) + A(i,j,k,6) * p(i,j,k+1) + A(i,j,k,8) )
   enddo; enddo; enddo
   res = res/float(Nx*Ny*Nz)
   call MPI_ALLREDUCE(res, totalres, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr)
