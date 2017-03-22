@@ -78,7 +78,7 @@ Program paris
   integer :: ierr, icolor
 
   INTEGER :: irank, ii, i, j, k, out_fs
-  real(8) :: residual,cflmax,get_cfl_and_check,residualu,residualv,residualw
+  real(8) :: residual,cflmax,get_cfl_and_check,residualu,residualv,residualw,res_tab(3)
   integer :: itu,itv,itw
 
 !---------------------------------------INITIALIZATION--------------------------------------------
@@ -500,7 +500,8 @@ Program paris
            endif
            ! If maximum iteration is reached, check residual
            if(it==maxit) then 
-              call calcResidual(A,p,ResNormOrderPressure,residual)
+              call calcResiduals(A,p,res_tab)
+              residual=res_tab(max(ResNormOrderPressure,3))
               if (residual/(maxError/MaxDt) > DivergeTol) then 
                  if ( SwitchHYPRESolver .and. HYPRESolverType == 2 ) then
                     ! if HYPRE-PFMG is diverged, retry with SMG
@@ -522,12 +523,13 @@ Program paris
            end if !it
            if(mod(itimestep,termout)==0 .and. ii==1) then
               !if (.not.FreeSurface) call calcResidual(A,p,ResNormOrderPressure,residual)
-              call calcResidual(A,p,ResNormOrderPressure,residual)
+              call calcResiduals(A,p,res_tab)
+              residual=res_tab(max(ResNormOrderPressure,3))
               if(rank==0) then
-                 write(*,'("              pressure residual*dt:   ",e7.1,&
-                   &" tolerance : ",e7.1)') residual*MaxDt,maxerror
-                 write(*,'("              pressure iterations :",I9,&
-                   &" norm order: ",I4)') it,ResNormOrderPressure              
+                 write(*,'("  pressure residuals*dt L1:",e8.1,"         L2:",e8.1,"       Linf:",e8.1)') &
+                      res_tab*MaxDt
+                 write(*,'("  pressure iterations     :",I8,  " tolerance :",e8.1," norm order:",I4)')   &
+                      it,maxerror,ResNormOrderPressure              
               end if
               if ( SwitchHYPRESolver .and. HYPRESolverType == 1 ) then
                  HYPRESolverType = 2 
@@ -542,8 +544,8 @@ Program paris
                     call do_all_ghost(p)
                     call calcResidual(A,p,ResNormOrderPressure,residual)
                     if(rank==0) then
-                       write(*,'("Solve again:  pressure residual*dt:   ",e7.1,&
-                         &" maxerror: ",e7.1)') residual*MaxDt,maxerror
+                       write(*,'("Solve again:  pressure residual*dt:   ",e8.1,&
+                         &" maxerror: ",e8.1)') residual*MaxDt,maxerror
                     end if
 ! END TEMPORARY
                  else if (HYPRE .and. residual/(maxError/MaxDt) < 0.5d0 ) then  
@@ -603,8 +605,8 @@ Program paris
                  call FreeSolver(A,p_ext,5.0d-2,beta,10,it,ierr,itimestep,time,residual)
                  if(mod(itimestep,termout)==0) then
                     if(rank==0) then
-                       write(*,'("FS2:   pressure residual, L_inf:   ",e7.1,&
-                            &" maxerror: ",e7.1)') residual,5.0d-2
+                       write(*,'("FS2:   pressure residual, L_inf:   ",e8.1,&
+                            &" maxerror: ",e8.1)') residual,5.0d-2
                        write(*,'("              pressure iterations :",I9)')it
                     endif
                  endif
@@ -770,7 +772,7 @@ Program paris
         if(mod(itimestep,nstats)==0.and.rank==0)then
            !        open(unit=121,file='track')
            !        write(121,'("Step:",I10," dt=",es16.5e2," time=",es16.5e2)')itimestep,dt,time
-           !        write(121,'("            Iterations:",I7," cpu(s):",f10.2)')it,end_time-start_time
+           !        write(121,'("            Iterations:",I8," cpu(s):",f10.2)')it,end_time-start_time
               !        close(121)
            open(unit=121,file='stats',position='append')
            write(121,'(30es14.6e2)')time,stats(1:nstatarray),dpdx,(stats(8)-stats(9))/dt,end_time-start_time

@@ -3308,6 +3308,26 @@ subroutine LinearSolver1(A,u,umask,maxError,beta,maxit,it,ierr)
 end subroutine LinearSolver1
 !=================================================================================================
 !=================================================================================================
+! Returns a table of residuals L1, L2, Linf
+!-------------------------------------------------------------------------------------------------
+subroutine calcResiduals(A,p, resid_tab)
+  use module_grid
+  use module_BC
+  implicit none
+  include 'mpif.h'
+  real(8), dimension(imin:imax,jmin:jmax,kmin:kmax), intent(in) :: p
+  real(8), dimension(is:ie,js:je,ks:ke,8), intent(in) :: A
+  integer :: NormOrder
+  real(8) :: Resid_Tab(1:3)
+  NormOrder=1
+  call calcResidual(A,p,NormOrder, resid_tab(1))  
+  NormOrder=2
+  call calcResidual(A,p,NormOrder, resid_tab(2))
+  NormOrder=100
+  call calcResidual(A,p,NormOrder, resid_tab(3))  
+end subroutine calcResiduals
+!=================================================================================================
+!=================================================================================================
 ! Returns the residual. Ln norm of the new divergence where n=NormOrder. 
 !-------------------------------------------------------------------------------------------------
 subroutine calcResidual(A,p,NormOrder, residual)
@@ -3351,13 +3371,15 @@ subroutine calcResidual(A,p,NormOrder, residual)
   enddo; enddo; enddo
   residual = 0.d0
   if ( NormOrder == 1 ) then 
-      call MPI_ALLREDUCE(res, residual, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr)
-      residual = residual/dble(Nx)/dble(Ny)/dble(Nz)
+     call MPI_ALLREDUCE(res, residual, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr)
+     residual = residual/dble(Nx)/dble(Ny)/dble(Nz)
   else if ( NormOrder == 2 ) then 
-      call MPI_ALLREDUCE(res, residual, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr)
-      residual = dsqrt(residual/dble(Nx)/dble(Ny)/dble(Nz))
-  else 
-      call MPI_ALLREDUCE(res, residual, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_Comm_Cart, ierr)
+     call MPI_ALLREDUCE(res, residual, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_Comm_Cart, ierr)
+     residual = dsqrt(residual/dble(Nx)/dble(Ny)/dble(Nz))
+  else if (NormOrder == 100 ) then
+     call MPI_ALLREDUCE(res, residual, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_Comm_Cart, ierr)
+  else
+     call Pariserror("invalid norm order")
   end if ! NormOrder
 end subroutine calcResidual
 !=================================================================================================
