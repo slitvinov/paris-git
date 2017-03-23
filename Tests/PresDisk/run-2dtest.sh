@@ -41,7 +41,7 @@ end=`grep -i EndTime input |  awk 'BEGIN {FS = "="}{print $2}' | awk '{print $1}
 phi=`cat out/porosity.txt | awk '{print $1}'`
 # echo phi = $phi
 
-awk '{print $1 " " $3}' < stats > deriv.tmp
+awk '{print $1 " " $3}' < stats  | tail -n +2 > deriv.tmp
 parisdeconv deriv.tmp > toplot.tmp
 
 gnuplot <<EOF > tmp 2>&1  &

@@ -33,13 +33,13 @@ restartAverages = F
 nBackup  = 200000      ! number of time steps between  backups are kept.
 
 NSTEP   = 100000       ! maximum number of time steps
-EndTime = 0.02   ! When to stop simulation
+EndTime = ENDTEMP   ! When to stop simulation
 
-MaxDt   = 5d-6    ! maximum size of time step
+MaxDt   = DTTEMP    ! maximum size of time step
 dtFlag  = 1        ! 1: fixed dt;  2: fixed CFL
-dt      = 5d-6    ! dt in case of dtFlag=1
+dt      = DTTEMP    ! dt in case of dtFlag=1
 CFL     = 0.25
-MAXERROR= 1d-7    ! Residual for Poisson solver
+MAXERROR= 1d-5    ! Residual for Poisson solver
 DivergeTol = 1d2 ! Used to dynamically adjust maxerror
 ! ErrorScaleHypre = 1d2  Stopping criterion for Hypre is || div U ||*MaxDt/ ErrorScaleHypre <  MaxError
 ! ErrorScaleHypre is dynamically adjusted during the computation.
@@ -68,14 +68,15 @@ nstats   = 200      ! number of time steps between flow statistics output
 !=================================================================================================
 ! Grid parameters
 
-npx      = 2
-npy      = 2
-npz      = 2
+npx      = NPXTEMP
+npy      = NPYTEMP
+npz      = NPZTEMP
+
                    ! number of processors in x,y,z direction
 
-Nx      = 32
-Ny      = 32
-Nz      = 32
+Nx      = NXTEMP
+Ny      = NYTEMP
+Nz      = NZTEMP
 Ng      = 2
                    ! grid size in x,y,z direction and number of ghost cells
 
