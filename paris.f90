@@ -2457,12 +2457,12 @@ subroutine momentumConvectionVerstappen (u,v,w,du,dv,dw)
   enddo; enddo; enddo
 
   do k=ks,kew;  do j=js,je; do i=is,ie
-      work(i,j,k,1) = (w(i,j,k) + w(i,j,k+1))*w(i,j,k+1) &
-                     -(w(i,j,k) + w(i,j,k-1))*w(i,j,k-1) &
-                     +(u(i,j,k) + u(i,j,k+1))*w(i+1,j,k) &
+      work(i,j,k,1) = (w(i,j,k) + w(i,j,k+1))*w(i,j,k+1)     &
+                     -(w(i,j,k) + w(i,j,k-1))*w(i,j,k-1)     &
+                     +(u(i,j,k) + u(i,j,k+1))*w(i+1,j,k)     &
                      -(u(i-1,j,k) + u(i-1,j,k+1))*w(i-1,j,k) &
-                     +(v(i,j,k) + v(i,j+1,k))*w(i,j,k+1) &
-                     -(v(i,j,k-1) + v(i,j+1,k-1))*w(i,j,k-1)
+                     +(v(i,j,k) + v(i,j,k+1))*w(i,j+1,k)     &
+                     -(v(i,j-1,k) + v(i,j-1,k+1))*w(i,j-1,k)
       work(i,j,k,1) = work(i,j,k,1)*0.25d0
   enddo; enddo; enddo
 
