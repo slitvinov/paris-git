@@ -26,7 +26,9 @@ rho2=1e3
 awk -v radius=$radius -v u0=$u0 -v pi=$pi -v rho2=$rho2 '{ print $1, $14/(0.5*u0*u0*rho2*radius*radius*radius*4.0*pi/3.0)}' stats | tail -n +2 > E-k2.tmp
 gnuplot < plot.gp 
 
-precision=2e-2
-pariscompare E-k2.tmp reference-E-k2.txt $precision 1 1
+# use a very lax tolerance for the comparison, since the energy strongly depends on the Poisson solver tolerance
+# and we jusst want to see if the code blows up. 
+precision=0.1
+pariscompare E-k2.tmp reference-E-k2.txt $precision 0 1
 
 

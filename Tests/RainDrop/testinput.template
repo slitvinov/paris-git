@@ -37,9 +37,10 @@ MaxDt   = 1.25d-5    ! maximum size of time step
 dtFlag  = 2        ! 1: fixed dt;  2: fixed CFL
 dt      = 1.25d-5    ! dt in case of dtFlag=1
 CFL     = 0.4
-MAXERROR= 5.0d-4   !1.0d-6     ! Residual for Poisson solver
+MAXERROR= 1.810193d-4   ! equivalent to 1.0d-6 in the previous definition of L2    ! Residual for Poisson solver
 MAXERRORVOL = 1.0d-6 ! Tolerance for Front Tracking
 ResNormOrderPressure=2
+MultiGrid = F
                    ! Numerical parameters
 
 ITIME_SCHEME = 1
@@ -68,9 +69,9 @@ npy      = 2
 npz      = 2
                    ! number of processors in x,y,z direction
 
-Nx      = 40
-Ny      = 40
-Nz      = 40
+Nx      = 32
+Ny      = 32
+Nz      = 32
 Ng      = 2
                    ! grid size in x,y,z direction and number of ghost cells
 
