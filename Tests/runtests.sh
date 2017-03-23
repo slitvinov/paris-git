@@ -10,7 +10,7 @@ for dir in `ls`; do
 	    if [ -e 'run.sh' ]; then
 		echo running test in $dir
 		chmod +x run.sh
-		./run.sh > outtest
+		./run.sh > outtest 2>&1
 # last line in output of test should be PASS or FAIL
 		tail -n 2 outtest
 	    fi
