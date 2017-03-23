@@ -6,11 +6,12 @@ rm -rf tmpout out convergenceMG_history.txt
 cp inputtemplate input
 mpirun -np 2 paris > tmpout
 res=$(tail -1 convergenceMG_history.txt | awk '{print $4} ')
-cpu=$(tail -1 convergenceMG_history.txt | awk '{print $3} ')
+cpu=$(tail -1 convergenceMG_history.txt | awk '{printf "%3.2g" , $3} ')
 err=$(echo `awk ' /error/ { res = $2 } END { print res } ' < tmpout`)
 
-echo " "
-echo "cpu =" $cpu $res $err
+#echo " "
+echo "cpu =" $cpu 
+
 awk '{if ('$res' < 0.00000001 && '$err' < 0.1) {print "\033[32;1m PASS\033[0m Residual '$res' Error '$err' "} 
          else {print "\033[31;1m FAIL\033[0m Residual '$res' Error '$err' "}}' tmpout | tail -1
 
