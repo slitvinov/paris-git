@@ -168,7 +168,7 @@ subroutine swpz(us,c,f,d,vof1,vof2,vof3)
               vof3(i,j,k) = dmax1(a2,0.d0)
            else if (c(i,j,k) .gt. 0.d0) then
               do i1=-1,1; do j1=-1,1; do k1=-1,1
-                stencil3x3(i1,j1,k1) = c(i+i1,j+j1,k+k1)
+                 stencil3x3(i1,j1,k1) = c(i+i1,j+j1,k+k1)
               enddo;enddo;enddo
               call fit_plane_new(c(i,j,k),d,a1,a2,stencil3x3,nr,alpha,error)
               if(error) cycle
@@ -191,25 +191,25 @@ subroutine swpz(us,c,f,d,vof1,vof2,vof3)
               vof2(i,j,k) = fl3d(nr,alpha,x0,deltax)
            endif
 #ifdef DEBUG_VOF_NAN  
-! made this optional, does someone need it ? 
-              ! check vof contributions
-              if ( vof1(i,j,k) /= vof1(i,j,k) .or. & 
-                   vof2(i,j,k) /= vof2(i,j,k) .or. &  
-                   vof3(i,j,k) /= vof3(i,j,k) ) then 
-                 OPEN(UNIT=88,FILE=TRIM(out_path)//'/message-rank-'//TRIM(int2text(rank,padding))//'.txt')
-                 write(88,*) "vof is NaN at ijk + minmax = ",i,j,k,imin,imax,jmin,jmax,kmin,kmax
-                 write(88,*) "vof1,vof2,vof3 = ",vof1(i,j,k),vof2(i,j,k),vof3(i,j,k)
-                 write(88,*) "nr = ",nr
-                 write(88,*) "alpha = ",alpha
-                 write(88,*) "a1,a2 = ",a1,a2
-                 write(88,*) "c = "
-                 write(88,'(3(E25.16,1X))') c(i-1:i+1,j-1:j+1,k-1:k+1)
-                 write(88,*) 
-                 write(88,*) "us = "
-                 write(88,'(3(E25.16,1X))') us(i-1:i+1,j-1:j+1,k-1:k+1)
-                 close(88)
-                 call pariserror("cvof is NaN!")
-              endif !
+           ! made this optional, does someone need it ? 
+           ! check vof contributions
+           if ( vof1(i,j,k) /= vof1(i,j,k) .or. & 
+                vof2(i,j,k) /= vof2(i,j,k) .or. &  
+                vof3(i,j,k) /= vof3(i,j,k) ) then 
+              OPEN(UNIT=88,FILE=TRIM(out_path)//'/message-rank-'//TRIM(int2text(rank,padding))//'.txt')
+              write(88,*) "vof is NaN at ijk + minmax = ",i,j,k,imin,imax,jmin,jmax,kmin,kmax
+              write(88,*) "vof1,vof2,vof3 = ",vof1(i,j,k),vof2(i,j,k),vof3(i,j,k)
+              write(88,*) "nr = ",nr
+              write(88,*) "alpha = ",alpha
+              write(88,*) "a1,a2 = ",a1,a2
+              write(88,*) "c = "
+              write(88,'(3(E25.16,1X))') c(i-1:i+1,j-1:j+1,k-1:k+1)
+              write(88,*) 
+              write(88,*) "us = "
+              write(88,'(3(E25.16,1X))') us(i-1:i+1,j-1:j+1,k-1:k+1)
+              close(88)
+              call pariserror("cvof is NaN!")
+           endif !
 #endif
         enddo
      enddo
@@ -283,7 +283,7 @@ subroutine swpz_stg(us,c,f,d,vof1,vof2,vof3,dir)
               vof3(i,j,k) = dmax1(a2,0.d0)
            else if (c(i,j,k) .gt. 0.d0) then
               do i1=-1,1; do j1=-1,1; do k1=-1,1
-                stencil3x3(i1,j1,k1) = c(i+i1,j+j1,k+k1)
+                 stencil3x3(i1,j1,k1) = c(i+i1,j+j1,k+k1)
               enddo;enddo;enddo
               call fit_plane_new(c(i,j,k),d,a1,a2,stencil3x3,nr,alpha,error)
               if(error) cycle
@@ -331,7 +331,7 @@ subroutine swpz_stg(us,c,f,d,vof1,vof2,vof3,dir)
 end subroutine swpz_stg
 
 subroutine swpzmom(us,c,d,mom1,mom2,mom3,mom,t)
-!  !***
+  !  !***
   use module_grid
   use module_flow
   use module_vof
@@ -363,7 +363,7 @@ subroutine swpzmom(us,c,d,mom1,mom2,mom3,mom,t)
         do i=is-1,ie+1
            a2 = us(i,j,k)*dt/dxh(i)
            a1 = us(i-i0,j-j0,k-k0)*dt/dxyz
-            
+
            mm1 = dmax1(a1,0.0d0)
            mm2 = 1.d0 - mm1 + dmin1(0.d0,a2)
 
@@ -410,28 +410,28 @@ subroutine swpzmom(us,c,d,mom1,mom2,mom3,mom,t)
   enddo
 
   do k=ks,ke
-    do j=js,je
-      do i=is,ie
-        mom(i,j,k)  = mom1(i+i0,j+j0,k+k0)+mom2(i,j,k)+mom3(i-i0,j-j0,k-k0)
-      enddo
-    enddo
+     do j=js,je
+        do i=is,ie
+           mom(i,j,k)  = mom1(i+i0,j+j0,k+k0)+mom2(i,j,k)+mom3(i-i0,j-j0,k-k0)
+        enddo
+     enddo
   enddo
 
-!  call SetMomentumBC(us,c,mom,d,umask,rho1,rho2,t) 
-! TEMPORARY 
-   if ( d == 1 ) then 
-      call SetMomentumBC(us,c,mom,d,umask,rho1,rho2,t)
-   else if ( d == 2 ) then 
-      call SetMomentumBC(us,c,mom,d,vmask,rho1,rho2,t)
-   else if ( d == 3 ) then 
-      call SetMomentumBC(us,c,mom,d,wmask,rho1,rho2,t)
-   end if !d
-! END TEMPORARY 
+  !  call SetMomentumBC(us,c,mom,d,umask,rho1,rho2,t) 
+  ! TEMPORARY 
+  if ( d == 1 ) then 
+     call SetMomentumBC(us,c,mom,d,umask,rho1,rho2,t)
+  else if ( d == 2 ) then 
+     call SetMomentumBC(us,c,mom,d,vmask,rho1,rho2,t)
+  else if ( d == 3 ) then 
+     call SetMomentumBC(us,c,mom,d,wmask,rho1,rho2,t)
+  end if !d
+  ! END TEMPORARY 
   !***
 end subroutine swpzmom
 
 subroutine swpzmom_stg(us,c,d,mom1,mom2,mom3,mom,dir,t)
-!  !***
+  !  !***
   use module_grid
   use module_flow
   use module_vof
@@ -464,145 +464,145 @@ subroutine swpzmom_stg(us,c,d,mom1,mom2,mom3,mom,dir,t)
 
   if(ng.lt.2) call pariserror("wrong ng")
   do k=ks-1,ke+1
-    do j=js-1,je+1
-      do i=is-1,ie+1
-        a2 = 0.5d0*(us(i,j,k)+us(i+i2,j+j2,k+k2))*dt/dxyz
-        a1 = 0.5d0*(us(i-i0,j-j0,k-k0)+us(i-i0+i2,j-j0+j2,k-k0+k2))*dt/dxyz
+     do j=js-1,je+1
+        do i=is-1,ie+1
+           a2 = 0.5d0*(us(i,j,k)+us(i+i2,j+j2,k+k2))*dt/dxyz
+           a1 = 0.5d0*(us(i-i0,j-j0,k-k0)+us(i-i0+i2,j-j0+j2,k-k0+k2))*dt/dxyz
 
-        ro1 = (rho2*c(i-i0,j-j0,k-k0)+rho1*(1.d0-c(i-i0,j-j0,k-k0)))
-        ro2 = (rho2*c(i,j,k)+rho1*(1.d0-c(i,j,k)))
-        ro3 = (rho2*c(i+i0,j+j0,k+k0)+rho1*(1.d0-c(i+i0,j+j0,k+k0)))
+           ro1 = (rho2*c(i-i0,j-j0,k-k0)+rho1*(1.d0-c(i-i0,j-j0,k-k0)))
+           ro2 = (rho2*c(i,j,k)+rho1*(1.d0-c(i,j,k)))
+           ro3 = (rho2*c(i+i0,j+j0,k+k0)+rho1*(1.d0-c(i+i0,j+j0,k+k0)))
 
-        u1 = mom(i-i0,j-j0,k-k0)/ro1
-        u2 = mom(i,j,k)/ro2
-        u3 = mom(i+i0,j+j0,k+k0)/ro3
+           u1 = mom(i-i0,j-j0,k-k0)/ro1
+           u2 = mom(i,j,k)/ro2
+           u3 = mom(i+i0,j+j0,k+k0)/ro3
 
-        uadv1 = interpole3(u1,u2,u3,AdvectionScheme,-0.5d0-a1/2.d0)           
-        uadv3 = interpole3(u1,u2,u3,AdvectionScheme, 0.5d0-a2/2.d0)           
+           uadv1 = interpole3(u1,u2,u3,AdvectionScheme,-0.5d0-a1/2.d0)           
+           uadv3 = interpole3(u1,u2,u3,AdvectionScheme, 0.5d0-a2/2.d0)           
 
-        mm1 = dmax1(a1,0.0d0)
-        mm2 = 1.d0 - mm1 + dmin1(0.d0,a2)
+           mm1 = dmax1(a1,0.0d0)
+           mm2 = 1.d0 - mm1 + dmin1(0.d0,a2)
 
-        uavg = interpole3(u1,u2,u3,AdvectionScheme,(-dmin1(a1,0.) - dmax1(a2,0.d0))/2.d0)
-        mom1(i,j,k) = 0.d0; mom2(i,j,k) = 0.d0; mom3(i,j,k) = 0.d0
+           uavg = interpole3(u1,u2,u3,AdvectionScheme,(-dmin1(a1,0.) - dmax1(a2,0.d0))/2.d0)
+           mom1(i,j,k) = 0.d0; mom2(i,j,k) = 0.d0; mom3(i,j,k) = 0.d0
 
-        if ((c(i,j,k) .gt. 0.d0).and.(c(i,j,k) .lt. 1.d0)) then
-          do i1=-1,1; do j1=-1,1; do k1=-1,1
-            stencil3x3(i1,j1,k1) = c(i+i1,j+j1,k+k1)
-          enddo;enddo;enddo
-          call fit_plane_new(c(i,j,k),d,a1,a2,stencil3x3,nr,alpha,error)
-          if(error) cycle
-          x0=0d0
-          deltax=1d0
-          if (LinInterp) then
+           if ((c(i,j,k) .gt. 0.d0).and.(c(i,j,k) .lt. 1.d0)) then
+              do i1=-1,1; do j1=-1,1; do k1=-1,1
+                 stencil3x3(i1,j1,k1) = c(i+i1,j+j1,k+k1)
+              enddo;enddo;enddo
+              call fit_plane_new(c(i,j,k),d,a1,a2,stencil3x3,nr,alpha,error)
+              if(error) cycle
+              x0=0d0
+              deltax=1d0
+              if (LinInterp) then
 
-            !complementary problem
-            do i1=-1,1; do j1=-1,1; do k1=-1,1
-              stencil3x3c(i1,j1,k1) = 1.d0 - c(i+i1,j+j1,k+k1)
-            enddo;enddo;enddo
-            CALL fit_plane_new(1.d0-c(i,j,k),d,a1,a2,stencil3x3c,nrc,alphac,error)
+                 !complementary problem
+                 do i1=-1,1; do j1=-1,1; do k1=-1,1
+                    stencil3x3c(i1,j1,k1) = 1.d0 - c(i+i1,j+j1,k+k1)
+                 enddo;enddo;enddo
+                 CALL fit_plane_new(1.d0-c(i,j,k),d,a1,a2,stencil3x3c,nrc,alphac,error)
 
-            if(a1.lt.0d0) then
+                 if(a1.lt.0d0) then
 
-              uadv1 = interpole3(u1,u2,u3,AdvectionScheme,-0.5d0-a1/2.d0/(1.d0 - a1 + a2))           
-              uadv3 = interpole3(u1,u2,u3,AdvectionScheme,-0.5d0)  
+                    uadv1 = interpole3(u1,u2,u3,AdvectionScheme,-0.5d0-a1/2.d0/(1.d0 - a1 + a2))           
+                    uadv3 = interpole3(u1,u2,u3,AdvectionScheme,-0.5d0)  
 
-              x0(d)=a1
-              deltax(d)=-a1
+                    x0(d)=a1
+                    deltax(d)=-a1
 
-              vof = fl3d(nr,alpha,x0,deltax)
-              CALL flux_centroid(nr,alpha,x0,deltax,xcm1)
-              CALL flux_centroid(nrc,alphac,x0,deltax,xcm2)
+                    vof = fl3d(nr,alpha,x0,deltax)
+                    CALL flux_centroid(nr,alpha,x0,deltax,xcm1)
+                    CALL flux_centroid(nrc,alphac,x0,deltax,xcm2)
 
-              mom1(i,j,k) = (rho2*vof + rho1*(-a1 - vof))*uadv1 + &
-                            (rho2*vof*xcm1(d) + rho1*(-a1 - vof)*xcm2(d))*(uadv3-uadv1)/a1
-            endif
+                    mom1(i,j,k) = (rho2*vof + rho1*(-a1 - vof))*uadv1 + &
+                         (rho2*vof*xcm1(d) + rho1*(-a1 - vof)*xcm2(d))*(uadv3-uadv1)/a1
+                 endif
 
-            if(a2.gt.0d0) then
+                 if(a2.gt.0d0) then
 
-              uadv1 = interpole3(u1,u2,u3,AdvectionScheme,0.5d0-a2/(1.d0 - a1 + a2))           
-              uadv3 = interpole3(u1,u2,u3,AdvectionScheme,0.5d0)  
+                    uadv1 = interpole3(u1,u2,u3,AdvectionScheme,0.5d0-a2/(1.d0 - a1 + a2))           
+                    uadv3 = interpole3(u1,u2,u3,AdvectionScheme,0.5d0)  
 
-              x0(d)=1d0
-              deltax(d)=a2
-              vof = fl3d(nr,alpha,x0,deltax)
-              CALL flux_centroid(nr,alpha,x0,deltax,xcm1)
-              CALL flux_centroid(nrc,alphac,x0,deltax,xcm2)
+                    x0(d)=1d0
+                    deltax(d)=a2
+                    vof = fl3d(nr,alpha,x0,deltax)
+                    CALL flux_centroid(nr,alpha,x0,deltax,xcm1)
+                    CALL flux_centroid(nrc,alphac,x0,deltax,xcm2)
 
-              mom3(i,j,k) = (rho2*vof + rho1*(a2 - vof))*uadv1  &
-                        + (rho2*(xcm1(d)-1.d0)*vof + rho1*(xcm2(d)-1.d0)*(a2 - vof))*(uadv3-uadv1)/a2
+                    mom3(i,j,k) = (rho2*vof + rho1*(a2 - vof))*uadv1  &
+                         + (rho2*(xcm1(d)-1.d0)*vof + rho1*(xcm2(d)-1.d0)*(a2 - vof))*(uadv3-uadv1)/a2
 
-            endif
+                 endif
 
-            uadv1 = interpole3(u1,u2,u3,AdvectionScheme,-0.5d0 - dmin1(a1,0.))
-            uadv3 = interpole3(u1,u2,u3,AdvectionScheme, 0.5d0 - dmax1(a2,0.d0))
+                 uadv1 = interpole3(u1,u2,u3,AdvectionScheme,-0.5d0 - dmin1(a1,0.))
+                 uadv3 = interpole3(u1,u2,u3,AdvectionScheme, 0.5d0 - dmax1(a2,0.d0))
 
-            x0(d)=mm1
-            deltax(d)=mm2
-            vof = fl3d(nr,alpha,x0,deltax)
-            CALL flux_centroid(nr,alpha,x0,deltax,xcm1)
-            CALL flux_centroid(nrc,alphac,x0,deltax,xcm2)
+                 x0(d)=mm1
+                 deltax(d)=mm2
+                 vof = fl3d(nr,alpha,x0,deltax)
+                 CALL flux_centroid(nr,alpha,x0,deltax,xcm1)
+                 CALL flux_centroid(nrc,alphac,x0,deltax,xcm2)
 
-            mom2(i,j,k) = (rho2*vof + rho1*(mm2 - vof))*uadv1  &
-                        + (rho2*(xcm1(d)-x0(d))*vof + rho1*(xcm2(d)-x0(d))*(mm2 - vof))*(uadv3-uadv1)/mm2
+                 mom2(i,j,k) = (rho2*vof + rho1*(mm2 - vof))*uadv1  &
+                      + (rho2*(xcm1(d)-x0(d))*vof + rho1*(xcm2(d)-x0(d))*(mm2 - vof))*(uadv3-uadv1)/mm2
 
-          else
+              else
 
-            if(a1.lt.0d0) then
-              x0(d)=a1
-              deltax(d)=-a1
-              vof = fl3d(nr,alpha,x0,deltax)
-              mom1(i,j,k) = (rho2*vof + rho1*(-a1 - vof))*uadv1
-            endif
-            if(a2.gt.0d0) then
-              x0(d)=1d0
-              deltax(d)=a2
-              vof = fl3d(nr,alpha,x0,deltax)
-              mom3(i,j,k) = (rho2*vof + rho1*(a2 - vof))*uadv3
-            endif
-            x0(d)=mm1
-            deltax(d)=mm2
-            vof = fl3d(nr,alpha,x0,deltax)
-            mom2(i,j,k) = (rho2*vof + rho1*(mm2 - vof))*uavg
-          endif
+                 if(a1.lt.0d0) then
+                    x0(d)=a1
+                    deltax(d)=-a1
+                    vof = fl3d(nr,alpha,x0,deltax)
+                    mom1(i,j,k) = (rho2*vof + rho1*(-a1 - vof))*uadv1
+                 endif
+                 if(a2.gt.0d0) then
+                    x0(d)=1d0
+                    deltax(d)=a2
+                    vof = fl3d(nr,alpha,x0,deltax)
+                    mom3(i,j,k) = (rho2*vof + rho1*(a2 - vof))*uadv3
+                 endif
+                 x0(d)=mm1
+                 deltax(d)=mm2
+                 vof = fl3d(nr,alpha,x0,deltax)
+                 mom2(i,j,k) = (rho2*vof + rho1*(mm2 - vof))*uavg
+              endif
 
-        else
+           else
 
-          if(a1.lt.0d0) then
-            vof = c(i,j,k)*(-a1)
-            mom1(i,j,k) = (rho2*vof + rho1*(-a1 - vof))*uadv1
-          endif
-          if(a2.gt.0d0) then
-            vof = c(i,j,k)*a2
-            mom3(i,j,k) = (rho2*vof + rho1*(a2 - vof))*uadv3
-          endif
-          vof = c(i,j,k)*mm2
-          mom2(i,j,k) = (rho2*vof + rho1*(mm2 - vof))*uavg
+              if(a1.lt.0d0) then
+                 vof = c(i,j,k)*(-a1)
+                 mom1(i,j,k) = (rho2*vof + rho1*(-a1 - vof))*uadv1
+              endif
+              if(a2.gt.0d0) then
+                 vof = c(i,j,k)*a2
+                 mom3(i,j,k) = (rho2*vof + rho1*(a2 - vof))*uadv3
+              endif
+              vof = c(i,j,k)*mm2
+              mom2(i,j,k) = (rho2*vof + rho1*(mm2 - vof))*uavg
 
-        endif
+           endif
 
-      enddo
-    enddo
+        enddo
+     enddo
   enddo
 
   do k=ks,ke
-    do j=js,je
-      do i=is,ie
-        mom(i,j,k)  = mom1(i+i0,j+j0,k+k0)+mom2(i,j,k)+mom3(i-i0,j-j0,k-k0)
-      enddo
-    enddo
+     do j=js,je
+        do i=is,ie
+           mom(i,j,k)  = mom1(i+i0,j+j0,k+k0)+mom2(i,j,k)+mom3(i-i0,j-j0,k-k0)
+        enddo
+     enddo
   enddo
 
-!  call SetMomentumBC(us,c,mom,d,umask,rho1,rho2,t)
-! TEMPORARY 
-   if ( d == 1 ) then 
-      call SetMomentumBC(us,c,mom,d,umask,rho1,rho2,t)
-   else if ( d == 2 ) then 
-      call SetMomentumBC(us,c,mom,d,vmask,rho1,rho2,t)
-   else if ( d == 3 ) then 
-      call SetMomentumBC(us,c,mom,d,wmask,rho1,rho2,t)
-   end if !d
-! END TEMPORARY 
+  !  call SetMomentumBC(us,c,mom,d,umask,rho1,rho2,t)
+  ! TEMPORARY 
+  if ( d == 1 ) then 
+     call SetMomentumBC(us,c,mom,d,umask,rho1,rho2,t)
+  else if ( d == 2 ) then 
+     call SetMomentumBC(us,c,mom,d,vmask,rho1,rho2,t)
+  else if ( d == 3 ) then 
+     call SetMomentumBC(us,c,mom,d,wmask,rho1,rho2,t)
+  end if !d
+  ! END TEMPORARY 
   !***
 end subroutine swpzmom_stg
 
@@ -616,15 +616,15 @@ subroutine fit_plane_new(vof,d,a1,a2,stencil3x3,mxyz,alpha,error)
 
   error=.TRUE.
   call mycs(stencil3x3,mxyz)
-! TEMPORARY - Note: avoid calculating alpha when mxyz is zero, which occurs when cvof is 
-!                   a very small non-zero number in an isolated cell  
+  ! TEMPORARY - Note: avoid calculating alpha when mxyz is zero, which occurs when cvof is 
+  !                   a very small non-zero number in an isolated cell  
   if ( mxyz(1) == 0.d0 .and. mxyz(2) == 0.d0 .and. mxyz(3) == 0.d0 ) return
-! END TEMPORARY  
+  ! END TEMPORARY  
 
   alpha = al3d(mxyz,vof)
   mxyz(d) = mxyz(d)/(1.0d0 - a1 + a2)
   alpha = alpha + mxyz(d)*a1
-  
+
   error=.FALSE.
 
 end subroutine fit_plane_new
@@ -638,26 +638,26 @@ end subroutine fit_plane_new
 !=================================================================================================
 !=================================================================================================
 SUBROUTINE swpr(us,c,f,dir,vof1,cg,vof3)
-!***
-    USE module_grid
-    USE module_flow
-    USE module_vof
-    
-    IMPLICIT NONE
-    include 'mpif.h'
-    INTEGER :: i,j,k
-    INTEGER :: ii,jj,kk,i0,j0,k0
-    INTEGER, INTENT(IN) :: dir
-    REAL (8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), INTENT(IN) :: us
-    REAL (8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), INTENT(INOUT) :: c,vof1,cg,vof3
-    integer, dimension(imin:imax,jmin:jmax,kmin:kmax),  intent(inout) :: f
-    REAL(8), TARGET :: dmx,dmy,dmz,dxyz
-    REAL(8), POINTER :: dm1,dm2,dm3
-    REAL(8) :: a1,a2,alpha
-    REAL(8) :: al3d, fl3d, x0(3), deltax(3)
-    real(8) :: mxyz(3),stencil3x3(-1:1,-1:1,-1:1)
-    INTRINSIC DMAX1,DMIN1
-!
+  !***
+  USE module_grid
+  USE module_flow
+  USE module_vof
+
+  IMPLICIT NONE
+  include 'mpif.h'
+  INTEGER :: i,j,k
+  INTEGER :: ii,jj,kk,i0,j0,k0
+  INTEGER, INTENT(IN) :: dir
+  REAL (8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), INTENT(IN) :: us
+  REAL (8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), INTENT(INOUT) :: c,vof1,cg,vof3
+  integer, dimension(imin:imax,jmin:jmax,kmin:kmax),  intent(inout) :: f
+  REAL(8), TARGET :: dmx,dmy,dmz,dxyz
+  REAL(8), POINTER :: dm1,dm2,dm3
+  REAL(8) :: a1,a2,alpha
+  REAL(8) :: al3d, fl3d, x0(3), deltax(3)
+  real(8) :: mxyz(3),stencil3x3(-1:1,-1:1,-1:1)
+  INTRINSIC DMAX1,DMIN1
+  !
   if(ng < 2) call pariserror("wrong ng")
   ii=0; jj=0; kk=0
   if (dir == 1) then
@@ -682,7 +682,7 @@ SUBROUTINE swpr(us,c,f,dir,vof1,cg,vof3)
            if (c(i,j,k) == 1.0d0) then
               vof1(i,j,k) = DMAX1(-a1,0.d0)
               vof3(i,j,k) = DMAX1(a2,0.d0)
-           ! 0. < c < 1.
+              ! 0. < c < 1.
            else if (c(i,j,k) > 0.d0) then
               ! local stencil and normal vector: |dmx|+|dmy|+|dmz| = 1.
               do i0=-1,1; do j0=-1,1; do k0=-1,1
@@ -715,7 +715,7 @@ SUBROUTINE swpr(us,c,f,dir,vof1,cg,vof3)
            a2 = us(i,j,k)*dt/dxyz
            a1 = us(i-ii,j-jj,k-kk)*dt/dxyz
            c(i,j,k) = c(i,j,k) - (vof3(i,j,k) - vof1(i+ii,j+jj,k+kk)) + & 
-                      (vof3(i-ii,j-jj,k-kk) - vof1(i,j,k)) + cg(i,j,k)*(a2-a1);
+                (vof3(i-ii,j-jj,k-kk) - vof1(i,j,k)) + cg(i,j,k)*(a2-a1);
 !!$           c(i,j,k) = DMAX1(0.d0,DMIN1(1.d0,c(i,j,k)))
            if (c(i,j,k) < EPSC) then
               c(i,j,k) = 0.d0
@@ -730,31 +730,31 @@ SUBROUTINE swpr(us,c,f,dir,vof1,cg,vof3)
 end subroutine swpr
 
 SUBROUTINE swpr_stg(us,c,f,d,vof1,cg,vof3, dir)
-!***
-    USE module_grid
-    USE module_flow
-    USE module_vof
-    
-    IMPLICIT NONE
-    include 'mpif.h'
-    INTEGER :: i,j,k
-    INTEGER :: i0,j0,k0
-    INTEGER :: i1,j1,k1
-    INTEGER :: i2,j2,k2
-    INTEGER, INTENT(IN) :: d, dir
-    REAL (8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), INTENT(IN) :: us
-    REAL (8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), INTENT(INOUT) :: c,vof1,cg,vof3
-    integer, dimension(imin:imax,jmin:jmax,kmin:kmax),  intent(inout) :: f
-    REAL(8), TARGET :: dmx,dmy,dmz
-    REAL(8), POINTER :: dm1,dm2,dm3
-    REAL(8) :: a1,a2,alpha, dxyz
-    REAL(8) :: al3d, fl3d, x0(3), deltax(3)
-    real(8) :: mxyz(3),stencil3x3(-1:1,-1:1,-1:1)
-    INTRINSIC DMAX1,DMIN1
+  !***
+  USE module_grid
+  USE module_flow
+  USE module_vof
+
+  IMPLICIT NONE
+  include 'mpif.h'
+  INTEGER :: i,j,k
+  INTEGER :: i0,j0,k0
+  INTEGER :: i1,j1,k1
+  INTEGER :: i2,j2,k2
+  INTEGER, INTENT(IN) :: d, dir
+  REAL (8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), INTENT(IN) :: us
+  REAL (8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), INTENT(INOUT) :: c,vof1,cg,vof3
+  integer, dimension(imin:imax,jmin:jmax,kmin:kmax),  intent(inout) :: f
+  REAL(8), TARGET :: dmx,dmy,dmz
+  REAL(8), POINTER :: dm1,dm2,dm3
+  REAL(8) :: a1,a2,alpha, dxyz
+  REAL(8) :: al3d, fl3d, x0(3), deltax(3)
+  real(8) :: mxyz(3),stencil3x3(-1:1,-1:1,-1:1)
+  INTRINSIC DMAX1,DMIN1
 
   call init_i0j0k0 (d,i0,j0,k0)
   call init_i0j0k0 (dir,i2,j2,k2)
-!
+  !
   call test_cell_size()
   dxyz = dxh(is)
 
@@ -780,7 +780,7 @@ SUBROUTINE swpr_stg(us,c,f,d,vof1,cg,vof3, dir)
            if (c(i,j,k) == 1.0d0) then
               vof1(i,j,k) = DMAX1(-a1,0.d0)
               vof3(i,j,k) = DMAX1(a2,0.d0)
-           ! 0. < c < 1.
+              ! 0. < c < 1.
            else if (c(i,j,k) > 0.d0) then
               ! local stencil and normal vector: |dmx|+|dmy|+|dmz| = 1.
               do i1=-1,1; do j1=-1,1; do k1=-1,1
@@ -814,7 +814,7 @@ SUBROUTINE swpr_stg(us,c,f,d,vof1,cg,vof3, dir)
            a1 = 0.5d0*(us(i-i0,j-j0,k-k0)+us(i-i0+i2,j-j0+j2,k-k0+k2))*dt/dxyz
 
            c(i,j,k) = c(i,j,k) - (vof3(i,j,k) - vof1(i+i0,j+j0,k+k0)) + & 
-                      (vof3(i-i0,j-j0,k-k0) - vof1(i,j,k)) + cg(i,j,k)*(a2-a1);
+                (vof3(i-i0,j-j0,k-k0) - vof1(i,j,k)) + cg(i,j,k)*(a2-a1);
 
 !!$           c(i,j,k) = DMAX1(0.d0,DMIN1(1.d0,c(i,j,k)))
            if (c(i,j,k) < EPSC) then
@@ -831,26 +831,26 @@ SUBROUTINE swpr_stg(us,c,f,d,vof1,cg,vof3, dir)
 end subroutine swpr_stg
 
 SUBROUTINE swprmom(us,c,d,mom1,cg,mom3,mom,t)
-!***
-    USE module_grid
-    USE module_flow
-    USE module_vof
-    use module_BC
-    
-    IMPLICIT NONE
-    include 'mpif.h'
-    INTEGER :: i,j,k
-    INTEGER :: ii,jj,kk,i0,j0,k0
-    INTEGER, INTENT(IN) :: d
-    REAL (8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), INTENT(INOUT) :: us
-    REAL(8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: mom
-    REAL (8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), INTENT(INOUT) :: c,mom1,cg,mom3
-    REAL(8), TARGET :: dmx,dmy,dmz,dxyz
-    REAL(8), POINTER :: dm1,dm2,dm3
-    REAL(8) :: a1,a2,alpha,vof,uavg,t
-    REAL(8) :: al3d, fl3d, x0(3), deltax(3)
-    REAL(8) :: mxyz(3),stencil3x3(-1:1,-1:1,-1:1)
-    INTRINSIC DMAX1,DMIN1
+  !***
+  USE module_grid
+  USE module_flow
+  USE module_vof
+  use module_BC
+
+  IMPLICIT NONE
+  include 'mpif.h'
+  INTEGER :: i,j,k
+  INTEGER :: ii,jj,kk,i0,j0,k0
+  INTEGER, INTENT(IN) :: d
+  REAL (8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), INTENT(INOUT) :: us
+  REAL(8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: mom
+  REAL (8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), INTENT(INOUT) :: c,mom1,cg,mom3
+  REAL(8), TARGET :: dmx,dmy,dmz,dxyz
+  REAL(8), POINTER :: dm1,dm2,dm3
+  REAL(8) :: a1,a2,alpha,vof,uavg,t
+  REAL(8) :: al3d, fl3d, x0(3), deltax(3)
+  REAL(8) :: mxyz(3),stencil3x3(-1:1,-1:1,-1:1)
+  INTRINSIC DMAX1,DMIN1
 
   if(ng < 2) call pariserror("wrong ng")
   ii=0; jj=0; kk=0
@@ -867,7 +867,7 @@ SUBROUTINE swprmom(us,c,d,mom1,cg,mom3,mom,t)
   do k=ks-1,ke+1
      do j=js-1,je+1
         do i=is-1,ie+1
-          mom1(i,j,k)  = 0.d0; mom3(i,j,k)  = 0.d0
+           mom1(i,j,k)  = 0.d0; mom3(i,j,k)  = 0.d0
            a2 = us(i,j,k)*dt/dxyz
            a1 = us(i-ii,j-jj,k-kk)*dt/dxyz
            !  default: fluxes=0. (good also for c=0.)
@@ -918,53 +918,53 @@ SUBROUTINE swprmom(us,c,d,mom1,cg,mom3,mom,t)
            a1 = us(i-ii,j-jj,k-kk)*dt/dxyz
            uavg = mom(i,j,k)/(rho2*c(i,j,k)+rho1*(1.d0-c(i,j,k)))
            mom(i,j,k)  = mom(i,j,k) -  (mom3(i,j,k) - mom1(i+ii,j+jj,k+kk)) + & 
-                      (mom3(i-ii,j-jj,k-kk) - mom1(i,j,k)) &
-                      + (rho2*cg(i,j,k)+rho1*(1.d0-cg(i,j,k)))*uavg*(a2-a1);
+                (mom3(i-ii,j-jj,k-kk) - mom1(i,j,k)) &
+                + (rho2*cg(i,j,k)+rho1*(1.d0-cg(i,j,k)))*uavg*(a2-a1);
         enddo
      enddo
   enddo
   ! apply proper boundary conditions 
-!  call SetMomentumBC(us,c,mom,d,umask,rho1,rho2,t) 
-! TEMPORARY 
-   if ( d == 1 ) then 
-      call SetMomentumBC(us,c,mom,d,umask,rho1,rho2,t)
-   else if ( d == 2 ) then 
-      call SetMomentumBC(us,c,mom,d,vmask,rho1,rho2,t)
-   else if ( d == 3 ) then 
-      call SetMomentumBC(us,c,mom,d,wmask,rho1,rho2,t)
-   end if !d
-! END TEMPORARY 
+  !  call SetMomentumBC(us,c,mom,d,umask,rho1,rho2,t) 
+  ! TEMPORARY 
+  if ( d == 1 ) then 
+     call SetMomentumBC(us,c,mom,d,umask,rho1,rho2,t)
+  else if ( d == 2 ) then 
+     call SetMomentumBC(us,c,mom,d,vmask,rho1,rho2,t)
+  else if ( d == 3 ) then 
+     call SetMomentumBC(us,c,mom,d,wmask,rho1,rho2,t)
+  end if !d
+  ! END TEMPORARY 
 
 end subroutine swprmom
 
 !=================================================================================================
 
 SUBROUTINE swprmom_stg(us,c,d,mom1,cg,mom3,mom,dir,t)
-!***
-    USE module_grid
-    USE module_flow
-    USE module_vof
-    use module_BC
-    
-    IMPLICIT NONE
-    include 'mpif.h'
-    INTEGER :: i,j,k
-    INTEGER :: i0,j0,k0
-    INTEGER :: i1,j1,k1
-    INTEGER :: i2,j2,k2
-    INTEGER, INTENT(IN) :: d,dir
-    REAL (8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), INTENT(INOUT) :: us
-    real(8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: mom
-    REAL (8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), INTENT(INOUT) :: c,mom1,cg,mom3
-    REAL(8), TARGET :: dmx,dmy,dmz
-    REAL(8), POINTER :: dm1,dm2,dm3
-    REAL(8) :: a1,a2,alpha,alphac,vof,uavg,t, uadv1, uadv3
-    REAL(8) :: ro1, ro2, ro3, dxyz
-    REAL(8) :: u1,u2,u3
-    REAL(8) :: al3d, fl3d, x0(3), deltax(3), xcm1(3),xcm2(3)
-    real(8) :: mxyz(3),stencil3x3(-1:1,-1:1,-1:1)
-    real(8) :: mxyzc(3),stencil3x3c(-1:1,-1:1,-1:1)
-    INTRINSIC DMAX1,DMIN1
+  !***
+  USE module_grid
+  USE module_flow
+  USE module_vof
+  use module_BC
+
+  IMPLICIT NONE
+  include 'mpif.h'
+  INTEGER :: i,j,k
+  INTEGER :: i0,j0,k0
+  INTEGER :: i1,j1,k1
+  INTEGER :: i2,j2,k2
+  INTEGER, INTENT(IN) :: d,dir
+  REAL (8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), INTENT(INOUT) :: us
+  real(8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), intent(inout) :: mom
+  REAL (8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), INTENT(INOUT) :: c,mom1,cg,mom3
+  REAL(8), TARGET :: dmx,dmy,dmz
+  REAL(8), POINTER :: dm1,dm2,dm3
+  REAL(8) :: a1,a2,alpha,alphac,vof,uavg,t, uadv1, uadv3
+  REAL(8) :: ro1, ro2, ro3, dxyz
+  REAL(8) :: u1,u2,u3
+  REAL(8) :: al3d, fl3d, x0(3), deltax(3), xcm1(3),xcm2(3)
+  real(8) :: mxyz(3),stencil3x3(-1:1,-1:1,-1:1)
+  real(8) :: mxyzc(3),stencil3x3c(-1:1,-1:1,-1:1)
+  INTRINSIC DMAX1,DMIN1
 
   call init_i0j0k0 (d,i0,j0,k0)
   call init_i0j0k0 (dir,i2,j2,k2)
@@ -985,7 +985,7 @@ SUBROUTINE swprmom_stg(us,c,d,mom1,cg,mom3,mom,dir,t)
   do k=ks-1,ke+1
      do j=js-1,je+1
         do i=is-1,ie+1
-          mom1(i,j,k)  = 0.d0; mom3(i,j,k)  = 0.d0
+           mom1(i,j,k)  = 0.d0; mom3(i,j,k)  = 0.d0
            a2 = 0.5d0*(us(i,j,k)+us(i+i2,j+j2,k+k2))*dt/dxyz
            a1 = 0.5d0*(us(i-i0,j-j0,k-k0)+us(i-i0+i2,j-j0+j2,k-k0+k2))*dt/dxyz
            !  default: fluxes=0. (good also for c=0.)
@@ -1082,23 +1082,23 @@ SUBROUTINE swprmom_stg(us,c,d,mom1,cg,mom3,mom,dir,t)
 
            uavg = mom(i,j,k)/(rho2*c(i,j,k)+rho1*(1.d0-c(i,j,k)))
            mom(i,j,k)= mom(i,j,k) -  (mom3(i,j,k) - mom1(i+i0,j+j0,k+k0)) + & 
-                      (mom3(i-i0,j-j0,k-k0) - mom1(i,j,k)) + &
-                      (rho2-rho1)*cg(i,j,k)*uavg*(a2-a1)
+                (mom3(i-i0,j-j0,k-k0) - mom1(i,j,k)) + &
+                (rho2-rho1)*cg(i,j,k)*uavg*(a2-a1)
         enddo
      enddo
   enddo
 
   ! apply proper boundary conditions 
-!  call SetMomentumBC(us,c,mom,dir,umask,rho1,rho2,t) 
-! TEMPORARY 
-   if ( dir == 1 ) then 
-      call SetMomentumBC(us,c,mom,dir,umask,rho1,rho2,t)
-   else if ( d == 2 ) then 
-      call SetMomentumBC(us,c,mom,dir,vmask,rho1,rho2,t)
-   else if ( d == 3 ) then 
-      call SetMomentumBC(us,c,mom,dir,wmask,rho1,rho2,t)
-   end if !d
-! END TEMPORARY 
+  !  call SetMomentumBC(us,c,mom,dir,umask,rho1,rho2,t) 
+  ! TEMPORARY 
+  if ( dir == 1 ) then 
+     call SetMomentumBC(us,c,mom,dir,umask,rho1,rho2,t)
+  else if ( d == 2 ) then 
+     call SetMomentumBC(us,c,mom,dir,vmask,rho1,rho2,t)
+  else if ( d == 3 ) then 
+     call SetMomentumBC(us,c,mom,dir,wmask,rho1,rho2,t)
+  end if !d
+  ! END TEMPORARY 
 
 end subroutine swprmom_stg
 
@@ -1270,14 +1270,14 @@ subroutine mycs(c,mxyz)
 
   cn = 0
   if (t1 > t0) then
-    t0 = t1
-    cn = 1
+     t0 = t1
+     cn = 1
   endif
 
   if (t2 > t0) cn = 2
 
   ! Youngs-CIAM scheme */  
-  
+
   call fd32(c,m(3,0:2))
 
   ! normalize the set (mx,my,mz): |mx|+|my|+|mz| = 1 
@@ -1302,7 +1302,7 @@ subroutine mycs(c,mxyz)
   mxyz(2) = m(cn,2)
 
   return 
-  end subroutine mycs
+end subroutine mycs
 
 ! *----------------------------------------------------------------* 
 ! *  FD32 - Youngs Finite Difference Gradient Scheme               *
@@ -1352,7 +1352,7 @@ subroutine fd32(c,mm)
   mm(2) = m1-m2
 
   return 
-  end subroutine fd32
+end subroutine fd32
 
 !
 ! *----------------------------------------------------------------* 
