@@ -982,12 +982,11 @@ SUBROUTINE swprmom_stg(us,c,d,mom1,cg,mom3,mom,dir,t)
     REAL (8), DIMENSION(imin:imax,jmin:jmax,kmin:kmax), INTENT(INOUT) :: c,mom1,cg,mom3
     REAL(8), TARGET :: dmx,dmy,dmz
     REAL(8), POINTER :: dm1,dm2,dm3
-    REAL(8) :: a1,a2,alpha,alphac,vof,uavg,t, uadv1, uadv3
+    REAL(8) :: a1,a2,alpha,vof,uavg,t, uadv1, uadv3
     REAL(8) :: ro1, ro2, ro3, dxyz
     REAL(8) :: u1,u2,u3
     REAL(8) :: al3d, fl3d, x0(3), deltax(3), xcm1(3),xcm2(3)
     real(8) :: mxyz(3),stencil3x3(-1:1,-1:1,-1:1)
-    real(8) :: mxyzc(3),stencil3x3c(-1:1,-1:1,-1:1)
     INTRINSIC DMAX1,DMIN1
 
   call init_i0j0k0 (d,i0,j0,k0)
@@ -1038,18 +1037,9 @@ SUBROUTINE swprmom_stg(us,c,d,mom1,cg,mom3,mom,dir,t)
               call mycs(stencil3x3,mxyz)
               alpha = al3d(mxyz,c(i,j,k))
 
-              ! local stencil and normal vector: |dmx|+|dmy|+|dmz| = 1.
-              do i1=-1,1; do j1=-1,1; do k1=-1,1
-                 stencil3x3c(i1,j1,k1) = 1.d0 - c(i+i1,j+j1,k+k1)
-              enddo;enddo;enddo
-              call mycs(stencil3x3c,mxyzc)
-              alphac = al3d(mxyzc,1.d0-c(i,j,k))
-
-
               ! Eulerian advection
               !-pcpaper no Lagrangian mapping : no fit_plane_new() call. 
-              ! @fixme : ALPHAC not required if not LinInterp. 
-
+ 
               x0=0d0
               deltax=1d0
               if (LinInterp) then
@@ -1059,7 +1049,7 @@ SUBROUTINE swprmom_stg(us,c,d,mom1,cg,mom3,mom,dir,t)
                     deltax(d)=-a1
                     vof = fl3d(mxyz,alpha,x0,deltax)
                     CALL flux_centroid(mxyz,alpha,x0,deltax,xcm1)
-                    CALL flux_centroid(mxyzc,alphac,x0,deltax,xcm2)
+                    CALL flux_centroid(mxyz,1d0-alpha,x0,deltax,xcm2)
                     mom1(i,j,k) = (rho2*vof + rho1*(-a1 - vof))*uadv1 + &
                          (rho2*vof*xcm1(d) + rho1*(-a1 - vof)*xcm2(d))*(uadv3-uadv1)/(-a1)
                  endif
@@ -1069,7 +1059,7 @@ SUBROUTINE swprmom_stg(us,c,d,mom1,cg,mom3,mom,dir,t)
                     x0(d)=1d0-a2
                     deltax(d)=a2
                     vof = fl3d(mxyz,alpha,x0,deltax)
-                    CALL flux_centroid(mxyzc,alphac,x0,deltax,xcm2)
+                    CALL flux_centroid(mxyz,1d0-alpha,x0,deltax,xcm2)
                     CALL flux_centroid(mxyz,alpha,x0,deltax,xcm1)
                     mom3(i,j,k) = (rho2*vof + rho1*(a2 - vof))*uadv1 + &
                          (rho2*vof*(xcm1(d)-x0(d)) + rho1*(a2 - vof)*(xcm2(d)-x0(d)))*(uadv3-uadv1)/a2
