@@ -502,7 +502,7 @@ Program paris
            ! If maximum iteration is reached, check residual
            if(it==maxit) then 
               call calcResiduals(A,p,res_tab)
-              residual=res_tab(max(ResNormOrderPressure,3))
+              residual=res_tab(min(ResNormOrderPressure,3))
               if (residual/(maxError/MaxDt) > DivergeTol) then 
                  if ( SwitchHYPRESolver .and. HYPRESolverType == 2 ) then
                     ! if HYPRE-PFMG is diverged, retry with SMG
@@ -525,7 +525,7 @@ Program paris
            if(mod(itimestep,termout)==0 .and. ii==1) then
               !if (.not.FreeSurface) call calcResidual(A,p,ResNormOrderPressure,residual)
               call calcResiduals(A,p,res_tab)
-              residual=res_tab(max(ResNormOrderPressure,3))
+              residual=res_tab(min(ResNormOrderPressure,3))
               if(rank==0) then
                  write(*,'("  pressure residuals*dt L1:",e8.1,"         L2:",e8.1,"       Linf:",e8.1)') &
                       res_tab*MaxDt
