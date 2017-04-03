@@ -965,6 +965,7 @@ end subroutine swprmom
 
 SUBROUTINE swprmom_stg(us,c,d,mom1,cg,mom3,mom,dir,t)
 !***
+!-pcpaper on entry cg must be the central coefficient in WY. 
     USE module_grid
     USE module_flow
     USE module_vof

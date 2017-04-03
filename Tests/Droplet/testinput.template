@@ -45,6 +45,7 @@ DivergeTol = 1d2 ! Used to dynamically adjust maxerror
 ! ErrorScaleHypre is dynamically adjusted during the computation.
 
 MAXERRORVOL = 1.0d-6 ! Tolerance for Front Tracking
+ResNormOrderPressure=2
                    ! Numerical parameters
 
 ITIME_SCHEME = 1
